@@ -272,7 +272,87 @@ with tab1:
             st.rerun()
             
             
+# --- TAB 2: RIEPILOGO GIORNALIERO ---
+with tab2:
+    st.subheader("📊 Riepilogo Giornaliero")
+    
+    summary_date = st.date_input("Data riepilogo", value=date.today(), key="summary_date_input")
+    
+    # Recuperiamo i dati in modo sicuro
+    daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).execute().data
+    meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).execute().data
+    
+    raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).execute().data
+    activities_data = [a for a in raw_activities if a.get("activity_name") not in ["Ufficio", "Base"]] if raw_activities else []
+    
+    # Calcolo delle calorie ingerite totali
+    total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
+    
+    # Valore base di riferimento (default a 1900 se manca il log giornaliero)
+    bmr_base = 1900
+    current_weight = None
+    if daily_log_res:
+        row = daily_log_res[0]
+        if row.get('calories_out'):
+            bmr_base = row.get('calories_out')
+        current_weight = row.get('weight')
+        
+    from datetime import datetime
+    now = datetime.now()
+    
+    # Calcolo proporzionale del BMI (BMR / 24 * ora del giorno) finora
+    if summary_date == date.today():
+        bmi_so_far = int((bmr_base / 24.0) * (now.hour + now.minute / 60.0))
+    else:
+        bmi_so_far = bmr_base
+        
+    # Somma delle attività extra
+    extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
+    total_burned_finora = bmi_so_far + extra_burned
+    
+    # Calcolo del bilancio / deficit
+    deficit = total_burned_finora - total_cals_in
 
+    # --- COUNTER IN CIMA ---
+    col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+    col_c1.metric("Kcal Ingerite", f"{total_cals_in} kcal")
+    col_c2.metric("Kcal Bruciate", f"{total_burned_finora} kcal")
+    col_c3.metric("Bilancio / Deficit", f"{deficit:+d} kcal")
+    col_c4.metric("Peso", f"{current_weight} kg" if current_weight else "N/D")
+        
+    st.markdown("---")
+    
+    # --- TABELLA CIBI ---
+    st.markdown("### 🍽️ Cibi inseriti")
+    if meals_data:
+        df_meals = pd.DataFrame(meals_data)
+        df_meals = df_meals.rename(columns={
+            "meal_type": "Pasto",
+            "name": "Nome",
+            "calories": "Kcal",
+            "protein": "Pro (g)",
+            "carbs": "Carbs (g)",
+            "fat": "Fat (g)"
+        })
+        st.dataframe(df_meals, use_container_width=True, hide_index=True)
+    else:
+        st.info("Nessun pasto registrato per questa data.")
+        
+    st.markdown("---")
+    
+    # --- TABELLA ATTIVITÀ (Solo BMI proporzionale + attività extra) ---
+    st.markdown("### 🏃 Calorie Bruciate & Attività")
+    
+    rows_acts = [{"Attività": "BMI", "Kcal Bruciate": bmi_so_far}]
+    if activities_data:
+        for act in activities_data:
+            rows_acts.append({
+                "Attività": act.get("activity_name"),
+                "Kcal Bruciate": act.get("burned_calories")
+            })
+            
+    df_acts = pd.DataFrame(rows_acts)
+    st.dataframe(df_acts, use_container_width=True, hide_index=True)
     
 # --- TAB 3: PESO ---
 with tab3:
