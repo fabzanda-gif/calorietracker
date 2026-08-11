@@ -17,31 +17,53 @@ def init_supabase() -> Client:
 supabase = init_supabase()
 controller = CookieController()
 
-# --- LOGICA DI LOGIN PERSISTENTE ---
+# --- LOGICA DI LOGIN / SIGNUP PERSISTENTE ---
 if "user" not in st.session_state:
     saved_session = controller.get("supabase_session")
     if saved_session:
         st.session_state["user"] = saved_session
         st.rerun()
     else:
-        st.set_page_config(page_title="Login - Tracker Pro")
+        st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
-        with st.form("login_form"):
+        
+        auth_mode = st.radio("Azione", ["Login", "Registrazione"], horizontal=True)
+        
+        with st.form("auth_form"):
             email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            if st.form_submit_button("Login"):
+            password = st.text_input("Password (min. 6 caratteri)", type="password")
+            
+            target_weight = 78.0
+            if auth_mode == "Registrazione":
+                target_weight = st.number_input("Peso Obiettivo (kg)", value=78.0, step=0.5)
+            
+            submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
+            if st.form_submit_button(submit_label):
                 try:
-                    user = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    st.session_state["user"] = user
-                    controller.set("supabase_session", user, max_age=30*24*60*60)
-                    st.rerun()
-                except Exception: st.error("Credenziali non valide.")
+                    if auth_mode == "Login":
+                        user = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        st.session_state["user"] = user
+                        controller.set("supabase_session", user, max_age=30*24*60*60)
+                        st.rerun()
+                    else:
+                        user = supabase.auth.sign_up({
+                            "email": email, 
+                            "password": password,
+                            "options": {
+                                "data": {"target_weight": float(target_weight)}
+                            }
+                        })
+                        st.success("Account creato con successo! Effettua il login.")
+                except Exception as e:
+                    st.error(f"Errore durante l'autenticazione: {e}")
         st.stop()
 
 # --- CONFIGURAZIONE APP E TRADUZIONI ---
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 user_data = st.session_state["user"]
 display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', user_data.user.email.split('@')[0])
+user_target_weight = float(getattr(user_data.user, 'user_metadata', {}).get('target_weight', 78.0))
+
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
 # Messaggio di saluto dinamico basato su orario e stagione
@@ -430,13 +452,13 @@ with tab3:
             name="Proiezione"
         )
         
-        fig.update_yaxes(range=[75, 90])
+        fig.update_yaxes(range=[min(75, user_target_weight - 3), max(90, user_target_weight + 10)])
         
-        fig.add_hline(y=78, line_dash="dash", line_color="#FFD700", line_width=3.5)
+        fig.add_hline(y=user_target_weight, line_dash="dash", line_color="#FFD700", line_width=3.5)
         
         fig.add_annotation(
-            xref="paper", yref="y", x=0.98, y=88.5, 
-            text="<b>🎯 GOAL: 78 kg</b>", 
+            xref="paper", yref="y", x=0.98, y=user_target_weight + 2.5, 
+            text=f"<b>🎯 GOAL: {user_target_weight} kg</b>", 
             showarrow=False, 
             font=dict(color="#FFD700", size=16, family="sans-serif"), 
             align="right",
