@@ -81,9 +81,21 @@ if "user" not in st.session_state:
             if st.form_submit_button(submit_label):
                 try:
                     if auth_mode == "Login":
-                        user = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                        st.session_state["user"] = user
-                        controller.set("supabase_session", user, max_age=30*24*60*60)
+                        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        
+                        # Salvataggio sicuro della sessione senza errori JSON
+                        session_data = {
+                            "access_token": response.session.access_token,
+                            "refresh_token": response.session.refresh_token,
+                            "user": {
+                                "id": response.user.id,
+                                "email": response.user.email,
+                                "user_metadata": response.user.user_metadata
+                            }
+                        }
+                        
+                        st.session_state["user"] = response
+                        controller.set("supabase_session", session_data, max_age=30*24*60*60)
                         st.rerun()
                     else:
                         calculated_bmr = calculate_bmr(current_weight, height, gender)
@@ -109,10 +121,18 @@ if "user" not in st.session_state:
 # ==============================================================================
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 user_data = st.session_state["user"]
-user_id = user_data.user.id
-user_metadata = getattr(user_data.user, 'user_metadata', {})
 
-display_name = user_metadata.get('display_name', user_data.user.email.split('@')[0])
+# Gestione sicura sia dell'oggetto utente nativo che del dizionario salvato in sessione
+if hasattr(user_data, "user"):
+    user_id = user_data.user.id
+    user_metadata = getattr(user_data.user, 'user_metadata', {})
+    user_email = user_data.user.email
+else:
+    user_id = user_data["user"]["id"]
+    user_metadata = user_data["user"].get("user_metadata", {})
+    user_email = user_data["user"].get("email", "")
+
+display_name = user_metadata.get('display_name', user_email.split('@')[0] if user_email else "Utente")
 user_target_weight = user_metadata.get('target_weight')
 user_bmr = user_metadata.get('bmr')
 
@@ -196,19 +216,14 @@ def refresh_daily_logs(log_date):
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
 # ==============================================================================
-# 5. LOGOUT (Aggiungilo prima delle tab o all'inizio della sidebar)
+# 5. LOGOUT
 # ==============================================================================
 with st.sidebar:
     st.markdown(f"👤 **{display_name}**")
     if st.button("🚪 Esci (Logout)"):
-        # 1. Rimuove il cookie di sessione
         controller.set("supabase_session", None, max_age=0)
-        
-        # 2. Pulisce tutte le variabili salvate in session_state
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-            
-        # 3. Ricarica l'app per mostrare la schermata di login
         st.rerun()
 
 # ==========================================
