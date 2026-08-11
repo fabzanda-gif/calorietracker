@@ -2,21 +2,26 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime
 import requests
-from supabase import create_client, Client
+from supabase import create_client
 from streamlit_cookies_controller import CookieController
 import plotly.express as px
 
 # ==============================================================================
-# 1. SETUP INIZIALE E CONNESSIONE SUPABASE
+# 1. SETUP INIZIALE E CONFIGURAZIONE PAGINA (DEVE ESSERE IL PRIMO COMANDO)
 # ==============================================================================
+st.set_page_config(
+    page_title="Tracker Pro",
+    layout="wide",
+)
+
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-@st.cache_resource
-def init_supabase() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+# Client Supabase isolato per sessione per evitare contaminazioni
+if "supabase" not in st.session_state:
+    st.session_state["supabase"] = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-supabase = init_supabase()
+supabase = st.session_state["supabase"]
 controller = CookieController()
 
 # --- Rilevamento automatico dell'URL (Locale vs Cloud) ---
@@ -65,160 +70,149 @@ def get_dynamic_greeting(display_name):
 
     return f"{time_greeting}, {display_name}! Che bello rivederti in questa splendida giornata di {season} ({weather_desc})."
 
-if "user" not in st.session_state:
-    saved_session = controller.get("supabase_session")
-    if saved_session:
-        st.session_state["user"] = saved_session
-        st.rerun()
-    else:
-        query_params = st.query_params
-        if "code" in query_params or "access_token" in query_params:
-            try:
-                res = supabase.auth.get_session()
-                if res and res.session:
-                    session_data = {
-                        "access_token": res.session.access_token,
-                        "refresh_token": res.session.refresh_token,
-                        "user": {
-                            "id": res.user.id,
-                            "email": res.user.email,
-                            "user_metadata": res.user.user_metadata
-                        }
-                    }
-                    st.session_state["user"] = res
-                    controller.set("supabase_session", session_data, max_age=30*24*60*60)
-                    st.query_params.clear()
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Errore nel recupero della sessione Google: {e}")
+def session_to_cookie(session):
+    return {
+        "access_token": session.access_token,
+        "refresh_token": session.refresh_token,
+    }
 
-        st.set_page_config(page_title="Accesso - Tracker Pro")
-        st.title("🔐 Accesso Tracker Pro")
-        
-        # Pulsante Google con link HTML nativo per evitare i refresh bloccati di Streamlit
-        try:
-            google_res = supabase.auth.sign_in_with_oauth({
-                "provider": "google",
-                "options": {
-                    "redirect_to": REDIRECT_URL
-                }
-            })
-            login_url = google_res.url
-        except Exception:
-            login_url = "#"
+def save_authenticated_session(auth_response):
+    if not auth_response or not auth_response.session:
+        raise RuntimeError("Supabase non ha restituito una sessione.")
+    st.session_state["user"] = auth_response.user
+    controller.set(
+        "supabase_session",
+        session_to_cookie(auth_response.session),
+        max_age=30 * 24 * 60 * 60,
+    )
 
-        st.markdown(
-            f"""
-            <div style="text-align: center; margin: 20px 0;">
-                <a href="{login_url}" target="_self" style="
-                    background-color: #4285F4;
-                    color: white;
-                    padding: 12px 24px;
-                    text-decoration: none;
-                    font-size: 16px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    display: inline-block;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                ">
-                    🌐 Accedi / Registrati con Google
-                </a>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+def restore_session_from_cookie():
+    saved = controller.get("supabase_session")
+    if not isinstance(saved, dict):
+        return False
+    access_token = saved.get("access_token")
+    refresh_token = saved.get("refresh_token")
+    if not access_token or not refresh_token:
+        return False
+    try:
+        response = supabase.auth.set_session(access_token, refresh_token)
+        save_authenticated_session(response)
+        return True
+    except Exception:
+        controller.set("supabase_session", None, max_age=0)
+        return False
 
-        st.markdown("---")
-        auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
-        
-        with st.form("auth_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Password (min. 6 caratteri)", type="password")
-            
-            display_name_input = ""
-            target_weight = None
-            height = None
-            current_weight = None
-            gender = None
-            
-            if auth_mode == "Registrazione":
-                st.markdown("### 📋 Parametri Fisici Iniziali")
-                display_name_input = st.text_input("Display Name", value="")
-                gender = st.selectbox("Genere", ["Uomo", "Donna"], index=None, placeholder="Seleziona genere...")
-                height = st.number_input("Altezza (cm)", value=None, step=1.0, placeholder="Es. 175")
-                current_weight = st.number_input("Peso Attuale (kg)", value=None, step=0.5, placeholder="Es. 81.0")
-                target_weight = st.number_input("Peso Obiettivo (kg)", value=None, step=0.5, placeholder="Es. 78.0")
-            
-            submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
-            if st.form_submit_button(submit_label):
-                try:
-                    if auth_mode == "Login":
-                        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                        
-                        session_data = {
-                            "access_token": response.session.access_token,
-                            "refresh_token": response.session.refresh_token,
-                            "user": {
-                                "id": response.user.id,
-                                "email": response.user.email,
-                                "user_metadata": response.user.user_metadata
-                            }
-                        }
-                        
-                        st.session_state["user"] = response
-                        controller.set("supabase_session", session_data, max_age=30*24*60*60)
-                        st.rerun()
-                    else:
-                        if not height or not current_weight or not target_weight or not gender:
-                            st.warning("Per favore compila tutti i campi fisici per la registrazione.")
-                        else:
-                            calculated_bmr = calculate_bmr(current_weight, height, gender)
-                            user = supabase.auth.sign_up({
-                                "email": email, 
-                                "password": password,
-                                "options": {
-                                    "data": {
-                                        "display_name": display_name_input,
-                                        "target_weight": float(target_weight),
-                                        "bmr": calculated_bmr,
-                                        "height": float(height),
-                                        "gender": gender
-                                    }
-                                }
-                            })
-                            st.success("Account creato con successo! Effettua il login.")
-                except Exception as e:
-                    st.error(f"Errore durante l'autenticazione: {e}")
+def handle_oauth_callback():
+    code = st.query_params.get("code")
+    oauth_error = st.query_params.get("error")
+    error_description = st.query_params.get("error_description")
+    if oauth_error:
+        st.query_params.clear()
+        st.error(error_description or oauth_error)
         st.stop()
-else:
-    user_obj = st.session_state["user"]
-    user_metadata = {}
-    if hasattr(user_obj, "user") and hasattr(user_obj.user, "user_metadata"):
-        user_metadata = user_obj.user.user_metadata or {}
-    elif isinstance(user_obj, dict) and "user" in user_obj:
-        user_metadata = user_obj["user"].get("user_metadata", {})
-        
-    display_name = user_metadata.get("display_name", "Utente")
-    st.title(get_dynamic_greeting(display_name))
+    if not code:
+        return False
+    try:
+        response = supabase.auth.exchange_code_for_session(code)
+        save_authenticated_session(response)
+        st.query_params.clear()
+        st.rerun()
+    except Exception as e:
+        st.error(f"Completamento del login Google fallito: {e}")
+        st.stop()
+
+if "user" not in st.session_state:
+    handle_oauth_callback()
+
+if "user" not in st.session_state:
+    restore_session_from_cookie()
+
+if "user" not in st.session_state:
+    st.title("🔐 Accesso Tracker Pro")
     
+    try:
+        response = supabase.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": REDIRECT_URL,
+            },
+        })
+        login_url = response.url
+    except Exception as e:
+        st.error(f"Generazione URL Google fallita: {e}")
+        st.stop()
+        
+    st.link_button(
+        "🌐 Accedi / Registrati con Google",
+        login_url,
+        use_container_width=True,
+    )
+
+    st.markdown("---")
+    auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
+    
+    with st.form("auth_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password (min. 6 caratteri)", type="password")
+        
+        display_name_input = ""
+        target_weight = None
+        height = None
+        current_weight = None
+        gender = None
+        
+        if auth_mode == "Registrazione":
+            st.markdown("### 📋 Parametri Fisici Iniziali")
+            display_name_input = st.text_input("Display Name", value="")
+            gender = st.selectbox("Genere", ["Uomo", "Donna"], index=None, placeholder="Seleziona genere...")
+            height = st.number_input("Altezza (cm)", value=None, step=1.0, placeholder="Es. 175")
+            current_weight = st.number_input("Peso Attuale (kg)", value=None, step=0.5, placeholder="Es. 81.0")
+            target_weight = st.number_input("Peso Obiettivo (kg)", value=None, step=0.5, placeholder="Es. 78.0")
+        
+        submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
+        if st.form_submit_button(submit_label):
+            try:
+                if auth_mode == "Login":
+                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    save_authenticated_session(response)
+                    st.rerun()
+                else:
+                    if not height or not current_weight or not target_weight or not gender:
+                        st.warning("Per favore compila tutti i campi fisici per la registrazione.")
+                    else:
+                        calculated_bmr = calculate_bmr(current_weight, height, gender)
+                        supabase.auth.sign_up({
+                            "email": email, 
+                            "password": password,
+                            "options": {
+                                "data": {
+                                    "display_name": display_name_input,
+                                    "target_weight": float(target_weight),
+                                    "bmr": calculated_bmr,
+                                    "height": float(height),
+                                    "gender": gender
+                                }
+                            }
+                        })
+                        st.success("Account creato con successo! Effettua il login.")
+            except Exception as e:
+                st.error(f"Errore durante l'autenticazione: {e}")
+    st.stop()
+
 # ==============================================================================
 # 3. CONFIGURAZIONE UTENTE E DATI MANCANTI (POST-LOGIN)
 # ==============================================================================
-st.set_page_config(page_title="Tracker Pro", layout="wide")
-user_data = st.session_state["user"]
-
-if hasattr(user_data, "user"):
-    user_id = user_data.user.id
-    user_metadata = getattr(user_data.user, 'user_metadata', {})
-    user_email = user_data.user.email
-else:
-    user_id = user_data["user"]["id"]
-    user_metadata = user_data["user"].get("user_metadata", {})
-    user_email = user_data["user"].get("email", "")
+user = st.session_state["user"]
+user_id = user.id
+user_email = user.email
+user_metadata = user.user_metadata or {}
 
 display_name = user_metadata.get('display_name', user_email.split('@')[0] if user_email else "Utente")
 user_target_weight = user_metadata.get('target_weight')
 user_bmr = user_metadata.get('bmr')
+
+# Stampa il saluto dinamico personalizzato
+st.title(get_dynamic_greeting(display_name))
 
 if not user_target_weight or not user_bmr:
     st.warning("⚠️ Per iniziare, configura i tuoi dati.")
@@ -238,7 +232,8 @@ if not user_target_weight or not user_bmr:
                     "height": float(h_val),
                     "gender": gen
                 }})
-                st.session_state["user"] = res
+                if res.user:
+                    st.session_state["user"] = res.user
                 st.rerun()
             except Exception as e:
                 st.error(f"Errore: {e}")
@@ -251,8 +246,6 @@ user_bmr = int(user_bmr)
 # 4. INTERFACCIA E LOGICA APPLICATIVA (TABS)
 # ==============================================================================
 lang = st.sidebar.selectbox("🌐 Lingua", ["Italiano", "English"])
-now = datetime.now()
-greeting = f"Ciao {display_name}!"
 t = {
     "Italiano": {
         "tab1": "🚀 Inserimento", "tab2": "📊 Overview", "tab3": "📈 Peso", "tab4": "🍳 Ricette",
@@ -269,8 +262,6 @@ t = {
         "recipe_name": "Recipe Name", "save_recipe": "Save Recipe", "recipe_saved": "✅ Recipe saved successfully!"
     }
 }[lang]
-
-st.title(greeting)
 
 def search_open_food_facts(query):
     try:
@@ -305,10 +296,13 @@ tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 with st.sidebar:
     st.markdown(f"👤 **{display_name}**")
     if st.button("🚪 Esci (Logout)"):
-        controller.set("supabase_session", None, max_age=0)
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
+        try:
+            supabase.auth.sign_out()
+        finally:
+            controller.set("supabase_session", None, max_age=0)
+            st.session_state.pop("user", None)
+            st.session_state.pop("supabase", None)
+            st.rerun()
 
 # ==========================================
 # 6. TAB 1: INSERIMENTO (CIBO, RICETTE & ATTIVITÀ)
@@ -559,7 +553,8 @@ with tab3:
                 res = supabase.auth.update_user({
                     "data": {"target_weight": float(new_target)}
                 })
-                st.session_state["user"] = res
+                if res.user:
+                    st.session_state["user"] = res.user
                 st.success("Obiettivo aggiornato con successo!")
                 st.rerun()
             except Exception as e:
