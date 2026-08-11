@@ -42,67 +42,27 @@ if "user" not in st.session_state:
         st.session_state["user"] = saved_session
         st.rerun()
     else:
-        # Intercettiamo eventuali parametri di ritorno da Google nell'URL
-        query_params = st.query_params
-        if "code" in query_params or "access_token" in query_params:
-            try:
-                session = supabase.auth.get_session()
-                if session and session.session:
-                    session_data = {
-                        "access_token": session.session.access_token,
-                        "refresh_token": session.session.refresh_token,
-                        "user": {
-                            "id": session.user.id,
-                            "email": session.user.email,
-                            "user_metadata": session.user.user_metadata
-                        }
-                    }
-                    st.session_state["user"] = session
-                    controller.set("supabase_session", session_data, max_age=30*24*60*60)
-                    st.query_params.clear()
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Errore nel recupero della sessione Google: {e}")
-
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
-        # Generiamo l'URL di Google direttamente tramite Supabase
-        try:
-            google_auth_res = supabase.auth.sign_in_with_oauth({
-                "provider": "google",
-                "options": {
-                    "redirect_to": REDIRECT_URL
-                }
-            })
-            google_url = google_auth_res.url
-        except Exception:
-            google_url = "#"
-
-        # Usiamo un link HTML pulito che forza l'apertura del flusso OAuth senza blocchi di Streamlit
-        st.markdown(
-            f'''
-            <div style="text-align: center; margin-bottom: 20px;">
-                <a href="{google_url}" target="_self" style="
-                    display: inline-block;
-                    background-color: #ffffff;
-                    color: #333333;
-                    border: 1px solid #cccccc;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    text-decoration: none;
-                    font-weight: bold;
-                    font-family: sans-serif;
-                ">
-                    🌐 Accedi / Registrati con Google
-                </a>
-            </div>
-            ''',
-            unsafe_allow_html=True
-        )
+        # ----------------------------------------------------
+        # ACCESSO RAPIDO CON MAGIC LINK (Sostituisce Google)
+        # ----------------------------------------------------
+        st.subheader("✨ Accesso Rapido con Magic Link")
+        with st.form("magic_form"):
+            magic_email = st.text_input("Inserisci la tua email")
+            if st.form_submit_button("Invia Link Magico"):
+                if not magic_email.strip():
+                    st.warning("Inserisci un'email valida.")
+                else:
+                    try:
+                        supabase.auth.sign_in_with_otp({"email": magic_email})
+                        st.success("Controlla la tua casella di posta! Ti è arrivato il link per accedere.")
+                    except Exception as e:
+                        st.error(f"Errore: {e}")
 
         st.markdown("---")
-        auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
+        auth_mode = st.radio("Oppure via Password (Login / Registrazione)", ["Login", "Registrazione"], horizontal=True)
         
         with st.form("auth_form"):
             email = st.text_input("Email")
@@ -128,6 +88,7 @@ if "user" not in st.session_state:
                     if auth_mode == "Login":
                         response = supabase.auth.sign_in_with_password({"email": email, "password": password})
                         
+                        # Salvataggio sicuro della sessione senza errori JSON
                         session_data = {
                             "access_token": response.session.access_token,
                             "refresh_token": response.session.refresh_token,
