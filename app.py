@@ -46,7 +46,6 @@ if "user" not in st.session_state:
         query_params = st.query_params
         if "code" in query_params or "access_token" in query_params:
             try:
-                # Supabase gestisce automaticamente lo scambio del codice di sessione se presente nell'URL
                 session = supabase.auth.get_session()
                 if session and session.session:
                     session_data = {
@@ -60,7 +59,6 @@ if "user" not in st.session_state:
                     }
                     st.session_state["user"] = session
                     controller.set("supabase_session", session_data, max_age=30*24*60*60)
-                    # Pulisci i parametri dall'URL per una navigazione pulita
                     st.query_params.clear()
                     st.rerun()
             except Exception as e:
@@ -69,18 +67,39 @@ if "user" not in st.session_state:
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
-        if st.button("🌐 Accedi / Registrati con Google"):
-            try:
-                res = supabase.auth.sign_in_with_oauth({
-                    "provider": "google",
-                    "options": {
-                        "redirect_to": REDIRECT_URL
-                    }
-                })
-                if res.url:
-                    st.markdown(f'<meta http-equiv="refresh" content="0;url={res.url}">', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Errore con Google Auth: {e}")
+        # Generiamo l'URL di Google direttamente tramite Supabase
+        try:
+            google_auth_res = supabase.auth.sign_in_with_oauth({
+                "provider": "google",
+                "options": {
+                    "redirect_to": REDIRECT_URL
+                }
+            })
+            google_url = google_auth_res.url
+        except Exception:
+            google_url = "#"
+
+        # Usiamo un link HTML pulito che forza l'apertura del flusso OAuth senza blocchi di Streamlit
+        st.markdown(
+            f'''
+            <div style="text-align: center; margin-bottom: 20px;">
+                <a href="{google_url}" target="_self" style="
+                    display: inline-block;
+                    background-color: #ffffff;
+                    color: #333333;
+                    border: 1px solid #cccccc;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    text-decoration: none;
+                    font-weight: bold;
+                    font-family: sans-serif;
+                ">
+                    🌐 Accedi / Registrati con Google
+                </a>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
 
         st.markdown("---")
         auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
