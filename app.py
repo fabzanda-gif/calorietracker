@@ -14,6 +14,7 @@ st.markdown("""
 
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 
+# Credenziali Supabase
 SUPABASE_URL = "https://inhmvbdujpxrqrlcgmqw.supabase.co"
 SUPABASE_KEY = "sb_publishable_1fQpT5dZqjre5D7MXm1aMg_ZQVRMjJq"
 
@@ -25,7 +26,7 @@ supabase = init_supabase()
 
 st.title("⚖️ Tracker Pro")
 
-# --- NAVIGAZIONE ---
+# --- NAVIGAZIONE A TAB ---
 tab1, tab2, tab3, tab4 = st.tabs(["🚀 Inserimento", "📊 Overview", "📈 Peso", "🍳 Ricette"])
 
 # --- TAB 1: INSERIMENTO ---
@@ -37,7 +38,7 @@ with tab1:
         day_type = st.selectbox("Tipo di Giornata (Base)", ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
         extra_act = st.selectbox("Attività Extra", ["Nessuna", "Padel", "Bici", "Camminata"])
         extra_cals = st.number_input("Kcal Extra", value=0, step=50)
-        if st.form_submit_button("Salva Configurazione"):
+        if st.form_submit_button("Salva Configurazione Giornata"):
             base_cals = 2200 if "Ufficio" in day_type else 1900
             base_name = "Ufficio" if "Ufficio" in day_type else "Casa"
             supabase.table("activities").delete().eq("date", str(log_date)).execute()
@@ -47,21 +48,31 @@ with tab1:
             ]).execute()
             st.success("Configurazione salvata!")
 
+    recipes_res = supabase.table("recipes").select("*").execute().data
+    recipe_dict = {r['name']: r for r in recipes_res} if recipes_res else {}
+
     with st.form("meal_form"):
+        st.subheader("🍽️ Inserisci Pasto")
+        selected_recipe = st.selectbox("Seleziona Ricetta (Opzionale)", [""] + list(recipe_dict.keys()))
+        ref = recipe_dict.get(selected_recipe, {})
+        
         m_type = st.selectbox("Pasto", ["Colazione", "Pranzo", "Cena", "Snack"])
-        name = st.text_input("Nome Pasto")
+        name = st.text_input("Nome Pasto", value=selected_recipe)
         c1, c2, c3, c4 = st.columns(4)
-        cals, prot, carbs, fat = c1.number_input("Kcal", value=0), c2.number_input("Pro", value=0), c3.number_input("Carbs", value=0), c4.number_input("Fat", value=0)
+        cals = c1.number_input("Kcal", value=int(ref.get('calories', 0)))
+        prot = c2.number_input("Pro", value=int(ref.get('protein', 0)))
+        carbs = c3.number_input("Carbs", value=int(ref.get('carbs', 0)))
+        fat = c4.number_input("Fat", value=int(ref.get('fat', 0)))
+        
         if st.form_submit_button("Aggiungi Pasto"):
             supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
             st.success("Pasto aggiunto!")
 
     if st.button("🔄 Aggiorna Totali Giornalieri"):
-        # Logica di calcolo che avevamo già scritto
         meals = supabase.table("meals").select("*").eq("date", str(log_date)).execute().data
         acts = supabase.table("activities").select("*").eq("date", str(log_date)).execute().data
-        cals_in = sum(m['calories'] for m in meals)
-        cals_out = sum(a['burned_calories'] for a in acts)
+        cals_in = sum(m['calories'] for m in meals) if meals else 0
+        cals_out = sum(a['burned_calories'] for a in acts) if acts else 0
         supabase.table("daily_logs").upsert({"date": str(log_date), "calories": cals_in, "burned_calories": cals_out, "calorie_deficit": cals_in - cals_out}, on_conflict="date").execute()
         st.success("Dati aggiornati!")
 
@@ -92,6 +103,12 @@ with tab3:
 
 # --- TAB 4: RICETTE ---
 with tab4:
-    st.header("Ricette")
+    st.header("Gestione Ricette")
+    with st.form("recipe_add"):
+        r_name = st.text_input("Nome Ricetta")
+        c1, c2, c3, c4 = st.columns(4)
+        if st.form_submit_button("Salva Ricetta"):
+            supabase.table("recipes").upsert({"name": r_name, "calories": c1.number_input("Kcal", value=0), "protein": c2.number_input("Pro", value=0), "carbs": c3.number_input("Carbs", value=0), "fat": c4.number_input("Fat", value=0)}, on_conflict="name").execute()
+            st.success("Ricetta salvata!")
     recipes = supabase.table("recipes").select("*").execute().data
-    st.dataframe(pd.DataFrame(recipes), use_container_width=True)
+    if recipes: st.dataframe(pd.DataFrame(recipes), use_container_width=True)
