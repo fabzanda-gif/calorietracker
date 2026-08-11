@@ -279,15 +279,28 @@ with tab2:
     # Selettore della data per il riepilogo
     summary_date = st.date_input("Data riepilogo", value=date.today(), key="summary_date_input")
     
+    # Recuperiamo i log giornalieri e le tabelle di dettaglio per la data selezionata
+    daily_log = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).execute().data
+    meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).execute().data
+    activities_data = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).execute().data
+    
+    # Mostriamo le metriche generali se esistono log per la giornata
+    if daily_log:
+        row = daily_log[0]
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Peso", f"{row.get('weight', 'N/D')} kg" if row.get('weight') else "N/D")
+        col2.metric("Kcal Assunte", f"{row.get('calories_in', 0)} kcal")
+        col3.metric("Kcal Bruciate", f"{row.get('calories_out', 0)} kcal")
+        col4.metric("Bilancio", f"{row.get('calories_in', 0) - row.get('calories_out', 0)} kcal")
+    else:
+        st.info("Nessun dato di riepilogo generale trovato per questa data.")
+        
     st.markdown("---")
     
-    # 1. Sezione Cibo / Pasti inseriti
+    # Tabella dettaglio cibi inseriti
     st.markdown("### 🍽️ Cibi inseriti")
-    meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).execute().data
-    
     if meals_data:
         df_meals = pd.DataFrame(meals_data)
-        # Rinominiamo le colonne per una visualizzazione più pulita
         df_meals = df_meals.rename(columns={
             "meal_type": "Pasto",
             "name": "Nome",
@@ -302,10 +315,8 @@ with tab2:
         
     st.markdown("---")
     
-    # 2. Sezione Attività / Calorie bruciate
+    # Tabella dettaglio attività / calorie bruciate
     st.markdown("### 🏃 Calorie Bruciate & Attività")
-    activities_data = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).execute().data
-    
     if activities_data:
         df_acts = pd.DataFrame(activities_data)
         df_acts = df_acts.rename(columns={
@@ -315,7 +326,6 @@ with tab2:
         st.dataframe(df_acts, use_container_width=True)
     else:
         st.info("Nessuna attività registrata per questa data.")
-
 # --- TAB 3: PESO ---
 with tab3:
     w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
