@@ -276,28 +276,48 @@ with tab1:
 with tab2:
     st.subheader("📊 Riepilogo Giornaliero")
     
-    # Selettore della data per il riepilogo
     summary_date = st.date_input("Data riepilogo", value=date.today(), key="summary_date_input")
     
-    # Recuperiamo i log giornalieri e le tabelle di dettaglio per la data selezionata
+    # Recuperiamo i dati
     daily_log = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).execute().data
     meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).execute().data
     activities_data = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).execute().data
     
-    # Mostriamo le metriche generali se esistono log per la giornata
-    if daily_log:
-        row = daily_log[0]
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Peso", f"{row.get('weight', 'N/D')} kg" if row.get('weight') else "N/D")
-        col2.metric("Kcal Assunte", f"{row.get('calories_in', 0)} kcal")
-        col3.metric("Kcal Bruciate", f"{row.get('calories_out', 0)} kcal")
-        col4.metric("Bilancio", f"{row.get('calories_in', 0) - row.get('calories_out', 0)} kcal")
+    # Calcolo delle calorie ingerite totali
+    total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
+    
+    # Calcolo delle calorie bruciate finora (BMR stimato / 24 * ora del giorno se oggi, o intera giornata se data passata)
+    # Usiamo un BMR di riferimento (es. 1900 kcal o basato sui dati salvati)
+    bmr_base = 1900 # Valore base standard o recuperabile
+    if daily_log and daily_log[0].get('calories_out'):
+        bmr_base = daily_log[0].get('calories_out')
+        
+    from datetime import datetime, time
+    now = datetime.now()
+    if summary_date == date.today():
+        fraction_of_day = (now.hour + now.minute / 60.0) / 24.0
     else:
-        st.info("Nessun dato di riepilogo generale trovato per questa data.")
+        fraction_of_day = 1.0
+        
+    burned_so_far = int((bmr_base / 24.0) * (now.hour + now.minute / 60.0)) if summary_date == date.today() else bmr_base
+    
+    # Aggiungiamo le attività extra se presenti
+    extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
+    total_burned_finora = burned_so_far + extra_burned
+    
+    # Calcolo del deficit (Kcal Bruciate - Kcal Ingerite, o viceversa a seconda della convenzione desiderata)
+    deficit = total_burned_finora - total_cals_in
+
+    # --- COUNTER IN CIMA ---
+    col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+    col_c1.metric("Kcal Ingerite", f"{total_cals_in} kcal")
+    col_c2.metric("Kcal Bruciate", f"{total_burned_finora} kcal")
+    col_c3.metric("Bilancio / Deficit", f"{deficit:+d} kcal")
+    col_c4.metric("Peso", f"{daily_log[0].get('weight', 'N/D')} kg" if daily_log and daily_log[0].get('weight') else "N/D")
         
     st.markdown("---")
     
-    # Tabella dettaglio cibi inseriti
+    # --- TABELLA CIBI ---
     st.markdown("### 🍽️ Cibi inseriti")
     if meals_data:
         df_meals = pd.DataFrame(meals_data)
@@ -309,23 +329,28 @@ with tab2:
             "carbs": "Carbs (g)",
             "fat": "Fat (g)"
         })
-        st.dataframe(df_meals, use_container_width=True)
+        # Nasconde la colonna indice iniziale
+        st.dataframe(df_meals, use_container_width=True, hide_index=True)
     else:
         st.info("Nessun pasto registrato per questa data.")
         
     st.markdown("---")
     
-    # Tabella dettaglio attività / calorie bruciate
+    # --- TABELLA ATTIVITÀ / CALORIE BRUCIATE (Senza duplicati Ufficio/Casa) ---
     st.markdown("### 🏃 Calorie Bruciate & Attività")
+    
+    # Prepariamo un'unica lista pulita con la quota base proporzionata e le extra
+    rows_acts = [{"Attività": "Metabolismo / Base (fino ad ora)", "Kcal Bruciate": burned_so_far}]
     if activities_data:
-        df_acts = pd.DataFrame(activities_data)
-        df_acts = df_acts.rename(columns={
-            "activity_name": "Attività",
-            "burned_calories": "Kcal Bruciate"
-        })
-        st.dataframe(df_acts, use_container_width=True)
-    else:
-        st.info("Nessuna attività registrata per questa data.")
+        for act in activities_data:
+            rows_acts.append({
+                "Attività": act.get("activity_name"),
+                "Kcal Bruciate": act.get("burned_calories")
+            })
+            
+    df_acts = pd.DataFrame(rows_acts)
+    st.dataframe(df_acts, use_container_width=True, hide_index=True)
+    
 # --- TAB 3: PESO ---
 with tab3:
     w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
