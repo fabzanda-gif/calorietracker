@@ -77,7 +77,9 @@ t = {
         "extra_cals": "Calorie Bruciate",
         "insert_weight": "Inserisci Peso (kg)",
         "save_weight": "Salva Peso",
-        "recipe_name": "Nome Ricetta"
+        "recipe_name": "Nome Ricetta",
+        "save_recipe": "Salva Ricetta",
+        "recipe_saved": "Ricetta salvata con successo!"
     },
     "English": {
         "title": greeting_en, 
@@ -93,11 +95,13 @@ t = {
         "extra_cals": "Burned Calories",
         "insert_weight": "Insert Weight (kg)",
         "save_weight": "Save Weight",
-        "recipe_name": "Recipe Name"
+        "recipe_name": "Recipe Name",
+        "save_recipe": "Save Recipe",
+        "recipe_saved": "Recipe saved successfully!"
     }
 }[lang]
 
-# Mostra il titolo dinamico UNA SOLA VOLTA
+# Mostra il titolo dinamico UNA SOLA VOLTA (controlla di non avere altri st.title sparsi nel codice)
 st.title(t["title"])
 
 # --- FUNZIONI DI SUPPORTO (AGGIORNATE E SICURE) ---
