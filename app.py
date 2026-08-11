@@ -76,7 +76,8 @@ t = {
         "extra_act": "Attività Extra",
         "extra_cals": "Calorie Bruciate",
         "insert_weight": "Inserisci Peso (kg)",
-        "save_weight": "Salva Peso"
+        "save_weight": "Salva Peso",
+        "recipe_name": "Nome Ricetta"
     },
     "English": {
         "title": greeting_en, 
@@ -91,7 +92,8 @@ t = {
         "extra_act": "Extra Activity",
         "extra_cals": "Burned Calories",
         "insert_weight": "Insert Weight (kg)",
-        "save_weight": "Save Weight"
+        "save_weight": "Save Weight",
+        "recipe_name": "Recipe Name"
     }
 }[lang]
 
