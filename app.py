@@ -27,14 +27,11 @@ if "user" not in st.session_state:
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
-        # Opzione Google Login
+        # Opzione Google Login (senza forzare il redirect_to locale per evitare errori 403)
         if st.button("🌐 Accedi / Registrati con Google"):
             try:
                 res = supabase.auth.sign_in_with_oauth({
-                    "provider": "google",
-                    "options": {
-                        "redirect_to": "http://localhost:8501"
-                    }
+                    "provider": "google"
                 })
                 if res.url:
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={res.url}">', unsafe_allow_html=True)
