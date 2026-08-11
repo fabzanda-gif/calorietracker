@@ -75,7 +75,8 @@ t = {
         "meal_added": "Pasto aggiunto con successo!",
         "extra_act": "Attività Extra",
         "extra_cals": "Calorie Bruciate",
-        "insert_weight": "Inserisci Peso (kg)"
+        "insert_weight": "Inserisci Peso (kg)",
+        "save_weight": "Salva Peso"
     },
     "English": {
         "title": greeting_en, 
@@ -89,7 +90,8 @@ t = {
         "meal_added": "Meal added successfully!",
         "extra_act": "Extra Activity",
         "extra_cals": "Burned Calories",
-        "insert_weight": "Insert Weight (kg)"
+        "insert_weight": "Insert Weight (kg)",
+        "save_weight": "Save Weight"
     }
 }[lang]
 
