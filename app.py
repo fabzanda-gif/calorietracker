@@ -137,16 +137,34 @@ with tab3:
     if logs:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
+        df = df.set_index('date')
         
-        # Creazione grafico con Plotly per maggiore controllo
+        # 1. Creiamo un range di date completo dal primo al'ultimo log
+        idx = pd.date_range(df.index.min(), df.index.max())
+        
+        # 2. Reindicizziamo e interpoliamo (il valore fittizio)
+        df_full = df.reindex(idx)
+        df_full['is_real'] = df_full['weight'].notnull() # Segniamo cosa è vero
+        df_full['weight'] = df_full['weight'].interpolate() # Creiamo la proiezione
+        df_full = df_full.reset_index().rename(columns={'index': 'date'})
+        
+        # 3. Grafico con Plotly
         import plotly.express as px
-        import plotly.graph_objects as go
         
-        fig = px.bar(df, x='date', y='weight', title="Trend Peso", color_discrete_sequence=['#007BFF'])
+        # Creiamo un colore/opacità basato su 'is_real'
+        fig = px.bar(
+            df_full, x='date', y='weight', 
+            color='is_real', 
+            color_discrete_map={True: '#007BFF', False: '#A0CFFF'}, # Blu scuro per vero, chiaro per proiezione
+            title="Trend Peso (con proiezioni)"
+        )
         
         # Impostazione range Y (75-90) e linea obiettivo
         fig.update_yaxes(range=[75, 90])
         fig.add_hline(y=78, line_dash="dash", line_color="red", annotation_text="Goal: 78kg")
+        
+        # Nascondiamo la legenda che non serve
+        fig.update_layout(showlegend=False)
         
         st.plotly_chart(fig, use_container_width=True)
 
