@@ -3,17 +3,7 @@ import pandas as pd
 from datetime import date, datetime
 from supabase import create_client, Client
 
-# --- CSS MODERNO ---
-st.markdown("""
-    <style>
-    .stButton>button { border-radius: 20px; background-color: #007BFF; color: white; width: 100%; }
-    .stTextInput>div>div>input, .stSelectbox>div>div>select, .stNumberInput>div>div>input { border-radius: 15px; }
-    div[data-testid="stMetricValue"] { font-size: 24px; color: #007BFF; }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.set_page_config(page_title="Tracker Pro", layout="wide")
-
+# --- SETUP SUPABASE ---
 SUPABASE_URL = "https://inhmvbdujpxrqrlcgmqw.supabase.co"
 SUPABASE_KEY = "sb_publishable_1fQpT5dZqjre5D7MXm1aMg_ZQVRMjJq"
 
@@ -23,49 +13,62 @@ def init_supabase() -> Client:
 
 supabase = init_supabase()
 
+# --- LOGICA DI LOGIN ---
+if "user" not in st.session_state:
+    st.set_page_config(page_title="Login - Tracker Pro")
+    st.title("🔐 Accesso Tracker Pro")
+    with st.form("login_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        if st.form_submit_button("Login"):
+            try:
+                user = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                st.session_state["user"] = user
+                st.rerun()
+            except Exception:
+                st.error("Credenziali non valide.")
+    st.stop()
+
+# --- APP PRINCIPALE ---
+st.set_page_config(page_title="Tracker Pro", layout="wide")
+
+# --- CSS MODERNO ---
+st.markdown("""
+    <style>
+    .stButton>button { border-radius: 20px; background-color: #007BFF; color: white; width: 100%; }
+    .stTextInput>div>div>input, .stSelectbox>div>div>select, .stNumberInput>div>div>input { border-radius: 15px; }
+    div[data-testid="stMetricValue"] { font-size: 24px; color: #007BFF; }
+    </style>
+    """, unsafe_allow_html=True)
+
 def refresh_daily_logs(log_date):
     meals = supabase.table("meals").select("*").eq("date", str(log_date)).execute().data
     acts = supabase.table("activities").select("*").eq("date", str(log_date)).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
     cals_out = sum(a['burned_calories'] for a in acts) if acts else 0
-    supabase.table("daily_logs").upsert({
-        "date": str(log_date), 
-        "calories": cals_in, 
-        "burned_calories": cals_out, 
-        "calorie_deficit": cals_in - cals_out
-    }, on_conflict="date").execute()
+    supabase.table("daily_logs").upsert({"date": str(log_date), "calories": cals_in, "burned_calories": cals_out, "calorie_deficit": cals_in - cals_out}, on_conflict="date").execute()
 
 st.title("⚖️ Tracker Pro")
-
-# --- NAVIGAZIONE ---
 tab1, tab2, tab3, tab4 = st.tabs(["🚀 Inserimento", "📊 Overview", "📈 Peso", "🍳 Ricette"])
 
-# --- TAB 1: INSERIMENTO ---
 with tab1:
-    st.header("Registra la giornata")
     log_date = st.date_input("Data", value=date.today())
-    
     with st.form("day_type_form"):
-        day_type = st.selectbox("Tipo di Giornata (Base)", ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
+        day_type = st.selectbox("Tipo di Giornata", ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
         extra_act = st.selectbox("Attività Extra", ["Nessuna", "Padel", "Bici", "Camminata"])
         extra_cals = st.number_input("Kcal Extra", value=0, step=50)
         if st.form_submit_button("Salva Configurazione"):
             base_cals = 2200 if "Ufficio" in day_type else 1900
             base_name = "Ufficio" if "Ufficio" in day_type else "Casa"
             supabase.table("activities").delete().eq("date", str(log_date)).execute()
-            supabase.table("activities").insert([
-                {"date": str(log_date), "activity_name": base_name, "burned_calories": base_cals},
-                {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals} if extra_act != "Nessuna" else {"date": str(log_date), "activity_name": "Nessuna", "burned_calories": 0}
-            ]).execute()
+            supabase.table("activities").insert([{"date": str(log_date), "activity_name": base_name, "burned_calories": base_cals}, {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals} if extra_act != "Nessuna" else {"date": str(log_date), "activity_name": "Nessuna", "burned_calories": 0}]).execute()
             refresh_daily_logs(log_date)
             st.success("Configurazione salvata!")
 
     recipes_res = supabase.table("recipes").select("*").execute().data
     recipe_dict = {r['name']: r for r in recipes_res} if recipes_res else {}
-
     with st.form("meal_form"):
-        st.subheader("🍽️ Inserisci Pasto")
-        selected_recipe = st.selectbox("Seleziona Ricetta (Opzionale)", [""] + list(recipe_dict.keys()))
+        selected_recipe = st.selectbox("Seleziona Ricetta", [""] + list(recipe_dict.keys()))
         ref = recipe_dict.get(selected_recipe, {})
         m_type = st.selectbox("Pasto", ["Colazione", "Pranzo", "Cena", "Snack"])
         name = st.text_input("Nome Pasto", value=selected_recipe)
@@ -76,136 +79,54 @@ with tab1:
             refresh_daily_logs(log_date)
             st.rerun()
 
-# --- TAB 2: OVERVIEW ---
 with tab2:
-    st.header("🎯 Overview Giornaliera (Proporzionale all'ora)")
     today_str = str(date.today())
-    
-    # Preleviamo i pasti di oggi per calcolare le ingerite
     meals_today = supabase.table("meals").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals_today) if meals_today else 0
-    
-    # Preleviamo le attività/base configurate oggi
     acts_today = supabase.table("activities").select("*").eq("date", today_str).execute().data
-    
-    # Troviamo la base giornaliera (1900 o 2200), se non impostata usiamo 1900 di default
-    base_daily = 1900
-    extra_burned = 0
+    base_daily, extra_burned = 1900, 0
     for a in acts_today:
-        if a['activity_name'] in ["Casa", "Ufficio"]:
-            base_daily = a['burned_calories']
-        elif a['activity_name'] != "Nessuna":
-            extra_burned += a['burned_calories']
-
-    # Calcolo proporzionale in base all'ora corrente
+        if a['activity_name'] in ["Casa", "Ufficio"]: base_daily = a['burned_calories']
+        elif a['activity_name'] != "Nessuna": extra_burned += a['burned_calories']
     now = datetime.now()
     current_hour = now.hour + (now.minute / 60.0)
-    # Evitiamo divisioni strane o ore a zero spaccato
-    hours_passed = max(current_hour, 0.1) 
-    
-    # Bruciate finora = (Base giornaliera / 24 * ore passate) + eventuali attività extra registrate
-    proportional_burned = int((base_daily / 24.0) * hours_passed + extra_burned)
-    
-    # Calcolo del deficit basato sulle ingerite e le bruciate stimate a quest'ora
-    current_deficit = cals_in - proportional_burned
-
+    proportional_burned = int((base_daily / 24.0) * max(current_hour, 0.1) + extra_burned)
     c1, c2, c3 = st.columns(3)
     c1.metric("🔥 Kcal Ingerite", f"{cals_in} kcal")
-    c2.metric("⚡ Kcal Bruciate (Stimate ad ora)", f"{proportional_burned} kcal")
-    c3.metric("📉 Deficit Attuale", f"{current_deficit} kcal")
-    
-    if current_deficit < 0:
-        st.success("💪 Ottimo lavoro! Sei in deficit calorico, continua così!")
-    elif current_deficit > 0:
-        st.warning("⚠️ Sei in surplus calorico per il momento della giornata.")
-    else:
-        st.info("⚖️ Sei in perfetto pareggio.")
+    c2.metric("⚡ Kcal Bruciate (Stimate)", f"{proportional_burned} kcal")
+    c3.metric("📉 Deficit Attuale", f"{cals_in - proportional_burned} kcal")
 
-# --- TAB 3: PESO ---
 with tab3:
-    st.header("📈 Analisi Peso")
-    
     w = st.number_input("Inserisci Peso (kg)", value=82.0, step=0.1)
     if st.button("Salva Peso"):
         supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
         st.success("Peso aggiornato!")
-    
     logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").order("date").execute().data
-    
     if logs:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
-        
         idx = pd.date_range(df.index.min(), df.index.max())
         df_full = df.reindex(idx)
         df_full['is_real'] = df_full['weight'].notnull()
         df_full['weight'] = df_full['weight'].interpolate()
         df_full = df_full.reset_index().rename(columns={'index': 'date'})
-        
         df_full['date_str'] = df_full['date'].dt.strftime('%d %b %Y')
         df_full['weight_str'] = df_full['weight'].round(1).astype(str) + " kg"
-        
         import plotly.express as px
-        
-        fig = px.bar(
-            df_full, x='date', y='weight', 
-            color='is_real', 
-            color_discrete_map={True: '#007BFF', False: '#A0CFFF'},
-            title="Trend Peso",
-            custom_data=['date_str', 'weight_str']
-        )
-        
-        fig.update_traces(
-            hovertemplate="<b>📅 %{customdata[0]}</b><br>⚖️ <b>%{customdata[1]}</b><extra></extra>"
-        )
-        
+        fig = px.bar(df_full, x='date', y='weight', color='is_real', color_discrete_map={True: '#007BFF', False: '#A0CFFF'}, title="Trend Peso", custom_data=['date_str', 'weight_str'])
+        fig.update_traces(hovertemplate="<b>📅 %{customdata[0]}</b><br>⚖️ <b>%{customdata[1]}</b><extra></extra>")
         fig.update_yaxes(range=[75, 90])
-        
-        # Goal super visibile in bianco
-        fig.add_hline(
-            y=78, 
-            line_dash="dot", 
-            line_color="white", 
-            line_width=4,
-            annotation_text="<span style='color:white; font-size:20px;'><b>🎯 GOAL: 78 kg</b></span>",
-            annotation_position="top left"
-        )
-        
+        fig.add_hline(y=78, line_dash="dot", line_color="white", line_width=4, annotation_text="<span style='color:white; font-size:20px;'><b>🎯 GOAL: 78 kg</b></span>")
         fig.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-        
         st.plotly_chart(fig, use_container_width=True)
 
-# --- TAB 4: RICETTE ---
 with tab4:
-    st.header("🍳 Gestione Ricette")
-    
     with st.form("recipe_add"):
         r_name = st.text_input("Nome Ricetta")
         c1, c2, c3, c4 = st.columns(4)
-        
-        # Aggiunta dei campi per i macro
-        r_cals = c1.number_input("Kcal", value=0, step=10)
-        r_prot = c2.number_input("Pro (g)", value=0, step=1)
-        r_carbs = c3.number_input("Carbs (g)", value=0, step=1)
-        r_fat = c4.number_input("Fat (g)", value=0, step=1)
-        
         if st.form_submit_button("Salva Ricetta"):
-            if r_name:
-                supabase.table("recipes").upsert({
-                    "name": r_name, 
-                    "calories": r_cals, 
-                    "protein": r_prot, 
-                    "carbs": r_carbs, 
-                    "fat": r_fat
-                }, on_conflict="name").execute()
-                st.success(f"Ricetta '{r_name}' salvata!")
-                st.rerun()
-            else:
-                st.error("Inserisci almeno il nome della ricetta.")
-                
-    st.divider()
-    st.subheader("Le tue ricette")
+            supabase.table("recipes").upsert({"name": r_name, "calories": c1.number_input("Kcal", value=0), "protein": c2.number_input("Pro (g)", value=0), "carbs": c3.number_input("Carbs (g)", value=0), "fat": c4.number_input("Fat (g)", value=0)}, on_conflict="name").execute()
+            st.rerun()
     recipes = supabase.table("recipes").select("*").execute().data
-    if recipes: 
-        st.dataframe(pd.DataFrame(recipes), use_container_width=True)
+    if recipes: st.dataframe(pd.DataFrame(recipes), use_container_width=True)
