@@ -196,9 +196,10 @@ with tab1:
             st.rerun()
 
 # --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
+# --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
 with tab2:
     st.header(t["overview_title"])
-    today_str = str(date.today())
+    today_str = str(date.today())  # <-- Definita subito qui in cima!
     
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
@@ -221,7 +222,7 @@ with tab2:
             st.success(f"Registrati {steps_input} passi ({steps_cals} kcal bruciate)!")
             st.rerun()
 
-    refresh_daily_logs(today_str)
+    refresh_daily_logs(today_str) # Ora la variabile esiste ed è pronta
     meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
     acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
