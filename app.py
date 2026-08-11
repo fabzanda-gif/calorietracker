@@ -72,12 +72,13 @@ t = {
     }
 }[lang]
 
-# --- FUNZIONI API E LOGICHE ---
+# --- FUNZIONI API ---
 def search_open_food_facts(query):
     if not query or len(query) < 3: return {}
+    headers = {"User-Agent": "TrackerPro - Python - Version 1.0"}
     url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
     try:
-        data = requests.get(url, timeout=5).json()
+        data = requests.get(url, headers=headers, timeout=5).json()
         options = {}
         for p in data.get("products", []):
             name = p.get("product_name", ""); brands = p.get("brands", "")
@@ -112,6 +113,7 @@ with tab1:
     st.subheader("🍽️ Inserisci Pasto")
     search_q = st.text_input("🔍 Cerca su Open Food Facts", key="search_box")
     if search_q and len(search_q) >= 3: st.session_state["api_res"] = search_open_food_facts(search_q)
+    
     api_res = st.session_state.get("api_res", {})
     sel_prod = st.selectbox("Seleziona Prodotto", [""] + list(api_res.keys()))
     ref = api_res.get(sel_prod, {}) if sel_prod else {}
@@ -127,7 +129,8 @@ with tab1:
 
 with tab2:
     st.header(t["overview_title"])
-    meals = supabase.table("meals").select("*").eq("date", str(date.today())).execute().data
+    today_str = str(date.today())
+    meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
     c1, c2, c3 = st.columns(3)
     c1.metric(t["eaten"], f"{cals_in} kcal")
@@ -137,6 +140,7 @@ with tab2:
     c3.metric(t["goal_target"], f"{int(target):,} kcal")
 
 with tab3:
+    st.header(t["weight_analysis"])
     w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
     if st.button(t["save_weight"]):
         supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
