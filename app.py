@@ -137,18 +137,17 @@ with tab1:
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
     # Inizializzazione dello state
-    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("form_version", 0)]:
+    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("form_version", 0), ("m_type_val", "Colazione")]:
         if key not in st.session_state:
             st.session_state[key] = default
 
-    # Funzione per aggiornare i dati e incrementare la versione (forzando il refresh dei widget)
     def update_form_data(name, cals, prot, carbs, fat):
         st.session_state["m_name"] = name
         st.session_state["m_cals"] = int(cals)
         st.session_state["m_prot"] = int(prot)
         st.session_state["m_carbs"] = int(carbs)
         st.session_state["m_fat"] = int(fat)
-        st.session_state["form_version"] += 1  # Forza la ricreazione dei widget con i nuovi valori
+        st.session_state["form_version"] += 1
 
     if not is_recipe:
         search_q = st.text_input("Cerca per Nome o inserisci Codice a Barre", key="search_box")
@@ -187,10 +186,15 @@ with tab1:
                 r_obj.get('fat', 0)
             )
 
-    # Chiavi dinamiche basate sulla versione per pulire la memoria dei widget a ogni cambio
     v = st.session_state["form_version"]
 
-    m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"], key=f"meal_type_input_{v}")
+    meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
+    current_m_type = st.session_state["m_type_val"]
+    m_type_idx = meal_options.index(current_m_type) if current_m_type in meal_options else 0
+
+    m_type = st.selectbox(t["meal"], meal_options, index=m_type_idx, key=f"meal_type_input_{v}")
+    st.session_state["m_type_val"] = m_type  # Ricorda la scelta
+
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
     
     if not is_recipe:
