@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime
+import requests
 from supabase import create_client, Client
 
 # --- SETUP SUPABASE ---
@@ -77,6 +78,67 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- FUNZIONI API OPEN FOOD FACTS ---
+def search_open_food_facts(query):
+    if not query or len(query) < 3:
+        return {}
+    url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            products = data.get("products", [])
+            options = {}
+            for p in products:
+                name = p.get("product_name", "Unknown")
+                brands = p.get("brands", "")
+                full_name = f"{name} ({brands})" if brands else name
+                nutri = p.get("nutriments", {})
+                cals = nutri.get("energy-kcal_100g", nutri.get("energy-kcal", 0))
+                pro = nutri.get("proteins_100g", 0)
+                carbs = nutri.get("carbohydrates_100g", 0)
+                fat = nutri.get("fat_100g", 0)
+                options[full_name] = {
+                    "name": name,
+                    "calories": int(cals) if cals else 0,
+                    "protein": int(pro) if pro else 0,
+                    "carbs": int(carbs) if carbs else 0,
+                    "fat": int(fat) if fat else 0
+                }
+            return options
+    except Exception:
+        pass
+    return {}
+
+def search_by_barcode(barcode):
+    if not barcode or len(barcode) < 8:
+        return {}
+    url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == 1:
+                p = data.get("product", {})
+                name = p.get("product_name", "Unknown")
+                brands = p.get("brands", "")
+                full_name = f"{name} ({brands})" if brands else name
+                nutri = p.get("nutriments", {})
+                cals = nutri.get("energy-kcal_100g", nutri.get("energy-kcal", 0))
+                pro = nutri.get("proteins_100g", 0)
+                carbs = nutri.get("carbohydrates_100g", 0)
+                fat = nutri.get("fat_100g", 0)
+                return {
+                    "name": full_name,
+                    "calories": int(cals) if cals else 0,
+                    "protein": int(pro) if pro else 0,
+                    "carbs": int(carbs) if carbs else 0,
+                    "fat": int(fat) if fat else 0
+                }
+    except Exception:
+        pass
+    return {}
+
 def refresh_daily_logs(log_date):
     meals = supabase.table("meals").select("*").eq("date", str(log_date)).execute().data
     acts = supabase.table("activities").select("*").eq("date", str(log_date)).execute().data
@@ -101,18 +163,33 @@ with tab1:
             refresh_daily_logs(log_date)
             st.success(t["conf_saved"])
 
-    recipes_res = supabase.table("recipes").select("*").execute().data
-    recipe_dict = {r['name']: r for r in recipes_res} if recipes_res else {}
     with st.form("meal_form"):
-        selected_recipe = st.selectbox(t["select_recipe"], [""] + list(recipe_dict.keys()))
-        ref = recipe_dict.get(selected_recipe, {})
+        st.subheader("🍽️ Inserisci Pasto")
+        barcode_input = st.text_input("📷 Codice a Barre / Barcode (Opzionale)", "")
+        barcode_result = search_by_barcode(barcode_input) if barcode_input else {}
+
+        search_query = st.text_input("🔍 Cerca su Open Food Facts", "")
+        api_results = search_open_food_facts(search_query) if search_query else {}
+        selected_api_product = st.selectbox("Seleziona da Open Food Facts", [""] + list(api_results.keys()))
+
+        if barcode_result:
+            ref = barcode_result
+        else:
+            ref = api_results.get(selected_api_product, {})
+
         m_type = st.selectbox(t["meal"], ["Colazione / Breakfast", "Pranzo / Lunch", "Cena / Dinner", "Snack"])
-        name = st.text_input(t["meal_name"], value=selected_recipe)
+        name = st.text_input(t["meal_name"], value=ref.get('name', search_query if not barcode_input else barcode_result.get('name', '')))
+        
         c1, c2, c3, c4 = st.columns(4)
-        cals, prot, carbs, fat = c1.number_input("Kcal", value=int(ref.get('calories', 0))), c2.number_input("Pro (g)", value=int(ref.get('protein', 0))), c3.number_input("Carbs (g)", value=int(ref.get('carbs', 0))), c4.number_input("Fat (g)", value=int(ref.get('fat', 0)))
+        cals = c1.number_input("Kcal", value=int(ref.get('calories', 0)))
+        prot = c2.number_input("Pro (g)", value=int(ref.get('protein', 0)))
+        carbs = c3.number_input("Carbs (g)", value=int(ref.get('carbs', 0)))
+        fat = c4.number_input("Fat (g)", value=int(ref.get('fat', 0)))
+        
         if st.form_submit_button(t["add_meal"]):
             supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
             refresh_daily_logs(log_date)
+            st.success(t["meal_added"])
             st.rerun()
 
 with tab2:
@@ -136,8 +213,6 @@ with tab2:
     
     st.divider()
     
-    # Calcolo target deficit per arrivare a 78kg (2.9kg rimasti * 10676 kcal)
-    # Recuperiamo l'ultimo peso inserito per calcoli precisi
     latest_weight_res = supabase.table("daily_logs").select("weight").not_.is_("weight", "null").order("date", desc=True).limit(1).execute().data
     current_weight = latest_weight_res[0]['weight'] if latest_weight_res else 80.9
     kg_to_lose = max(0.0, current_weight - 78.0)
