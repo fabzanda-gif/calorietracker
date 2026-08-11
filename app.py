@@ -148,28 +148,12 @@ def search_open_food_facts(query):
         st.error(f"Errore di connessione: {e}")
     return {}
 
-# --- TAB 1: INSERIMENTO ---
+# --- TAB 1: INSERIMENTO (Solo Cibo & Attività Extra) ---
 with tab1:
     log_date = st.date_input("Date", value=date.today())
     
-    # Configurazione attività giornaliera
-    with st.form("day_type_form"):
-        day_type = st.selectbox(t["day_type"], ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
-        extra_act = st.selectbox(t["extra_act"], ["Nessuna", "Padel", "Bici", "Camminata"])
-        extra_cals = st.number_input(t["extra_cals"], value=0, step50)
-        if st.form_submit_button(t["save_conf"]):
-            supabase.table("activities").delete().eq("date", str(log_date)).execute()
-            supabase.table("activities").insert([
-                {"date": str(log_date), "activity_name": "Base", "burned_calories": 2200 if "Ufficio" in day_type else 1900}, 
-                {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals}
-            ]).execute()
-            refresh_daily_logs(log_date)
-            st.success(t["conf_saved"])
-
     st.subheader("🍽️ Inserimento Cibo & Pasti")
-    
-    # Campo di ricerca unificato (puoi digitare il nome del cibo o incollare/digitare il codice a barre numerico)
-    search_q = st.text_input("🔍 Cerca per Nome o inserisci/scansiona Codice a Barre", key="search_box")
+    search_q = st.text_input("🔍 Cerca per Nome o inserisci Codice a Barre", key="search_box")
     
     if st.button("🚀 Cerca"):
         if len(search_q) >= 2:
@@ -178,16 +162,13 @@ with tab1:
         else:
             st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
 
-    # Recupero risultati dallo state
     api_res = st.session_state.get("api_res", {})
     sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
     ref = api_res.get(sel_prod, {}) if sel_prod else {}
 
-    # Form inserimento pasto con calcolo proporzionale sui grammi
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
         name = st.text_input(t["meal_name"], value=ref.get('name', search_q if search_q else ''))
-        
         grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
         factor = grams / 100.0
         
@@ -198,28 +179,65 @@ with tab1:
         fat = c4.number_input("Fat (g)", value=round(float(ref.get('fat', 0) * factor), 1), key="m_fat")
         
         if st.form_submit_button(t["add_meal"]):
-            supabase.table("meals").insert({
-                "date": str(log_date), 
-                "meal_type": m_type, 
-                "name": f"{name} ({grams}g)", 
-                "calories": cals, 
-                "protein": prot, 
-                "carbs": carbs, 
-                "fat": fat
-            }).execute()
+            supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": f"{name} ({grams}g)", "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
             refresh_daily_logs(log_date)
             st.success(t["meal_added"])
             st.rerun()
-# --- TAB 2: OVERVIEW ---
+
+    st.markdown("---")
+    st.subheader("🏃 Attività Extra (es. Padel, Bici)")
+    with st.form("extra_act_form"):
+        extra_act = st.selectbox(t["extra_act"], ["Padel", "Bici", "Camminata", "Altro"])
+        extra_cals = st.number_input(t["extra_cals"], value=0, step=50)
+        if st.form_submit_button("Salva Attività Extra"):
+            supabase.table("activities").insert({"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals}).execute()
+            refresh_daily_logs(log_date)
+            st.success("Attività extra salvata!")
+            st.rerun()
+
+# --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
 with tab2:
     st.header(t["overview_title"])
-    meals = supabase.table("meals").select("*").eq("date", str(date.today())).execute().data
-    acts = supabase.table("activities").select("*").eq("date", str(date.today())).execute().data
+    today_str = str(date.today())
+    
+    col_opt1, col_opt2 = st.columns(2)
+    with col_opt1:
+        current_loc = st.selectbox("📍 Dove sei oggi?", ["Casa (1900 kcal)", "Ufficio (2200 kcal)"], key="location_selector")
+        base_cals_val = 2200 if "Ufficio" in current_loc else 1900
+        
+        existing_base = supabase.table("activities").select("*").eq("date", today_str).eq("activity_name", "Base").execute().data
+        if not existing_base:
+            supabase.table("activities").insert({"date": today_str, "activity_name": "Base", "burned_calories": base_cals_val}).execute()
+        else:
+            supabase.table("activities").update({"burned_calories": base_cals_val}).eq("date", today_str).eq("activity_name", "Base").execute()
+
+    with col_opt2:
+        steps_input = st.number_input("👣 Passi Giornalieri", min_value=0, step=500, value=0, key="steps_input")
+        if st.button("Salva Passi"):
+            steps_cals = int(steps_input * 0.04)
+            supabase.table("activities").delete().eq("date", today_str).eq("activity_name", "Passi Giornalieri").execute()
+            supabase.table("activities").insert({"date": today_str, "activity_name": "Passi Giornalieri", "burned_calories": steps_cals}).execute()
+            refresh_daily_logs(today_str)
+            st.success(f"Registrati {steps_input} passi ({steps_cals} kcal bruciate)!")
+            st.rerun()
+
+    refresh_daily_logs(today_str)
+    meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
+    acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
-    # Calcolo proporzionale calorie bruciate
-    base_cal = next((a['burned_calories'] for a in acts if a['activity_name'] == "Base"), 1900)
-    extra_cal = sum(a['burned_calories'] for a in acts if a['activity_name'] != "Base")
-    est_burned = int((base_cal / 24.0) * (datetime.now().hour + datetime.now().minute/60) + extra_cal)
+    
+    base_cal = 1900
+    extra_cal = 0
+    for a in acts:
+        name = a.get('activity_name', '')
+        cals = a.get('burned_calories', 0)
+        if name in ["Casa", "Ufficio", "Base"] or "kcal" in name.lower():
+            base_cal = cals
+        else:
+            extra_cal += cals
+            
+    now = datetime.now()
+    est_burned = int((base_cal / 24.0) * (now.hour + now.minute/60) + extra_cal)
     
     c1, c2, c3 = st.columns(3)
     c1.metric(t["eaten"], f"{cals_in} kcal")
