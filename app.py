@@ -16,7 +16,7 @@ def init_supabase() -> Client:
 supabase = init_supabase()
 controller = CookieController()
 
-# --- LOGICA DI LOGIN PERSISTENTE ---
+# --- LOGICA DI LOGIN ---
 if "user" not in st.session_state:
     saved_session = controller.get("supabase_session")
     if saved_session:
@@ -34,57 +34,18 @@ if "user" not in st.session_state:
                     st.session_state["user"] = user
                     controller.set("supabase_session", user, max_age=30*24*60*60)
                     st.rerun()
-                except Exception:
-                    st.error("Credenziali non valide.")
+                except Exception: st.error("Credenziali non valide.")
         st.stop()
 
-user_data = st.session_state["user"]
-user_metadata = getattr(user_data.user, 'user_metadata', {})
-display_name = user_metadata.get('display_name', user_data.user.email.split('@')[0])
-
 st.set_page_config(page_title="Tracker Pro", layout="wide")
+user_data = st.session_state["user"]
+display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', user_data.user.email.split('@')[0])
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
 t = {
-    "Italiano": {
-        "title": f"⚖️ Tracker Pro - Ciao, {display_name}!",
-        "tab1": "🚀 Inserimento", "tab2": "📊 Overview", "tab3": "📈 Peso", "tab4": "🍳 Ricette",
-        "day_type": "Tipo di Giornata", "extra_act": "Attività Extra", "extra_cals": "Kcal Extra", 
-        "save_conf": "Salva Configurazione", "conf_saved": "Configurazione salvata!",
-        "meal": "Pasto", "meal_name": "Nome Pasto", "add_meal": "Aggiungi Pasto", "meal_added": "Pasto aggiunto!",
-        "overview_title": "🎯 Overview Giornaliera", "eaten": "🔥 Kcal Ingerite", "burned": "⚡ Kcal Bruciate (Stimate)", 
-        "deficit": "📉 Deficit Attuale", "weight_analysis": "📈 Analisi Peso", "insert_weight": "Inserisci Peso (kg)", 
-        "save_weight": "Peso aggiornato!", "recipes_title": "🍳 Gestione Ricette", "recipe_name": "Nome Ricetta", 
-        "save_recipe": "Salva Ricetta", "recipe_saved": "Ricetta salvata!", "goal_target": "🎯 Obiettivo Deficit Rimanente"
-    },
-    "English": {
-        "title": f"⚖️ Tracker Pro - Hello, {display_name}!",
-        "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": "🍳 Recipes",
-        "day_type": "Day Type", "extra_act": "Extra Activity", "extra_cals": "Extra Cals", 
-        "save_conf": "Save Configuration", "conf_saved": "Configuration saved!",
-        "meal": "Meal", "meal_name": "Meal Name", "add_meal": "Add Meal", "meal_added": "Meal added!",
-        "overview_title": "🎯 Daily Overview", "eaten": "🔥 Calories Eaten", "burned": "⚡ Calories Burned (Estimated)", 
-        "deficit": "📉 Current Deficit", "weight_analysis": "📈 Weight Analysis", "insert_weight": "Insert Weight (kg)", 
-        "save_weight": "Weight updated!", "recipes_title": "🍳 Recipe Management", "recipe_name": "Recipe Name", 
-        "save_recipe": "Save Recipe", "recipe_saved": "Recipe saved!", "goal_target": "🎯 Remaining Deficit Target"
-    }
+    "Italiano": {"title": f"⚖️ Tracker Pro - Ciao, {display_name}!", "tab1": "🚀 Inserimento", "tab2": "📊 Overview", "tab3": "📈 Peso", "tab4": "🍳 Ricette", "day_type": "Tipo di Giornata", "extra_act": "Attività Extra", "extra_cals": "Kcal Extra", "save_conf": "Salva Configurazione", "conf_saved": "Configurazione salvata!", "meal": "Pasto", "meal_name": "Nome Pasto", "add_meal": "Aggiungi Pasto", "meal_added": "Pasto aggiunto!", "overview_title": "🎯 Overview Giornaliera", "eaten": "🔥 Kcal Ingerite", "burned": "⚡ Kcal Bruciate (Stimate)", "deficit": "📉 Deficit Attuale", "weight_analysis": "📈 Analisi Peso", "insert_weight": "Inserisci Peso (kg)", "save_weight": "Peso aggiornato!", "recipes_title": "🍳 Gestione Ricette", "recipe_name": "Nome Ricetta", "save_recipe": "Salva Ricetta", "recipe_saved": "Ricetta salvata!", "goal_target": "🎯 Obiettivo Deficit Rimanente"},
+    "English": {"title": f"⚖️ Tracker Pro - Hello, {display_name}!", "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": "🍳 Recipes", "day_type": "Day Type", "extra_act": "Extra Activity", "extra_cals": "Extra Cals", "save_conf": "Save Configuration", "conf_saved": "Configuration saved!", "meal": "Meal", "meal_name": "Meal Name", "add_meal": "Add Meal", "meal_added": "Meal added!", "overview_title": "🎯 Daily Overview", "eaten": "🔥 Calories Eaten", "burned": "⚡ Calories Burned (Estimated)", "deficit": "📉 Current Deficit", "weight_analysis": "📈 Weight Analysis", "insert_weight": "Insert Weight (kg)", "save_weight": "Weight updated!", "recipes_title": "🍳 Recipe Management", "recipe_name": "Recipe Name", "save_recipe": "Save Recipe", "recipe_saved": "Recipe saved!", "goal_target": "🎯 Remaining Deficit Target"}
 }[lang]
-
-def search_open_food_facts(query):
-    if not query or len(query) < 3: return {}
-    headers = {"User-Agent": "TrackerPro - Python - Version 1.0"}
-    url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
-    try:
-        data = requests.get(url, headers=headers, timeout=5).json()
-        options = {}
-        for p in data.get("products", []):
-            name = p.get("product_name", ""); brands = p.get("brands", "")
-            if not name: continue
-            display = f"{name} ({brands})" if brands else name
-            nutri = p.get("nutriments", {})
-            options[display] = {"name": name, "calories": int(nutri.get("energy-kcal_100g", 0)), "protein": int(nutri.get("proteins_100g", 0)), "carbs": int(nutri.get("carbohydrates_100g", 0)), "fat": int(nutri.get("fat_100g", 0))}
-        return options
-    except: return {}
 
 def refresh_daily_logs(log_date):
     meals = supabase.table("meals").select("*").eq("date", str(log_date)).execute().data
@@ -107,37 +68,17 @@ with tab1:
             supabase.table("activities").insert([{"date": str(log_date), "activity_name": "Base", "burned_calories": 2200 if "Ufficio" in day_type else 1900}, {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals}]).execute()
             refresh_daily_logs(log_date); st.success(t["conf_saved"])
 
-    st.subheader("🍽️ Inserisci Pasto")
-    search_q = st.text_input("🔍 Cerca su Open Food Facts", key="search_box")
-    if search_q and len(search_q) >= 3 and st.session_state.get("last_q") != search_q:
-        st.session_state["api_res"] = search_open_food_facts(search_q)
-        st.session_state["last_q"] = search_q
-    
-    api_res = st.session_state.get("api_res", {})
-    sel_prod = st.selectbox("Seleziona Prodotto", [""] + list(api_res.keys()), key="prod_select")
-    ref = api_res.get(sel_prod, {}) if sel_prod else {}
-    
-    with st.form("meal_form"):
-        m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
-        name = st.text_input(t["meal_name"], value=ref.get('name', search_q if search_q else ''))
-        c1, c2, c3, c4 = st.columns(4)
-        cals, prot, carbs, fat = c1.number_input("Kcal", value=int(ref.get('calories', 0))), c2.number_input("Pro (g)", value=int(ref.get('protein', 0))), c3.number_input("Carbs (g)", value=int(ref.get('carbs', 0))), c4.number_input("Fat (g)", value=int(ref.get('fat', 0)))
-        if st.form_submit_button(t["add_meal"]):
-            supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
-            refresh_daily_logs(log_date); st.rerun()
-
 with tab2:
     st.header(t["overview_title"])
     today_str = str(date.today())
     meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
     acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
-    base_cal, extra_cal = 1900, 0
-    for a in acts:
-        if a['activity_name'] == "Base": base_cal = a['burned_calories']
-        else: extra_cal += a['burned_calories']
-    now = datetime.now()
-    est_burned = int((base_cal / 24.0) * (now.hour + now.minute/60) + extra_cal)
+    # FIX: Calcolo corretto bruciate
+    total_burned = sum(a['burned_calories'] for a in acts if a['activity_name'] != "Base")
+    base_target = next((a['burned_calories'] for a in acts if a['activity_name'] == "Base"), 1900)
+    est_burned = int((base_target / 24.0) * (datetime.now().hour + datetime.now().minute/60) + total_burned)
+    
     c1, c2, c3 = st.columns(3)
     c1.metric(t["eaten"], f"{cals_in} kcal")
     c2.metric(t["burned"], f"{est_burned} kcal")
@@ -147,27 +88,27 @@ with tab2:
     c3.metric(t["goal_target"], f"{int(target):,} kcal")
 
 with tab3:
-    st.header(t["weight_analysis"])
     w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
-    if st.button(t["save_weight"]):
-        supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
-        st.rerun()
+    if st.button(t["save_weight"]): supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute(); st.rerun()
     logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").order("date").execute().data
     if logs:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index().rename(columns={'index': 'date'})
+        df = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index()
+        df['is_real'] = df['weight'].notnull() # Non usato qui, ma utile
         import plotly.express as px
-        fig = px.bar(df, x='date', y='weight', title="Trend Peso")
+        fig = px.bar(df, x='index', y='weight', title="Trend Peso")
+        fig.update_yaxes(range=[75, 90])
         fig.add_hline(y=78, line_dash="dot", line_color="white", line_width=4, annotation_text="<b>🎯 GOAL: 78 kg</b>")
+        fig.update_traces(marker_color=['#007BFF' if i % 2 == 0 else 'rgba(0, 123, 255, 0.3)' for i in range(len(df))])
         st.plotly_chart(fig, use_container_width=True)
 
 with tab4:
     with st.form("recipe_add"):
         r_name = st.text_input(t["recipe_name"])
         c1, c2, c3, c4 = st.columns(4)
-        if st.form_submit_button(t["save_recipe"]):
-            supabase.table("recipes").upsert({"name": r_name, "calories": c1.number_input("Kcal"), "protein": c2.number_input("Pro"), "carbs": c3.number_input("Carbs"), "fat": c4.number_input("Fat")}, on_conflict="name").execute()
-            st.rerun()
+        # FIX: Aggiunte chiavi uniche
+        cals, prot, carbs, fat = c1.number_input("Kcal", key="r_cal"), c2.number_input("Pro", key="r_pro"), c3.number_input("Carbs", key="r_carbs"), c4.number_input("Fat", key="r_fat")
+        if st.form_submit_button(t["save_recipe"]): supabase.table("recipes").upsert({"name": r_name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}, on_conflict="name").execute(); st.rerun()
     recipes = supabase.table("recipes").select("*").execute().data
     if recipes: st.dataframe(pd.DataFrame(recipes), use_container_width=True)
