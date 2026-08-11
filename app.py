@@ -7,10 +7,10 @@ from streamlit_cookies_controller import CookieController
 import plotly.express as px
 
 # ==============================================================================
-# 1. SETUP INIZIALE E CONNESSIONE SUPABASE
+# 1. SETUP INIZIALE E CONNESSIONE SUPABASE (Tramite Streamlit Secrets)
 # ==============================================================================
-SUPABASE_URL = "https://inhmvbdujpxrqrlcgmqw.supabase.co"
-SUPABASE_KEY = "sb_publishable_1fQpT5dZqjre5D7MXm1aMg_ZQVRMjJq"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 @st.cache_resource
 def init_supabase() -> Client:
@@ -18,6 +18,17 @@ def init_supabase() -> Client:
 
 supabase = init_supabase()
 controller = CookieController()
+
+# --- Rilevamento automatico dell'URL corrente (Locale vs Cloud) ---
+# Questo evita problemi di redirect mismatch tra localhost e Streamlit Cloud
+try:
+    host_url = st.context.headers.get("Host", "localhost:8501")
+    if "localhost" in host_url or "127.0.0.1" in host_url:
+        REDIRECT_URL = "http://localhost:8501"
+    else:
+        REDIRECT_URL = "https://diario-alimentare.streamlit.app"
+except Exception:
+    REDIRECT_URL = "https://diario-alimentare.streamlit.app"
 
 # --- FUNZIONE CALCOLO BMR (Formula Mifflin-St Jeor) ---
 def calculate_bmr(weight, height, gender):
@@ -41,11 +52,10 @@ if "user" not in st.session_state:
         # --- BLOCCO LOGIN GOOGLE ---
         if st.button("🌐 Accedi / Registrati con Google"):
             try:
-                # Forza il redirect locale per evitare il mismatch di endpoint
                 res = supabase.auth.sign_in_with_oauth({
                     "provider": "google",
                     "options": {
-                        "redirect_to": "http://localhost:8501"
+                        "redirect_to": REDIRECT_URL
                     }
                 })
                 if res.url:
@@ -141,7 +151,6 @@ user_target_weight = float(user_target_weight)
 user_bmr = int(user_bmr)
 
 # ==============================================================================
-# 4. INTERFACCIA E LOGICA APPLICATIVA
+# 4. INTERFACCIA E LOGICA APPLICATIVA (Tab 1 - Tab 4)
 # ==============================================================================
-# (Codice di visualizzazione omesso per brevità, resta invariato rispetto al tuo originale)
-# Assicurati di mantenere qui il resto della logica Tab1-Tab4
+# Inserisci qui il resto del codice delle tue tab (Tab 1, Tab 2, Tab 3, Tab 4)
