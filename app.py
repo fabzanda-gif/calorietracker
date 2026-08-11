@@ -195,6 +195,22 @@ def refresh_daily_logs(log_date):
 
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
+# ==============================================================================
+# 5. LOGOUT (Aggiungilo prima delle tab o all'inizio della sidebar)
+# ==============================================================================
+with st.sidebar:
+    st.markdown(f"👤 **{display_name}**")
+    if st.button("🚪 Esci (Logout)"):
+        # 1. Rimuove il cookie di sessione
+        controller.set("supabase_session", None, max_age=0)
+        
+        # 2. Pulisce tutte le variabili salvate in session_state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+            
+        # 3. Ricarica l'app per mostrare la schermata di login
+        st.rerun()
+
 # ==========================================
 # 6. TAB 1: INSERIMENTO (CIBO, RICETTE & ATTIVITÀ)
 # ==========================================
