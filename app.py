@@ -95,18 +95,38 @@ if "user" not in st.session_state:
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
-        if st.button("🌐 Accedi / Registrati con Google"):
-            try:
-                res = supabase.auth.sign_in_with_oauth({
-                    "provider": "google",
-                    "options": {
-                        "redirect_to": REDIRECT_URL
-                    }
-                })
-                if res.url:
-                    st.markdown(f'<meta http-equiv="refresh" content="0;url={res.url}">', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Errore con Google Auth: {e}")
+        # Pulsante Google con link HTML nativo per evitare i refresh bloccati di Streamlit
+        try:
+            google_res = supabase.auth.sign_in_with_oauth({
+                "provider": "google",
+                "options": {
+                    "redirect_to": REDIRECT_URL
+                }
+            })
+            login_url = google_res.url
+        except Exception:
+            login_url = "#"
+
+        st.markdown(
+            f"""
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{login_url}" target="_self" style="
+                    background-color: #4285F4;
+                    color: white;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    font-size: 16px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                    display: inline-block;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                ">
+                    🌐 Accedi / Registrati con Google
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         st.markdown("---")
         auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
@@ -187,7 +207,6 @@ else:
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 user_data = st.session_state["user"]
 
-# Gestione sicura sia dell'oggetto utente nativo che del dizionario salvato in sessione
 if hasattr(user_data, "user"):
     user_id = user_data.user.id
     user_metadata = getattr(user_data.user, 'user_metadata', {})
