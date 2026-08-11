@@ -134,9 +134,14 @@ with tab1:
     st.subheader("🍽️ Inserimento Cibo & Pasti")
     
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
-    
-    ref = {"name": "", "calories": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
+
+    # Inizializzazione dello state per i valori del pasto
+    if "form_name" not in st.session_state: st.session_state["form_name"] = ""
+    if "form_cals" not in st.session_state: st.session_state["form_cals"] = 0
+    if "form_prot" not in st.session_state: st.session_state["form_prot"] = 0.0
+    if "form_carbs" not in st.session_state: st.session_state["form_carbs"] = 0.0
+    if "form_fat" not in st.session_state: st.session_state["form_fat"] = 0.0
 
     if not is_recipe:
         search_q = st.text_input("Cerca per Nome o inserisci Codice a Barre", key="search_box")
@@ -150,7 +155,12 @@ with tab1:
         api_res = st.session_state.get("api_res", {})
         sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
         if sel_prod and sel_prod in api_res:
-            ref = api_res[sel_prod]
+            p_data = api_res[sel_prod]
+            st.session_state["form_name"] = p_data.get('name', '')
+            st.session_state["form_cals"] = int(p_data.get('calories', 0))
+            st.session_state["form_prot"] = float(p_data.get('protein', 0))
+            st.session_state["form_carbs"] = float(p_data.get('carbs', 0))
+            st.session_state["form_fat"] = float(p_data.get('fat', 0))
     else:
         recipes_data = supabase.table("recipes").select("*").execute().data
         recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
@@ -158,34 +168,40 @@ with tab1:
         sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
         if sel_recipe and sel_recipe in recipes_dict:
             r_obj = recipes_dict[sel_recipe]
-            ref = {
-                'name': r_obj.get('name'),
-                'calories': int(r_obj.get('calories', 0)),
-                'protein': float(r_obj.get('protein', 0)),
-                'carbs': float(r_obj.get('carbs', 0)),
-                'fat': float(r_obj.get('fat', 0))
-            }
+            st.session_state["form_name"] = r_obj.get('name', '')
+            st.session_state["form_cals"] = int(r_obj.get('calories', 0))
+            st.session_state["form_prot"] = float(r_obj.get('protein', 0))
+            st.session_state["form_carbs"] = float(r_obj.get('carbs', 0))
+            st.session_state["form_fat"] = float(r_obj.get('fat', 0))
 
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
         
-        # Se è una ricetta usa il nome della ricetta, altrimenti il nome del prodotto cercato o vuoto
-        default_name = ref.get('name', search_q if not is_recipe and 'search_q' in locals() else '')
-        name = st.text_input(t["meal_name"], value=default_name)
+        name = st.text_input(t["meal_name"], value=st.session_state["form_name"])
         
         if not is_recipe:
             grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
             factor = grams / 100.0
             meal_display_name = f"{name} ({grams}g)"
+            
+            # Calcolo proporzionale basato sui grammi per la ricerca online
+            base_cals = st.session_state["form_cals"] * factor
+            base_prot = st.session_state["form_prot"] * factor
+            base_carbs = st.session_state["form_carbs"] * factor
+            base_fat = st.session_state["form_fat"] * factor
         else:
             factor = 1.0
             meal_display_name = name
+            base_cals = st.session_state["form_cals"]
+            base_prot = st.session_state["form_prot"]
+            base_carbs = st.session_state["form_carbs"]
+            base_fat = st.session_state["form_fat"]
         
         c1, c2, c3, c4 = st.columns(4)
-        cals = c1.number_input("Kcal", value=int(ref.get('calories', 0) * factor), key="m_cals")
-        prot = c2.number_input("Pro (g)", value=round(float(ref.get('protein', 0) * factor), 1), key="m_pro")
-        carbs = c3.number_input("Carbs (g)", value=round(float(ref.get('carbs', 0) * factor), 1), key="m_carbs")
-        fat = c4.number_input("Fat (g)", value=round(float(ref.get('fat', 0) * factor), 1), key="m_fat")
+        cals = c1.number_input("Kcal", value=int(base_cals), key="m_cals")
+        prot = c2.number_input("Pro (g)", value=round(float(base_prot), 1), key="m_pro")
+        carbs = c3.number_input("Carbs (g)", value=round(float(base_carbs), 1), key="m_carbs")
+        fat = c4.number_input("Fat (g)", value=round(float(base_fat), 1), key="m_fat")
         
         if st.form_submit_button(t["add_meal"]):
             supabase.table("meals").insert({
@@ -215,6 +231,7 @@ with tab1:
             refresh_daily_logs(log_date)
             st.success("Attività extra salvata!")
             st.rerun()
+            
             
 # --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
 with tab2:
