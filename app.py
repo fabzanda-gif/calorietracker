@@ -70,19 +70,14 @@ def get_dynamic_greeting(display_name):
 
     return f"{time_greeting}, {display_name}! Che bello rivederti in questa splendida giornata di {season} ({weather_desc})."
 
-def session_to_cookie(session):
-    return {
-        "access_token": session.access_token,
-        "refresh_token": session.refresh_token,
-    }
-
-def save_authenticated_session(auth_response):
-    if not auth_response or not auth_response.session:
-        raise RuntimeError("Supabase non ha restituito una sessione.")
-    st.session_state["user"] = auth_response.user
+def save_authenticated_session(session_obj, user_obj):
+    st.session_state["user"] = user_obj
     controller.set(
         "supabase_session",
-        session_to_cookie(auth_response.session),
+        {
+            "access_token": session_obj.access_token,
+            "refresh_token": session_obj.refresh_token,
+        },
         max_age=30 * 24 * 60 * 60,
     )
 
@@ -96,8 +91,10 @@ def restore_session_from_cookie():
         return False
     try:
         response = supabase.auth.set_session(access_token, refresh_token)
-        save_authenticated_session(response)
-        return True
+        if response and response.session and response.user:
+            save_authenticated_session(response.session, response.user)
+            return True
+        return False
     except Exception:
         controller.set("supabase_session", None, max_age=0)
         return False
@@ -113,10 +110,16 @@ def handle_oauth_callback():
     if not code:
         return False
     try:
-        response = supabase.auth.exchange_code_for_session(code)
-        save_authenticated_session(response)
-        st.query_params.clear()
-        st.rerun()
+        supabase.auth.exchange_code_for_session(code)
+        session_res = supabase.auth.get_session()
+        
+        if session_res and session_res.session and session_res.user:
+            save_authenticated_session(session_res.session, session_res.user)
+            st.query_params.clear()
+            st.rerun()
+        else:
+            st.error("Impossibile recuperare la sessione utente dopo il login con Google.")
+            st.stop()
     except Exception as e:
         st.error(f"Completamento del login Google fallito: {e}")
         st.stop()
@@ -174,8 +177,9 @@ if "user" not in st.session_state:
             try:
                 if auth_mode == "Login":
                     response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    save_authenticated_session(response)
-                    st.rerun()
+                    if response and response.session and response.user:
+                        save_authenticated_session(response.session, response.user)
+                        st.rerun()
                 else:
                     if not height or not current_weight or not target_weight or not gender:
                         st.warning("Per favore compila tutti i campi fisici per la registrazione.")
