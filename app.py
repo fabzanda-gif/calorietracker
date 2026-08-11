@@ -107,13 +107,30 @@ with tab3:
     if logs:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index()
-        df['is_real'] = df['weight'].notnull() # Non usato qui, ma utile
-        import plotly.express as px
-        fig = px.bar(df, x='index', y='weight', title="Trend Peso")
+        df = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max()))
+        df['is_real'] = df['weight'].notnull()
+        df['weight'] = df['weight'].interpolate()
+        df = df.reset_index().rename(columns={'index': 'date'})
+        df['date_str'] = df['date'].dt.strftime('%d %b %Y')
+        df['weight_str'] = df['weight'].round(1).astype(str) + " kg"
+        
+        fig = px.bar(df, x='date', y='weight', color='is_real', 
+                     color_discrete_map={True: '#007BFF', False: 'rgba(0, 123, 255, 0.3)'}, 
+                     title="Trend Peso", custom_data=['date_str', 'weight_str'])
+        
+        fig.update_traces(hovertemplate="<b>📅 %{customdata[0]}</b><br>⚖️ <b>%{customdata[1]}</b><extra></extra>")
         fig.update_yaxes(range=[75, 90])
-        fig.add_hline(y=78, line_dash="dot", line_color="white", line_width=4, annotation_text="<b>🎯 GOAL: 78 kg</b>")
-        fig.update_traces(marker_color=['#007BFF' if i % 2 == 0 else 'rgba(0, 123, 255, 0.3)' for i in range(len(df))])
+        
+        # Linea del goal con scritta esterna in alto a destra
+        fig.add_hline(y=78, line_dash="dot", line_color="#FF4B4B", line_width=2)
+        fig.add_annotation(
+            xref="paper", yref="y", x=0.98, y=78.3,
+            text="<b>🎯 GOAL: 78 kg</b>",
+            showarrow=False, font=dict(color="#FF4B4B", size=14),
+            align="right"
+        )
+        
+        fig.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True)
 
 with tab4:
