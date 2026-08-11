@@ -38,12 +38,10 @@ if "user" not in st.session_state:
                     st.error("Credenziali non valide.")
         st.stop()
 
-# --- RECUPERO DISPLAY NAME ---
 user_data = st.session_state["user"]
 user_metadata = getattr(user_data.user, 'user_metadata', {})
 display_name = user_metadata.get('display_name', user_data.user.email.split('@')[0])
 
-# --- APP PRINCIPALE ---
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
@@ -72,7 +70,6 @@ t = {
     }
 }[lang]
 
-# --- FUNZIONI API ---
 def search_open_food_facts(query):
     if not query or len(query) < 3: return {}
     headers = {"User-Agent": "TrackerPro - Python - Version 1.0"}
@@ -133,9 +130,17 @@ with tab2:
     st.header(t["overview_title"])
     today_str = str(date.today())
     meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
+    acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
+    base_cal, extra_cal = 1900, 0
+    for a in acts:
+        if a['activity_name'] == "Base": base_cal = a['burned_calories']
+        else: extra_cal += a['burned_calories']
+    now = datetime.now()
+    est_burned = int((base_cal / 24.0) * (now.hour + now.minute/60) + extra_cal)
     c1, c2, c3 = st.columns(3)
     c1.metric(t["eaten"], f"{cals_in} kcal")
+    c2.metric(t["burned"], f"{est_burned} kcal")
     latest_w = supabase.table("daily_logs").select("weight").not_.is_("weight", "null").order("date", desc=True).limit(1).execute().data
     curr_w = latest_w[0]['weight'] if latest_w else 80.9
     target = max(0.0, curr_w - 78.0) * 10676
@@ -151,6 +156,7 @@ with tab3:
     if logs:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
+        df = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index().rename(columns={'index': 'date'})
         import plotly.express as px
         fig = px.bar(df, x='date', y='weight', title="Trend Peso")
         fig.add_hline(y=78, line_dash="dot", line_color="white", line_width=4, annotation_text="<b>🎯 GOAL: 78 kg</b>")
@@ -164,4 +170,4 @@ with tab4:
             supabase.table("recipes").upsert({"name": r_name, "calories": c1.number_input("Kcal"), "protein": c2.number_input("Pro"), "carbs": c3.number_input("Carbs"), "fat": c4.number_input("Fat")}, on_conflict="name").execute()
             st.rerun()
     recipes = supabase.table("recipes").select("*").execute().data
-    if recipes: st.dataframe(pd.DataFrame(recipes))
+    if recipes: st.dataframe(pd.DataFrame(recipes), use_container_width=True)
