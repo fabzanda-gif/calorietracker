@@ -50,37 +50,38 @@ t = {
     "English": {"title": f"⚖️ Tracker Pro - Hello, {display_name}!", "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": "🍳 Recipes", "day_type": "Day Type", "extra_act": "Extra Activity", "extra_cals": "Extra Cals", "save_conf": "Save Configuration", "conf_saved": "Configuration saved!", "meal": "Meal", "meal_name": "Meal Name", "add_meal": "Add Meal", "meal_added": "Meal added!", "overview_title": "🎯 Daily Overview", "eaten": "🔥 Calories Eaten", "burned": "⚡ Calories Burned (Estimated)", "deficit": "📉 Current Deficit", "weight_analysis": "📈 Weight Analysis", "insert_weight": "Insert Weight (kg)", "save_weight": "Weight updated!", "recipes_title": "🍳 Recipe Management", "recipe_name": "Recipe Name", "save_recipe": "Save Recipe", "recipe_saved": "Recipe saved!", "goal_target": "🎯 Remaining Deficit Target"}
 }[lang]
 
-# --- FUNZIONI DI SUPPORTO ---
+# --- FUNZIONE API OTTIMIZZATA ---
 def search_open_food_facts(query):
-    """Interroga l'API di Open Food Facts per cercare alimenti e recuperarne i valori nutrizionali"""
+    """Funzione con gestione errori estesa e User-Agent simulato per reti con restrizioni"""
     if not query or len(query) < 3: return {}
-    headers = {"User-Agent": "TrackerPro - Python - Version 1.0"}
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
+    
     try:
-        data = requests.get(url, headers=headers, timeout=5).json()
-        options = {}
-        for p in data.get("products", []):
-            name = p.get("product_name", ""); brands = p.get("brands", "")
-            if not name: continue
-            display = f"{name} ({brands})" if brands else name
-            nutri = p.get("nutriments", {})
-            options[display] = {
-                "name": name, 
-                "calories": float(nutri.get("energy-kcal_100g", 0)), 
-                "protein": float(nutri.get("proteins_100g", 0)), 
-                "carbs": float(nutri.get("carbohydrates_100g", 0)), 
-                "fat": float(nutri.get("fat_100g", 0))
-            }
-        return options
-    except: return {}
-
-def refresh_daily_logs(log_date):
-    """Aggiorna il bilancio calorico giornaliero su Supabase"""
-    meals = supabase.table("meals").select("*").eq("date", str(log_date)).execute().data
-    acts = supabase.table("activities").select("*").eq("date", str(log_date)).execute().data
-    cals_in = sum(m['calories'] for m in meals) if meals else 0
-    cals_out = sum(a['burned_calories'] for a in acts) if acts else 0
-    supabase.table("daily_logs").upsert({"date": str(log_date), "calories": cals_in, "burned_calories": cals_out, "calorie_deficit": cals_in - cals_out}, on_conflict="date").execute()
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            options = {}
+            for p in data.get("products", []):
+                name = p.get("product_name", "")
+                brands = p.get("brands", "")
+                if not name: continue
+                display = f"{name} ({brands})" if brands else name
+                nutri = p.get("nutriments", {})
+                options[display] = {
+                    "name": name, 
+                    "calories": float(nutri.get("energy-kcal_100g", 0)), 
+                    "protein": float(nutri.get("proteins_100g", 0)), 
+                    "carbs": float(nutri.get("carbohydrates_100g", 0)), 
+                    "fat": float(nutri.get("fat_100g", 0))
+                }
+            return options
+    except Exception as e:
+        st.error(f"Errore di connessione: {e}")
+    return {}
 
 st.title(t["title"])
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
@@ -88,38 +89,65 @@ tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 # --- TAB 1: INSERIMENTO ---
 with tab1:
     log_date = st.date_input("Date", value=date.today())
-    # Configurazione attività giornaliera
+    
+    # Configurazione attività giornaliera (Tipo di giornata e attività extra)
     with st.form("day_type_form"):
         day_type = st.selectbox(t["day_type"], ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
         extra_act = st.selectbox(t["extra_act"], ["Nessuna", "Padel", "Bici", "Camminata"])
         extra_cals = st.number_input(t["extra_cals"], value=0, step=50)
         if st.form_submit_button(t["save_conf"]):
             supabase.table("activities").delete().eq("date", str(log_date)).execute()
-            supabase.table("activities").insert([{"date": str(log_date), "activity_name": "Base", "burned_calories": 2200 if "Ufficio" in day_type else 1900}, {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals}]).execute()
-            refresh_daily_logs(log_date); st.success(t["conf_saved"])
+            supabase.table("activities").insert([
+                {"date": str(log_date), "activity_name": "Base", "burned_calories": 2200 if "Ufficio" in day_type else 1900}, 
+                {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals}
+            ]).execute()
+            refresh_daily_logs(log_date)
+            st.success(t["conf_saved"])
 
     st.subheader("🍽️ Inserimento Cibo & Pasti")
-    # Ricerca live nel database globale
-    search_q = st.text_input("🔍 Cerca nel database Open Food Facts", key="search_box")
-    if search_q and len(search_q) >= 3 and st.session_state.get("last_q") != search_q:
-        st.session_state["api_res"] = search_open_food_facts(search_q)
-        st.session_state["last_q"] = search_q
     
+    # Campo di ricerca Open Food Facts con pulsante esplicito per evitare blocchi di rete
+    search_q = st.text_input("🔍 Cerca nel database Open Food Facts", key="search_box")
+    
+    if st.button("🚀 Cerca"):
+        if len(search_q) >= 3:
+            with st.spinner('Ricerca in corso...'):
+                st.session_state["api_res"] = search_open_food_facts(search_q)
+        else:
+            st.warning("Inserisci almeno 3 caratteri.")
+
+    # Recupero dei risultati salvati nello state
     api_res = st.session_state.get("api_res", {})
     sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
     ref = api_res.get(sel_prod, {}) if sel_prod else {}
 
-    # Form pasto con calcolo automatico su base 100g
+    # Form pasto con calcolo automatico proporzionale basato sui grammi inseriti
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
         name = st.text_input(t["meal_name"], value=ref.get('name', search_q if search_q else ''))
+        
         grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
         factor = grams / 100.0
+        
         c1, c2, c3, c4 = st.columns(4)
-        cals, prot, carbs, fat = c1.number_input("Kcal", value=int(ref.get('calories', 0) * factor), key="m_cals"), c2.number_input("Pro (g)", value=round(float(ref.get('protein', 0) * factor), 1), key="m_pro"), c3.number_input("Carbs (g)", value=round(float(ref.get('carbs', 0) * factor), 1), key="m_carbs"), c4.number_input("Fat (g)", value=round(float(ref.get('fat', 0) * factor), 1), key="m_fat")
+        cals = c1.number_input("Kcal", value=int(ref.get('calories', 0) * factor), key="m_cals")
+        prot = c2.number_input("Pro (g)", value=round(float(ref.get('protein', 0) * factor), 1), key="m_pro")
+        carbs = c3.number_input("Carbs (g)", value=round(float(ref.get('carbs', 0) * factor), 1), key="m_carbs")
+        fat = c4.number_input("Fat (g)", value=round(float(ref.get('fat', 0) * factor), 1), key="m_fat")
+        
         if st.form_submit_button(t["add_meal"]):
-            supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": f"{name} ({grams}g)", "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
-            refresh_daily_logs(log_date); st.rerun()
+            supabase.table("meals").insert({
+                "date": str(log_date), 
+                "meal_type": m_type, 
+                "name": f"{name} ({grams}g)", 
+                "calories": cals, 
+                "protein": prot, 
+                "carbs": carbs, 
+                "fat": fat
+            }).execute()
+            refresh_daily_logs(log_date)
+            st.success(t["meal_added"])
+            st.rerun()
 
 # --- TAB 2: OVERVIEW ---
 with tab2:
