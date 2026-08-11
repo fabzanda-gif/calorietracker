@@ -272,57 +272,49 @@ with tab1:
             st.rerun()
             
             
-# --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
+# --- TAB 2: RIEPILOGO GIORNALIERO ---
 with tab2:
-    st.header(t["overview_title"])
-    today_str = str(date.today())
+    st.subheader("📊 Riepilogo Giornaliero")
     
-    col_opt1, col_opt2 = st.columns(2)
-    with col_opt1:
-        current_loc = st.selectbox("📍 Dove sei oggi?", ["Casa (1900 kcal)", "Ufficio (2200 kcal)"], key="location_selector")
-        base_cals_val = 2200 if "Ufficio" in current_loc else 1900
+    # Selettore della data per il riepilogo
+    summary_date = st.date_input("Data riepilogo", value=date.today(), key="summary_date_input")
+    
+    st.markdown("---")
+    
+    # 1. Sezione Cibo / Pasti inseriti
+    st.markdown("### 🍽️ Cibi inseriti")
+    meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).execute().data
+    
+    if meals_data:
+        df_meals = pd.DataFrame(meals_data)
+        # Rinominiamo le colonne per una visualizzazione più pulita
+        df_meals = df_meals.rename(columns={
+            "meal_type": "Pasto",
+            "name": "Nome",
+            "calories": "Kcal",
+            "protein": "Pro (g)",
+            "carbs": "Carbs (g)",
+            "fat": "Fat (g)"
+        })
+        st.dataframe(df_meals, use_container_width=True)
+    else:
+        st.info("Nessun pasto registrato per questa data.")
         
-        existing_base = supabase.table("activities").select("*").eq("date", today_str).eq("activity_name", "Base").execute().data
-        if not existing_base:
-            supabase.table("activities").insert({"date": today_str, "activity_name": "Base", "burned_calories": base_cals_val}).execute()
-        else:
-            supabase.table("activities").update({"burned_calories": base_cals_val}).eq("date", today_str).eq("activity_name", "Base").execute()
-
-    with col_opt2:
-        steps_input = st.number_input("👣 Passi Giornalieri", min_value=0, step=500, value=0, key="steps_input")
-        if st.button("Salva Passi"):
-            steps_cals = int(steps_input * 0.04)
-            supabase.table("activities").delete().eq("date", today_str).eq("activity_name", "Passi Giornalieri").execute()
-            supabase.table("activities").insert({"date": today_str, "activity_name": "Passi Giornalieri", "burned_calories": steps_cals}).execute()
-            refresh_daily_logs(today_str)
-            st.success(f"Registrati {steps_input} passi ({steps_cals} kcal bruciate)!")
-            st.rerun()
-
-    refresh_daily_logs(today_str)
-    meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
-    acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
-    cals_in = sum(m['calories'] for m in meals) if meals else 0
+    st.markdown("---")
     
-    base_cal = 1900
-    extra_cal = 0
-    for a in acts:
-        name = a.get('activity_name', '')
-        cals = a.get('burned_calories', 0)
-        if name in ["Casa", "Ufficio", "Base"] or "kcal" in name.lower():
-            base_cal = cals
-        else:
-            extra_cal += cals
-            
-    now = datetime.now()
-    est_burned = int((base_cal / 24.0) * (now.hour + now.minute/60) + extra_cal)
+    # 2. Sezione Attività / Calorie bruciate
+    st.markdown("### 🏃 Calorie Bruciate & Attività")
+    activities_data = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).execute().data
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric(t["eaten"], f"{cals_in} kcal")
-    c2.metric(t["burned"], f"{est_burned} kcal")
-    latest_w = supabase.table("daily_logs").select("weight").not_.is_("weight", "null").order("date", desc=True).limit(1).execute().data
-    curr_w = latest_w[0]['weight'] if latest_w else 80.9
-    target = max(0.0, curr_w - 78.0) * 10676
-    c3.metric(t["goal_target"], f"{int(target):,} kcal")
+    if activities_data:
+        df_acts = pd.DataFrame(activities_data)
+        df_acts = df_acts.rename(columns={
+            "activity_name": "Attività",
+            "burned_calories": "Kcal Bruciate"
+        })
+        st.dataframe(df_acts, use_container_width=True)
+    else:
+        st.info("Nessuna attività registrata per questa data.")
 
 # --- TAB 3: PESO ---
 with tab3:
