@@ -249,41 +249,63 @@ with tab3:
     if logs:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index().rename(columns={'index': 'date'})
-        df['is_real'] = df['weight'].notnull()
-        df['date_str'] = df['date'].dt.strftime('%d %b %Y')
-        df['weight_str'] = df['weight'].round(1).astype(str) + " kg"
         
-        # Grafico con colori e mappatura esplicita della trasparenza per le entry proiettate
-        fig = px.bar(
-            df, x='date', y='weight', 
-            color='is_real', 
-            color_discrete_map={True: '#007BFF', False: '#007BFF'}, 
-            title="Trend Peso", 
-            custom_data=['date_str', 'weight_str']
+        # Creiamo il range completo e interpoliamo
+        df_full = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index().rename(columns={'index': 'date'})
+        
+        # Identifichiamo quali sono reali e quali interpolati
+        real_dates = set(df['date'])
+        df_full['is_real'] = df_full['date'].isin(real_dates)
+        
+        df_full['date_str'] = df_full['date'].dt.strftime('%d %b %Y')
+        df_full['weight_str'] = df_full['weight'].round(1).astype(str) + " kg"
+        
+        # Dividiamo in due DataFrame separati per gestire perfettamente la trasparenza
+        df_real = df_full[df_full['is_real']]
+        df_interp = df_full[~df_full['is_real']]
+        
+        fig = px.bar()
+        
+        # Aggiungiamo le barre reali (piene)
+        fig.add_bar(
+            x=df_real['date'], y=df_real['weight'],
+            marker_color='#007BFF', marker_opacity=1.0,
+            customdata=df_real[['date_str', 'weight_str']],
+            hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>",
+            name="Reale"
         )
         
-        # Forza la trasparenza (opacity) specifica per le barre interpolate/proiettate (False)
-        fig.update_traces(
-            marker=dict(opacity=[1.0 if r else 0.25 for r in df['is_real']]),
-            hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>"
+        # Aggiungiamo le barre interpolate/proiettate (trasparenti)
+        fig.add_bar(
+            x=df_interp['date'], y=df_interp['weight'],
+            marker_color='#007BFF', marker_opacity=0.25,
+            customdata=df_interp[['date_str', 'weight_str']],
+            hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
+            name="Proiezione"
         )
         
         fig.update_yaxes(range=[75, 90])
         
-        # Linea del target in giallo ocra (#D4AF37) ed evidente
-        fig.add_hline(y=78, line_dash="dash", line_color="#D4AF37", line_width=4)
+        # Linea del target in Giallo Oro brillante (#FFD700)
+        fig.add_hline(y=78, line_dash="dash", line_color="#FFD700", line_width=3.5)
         
-        # Testo del goal in giallo ocra, grande e ben leggibile
+        # Testo del goal in Giallo Oro brillante posizionato in alto a destra
         fig.add_annotation(
-            xref="paper", yref="y", x=0.98, y=78.4, 
+            xref="paper", yref="y", x=0.98, y=88.5, 
             text="<b>🎯 GOAL: 78 kg</b>", 
             showarrow=False, 
-            font=dict(color="#D4AF37", size=18, family="sans-serif"), 
-            align="right"
+            font=dict(color="#FFD700", size=16, family="sans-serif"), 
+            align="right",
+            bgcolor="rgba(0,0,0,0.5)",
+            borderpad=4
         )
         
-        fig.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        fig.update_layout(
+            showlegend=False, 
+            plot_bgcolor="rgba(0,0,0,0)", 
+            paper_bgcolor="rgba(0,0,0,0)",
+            barmode='overlay'
+        )
         st.plotly_chart(fig, use_container_width=True)
 # --- TAB 4: RICETTE ---
 with tab4:
