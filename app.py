@@ -136,35 +136,24 @@ with tab1:
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
+    # Gestione del cambio di fonte per pulire automaticamente i campi
+    if "last_input_source" not in st.session_state:
+        st.session_state["last_input_source"] = input_source
+
+    if st.session_state["last_input_source"] != input_source:
+        st.session_state["last_input_source"] = input_source
+        st.session_state["m_name"] = ""
+        st.session_state["m_cals"] = 0
+        st.session_state["m_prot"] = 0
+        st.session_state["m_carbs"] = 0
+        st.session_state["m_fat"] = 0
+        st.session_state["last_selected"] = ""
+        st.rerun()
+
     # Inizializzazione dello state
-    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("m_type_val", "Colazione")]:
+    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("last_selected", "")]:
         if key not in st.session_state:
             st.session_state[key] = default
-
-    # Callback nativa per la selezione della ricetta
-    def on_recipe_change():
-        sel = st.session_state.get("recipe_select", "")
-        recipes_data = st.session_state.get("recipes_cache", [])
-        recipes_dict = {r["name"]: r for r in recipes_data}
-        if sel and sel in recipes_dict:
-            r_obj = recipes_dict[sel]
-            st.session_state["m_name"] = r_obj.get('name', '')
-            st.session_state["m_cals"] = int(r_obj.get('calories', 0))
-            st.session_state["m_prot"] = int(r_obj.get('protein', 0))
-            st.session_state["m_carbs"] = int(r_obj.get('carbs', 0))
-            st.session_state["m_fat"] = int(r_obj.get('fat', 0))
-
-    # Callback nativa per la ricerca online
-    def on_product_change():
-        sel = st.session_state.get("prod_select", "")
-        api_res = st.session_state.get("api_res", {})
-        if sel and sel in api_res:
-            p_data = api_res[sel]
-            st.session_state["m_name"] = p_data.get('name', '')
-            st.session_state["m_cals"] = int(p_data.get('calories', 0))
-            st.session_state["m_prot"] = int(p_data.get('protein', 0))
-            st.session_state["m_carbs"] = int(p_data.get('carbohydrates_100g', p_data.get('carbs', 0)))
-            st.session_state["m_fat"] = int(p_data.get('fat_100g', p_data.get('fat', 0)))
 
     if not is_recipe:
         search_q = st.text_input("Cerca per Nome o inserisci Codice a Barre", key="search_box")
@@ -176,18 +165,36 @@ with tab1:
                 st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
 
         api_res = st.session_state.get("api_res", {})
-        st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select", on_change=on_product_change)
+        sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
+        
+        if sel_prod and sel_prod != st.session_state.get("last_selected"):
+            p_data = api_res[sel_prod]
+            st.session_state["m_name"] = p_data.get('name', '')
+            st.session_state["m_cals"] = int(p_data.get('calories', 0))
+            st.session_state["m_prot"] = int(p_data.get('protein', 0))
+            st.session_state["m_carbs"] = int(p_data.get('carbohydrates_100g', p_data.get('carbs', 0)))
+            st.session_state["m_fat"] = int(p_data.get('fat_100g', p_data.get('fat', 0)))
+            st.session_state["last_selected"] = sel_prod
+            st.rerun()
     else:
         recipes_data = supabase.table("recipes").select("*").execute().data
-        st.session_state["recipes_cache"] = recipes_data
         recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
         
-        st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select", on_change=on_recipe_change)
+        sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
+        
+        if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
+            r_obj = recipes_dict[sel_recipe]
+            st.session_state["m_name"] = r_obj.get('name', '')
+            st.session_state["m_cals"] = int(r_obj.get('calories', 0))
+            st.session_state["m_prot"] = int(r_obj.get('protein', 0))
+            st.session_state["m_carbs"] = int(r_obj.get('carbs', 0))
+            st.session_state["m_fat"] = int(r_obj.get('fat', 0))
+            st.session_state["last_selected"] = sel_recipe
+            st.rerun()
 
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key="meal_type_input")
 
-    # Leggiamo direttamente dallo state aggiornato dalla callback
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key="input_meal_name")
     
     if not is_recipe:
