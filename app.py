@@ -182,6 +182,7 @@ else:
         
     display_name = user_metadata.get("display_name", "Utente")
     st.title(get_dynamic_greeting(display_name))
+    
 # ==============================================================================
 # 3. CONFIGURAZIONE UTENTE E DATI MANCANTI (POST-LOGIN)
 # ==============================================================================
