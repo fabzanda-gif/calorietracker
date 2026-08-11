@@ -254,32 +254,37 @@ with tab3:
         df['date_str'] = df['date'].dt.strftime('%d %b %Y')
         df['weight_str'] = df['weight'].round(1).astype(str) + " kg"
         
-        # Grafico con colori ripristinati per distinguere reali e proiettati
+        # Grafico con colori e mappatura esplicita della trasparenza per le entry proiettate
         fig = px.bar(
             df, x='date', y='weight', 
             color='is_real', 
-            color_discrete_map={True: '#007BFF', False: 'rgba(0, 123, 255, 0.25)'}, 
+            color_discrete_map={True: '#007BFF', False: '#007BFF'}, 
             title="Trend Peso", 
             custom_data=['date_str', 'weight_str']
         )
-        fig.update_traces(hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>")
+        
+        # Forza la trasparenza (opacity) specifica per le barre interpolate/proiettate (False)
+        fig.update_traces(
+            marker=dict(opacity=[1.0 if r else 0.25 for r in df['is_real']]),
+            hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>"
+        )
+        
         fig.update_yaxes(range=[75, 90])
         
-        # Linea del target ingrandita e ad altissima visibilità (Verde Neon)
-        fig.add_hline(y=78, line_dash="dash", line_color="#00FF66", line_width=4)
+        # Linea del target in giallo ocra (#D4AF37) ed evidente
+        fig.add_hline(y=78, line_dash="dash", line_color="#D4AF37", line_width=4)
         
-        # Testo del goal molto più grande, in grassetto e ben leggibile
+        # Testo del goal in giallo ocra, grande e ben leggibile
         fig.add_annotation(
             xref="paper", yref="y", x=0.98, y=78.4, 
             text="<b>🎯 GOAL: 78 kg</b>", 
             showarrow=False, 
-            font=dict(color="#00FF66", size=18, family="sans-serif"), 
+            font=dict(color="#D4AF37", size=18, family="sans-serif"), 
             align="right"
         )
         
         fig.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True)
-
 # --- TAB 4: RICETTE ---
 with tab4:
     with st.form("recipe_add"):
