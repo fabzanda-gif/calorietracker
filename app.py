@@ -136,37 +136,10 @@ with tab1:
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
-    # Inizializzazione dello state per i valori
-    if "form_name" not in st.session_state: st.session_state["form_name"] = ""
-    if "form_cals" not in st.session_state: st.session_state["form_cals"] = 0
-    if "form_prot" not in st.session_state: st.session_state["form_prot"] = 0
-    if "form_carbs" not in st.session_state: st.session_state["form_carbs"] = 0
-    if "form_fat" not in st.session_state: st.session_state["form_fat"] = 0
-
-    # Callback per aggiornare i campi quando selezioni un prodotto online
-    def update_from_product():
-        sel = st.session_state.get("prod_select", "")
-        api_res = st.session_state.get("api_res", {})
-        if sel and sel in api_res:
-            p_data = api_res[sel]
-            st.session_state["form_name"] = p_data.get('name', '')
-            st.session_state["form_cals"] = int(p_data.get('calories', 0))
-            st.session_state["form_prot"] = int(p_data.get('protein', 0))
-            st.session_state["form_carbs"] = int(p_data.get('carbohydrates_100g', p_data.get('carbs', 0)))
-            st.session_state["form_fat"] = int(p_data.get('fat_100g', p_data.get('fat', 0)))
-
-    # Callback per aggiornare i campi quando selezioni una ricetta
-    def update_from_recipe():
-        sel = st.session_state.get("recipe_select", "")
-        recipes_data = st.session_state.get("recipes_cache", [])
-        recipes_dict = {r["name"]: r for r in recipes_data}
-        if sel and sel in recipes_dict:
-            r_obj = recipes_dict[sel]
-            st.session_state["form_name"] = r_obj.get('name', '')
-            st.session_state["form_cals"] = int(r_obj.get('calories', 0))
-            st.session_state["form_prot"] = int(r_obj.get('protein', 0))
-            st.session_state["form_carbs"] = int(r_obj.get('carbs', 0))
-            st.session_state["form_fat"] = int(r_obj.get('fat', 0))
+    # Inizializzazione dello state per i valori del form
+    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0)]:
+        if key not in st.session_state:
+            st.session_state[key] = default
 
     if not is_recipe:
         search_q = st.text_input("Cerca per Nome o inserisci Codice a Barre", key="search_box")
@@ -178,53 +151,71 @@ with tab1:
                 st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
 
         api_res = st.session_state.get("api_res", {})
-        st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select", on_change=update_from_product)
+        sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
+        if sel_prod and sel_prod in api_res:
+            p_data = api_res[sel_prod]
+            st.session_state["m_name"] = p_data.get('name', '')
+            st.session_state["m_cals"] = int(p_data.get('calories', 0))
+            st.session_state["m_prot"] = int(p_data.get('protein', 0))
+            st.session_state["m_carbs"] = int(p_data.get('carbohydrates_100g', p_data.get('carbs', 0)))
+            st.session_state["m_fat"] = int(p_data.get('fat_100g', p_data.get('fat', 0)))
     else:
         recipes_data = supabase.table("recipes").select("*").execute().data
-        st.session_state["recipes_cache"] = recipes_data
         recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
         
-        st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select", on_change=update_from_recipe)
+        sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
+        if sel_recipe and sel_recipe in recipes_dict:
+            r_obj = recipes_dict[sel_recipe]
+            st.session_state["m_name"] = r_obj.get('name', '')
+            st.session_state["m_cals"] = int(r_obj.get('calories', 0))
+            st.session_state["m_prot"] = int(r_obj.get('protein', 0))
+            st.session_state["m_carbs"] = int(r_obj.get('carbs', 0))
+            st.session_state["m_fat"] = int(r_obj.get('fat', 0))
 
-    # Input fuori dal form per interazione istantanea
+    # Campi di input collegati direttamente allo state
     m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"], key="meal_type_input")
-    name = st.text_input(t["meal_name"], value=st.session_state["form_name"], key="meal_name_input")
+    name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key="meal_name_input")
     
     if not is_recipe:
         grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
         factor = grams / 100.0
         meal_display_name = f"{name} ({grams}g)"
         
-        cals_val = int(st.session_state["form_cals"] * factor)
-        prot_val = int(st.session_state["form_prot"] * factor)
-        carbs_val = int(st.session_state["form_carbs"] * factor)
-        fat_val = int(st.session_state["form_fat"] * factor)
+        calc_cals = int(st.session_state["m_cals"] * factor)
+        calc_prot = int(st.session_state["m_prot"] * factor)
+        calc_carbs = int(st.session_state["m_carbs"] * factor)
+        calc_fat = int(st.session_state["m_fat"] * factor)
     else:
         meal_display_name = name
-        cals_val = int(st.session_state["form_cals"])
-        prot_val = int(st.session_state["form_prot"])
-        carbs_val = int(st.session_state["form_carbs"])
-        fat_val = int(st.session_state["form_fat"])
+        calc_cals = int(st.session_state["m_cals"])
+        calc_prot = int(st.session_state["m_prot"])
+        calc_carbs = int(st.session_state["m_carbs"])
+        calc_fat = int(st.session_state["m_fat"])
     
     c1, c2, c3, c4 = st.columns(4)
-    cals = c1.number_input("Kcal", value=cals_val, step=1, key="m_cals")
-    prot = c2.number_input("Pro (g)", value=prot_val, step=1, key="m_pro")
-    carbs = c3.number_input("Carbs (g)", value=carbs_val, step=1, key="m_carbs")
-    fat = c4.number_input("Fat (g)", value=fat_val, step=1, key="m_fat")
+    final_cals = c1.number_input("Kcal", value=calc_cals, step=1, key="input_cals")
+    final_prot = c2.number_input("Pro (g)", value=calc_prot, step=1, key="input_prot")
+    final_carbs = c3.number_input("Carbs (g)", value=calc_carbs, step=1, key="input_carbs")
+    final_fat = c4.number_input("Fat (g)", value=calc_fat, step=1, key="input_fat")
     
     if st.button(t["add_meal"], key="submit_meal_btn"):
-        supabase.table("meals").insert({
-            "date": str(log_date), 
-            "meal_type": m_type, 
-            "name": meal_display_name, 
-            "calories": int(cals), 
-            "protein": int(prot), 
-            "carbs": int(carbs), 
-            "fat": int(fat)
-        }).execute()
-        refresh_daily_logs(log_date)
-        st.success(t["meal_added"])
-        st.rerun()
+        if not name.strip():
+            st.warning("Inserisci un nome valido per il pasto.")
+        else:
+            try:
+                supabase.table("meals").insert({
+                    "date": str(log_date), 
+                    "meal_type": m_type, 
+                    "name": meal_display_name, 
+                    "calories": int(final_cals), 
+                    "protein": int(final_prot), 
+                    "carbs": int(final_carbs), 
+                    "fat": int(final_fat)
+                }).execute()
+                refresh_daily_logs(log_date)
+                st.success(f"✅ {t['meal_added']} ({final_cals} kcal)")
+            except Exception as e:
+                st.error(f"Errore nel salvataggio: {e}")
 
     st.markdown("---")
     st.subheader("🏃 Attività Extra (es. Padel, Bici)")
@@ -238,7 +229,7 @@ with tab1:
                 "burned_calories": int(extra_cals)
             }).execute()
             refresh_daily_logs(log_date)
-            st.success("Attività extra salvata!")
+            st.success("✅ Attività extra salvata con successo!")
             st.rerun()
             
             
