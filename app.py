@@ -44,10 +44,31 @@ user_data = st.session_state["user"]
 display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', user_data.user.email.split('@')[0])
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
+# Messaggio di saluto dinamico basato su orario e stagione (agosto -> estate calda)
+from datetime import datetime
+now = datetime.now()
+hour = now.hour
+
+if 5 <= hour < 12:
+    greeting_it = f"Buongiorno, {display_name}! ☀️ Mattinata estiva calda, carica le energie!"
+    greeting_en = f"Good morning, {display_name}! ☀️ Warm summer morning, fuel up!"
+elif 12 <= hour < 18:
+    greeting_it = f"Buon pomeriggio, {display_name}! 🌤️ Pomeriggio estivo, occhio ai macro!"
+    greeting_en = f"Good afternoon, {display_name}! 🌤️ Summer afternoon, watch your macros!"
+elif 18 <= hour < 22:
+    greeting_it = f"Buonasera, {display_name}! 🌙 Serata estiva, come è andata oggi?"
+    greeting_en = f"Good evening, {display_name}! 🌙 Summer evening, how did today go?"
+else:
+    greeting_it = f"Notte fonda, {display_name}! 🌌 Riposa bene per domani."
+    greeting_en = f"Late night, {display_name}! 🌌 Rest well for tomorrow."
+
 t = {
-    "Italiano": {"title": f"⚖️ Tracker Pro - Ciao, {display_name}!", "tab1": "🚀 Inserimento", "tab2": "📊 Overview", "tab3": "📈 Peso", "tab4": "🍳 Ricette", "day_type": "Tipo di Giornata", "extra_act": "Attività Extra", "extra_cals": "Kcal Extra", "save_conf": "Salva Configurazione", "conf_saved": "Configurazione salvata!", "meal": "Pasto", "meal_name": "Nome Pasto", "add_meal": "Aggiungi Pasto", "meal_added": "Pasto aggiunto!", "overview_title": "🎯 Overview Giornaliera", "eaten": "🔥 Kcal Ingerite", "burned": "⚡ Kcal Bruciate (Stimate)", "deficit": "📉 Deficit Attuale", "weight_analysis": "📈 Analisi Peso", "insert_weight": "Inserisci Peso (kg)", "save_weight": "Peso aggiornato!", "recipes_title": "🍳 Gestione Ricette", "recipe_name": "Nome Ricetta", "save_recipe": "Salva Ricetta", "recipe_saved": "Ricetta salvata!", "goal_target": "🎯 Obiettivo Deficit Rimanente"},
-    "English": {"title": f"⚖️ Tracker Pro - Hello, {display_name}!", "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": "🍳 Recipes", "day_type": "Day Type", "extra_act": "Extra Activity", "extra_cals": "Extra Cals", "save_conf": "Save Configuration", "conf_saved": "Configuration saved!", "meal": "Meal", "meal_name": "Meal Name", "add_meal": "Add Meal", "meal_added": "Meal added!", "overview_title": "🎯 Daily Overview", "eaten": "🔥 Calories Eaten", "burned": "⚡ Calories Burned (Estimated)", "deficit": "📉 Current Deficit", "weight_analysis": "📈 Weight Analysis", "insert_weight": "Insert Weight (kg)", "save_weight": "Weight updated!", "recipes_title": "🍳 Recipe Management", "recipe_name": "Recipe Name", "save_recipe": "Save Recipe", "recipe_saved": "Recipe saved!", "goal_target": "🎯 Remaining Deficit Target"}
+    "Italiano": {"title": greeting_it, "tab1": "🚀 Inserimento", "tab2": "📊 Overview", "tab3": "📈 Peso", "tab4": ""},
+    "English": {"title": greeting_en, "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": ""}
 }[lang]
+
+# Mostra il titolo dinamico
+st.title(t["title"])
 
 # --- FUNZIONI DI SUPPORTO (AGGIORNATE E SICURE) ---
 def search_open_food_facts(query):
