@@ -178,12 +178,34 @@ with tab3:
 
 # --- TAB 4: RICETTE ---
 with tab4:
-    st.header("Gestione Ricette")
+    st.header("🍳 Gestione Ricette")
+    
     with st.form("recipe_add"):
         r_name = st.text_input("Nome Ricetta")
         c1, c2, c3, c4 = st.columns(4)
+        
+        # Aggiunta dei campi per i macro
+        r_cals = c1.number_input("Kcal", value=0, step=10)
+        r_prot = c2.number_input("Pro (g)", value=0, step=1)
+        r_carbs = c3.number_input("Carbs (g)", value=0, step=1)
+        r_fat = c4.number_input("Fat (g)", value=0, step=1)
+        
         if st.form_submit_button("Salva Ricetta"):
-            supabase.table("recipes").upsert({"name": r_name, "calories": c1.number_input("Kcal", value=0), "protein": c2.number_input("Pro", value=0), "carbs": c3.number_input("Carbs", value=0), "fat": c4.number_input("Fat", value=0)}, on_conflict="name").execute()
-            st.success("Ricetta salvata!")
+            if r_name:
+                supabase.table("recipes").upsert({
+                    "name": r_name, 
+                    "calories": r_cals, 
+                    "protein": r_prot, 
+                    "carbs": r_carbs, 
+                    "fat": r_fat
+                }, on_conflict="name").execute()
+                st.success(f"Ricetta '{r_name}' salvata!")
+                st.rerun()
+            else:
+                st.error("Inserisci almeno il nome della ricetta.")
+                
+    st.divider()
+    st.subheader("Le tue ricette")
     recipes = supabase.table("recipes").select("*").execute().data
-    if recipes: st.dataframe(pd.DataFrame(recipes), use_container_width=True)
+    if recipes: 
+        st.dataframe(pd.DataFrame(recipes), use_container_width=True)
