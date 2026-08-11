@@ -4,6 +4,7 @@ from datetime import date, datetime
 import requests
 from supabase import create_client, Client
 from streamlit_cookies_controller import CookieController
+import plotly.express as px
 
 # --- SETUP SUPABASE ---
 SUPABASE_URL = "https://inhmvbdujpxrqrlcgmqw.supabase.co"
@@ -73,10 +74,8 @@ with tab2:
     today_str = str(date.today())
     meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
     acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
-    
     cals_in = sum(m['calories'] for m in meals) if meals else 0
     
-    # Calcolo rigoroso: cerchiamo se c'è un valore di base salvato, altrimenti usiamo 1900 di default
     base_cal = 1900
     extra_cal = 0
     for a in acts:
@@ -87,14 +86,12 @@ with tab2:
         else:
             extra_cal += cals
             
-    # Se per qualche motivo base_cal è 0, lo forziamo a 1900 o 2200 in base al testo salvato
     now = datetime.now()
     est_burned = int((base_cal / 24.0) * (now.hour + now.minute/60) + extra_cal)
     
     c1, c2, c3 = st.columns(3)
     c1.metric(t["eaten"], f"{cals_in} kcal")
     c2.metric(t["burned"], f"{est_burned} kcal")
-    
     latest_w = supabase.table("daily_logs").select("weight").not_.is_("weight", "null").order("date", desc=True).limit(1).execute().data
     curr_w = latest_w[0]['weight'] if latest_w else 80.9
     target = max(0.0, curr_w - 78.0) * 10676
@@ -137,7 +134,6 @@ with tab4:
     with st.form("recipe_add"):
         r_name = st.text_input(t["recipe_name"])
         c1, c2, c3, c4 = st.columns(4)
-        # FIX: Aggiunte chiavi uniche
         cals, prot, carbs, fat = c1.number_input("Kcal", key="r_cal"), c2.number_input("Pro", key="r_pro"), c3.number_input("Carbs", key="r_carbs"), c4.number_input("Fat", key="r_fat")
         if st.form_submit_button(t["save_recipe"]): supabase.table("recipes").upsert({"name": r_name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}, on_conflict="name").execute(); st.rerun()
     recipes = supabase.table("recipes").select("*").execute().data
