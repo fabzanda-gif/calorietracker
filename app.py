@@ -133,13 +133,14 @@ with tab1:
     
     st.subheader("🍽️ Inserimento Cibo & Pasti")
     
-    # Opzione per scegliere se cercare su Open Food Facts o usare le Ricette Salvate
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     
-    ref = {}
-    search_q = ""
-    
-    if input_source == "🔍 Cerca online (Open Food Facts)":
+    if "selected_meal_data" not in st.session_state:
+        st.session_state["selected_meal_data"] = {"name": "", "calories": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+
+    is_recipe = (input_source == "🍳 Da Ricette Salvate")
+
+    if not is_recipe:
         search_q = st.text_input("Cerca per Nome o inserisci Codice a Barre", key="search_box")
         if st.button("🚀 Cerca"):
             if len(search_q) >= 2:
@@ -150,31 +151,37 @@ with tab1:
 
         api_res = st.session_state.get("api_res", {})
         sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
-        ref = api_res.get(sel_prod, {}) if sel_prod else {}
-        if sel_prod:
-            search_q = ref.get('name', search_q)
+        if sel_prod and sel_prod in api_res:
+            st.session_state["selected_meal_data"] = api_res[sel_prod]
     else:
-        # Recupera le ricette salvate da Supabase
         recipes_data = supabase.table("recipes").select("*").execute().data
         recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
         
         sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
         if sel_recipe and sel_recipe in recipes_dict:
             r_obj = recipes_dict[sel_recipe]
-            ref = {
+            st.session_state["selected_meal_data"] = {
                 'name': r_obj.get('name'),
                 'calories': float(r_obj.get('calories', 0)),
                 'protein': float(r_obj.get('protein', 0)),
                 'carbs': float(r_obj.get('carbs', 0)),
                 'fat': float(r_obj.get('fat', 0))
             }
-            search_q = r_obj.get('name')
+
+    ref = st.session_state["selected_meal_data"]
 
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
-        name = st.text_input(t["meal_name"], value=ref.get('name', search_q if search_q else ''))
-        grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
-        factor = grams / 100.0
+        name = st.text_input(t["meal_name"], value=ref.get('name', ''))
+        
+        # Se è una ricetta, niente calcoli sui grammi: i valori sono fissi
+        if not is_recipe:
+            grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
+            factor = grams / 100.0
+            meal_display_name = f"{name} ({grams}g)"
+        else:
+            factor = 1.0
+            meal_display_name = name
         
         c1, c2, c3, c4 = st.columns(4)
         cals = c1.number_input("Kcal", value=int(ref.get('calories', 0) * factor), key="m_cals")
@@ -186,7 +193,7 @@ with tab1:
             supabase.table("meals").insert({
                 "date": str(log_date), 
                 "meal_type": m_type, 
-                "name": f"{name} ({grams}g)", 
+                "name": meal_display_name, 
                 "calories": cals, 
                 "protein": prot, 
                 "carbs": carbs, 
