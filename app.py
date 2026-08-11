@@ -6,7 +6,9 @@ from supabase import create_client, Client
 from streamlit_cookies_controller import CookieController
 import plotly.express as px
 
-# --- SETUP SUPABASE ---
+# ==========================================
+# 1. SETUP INIZIALE E CONNESSIONE SUPABASE
+# ==========================================
 SUPABASE_URL = "https://inhmvbdujpxrqrlcgmqw.supabase.co"
 SUPABASE_KEY = "sb_publishable_1fQpT5dZqjre5D7MXm1aMg_ZQVRMjJq"
 
@@ -24,7 +26,9 @@ def calculate_bmr(weight, height, gender):
     else:
         return int((10 * weight) + (6.25 * height) - (5 * 30) - 161)
 
-# --- LOGICA DI ACCESSO / SIGNUP / GOOGLE OAUTH ---
+# ==========================================
+# 2. GESTIONE AUTENTICAZIONE (LOGIN, SIGNUP, GOOGLE OAUTH)
+# ==========================================
 if "user" not in st.session_state:
     saved_session = controller.get("supabase_session")
     if saved_session:
@@ -34,10 +38,14 @@ if "user" not in st.session_state:
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
+        # --- BLOCCO PULSANTE LOGIN GOOGLE ---
         if st.button("🌐 Accedi / Registrati con Google"):
             try:
                 res = supabase.auth.sign_in_with_oauth({
-                    "provider": "google"
+                    "provider": "google",
+                    "options": {
+                        "redirect_to": "http://localhost:8501"
+                    }
                 })
                 if res.url:
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={res.url}">', unsafe_allow_html=True)
@@ -47,6 +55,7 @@ if "user" not in st.session_state:
         st.markdown("---")
         auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
         
+        # --- FORM DI ACCESSO / REGISTRAZIONE VIA EMAIL ---
         with st.form("auth_form"):
             email = st.text_input("Email")
             password = st.text_input("Password (min. 6 caratteri)", type="password")
@@ -90,7 +99,9 @@ if "user" not in st.session_state:
                     st.error(f"Errore durante l'autenticazione: {e}")
         st.stop()
 
-# --- CONFIGURAZIONE APP E TRADUZIONI ---
+# ==========================================
+# 3. CONFIGURAZIONE UTENTE E PROMPT DI EMERGENZA DATI MANCANTI
+# ==========================================
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 user_data = st.session_state["user"]
 user_id = user_data.user.id
@@ -100,9 +111,9 @@ display_name = user_metadata.get('display_name', user_data.user.email.split('@')
 user_target_weight = user_metadata.get('target_weight')
 user_bmr = user_metadata.get('bmr')
 
-# --- PROMPT DINAMICO PER UTENTI SENZA DATI (es. Signup da Supabase o Google OAuth) ---
+# --- CONTROLLO PROFILO INCOMPLETO (es. da Google OAuth) ---
 if not user_target_weight or not user_bmr:
-    st.warning("⚠️ Per iniziare a usare Tracker Pro, abbiamo bisogno di qualche dato in più sul tuo profilo.")
+    st.warning("⚠️ Per iniziare a usare Tracker Pro, abbiamo bisogno di qualche dato inH più sul tuo profilo.")
     with st.form("missing_data_form"):
         st.subheader("📋 Configurazione Iniziale Profilo")
         gen = st.selectbox("Genere", ["Uomo", "Donna"])
@@ -128,10 +139,12 @@ if not user_target_weight or not user_bmr:
                 st.error(f"Errore durante il salvataggio: {e}")
     st.stop()
 
-# Convertiamo in valori numerici sicuri una volta superato il blocco
 user_target_weight = float(user_target_weight)
 user_bmr = int(user_bmr)
 
+# ==========================================
+# 4. INTERFACCIA, LINGUA E SALUTI DINAMICI
+# ==========================================
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
 now = datetime.now()
@@ -191,7 +204,9 @@ t = {
 
 st.title(t["title"])
 
-# --- FUNZIONI DI SUPPORTO ---
+# ==========================================
+# 5. FUNZIONI DI SUPPORTO (API E LOG GIORNALIERI)
+# ==========================================
 def search_open_food_facts(query):
     """Cerca per nome o direttamente per codice a barre su Open Food Facts"""
     if not query or len(query) < 2: return {}
@@ -267,7 +282,9 @@ def refresh_daily_logs(log_date):
 
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
-# --- TAB 1: INSERIMENTO (Cibo, Ricette & Attività Extra) ---
+# ==========================================
+# 6. TAB 1: INSERIMENTO (CIBO, RICETTE & ATTIVITÀ)
+# ==========================================
 with tab1:
     log_date = st.date_input("Date", value=date.today())
     
@@ -409,7 +426,9 @@ with tab1:
             st.success("✅ Attività extra salvata con successo!")
             st.rerun()
           
-# --- TAB 2: RIEPILOGO GIORNALIERO ---
+# ==========================================
+# 7. TAB 2: RIEPILOGO GIORNALIERO (OVERVIEW)
+# ==========================================
 with tab2:
     st.subheader("📊 Riepilogo Giornaliero")
     
@@ -429,7 +448,6 @@ with tab2:
         
     now = datetime.now()
     
-    # BMR unico calcolato per utente ripartito sulle ore della giornata
     if summary_date == date.today():
         bmr_so_far = int((user_bmr / 24.0) * (now.hour + now.minute / 60.0))
     else:
@@ -477,7 +495,9 @@ with tab2:
     df_acts = pd.DataFrame(rows_acts)
     st.dataframe(df_acts, use_container_width=True, hide_index=True)
     
-# --- TAB 3: PESO ---
+# ==========================================
+# 8. TAB 3: MONITORAGGIO PESO & OBIETTIVO
+# ==========================================
 with tab3:
     col_w1, col_w2 = st.columns(2)
     with col_w1:
@@ -560,7 +580,9 @@ with tab3:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-# --- TAB 4: RICETTE ---
+# ==========================================
+# 9. TAB 4: GESTIONE RICETTE PERSONALI
+# ==========================================
 with tab4:
     with st.form("recipe_add"):
         r_name = st.text_input(t["recipe_name"])
