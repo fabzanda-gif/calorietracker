@@ -36,10 +36,8 @@ def calculate_bmr(weight, height, gender):
 # ==============================================================================
 # 2. GESTIONE AUTENTICAZIONE E SALUTO DINAMICO
 # ==============================================================================
-import datetime
-
 def get_dynamic_greeting(display_name):
-    now = datetime.datetime.now()
+    now = datetime.now()
     hour = now.hour
     
     if 5 <= hour < 12:
@@ -374,7 +372,6 @@ with tab1:
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
     
     if not is_recipe:
-        # Funzione di callback eseguita immediatamente al cambio dei grammi
         def update_grams_callback():
             st.session_state["grams_val"] = st.session_state[f"meal_grams_{v}"]
 
