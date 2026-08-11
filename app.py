@@ -18,7 +18,6 @@ supabase = init_supabase()
 controller = CookieController()
 
 # --- LOGICA DI LOGIN PERSISTENTE ---
-# Controlla se esiste una sessione nel browser, altrimenti richiede le credenziali
 if "user" not in st.session_state:
     saved_session = controller.get("supabase_session")
     if saved_session:
@@ -50,44 +49,7 @@ t = {
     "English": {"title": f"⚖️ Tracker Pro - Hello, {display_name}!", "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": "🍳 Recipes", "day_type": "Day Type", "extra_act": "Extra Activity", "extra_cals": "Extra Cals", "save_conf": "Save Configuration", "conf_saved": "Configuration saved!", "meal": "Meal", "meal_name": "Meal Name", "add_meal": "Add Meal", "meal_added": "Meal added!", "overview_title": "🎯 Daily Overview", "eaten": "🔥 Calories Eaten", "burned": "⚡ Calories Burned (Estimated)", "deficit": "📉 Current Deficit", "weight_analysis": "📈 Weight Analysis", "insert_weight": "Insert Weight (kg)", "save_weight": "Weight updated!", "recipes_title": "🍳 Recipe Management", "recipe_name": "Recipe Name", "save_recipe": "Save Recipe", "recipe_saved": "Recipe saved!", "goal_target": "🎯 Remaining Deficit Target"}
 }[lang]
 
-# --- FUNZIONE API OTTIMIZZATA ---
-def search_open_food_facts(query):
-    """Funzione con gestione errori estesa e User-Agent simulato per reti con restrizioni"""
-    if not query or len(query) < 3: return {}
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            options = {}
-            for p in data.get("products", []):
-                name = p.get("product_name", "")
-                brands = p.get("brands", "")
-                if not name: continue
-                display = f"{name} ({brands})" if brands else name
-                nutri = p.get("nutriments", {})
-                options[display] = {
-                    "name": name, 
-                    "calories": float(nutri.get("energy-kcal_100g", 0)), 
-                    "protein": float(nutri.get("proteins_100g", 0)), 
-                    "carbs": float(nutri.get("carbohydrates_100g", 0)), 
-                    "fat": float(nutri.get("fat_100g", 0))
-                }
-            return options
-    except Exception as e:
-        st.error(f"Errore di connessione: {e}")
-    return {}
-
-st.title(t["title"])
-tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
-
-# --- TAB 1: INSERIMENTO ---
-# --- FUNZIONE API AGGIORNATA (TESTO + BARCODE) ---
+# --- FUNZIONI DI SUPPORTO (AGGIORNATE E SICURE) ---
 def search_open_food_facts(query):
     """Cerca per nome o direttamente per codice a barre su Open Food Facts"""
     if not query or len(query) < 2: return {}
@@ -96,7 +58,7 @@ def search_open_food_facts(query):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
-    # Se la query è composta solo da numeri (è un codice a barre), usiamo l'endpoint specifico per barcode
+    # Se la query è un codice a barre numerico
     if query.isdigit() and len(query) >= 8:
         url = f"https://world.openfoodfacts.org/api/v0/product/{query}.json"
         try:
@@ -123,7 +85,7 @@ def search_open_food_facts(query):
             st.error(f"Errore di connessione barcode: {e}")
         return {}
     
-    # Altrimenti, eseguiamo la ricerca testuale classica
+    # Ricerca testuale classica
     url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -147,6 +109,23 @@ def search_open_food_facts(query):
     except Exception as e:
         st.error(f"Errore di connessione: {e}")
     return {}
+
+def refresh_daily_logs(log_date):
+    """Aggiorna il bilancio calorico giornaliero su Supabase gestendo in sicurezza qualsiasi formato di data"""
+    date_str = str(log_date)
+    meals = supabase.table("meals").select("*").eq("date", date_str).execute().data
+    acts = supabase.table("activities").select("*").eq("date", date_str).execute().data
+    cals_in = sum(m['calories'] for m in meals) if meals else 0
+    cals_out = sum(a['burned_calories'] for a in acts) if acts else 0
+    supabase.table("daily_logs").upsert({
+        "date": date_str, 
+        "calories": cals_in, 
+        "burned_calories": cals_out, 
+        "calorie_deficit": cals_in - cals_out
+    }, on_conflict="date").execute()
+
+st.title(t["title"])
+tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
 # --- TAB 1: INSERIMENTO (Solo Cibo & Attività Extra) ---
 with tab1:
@@ -179,7 +158,15 @@ with tab1:
         fat = c4.number_input("Fat (g)", value=round(float(ref.get('fat', 0) * factor), 1), key="m_fat")
         
         if st.form_submit_button(t["add_meal"]):
-            supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": f"{name} ({grams}g)", "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
+            supabase.table("meals").insert({
+                "date": str(log_date), 
+                "meal_type": m_type, 
+                "name": f"{name} ({grams}g)", 
+                "calories": cals, 
+                "protein": prot, 
+                "carbs": carbs, 
+                "fat": fat
+            }).execute()
             refresh_daily_logs(log_date)
             st.success(t["meal_added"])
             st.rerun()
@@ -190,16 +177,19 @@ with tab1:
         extra_act = st.selectbox(t["extra_act"], ["Padel", "Bici", "Camminata", "Altro"])
         extra_cals = st.number_input(t["extra_cals"], value=0, step=50)
         if st.form_submit_button("Salva Attività Extra"):
-            supabase.table("activities").insert({"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals}).execute()
+            supabase.table("activities").insert({
+                "date": str(log_date), 
+                "activity_name": extra_act, 
+                "burned_calories": extra_cals
+            }).execute()
             refresh_daily_logs(log_date)
             st.success("Attività extra salvata!")
             st.rerun()
 
 # --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
-# --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
 with tab2:
     st.header(t["overview_title"])
-    today_str = str(date.today())  # <-- Definita subito qui in cima!
+    today_str = str(date.today())
     
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
@@ -222,7 +212,7 @@ with tab2:
             st.success(f"Registrati {steps_input} passi ({steps_cals} kcal bruciate)!")
             st.rerun()
 
-    refresh_daily_logs(today_str) # Ora la variabile esiste ed è pronta
+    refresh_daily_logs(today_str)
     meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
     acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
