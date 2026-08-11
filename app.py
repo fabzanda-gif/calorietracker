@@ -42,6 +42,30 @@ if "user" not in st.session_state:
         st.session_state["user"] = saved_session
         st.rerun()
     else:
+        # Intercettiamo eventuali parametri di ritorno da Google nell'URL
+        query_params = st.query_params
+        if "code" in query_params or "access_token" in query_params:
+            try:
+                # Supabase gestisce automaticamente lo scambio del codice di sessione se presente nell'URL
+                session = supabase.auth.get_session()
+                if session and session.session:
+                    session_data = {
+                        "access_token": session.session.access_token,
+                        "refresh_token": session.session.refresh_token,
+                        "user": {
+                            "id": session.user.id,
+                            "email": session.user.email,
+                            "user_metadata": session.user.user_metadata
+                        }
+                    }
+                    st.session_state["user"] = session
+                    controller.set("supabase_session", session_data, max_age=30*24*60*60)
+                    # Pulisci i parametri dall'URL per una navigazione pulita
+                    st.query_params.clear()
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Errore nel recupero della sessione Google: {e}")
+
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
@@ -85,7 +109,6 @@ if "user" not in st.session_state:
                     if auth_mode == "Login":
                         response = supabase.auth.sign_in_with_password({"email": email, "password": password})
                         
-                        # Salvataggio sicuro della sessione senza errori JSON
                         session_data = {
                             "access_token": response.session.access_token,
                             "refresh_token": response.session.refresh_token,
