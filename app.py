@@ -135,9 +135,7 @@ with tab1:
     
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     
-    if "selected_meal_data" not in st.session_state:
-        st.session_state["selected_meal_data"] = {"name": "", "calories": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
-
+    ref = {"name": "", "calories": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
     if not is_recipe:
@@ -152,7 +150,7 @@ with tab1:
         api_res = st.session_state.get("api_res", {})
         sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
         if sel_prod and sel_prod in api_res:
-            st.session_state["selected_meal_data"] = api_res[sel_prod]
+            ref = api_res[sel_prod]
     else:
         recipes_data = supabase.table("recipes").select("*").execute().data
         recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
@@ -160,21 +158,21 @@ with tab1:
         sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
         if sel_recipe and sel_recipe in recipes_dict:
             r_obj = recipes_dict[sel_recipe]
-            st.session_state["selected_meal_data"] = {
+            ref = {
                 'name': r_obj.get('name'),
-                'calories': float(r_obj.get('calories', 0)),
+                'calories': int(r_obj.get('calories', 0)),
                 'protein': float(r_obj.get('protein', 0)),
                 'carbs': float(r_obj.get('carbs', 0)),
                 'fat': float(r_obj.get('fat', 0))
             }
 
-    ref = st.session_state["selected_meal_data"]
-
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
-        name = st.text_input(t["meal_name"], value=ref.get('name', ''))
         
-        # Se è una ricetta, niente calcoli sui grammi: i valori sono fissi
+        # Se è una ricetta usa il nome della ricetta, altrimenti il nome del prodotto cercato o vuoto
+        default_name = ref.get('name', search_q if not is_recipe and 'search_q' in locals() else '')
+        name = st.text_input(t["meal_name"], value=default_name)
+        
         if not is_recipe:
             grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
             factor = grams / 100.0
@@ -217,7 +215,7 @@ with tab1:
             refresh_daily_logs(log_date)
             st.success("Attività extra salvata!")
             st.rerun()
-
+            
 # --- TAB 2: OVERVIEW (Con Selettore Casa/Ufficio e Inserimento Passi) ---
 with tab2:
     st.header(t["overview_title"])
