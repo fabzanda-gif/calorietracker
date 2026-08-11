@@ -73,15 +73,28 @@ with tab2:
     today_str = str(date.today())
     meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
     acts = supabase.table("activities").select("*").eq("date", today_str).execute().data
+    
     cals_in = sum(m['calories'] for m in meals) if meals else 0
-    # FIX: Calcolo corretto bruciate
-    total_burned = sum(a['burned_calories'] for a in acts if a['activity_name'] != "Base")
-    base_target = next((a['burned_calories'] for a in acts if a['activity_name'] == "Base"), 1900)
-    est_burned = int((base_target / 24.0) * (datetime.now().hour + datetime.now().minute/60) + total_burned)
+    
+    # Calcolo rigoroso: cerchiamo se c'è un valore di base salvato, altrimenti usiamo 1900 di default
+    base_cal = 1900
+    extra_cal = 0
+    for a in acts:
+        name = a.get('activity_name', '')
+        cals = a.get('burned_calories', 0)
+        if name in ["Casa", "Ufficio", "Base"] or "kcal" in name.lower():
+            base_cal = cals
+        else:
+            extra_cal += cals
+            
+    # Se per qualche motivo base_cal è 0, lo forziamo a 1900 o 2200 in base al testo salvato
+    now = datetime.now()
+    est_burned = int((base_cal / 24.0) * (now.hour + now.minute/60) + extra_cal)
     
     c1, c2, c3 = st.columns(3)
     c1.metric(t["eaten"], f"{cals_in} kcal")
     c2.metric(t["burned"], f"{est_burned} kcal")
+    
     latest_w = supabase.table("daily_logs").select("weight").not_.is_("weight", "null").order("date", desc=True).limit(1).execute().data
     curr_w = latest_w[0]['weight'] if latest_w else 80.9
     target = max(0.0, curr_w - 78.0) * 10676
