@@ -87,14 +87,76 @@ st.title(t["title"])
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
 # --- TAB 1: INSERIMENTO ---
+# --- FUNZIONE API AGGIORNATA (TESTO + BARCODE) ---
+def search_open_food_facts(query):
+    """Cerca per nome o direttamente per codice a barre su Open Food Facts"""
+    if not query or len(query) < 2: return {}
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    # Se la query è composta solo da numeri (è un codice a barre), usiamo l'endpoint specifico per barcode
+    if query.isdigit() and len(query) >= 8:
+        url = f"https://world.openfoodfacts.org/api/v0/product/{query}.json"
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("status") == 1:
+                    p = data.get("product", {})
+                    name = p.get("product_name", "")
+                    brands = p.get("brands", "")
+                    if name:
+                        display = f"[BARCODE] {name} ({brands})" if brands else f"[BARCODE] {name}"
+                        nutri = p.get("nutriments", {})
+                        return {
+                            display: {
+                                "name": name, 
+                                "calories": float(nutri.get("energy-kcal_100g", 0)), 
+                                "protein": float(nutri.get("proteins_100g", 0)), 
+                                "carbs": float(nutri.get("carbohydrates_100g", 0)), 
+                                "fat": float(nutri.get("fat_100g", 0))
+                            }
+                        }
+        except Exception as e:
+            st.error(f"Errore di connessione barcode: {e}")
+        return {}
+    
+    # Altrimenti, eseguiamo la ricerca testuale classica
+    url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            options = {}
+            for p in data.get("products", []):
+                name = p.get("product_name", "")
+                brands = p.get("brands", "")
+                if not name: continue
+                display = f"{name} ({brands})" if brands else name
+                nutri = p.get("nutriments", {})
+                options[display] = {
+                    "name": name, 
+                    "calories": float(nutri.get("energy-kcal_100g", 0)), 
+                    "protein": float(nutri.get("proteins_100g", 0)), 
+                    "carbs": float(nutri.get("carbohydrates_100g", 0)), 
+                    "fat": float(nutri.get("fat_100g", 0))
+                }
+            return options
+    except Exception as e:
+        st.error(f"Errore di connessione: {e}")
+    return {}
+
+# --- TAB 1: INSERIMENTO ---
 with tab1:
     log_date = st.date_input("Date", value=date.today())
     
-    # Configurazione attività giornaliera (Tipo di giornata e attività extra)
+    # Configurazione attività giornaliera
     with st.form("day_type_form"):
         day_type = st.selectbox(t["day_type"], ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
         extra_act = st.selectbox(t["extra_act"], ["Nessuna", "Padel", "Bici", "Camminata"])
-        extra_cals = st.number_input(t["extra_cals"], value=0, step=50)
+        extra_cals = st.number_input(t["extra_cals"], value=0, step50)
         if st.form_submit_button(t["save_conf"]):
             supabase.table("activities").delete().eq("date", str(log_date)).execute()
             supabase.table("activities").insert([
@@ -106,22 +168,22 @@ with tab1:
 
     st.subheader("🍽️ Inserimento Cibo & Pasti")
     
-    # Campo di ricerca Open Food Facts con pulsante esplicito per evitare blocchi di rete
-    search_q = st.text_input("🔍 Cerca nel database Open Food Facts", key="search_box")
+    # Campo di ricerca unificato (puoi digitare il nome del cibo o incollare/digitare il codice a barre numerico)
+    search_q = st.text_input("🔍 Cerca per Nome o inserisci/scansiona Codice a Barre", key="search_box")
     
     if st.button("🚀 Cerca"):
-        if len(search_q) >= 3:
+        if len(search_q) >= 2:
             with st.spinner('Ricerca in corso...'):
                 st.session_state["api_res"] = search_open_food_facts(search_q)
         else:
-            st.warning("Inserisci almeno 3 caratteri.")
+            st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
 
-    # Recupero dei risultati salvati nello state
+    # Recupero risultati dallo state
     api_res = st.session_state.get("api_res", {})
     sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
     ref = api_res.get(sel_prod, {}) if sel_prod else {}
 
-    # Form pasto con calcolo automatico proporzionale basato sui grammi inseriti
+    # Form inserimento pasto con calcolo proporzionale sui grammi
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
         name = st.text_input(t["meal_name"], value=ref.get('name', search_q if search_q else ''))
@@ -148,7 +210,6 @@ with tab1:
             refresh_daily_logs(log_date)
             st.success(t["meal_added"])
             st.rerun()
-
 # --- TAB 2: OVERVIEW ---
 with tab2:
     st.header(t["overview_title"])
