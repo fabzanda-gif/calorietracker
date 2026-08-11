@@ -45,7 +45,6 @@ display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', 
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
 # Messaggio di saluto dinamico basato su orario e stagione
-from datetime import datetime
 now = datetime.now()
 hour = now.hour
 
@@ -68,7 +67,7 @@ t = {
         "tab1": "🚀 Inserimento", 
         "tab2": "📊 Overview", 
         "tab3": "📈 Peso", 
-        "tab4": "⚙️ Altro", 
+        "tab4": "🍳 Ricette", 
         "meal": "Pasto",
         "meal_name": "Nome Pasto",
         "add_meal": "Aggiungi Pasto",
@@ -86,7 +85,7 @@ t = {
         "tab1": "🚀 Logging", 
         "tab2": "📊 Overview", 
         "tab3": "📈 Weight", 
-        "tab4": "⚙️ Other", 
+        "tab4": "🍳 Recipes", 
         "meal": "Meal",
         "meal_name": "Meal Name",
         "add_meal": "Add Meal",
@@ -101,10 +100,10 @@ t = {
     }
 }[lang]
 
-# Mostra il titolo dinamico UNA SOLA VOLTA (controlla di non avere altri st.title sparsi nel codice)
+# Mostra il titolo dinamico UNA SOLA VOLTA
 st.title(t["title"])
 
-# --- FUNZIONI DI SUPPORTO (AGGIORNATE E SICURE) ---
+# --- FUNZIONI DI SUPPORTO ---
 def search_open_food_facts(query):
     """Cerca per nome o direttamente per codice a barre su Open Food Facts"""
     if not query or len(query) < 2: return {}
@@ -113,7 +112,6 @@ def search_open_food_facts(query):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
-    # Se la query è un codice a barre numerico
     if query.isdigit() and len(query) >= 8:
         url = f"https://world.openfoodfacts.org/api/v0/product/{query}.json"
         try:
@@ -140,7 +138,6 @@ def search_open_food_facts(query):
             st.error(f"Errore di connessione barcode: {e}")
         return {}
     
-    # Ricerca testuale classica
     url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -179,7 +176,6 @@ def refresh_daily_logs(log_date):
         "calorie_deficit": cals_in - cals_out
     }, on_conflict="date").execute()
 
-st.title(t["title"])
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
 # --- TAB 1: INSERIMENTO (Cibo, Ricette & Attività Extra) ---
@@ -191,12 +187,10 @@ with tab1:
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
-    # Inizializzazione dello state di base
     for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("last_selected", ""), ("form_v", 0), ("last_source", input_source)]:
         if key not in st.session_state:
             st.session_state[key] = default
 
-    # Funzione per pulire o aggiornare i dati e forzare il refresh dei widget
     def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected=""):
         st.session_state["m_name"] = name
         st.session_state["m_cals"] = int(cals)
@@ -206,7 +200,6 @@ with tab1:
         st.session_state["last_selected"] = selected
         st.session_state["form_v"] += 1
 
-    # Se cambia la fonte (Radio button), puliamo tutto
     if st.session_state["last_source"] != input_source:
         st.session_state["last_source"] = input_source
         reset_or_update()
@@ -300,7 +293,6 @@ with tab1:
                     }).execute()
                     refresh_daily_logs(log_date)
                     
-                    # Pulisce automaticamente i campi e resetta lo stato
                     reset_or_update()
                     st.success(f"✅ Pasto aggiunto con successo! ({final_cals} kcal)")
                     st.rerun()
@@ -325,25 +317,21 @@ with tab1:
             refresh_daily_logs(log_date)
             st.success("✅ Attività extra salvata con successo!")
             st.rerun()
-            
-            
+          
 # --- TAB 2: RIEPILOGO GIORNALIERO ---
 with tab2:
     st.subheader("📊 Riepilogo Giornaliero")
     
     summary_date = st.date_input("Data riepilogo", value=date.today(), key="summary_date_input")
     
-    # Recuperiamo i dati in modo sicuro
     daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).execute().data
     meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).execute().data
     
     raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).execute().data
     activities_data = [a for a in raw_activities if a.get("activity_name") not in ["Ufficio", "Base"]] if raw_activities else []
     
-    # Calcolo delle calorie ingerite totali
     total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
     
-    # Valore base di riferimento (default a 1900 se manca il log giornaliero)
     bmr_base = 1900
     current_weight = None
     if daily_log_res:
@@ -352,23 +340,18 @@ with tab2:
             bmr_base = row.get('calories_out')
         current_weight = row.get('weight')
         
-    from datetime import datetime
     now = datetime.now()
     
-    # Calcolo proporzionale del BMI (BMR / 24 * ora del giorno) finora
     if summary_date == date.today():
         bmi_so_far = int((bmr_base / 24.0) * (now.hour + now.minute / 60.0))
     else:
         bmi_so_far = bmr_base
         
-    # Somma delle attività extra
     extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
     total_burned_finora = bmi_so_far + extra_burned
     
-    # Calcolo del bilancio / deficit
     deficit = total_burned_finora - total_cals_in
 
-    # --- COUNTER IN CIMA ---
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     col_c1.metric("Kcal Ingerite", f"{total_cals_in} kcal")
     col_c2.metric("Kcal Bruciate", f"{total_burned_finora} kcal")
@@ -377,7 +360,6 @@ with tab2:
         
     st.markdown("---")
     
-    # --- TABELLA CIBI ---
     st.markdown("### 🍽️ Cibi inseriti")
     if meals_data:
         df_meals = pd.DataFrame(meals_data)
@@ -395,9 +377,7 @@ with tab2:
         
     st.markdown("---")
     
-    # --- TABELLA ATTIVITÀ (Solo BMI proporzionale + attività extra) ---
     st.markdown("### 🏃 Calorie Bruciate & Attività")
-    
     rows_acts = [{"Attività": "BMI", "Kcal Bruciate": bmi_so_far}]
     if activities_data:
         for act in activities_data:
@@ -421,23 +401,19 @@ with tab3:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
         
-        # Creiamo il range completo e interpoliamo
         df_full = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index().rename(columns={'index': 'date'})
         
-        # Identifichiamo quali sono reali e quali interpolati
         real_dates = set(df['date'])
         df_full['is_real'] = df_full['date'].isin(real_dates)
         
         df_full['date_str'] = df_full['date'].dt.strftime('%d %b %Y')
         df_full['weight_str'] = df_full['weight'].round(1).astype(str) + " kg"
         
-        # Dividiamo in due DataFrame separati per gestire perfettamente la trasparenza
         df_real = df_full[df_full['is_real']]
         df_interp = df_full[~df_full['is_real']]
         
         fig = px.bar()
         
-        # Aggiungiamo le barre reali (piene)
         fig.add_bar(
             x=df_real['date'], y=df_real['weight'],
             marker_color='#007BFF', marker_opacity=1.0,
@@ -446,7 +422,6 @@ with tab3:
             name="Reale"
         )
         
-        # Aggiungiamo le barre interpolate/proiettate (trasparenti)
         fig.add_bar(
             x=df_interp['date'], y=df_interp['weight'],
             marker_color='#007BFF', marker_opacity=0.25,
@@ -457,10 +432,8 @@ with tab3:
         
         fig.update_yaxes(range=[75, 90])
         
-        # Linea del target in Giallo Oro brillante (#FFD700)
         fig.add_hline(y=78, line_dash="dash", line_color="#FFD700", line_width=3.5)
         
-        # Testo del goal in Giallo Oro brillante posizionato in alto a destra
         fig.add_annotation(
             xref="paper", yref="y", x=0.98, y=88.5, 
             text="<b>🎯 GOAL: 78 kg</b>", 
@@ -478,6 +451,7 @@ with tab3:
             barmode='overlay'
         )
         st.plotly_chart(fig, use_container_width=True)
+
 # --- TAB 4: RICETTE ---
 with tab4:
     with st.form("recipe_add"):
