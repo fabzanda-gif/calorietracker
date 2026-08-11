@@ -112,10 +112,12 @@ with tab1:
 
     st.subheader("🍽️ Inserisci Pasto")
     search_q = st.text_input("🔍 Cerca su Open Food Facts", key="search_box")
-    if search_q and len(search_q) >= 3: st.session_state["api_res"] = search_open_food_facts(search_q)
+    if search_q and len(search_q) >= 3 and st.session_state.get("last_q") != search_q:
+        st.session_state["api_res"] = search_open_food_facts(search_q)
+        st.session_state["last_q"] = search_q
     
     api_res = st.session_state.get("api_res", {})
-    sel_prod = st.selectbox("Seleziona Prodotto", [""] + list(api_res.keys()))
+    sel_prod = st.selectbox("Seleziona Prodotto", [""] + list(api_res.keys()), key="prod_select")
     ref = api_res.get(sel_prod, {}) if sel_prod else {}
     
     with st.form("meal_form"):
