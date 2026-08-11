@@ -44,7 +44,7 @@ user_data = st.session_state["user"]
 display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', user_data.user.email.split('@')[0])
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
-# Messaggio di saluto dinamico basato su orario e stagione (agosto -> estate calda)
+# Messaggio di saluto dinamico basato su orario e stagione
 from datetime import datetime
 now = datetime.now()
 hour = now.hour
@@ -63,11 +63,35 @@ else:
     greeting_en = f"Late night, {display_name}! 🌌 Rest well for tomorrow."
 
 t = {
-    "Italiano": {"title": greeting_it, "tab1": "🚀 Inserimento", "tab2": "📊 Overview", "tab3": "📈 Peso", "tab4": ""},
-    "English": {"title": greeting_en, "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": ""}
+    "Italiano": {
+        "title": greeting_it, 
+        "tab1": "🚀 Inserimento", 
+        "tab2": "📊 Overview", 
+        "tab3": "📈 Peso", 
+        "tab4": "⚙️ Altro", 
+        "meal": "Pasto",
+        "meal_name": "Nome Pasto",
+        "add_meal": "Aggiungi Pasto",
+        "meal_added": "Pasto aggiunto con successo!",
+        "extra_act": "Attività Extra",
+        "extra_cals": "Calorie Bruciate"
+    },
+    "English": {
+        "title": greeting_en, 
+        "tab1": "🚀 Logging", 
+        "tab2": "📊 Overview", 
+        "tab3": "📈 Weight", 
+        "tab4": "⚙️ Other", 
+        "meal": "Meal",
+        "meal_name": "Meal Name",
+        "add_meal": "Add Meal",
+        "meal_added": "Meal added successfully!",
+        "extra_act": "Extra Activity",
+        "extra_cals": "Burned Calories"
+    }
 }[lang]
 
-# Mostra il titolo dinamico
+# Mostra il titolo dinamico una sola volta
 st.title(t["title"])
 
 # --- FUNZIONI DI SUPPORTO (AGGIORNATE E SICURE) ---
