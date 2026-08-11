@@ -17,7 +17,7 @@ def init_supabase() -> Client:
 supabase = init_supabase()
 controller = CookieController()
 
-# --- LOGICA DI LOGIN / SIGNUP PERSISTENTE ---
+# --- LOGICA DI ACCESSO / SIGNUP / GOOGLE OAUTH ---
 if "user" not in st.session_state:
     saved_session = controller.get("supabase_session")
     if saved_session:
@@ -27,7 +27,22 @@ if "user" not in st.session_state:
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
-        auth_mode = st.radio("Azione", ["Login", "Registrazione"], horizontal=True)
+        # Opzione Google Login
+        if st.button("🌐 Accedi / Registrati con Google"):
+            try:
+                res = supabase.auth.sign_in_with_oauth({
+                    "provider": "google",
+                    "options": {
+                        "redirect_to": "http://localhost:8501"
+                    }
+                })
+                if res.url:
+                    st.markdown(f'<meta http-equiv="refresh" content="0;url={res.url}">', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Errore con Google Auth: {e}")
+
+        st.markdown("---")
+        auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
         
         with st.form("auth_form"):
             email = st.text_input("Email")
@@ -46,6 +61,7 @@ if "user" not in st.session_state:
                         controller.set("supabase_session", user, max_age=30*24*60*60)
                         st.rerun()
                     else:
+                        # Salviamo il target weight direttamente nei metadati in fase di signup
                         user = supabase.auth.sign_up({
                             "email": email, 
                             "password": password,
@@ -62,6 +78,8 @@ if "user" not in st.session_state:
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 user_data = st.session_state["user"]
 display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', user_data.user.email.split('@')[0])
+
+# Recupero dinamico del target weight direttamente dai metadata dell'utente
 user_target_weight = float(getattr(user_data.user, 'user_metadata', {}).get('target_weight', 78.0))
 
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
@@ -413,10 +431,26 @@ with tab2:
     
 # --- TAB 3: PESO ---
 with tab3:
-    w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
-    if st.button(t["save_weight"]): 
-        supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
-        st.rerun()
+    col_w1, col_w2 = st.columns(2)
+    with col_w1:
+        w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
+        if st.button(t["save_weight"]): 
+            supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
+            st.rerun()
+            
+    with col_w2:
+        # Modifica e aggiornamento dinamico del target weight nei metadata utente
+        new_target = st.number_input("Aggiorna Peso Obiettivo (kg)", value=user_target_weight, step=0.5)
+        if st.button("Salva Obiettivo"):
+            try:
+                res = supabase.auth.update_user({
+                    "data": {"target_weight": float(new_target)}
+                })
+                st.session_state["user"] = res
+                st.success("Obiettivo aggiornato con successo!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore durante l'aggiornamento: {e}")
         
     logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").order("date").execute().data
     if logs:
@@ -454,6 +488,7 @@ with tab3:
         
         fig.update_yaxes(range=[min(75, user_target_weight - 3), max(90, user_target_weight + 10)])
         
+        # Linea del target legata al valore dinamico dell'utente
         fig.add_hline(y=user_target_weight, line_dash="dash", line_color="#FFD700", line_width=3.5)
         
         fig.add_annotation(
