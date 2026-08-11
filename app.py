@@ -237,22 +237,33 @@ with tab1:
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
-    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("last_selected", ""), ("form_v", 0), ("last_source", input_source)]:
+    # Inizializzazione dello state per i valori attuali
+    for key, default in [
+        ("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0),
+        ("input_cals", 0), ("input_prot", 0), ("input_carbs", 0), ("input_fat", 0),
+        ("last_selected", ""), ("last_source", input_source), ("grams_val", 100.0)
+    ]:
         if key not in st.session_state:
             st.session_state[key] = default
 
-    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected=""):
+    def update_form_values(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0):
         st.session_state["m_name"] = name
-        st.session_state["m_cals"] = int(cals)
-        st.session_state["m_prot"] = int(prot)
-        st.session_state["m_carbs"] = int(carbs)
-        st.session_state["m_fat"] = int(fat)
+        st.session_state["m_cals"] = float(cals)
+        st.session_state["m_prot"] = float(prot)
+        st.session_state["m_carbs"] = float(carbs)
+        st.session_state["m_fat"] = float(fat)
+        st.session_state["grams_val"] = float(grams)
+        
+        factor = grams / 100.0 if not is_recipe else 1.0
+        st.session_state["input_cals"] = int(float(cals) * factor)
+        st.session_state["input_prot"] = int(float(prot) * factor)
+        st.session_state["input_carbs"] = int(float(carbs) * factor)
+        st.session_state["input_fat"] = int(float(fat) * factor)
         st.session_state["last_selected"] = selected
-        st.session_state["form_v"] += 1
 
     if st.session_state["last_source"] != input_source:
         st.session_state["last_source"] = input_source
-        reset_or_update()
+        update_form_values()
         st.rerun()
 
     if not is_recipe:
@@ -269,13 +280,14 @@ with tab1:
         
         if sel_prod and sel_prod != st.session_state.get("last_selected"):
             p_data = api_res[sel_prod]
-            reset_or_update(
+            update_form_values(
                 name=p_data.get('name', ''),
                 cals=p_data.get('calories', 0),
                 prot=p_data.get('protein', 0),
                 carbs=p_data.get('carbohydrates_100g', p_data.get('carbs', 0)),
                 fat=p_data.get('fat_100g', p_data.get('fat', 0)),
-                selected=sel_prod
+                selected=sel_prod,
+                grams=100.0
             )
             st.rerun()
     else:
@@ -286,48 +298,45 @@ with tab1:
         
         if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
             r_obj = recipes_dict[sel_recipe]
-            reset_or_update(
+            update_form_values(
                 name=r_obj.get('name', ''),
                 cals=r_obj.get('calories', 0),
                 prot=r_obj.get('protein', 0),
                 carbs=r_obj.get('carbs', 0),
                 fat=r_obj.get('fat', 0),
-                selected=sel_recipe
+                selected=sel_recipe,
+                grams=1.0
             )
             st.rerun()
 
-    v = st.session_state["form_v"]
-
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
-    m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
+    m_type = st.selectbox(t["meal"], meal_options, key="meal_type_input_main")
 
-    name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
+    name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key="input_meal_name_main")
     
     if not is_recipe:
-        grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key=f"meal_grams_{v}")
-        factor = grams / 100.0
+        grams = st.number_input("Grammi (g)", value=st.session_state["grams_val"], step=10.0, key="meal_grams_main")
+        if grams != st.session_state["grams_val"]:
+            st.session_state["grams_val"] = grams
+            factor = grams / 100.0
+            st.session_state["input_cals"] = int(st.session_state["m_cals"] * factor)
+            st.session_state["input_prot"] = int(st.session_state["m_prot"] * factor)
+            st.session_state["input_carbs"] = int(st.session_state["m_carbs"] * factor)
+            st.session_state["input_fat"] = int(st.session_state["m_fat"] * factor)
+            st.rerun()
         meal_display_name = f"{name} ({grams}g)"
-        
-        calc_cals = int(st.session_state["m_cals"] * factor)
-        calc_prot = int(st.session_state["m_prot"] * factor)
-        calc_carbs = int(st.session_state["m_carbs"] * factor)
-        calc_fat = int(st.session_state["m_fat"] * factor)
     else:
         meal_display_name = name
-        calc_cals = int(st.session_state["m_cals"])
-        calc_prot = int(st.session_state["m_prot"])
-        calc_carbs = int(st.session_state["m_carbs"])
-        calc_fat = int(st.session_state["m_fat"])
-    
+
     c1, c2, c3, c4 = st.columns(4)
-    final_cals = c1.number_input("Kcal", value=calc_cals, step=1, key=f"input_cals_{v}")
-    final_prot = c2.number_input("Pro (g)", value=calc_prot, step=1, key=f"input_prot_{v}")
-    final_carbs = c3.number_input("Carbs (g)", value=calc_carbs, step=1, key=f"input_carbs_{v}")
-    final_fat = c4.number_input("Fat (g)", value=calc_fat, step=1, key=f"input_fat_{v}")
+    final_cals = c1.number_input("Kcal", value=int(st.session_state["input_cals"]), step=1, key="input_cals_main")
+    final_prot = c2.number_input("Pro (g)", value=int(st.session_state["input_prot"]), step=1, key="input_prot_main")
+    final_carbs = c3.number_input("Carbs (g)", value=int(st.session_state["input_carbs"]), step=1, key="input_carbs_main")
+    final_fat = c4.number_input("Fat (g)", value=int(st.session_state["input_fat"]), step=1, key="input_fat_main")
     
     col_btn1, col_btn2 = st.columns([3, 1])
     with col_btn1:
-        if st.button(t["add_meal"], key=f"submit_meal_btn_{v}"):
+        if st.button(t["add_meal"], key="submit_meal_btn_main"):
             if not name.strip():
                 st.warning("Inserisci un nome valido per il pasto.")
             else:
@@ -344,14 +353,14 @@ with tab1:
                     }).execute()
                     refresh_daily_logs(log_date)
                     
-                    reset_or_update()
+                    update_form_values()
                     st.success(f"✅ Pasto aggiunto con successo! ({final_cals} kcal)")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore nel salvataggio: {e}")
     with col_btn2:
-        if st.button("Pulisci", key=f"clear_btn_{v}"):
-            reset_or_update()
+        if st.button("Pulisci", key="clear_btn_main"):
+            update_form_values()
             st.rerun()
 
     st.markdown("---")
@@ -369,7 +378,6 @@ with tab1:
             refresh_daily_logs(log_date)
             st.success("✅ Attività extra salvata con successo!")
             st.rerun()
-
 # ==========================================
 # 7. TAB 2: RIEPILOGO GIORNALIERO (OVERVIEW)
 # ==========================================
