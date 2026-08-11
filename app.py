@@ -17,6 +17,14 @@ def init_supabase() -> Client:
 supabase = init_supabase()
 controller = CookieController()
 
+# --- FUNZIONE CALCOLO BMR (Formula Mifflin-St Jeor) ---
+def calculate_bmr(weight, height, gender):
+    # Usiamo un'età media standard di 30 anni
+    if gender == "Uomo":
+        return int((10 * weight) + (6.25 * height) - (5 * 30) + 5)
+    else:
+        return int((10 * weight) + (6.25 * height) - (5 * 30) - 161)
+
 # --- LOGICA DI ACCESSO / SIGNUP / GOOGLE OAUTH ---
 if "user" not in st.session_state:
     saved_session = controller.get("supabase_session")
@@ -27,7 +35,6 @@ if "user" not in st.session_state:
         st.set_page_config(page_title="Accesso - Tracker Pro")
         st.title("🔐 Accesso Tracker Pro")
         
-        # Opzione Google Login (senza forzare il redirect_to locale per evitare errori 403)
         if st.button("🌐 Accedi / Registrati con Google"):
             try:
                 res = supabase.auth.sign_in_with_oauth({
@@ -46,7 +53,15 @@ if "user" not in st.session_state:
             password = st.text_input("Password (min. 6 caratteri)", type="password")
             
             target_weight = 78.0
+            height = 175.0
+            current_weight = 81.0
+            gender = "Uomo"
+            
             if auth_mode == "Registrazione":
+                st.markdown("### 📋 Parametri Fisici Iniziali")
+                gender = st.selectbox("Genere", ["Uomo", "Donna"])
+                height = st.number_input("Altezza (cm)", value=175.0, step=1.0)
+                current_weight = st.number_input("Peso Attuale (kg)", value=81.0, step=0.5)
                 target_weight = st.number_input("Peso Obiettivo (kg)", value=78.0, step=0.5)
             
             submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
@@ -58,12 +73,17 @@ if "user" not in st.session_state:
                         controller.set("supabase_session", user, max_age=30*24*60*60)
                         st.rerun()
                     else:
-                        # Salviamo il target weight direttamente nei metadati in fase di signup
+                        calculated_bmr = calculate_bmr(current_weight, height, gender)
                         user = supabase.auth.sign_up({
                             "email": email, 
                             "password": password,
                             "options": {
-                                "data": {"target_weight": float(target_weight)}
+                                "data": {
+                                    "target_weight": float(target_weight),
+                                    "bmr": calculated_bmr,
+                                    "height": float(height),
+                                    "gender": gender
+                                }
                             }
                         })
                         st.success("Account creato con successo! Effettua il login.")
@@ -74,14 +94,13 @@ if "user" not in st.session_state:
 # --- CONFIGURAZIONE APP E TRADUZIONI ---
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 user_data = st.session_state["user"]
+user_id = user_data.user.id
 display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', user_data.user.email.split('@')[0])
-
-# Recupero dinamico del target weight direttamente dai metadata dell'utente
 user_target_weight = float(getattr(user_data.user, 'user_metadata', {}).get('target_weight', 78.0))
+user_bmr = int(getattr(user_data.user, 'user_metadata', {}).get('bmr', 1900))
 
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
-# Messaggio di saluto dinamico basato su orario e stagione
 now = datetime.now()
 hour = now.hour
 
@@ -137,7 +156,6 @@ t = {
     }
 }[lang]
 
-# Mostra il titolo dinamico UNA SOLA VOLTA
 st.title(t["title"])
 
 # --- FUNZIONI DI SUPPORTO ---
@@ -200,18 +218,19 @@ def search_open_food_facts(query):
     return {}
 
 def refresh_daily_logs(log_date):
-    """Aggiorna il bilancio calorico giornaliero su Supabase gestendo in sicurezza qualsiasi formato di data"""
+    """Aggiorna il bilancio calorico giornaliero su Supabase filtrando per utente"""
     date_str = str(log_date)
-    meals = supabase.table("meals").select("*").eq("date", date_str).execute().data
-    acts = supabase.table("activities").select("*").eq("date", date_str).execute().data
+    meals = supabase.table("meals").select("*").eq("date", date_str).eq("user_id", user_id).execute().data
+    acts = supabase.table("activities").select("*").eq("date", date_str).eq("user_id", user_id).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
     cals_out = sum(a['burned_calories'] for a in acts) if acts else 0
     supabase.table("daily_logs").upsert({
+        "user_id": user_id,
         "date": date_str, 
         "calories": cals_in, 
         "burned_calories": cals_out, 
         "calorie_deficit": cals_in - cals_out
-    }, on_conflict="date").execute()
+    }, on_conflict="user_id,date").execute()
 
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
@@ -266,7 +285,7 @@ with tab1:
             )
             st.rerun()
     else:
-        recipes_data = supabase.table("recipes").select("*").execute().data
+        recipes_data = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
         recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
         
         sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
@@ -320,6 +339,7 @@ with tab1:
             else:
                 try:
                     supabase.table("meals").insert({
+                        "user_id": user_id,
                         "date": str(log_date), 
                         "meal_type": m_type, 
                         "name": meal_display_name, 
@@ -347,6 +367,7 @@ with tab1:
         extra_cals = st.number_input(t["extra_cals"], value=0, step=50)
         if st.form_submit_button("Salva Attività Extra"):
             supabase.table("activities").insert({
+                "user_id": user_id,
                 "date": str(log_date), 
                 "activity_name": extra_act, 
                 "burned_calories": int(extra_cals)
@@ -361,31 +382,28 @@ with tab2:
     
     summary_date = st.date_input("Data riepilogo", value=date.today(), key="summary_date_input")
     
-    daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).execute().data
-    meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).execute().data
+    daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
+    meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
     
-    raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).execute().data
+    raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
     activities_data = [a for a in raw_activities if a.get("activity_name") not in ["Ufficio", "Base"]] if raw_activities else []
     
     total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
-    
-    bmr_base = 1900
     current_weight = None
     if daily_log_res:
         row = daily_log_res[0]
-        if row.get('calories_out'):
-            bmr_base = row.get('calories_out')
         current_weight = row.get('weight')
         
     now = datetime.now()
     
+    # BMR unico calcolato per utente ripartito sulle ore della giornata
     if summary_date == date.today():
-        bmi_so_far = int((bmr_base / 24.0) * (now.hour + now.minute / 60.0))
+        bmr_so_far = int((user_bmr / 24.0) * (now.hour + now.minute / 60.0))
     else:
-        bmi_so_far = bmr_base
+        bmr_so_far = user_bmr
         
     extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
-    total_burned_finora = bmi_so_far + extra_burned
+    total_burned_finora = bmr_so_far + extra_burned
     
     deficit = total_burned_finora - total_cals_in
 
@@ -415,7 +433,7 @@ with tab2:
     st.markdown("---")
     
     st.markdown("### 🏃 Calorie Bruciate & Attività")
-    rows_acts = [{"Attività": "BMI", "Kcal Bruciate": bmi_so_far}]
+    rows_acts = [{"Attività": "BMR (Base)", "Kcal Bruciate": bmr_so_far}]
     if activities_data:
         for act in activities_data:
             rows_acts.append({
@@ -432,11 +450,15 @@ with tab3:
     with col_w1:
         w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
         if st.button(t["save_weight"]): 
-            supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
+            supabase.table("daily_logs").upsert({
+                "user_id": user_id,
+                "date": str(date.today()), 
+                "weight": w
+            }, on_conflict="user_id,date").execute()
+            st.success("Peso salvato!")
             st.rerun()
             
     with col_w2:
-        # Modifica e aggiornamento dinamico del target weight nei metadata utente
         new_target = st.number_input("Aggiorna Peso Obiettivo (kg)", value=user_target_weight, step=0.5)
         if st.button("Salva Obiettivo"):
             try:
@@ -449,7 +471,7 @@ with tab3:
             except Exception as e:
                 st.error(f"Errore durante l'aggiornamento: {e}")
         
-    logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").order("date").execute().data
+    logs = supabase.table("daily_logs").select("date, weight").eq("user_id", user_id).not_.is_("weight", "null").order("date").execute().data
     if logs:
         df = pd.DataFrame(logs)
         df['date'] = pd.to_datetime(df['date'])
@@ -485,7 +507,6 @@ with tab3:
         
         fig.update_yaxes(range=[min(75, user_target_weight - 3), max(90, user_target_weight + 10)])
         
-        # Linea del target legata al valore dinamico dell'utente
         fig.add_hline(y=user_target_weight, line_dash="dash", line_color="#FFD700", line_width=3.5)
         
         fig.add_annotation(
@@ -521,8 +542,6 @@ with tab4:
                 st.warning("Inserisci un nome valido per la ricetta.")
             else:
                 try:
-                    user_id = st.session_state["user"].user.id
-                    
                     supabase.table("recipes").upsert({
                         "name": r_name.strip(), 
                         "calories": int(cals), 
@@ -530,7 +549,7 @@ with tab4:
                         "carbs": int(carbs), 
                         "fat": int(fat),
                         "user_id": user_id
-                    }, on_conflict="name").execute()
+                    }, on_conflict="user_id,name").execute()
                     
                     st.success(t["recipe_saved"])
                     st.rerun()
