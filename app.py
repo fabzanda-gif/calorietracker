@@ -97,7 +97,57 @@ if "user" not in st.session_state:
     st.title("🔐 Accesso Tracker Pro")
     login_url = supabase.auth.sign_in_with_oauth({"provider": "google", "options": {"redirect_to": "https://diario-alimentare.streamlit.app"}}).url
     st.link_button("Accedi con Google", login_url)
-    # [Qui il tuo form di Login/Registrazione con la gestione errori che hai scritto tu]
+    
+    st.markdown("---")
+    auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
+    
+    with st.form("auth_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password (min. 6 caratteri)", type="password")
+        
+        display_name_input = ""
+        target_weight = None
+        height = None
+        current_weight = None
+        gender = None
+        
+        if auth_mode == "Registrazione":
+            st.markdown("### 📋 Parametri Fisici Iniziali")
+            display_name_input = st.text_input("Display Name", value="")
+            gender = st.selectbox("Genere", ["Uomo", "Donna"], index=None, placeholder="Seleziona genere...")
+            height = st.number_input("Altezza (cm)", value=None, step=1.0, placeholder="Es. 175")
+            current_weight = st.number_input("Peso Attuale (kg)", value=None, step=0.5, placeholder="Es. 81.0")
+            target_weight = st.number_input("Peso Obiettivo (kg)", value=None, step=0.5, placeholder="Es. 78.0")
+        
+        submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
+        if st.form_submit_button(submit_label):
+            try:
+                if auth_mode == "Login":
+                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    if response and response.session:
+                        save_authenticated_session(response)
+                        st.rerun()
+                else:
+                    if not height or not current_weight or not target_weight or not gender:
+                        st.warning("Per favore compila tutti i campi fisici per la registrazione.")
+                    else:
+                        calculated_bmr = calculate_bmr(current_weight, height, gender)
+                        supabase.auth.sign_up({
+                            "email": email, 
+                            "password": password,
+                            "options": {
+                                "data": {
+                                    "display_name": display_name_input,
+                                    "target_weight": float(target_weight),
+                                    "bmr": calculated_bmr,
+                                    "height": float(height),
+                                    "gender": gender
+                                }
+                            }
+                        })
+                        st.success("Account creato con successo! Effettua il login.")
+            except Exception as e:
+                st.error(f"Errore durante l'autenticazione: {e}")
     st.stop()
 
 # ==============================================================================
@@ -110,10 +160,30 @@ display_name = u_meta.get("display_name") or user.email.split("@")[0]
 user_target_weight = u_meta.get("target_weight")
 user_bmr = u_meta.get("bmr")
 
-# Configurazione profilo mancante
+# Configurazione profilo mancante (es. dopo login Google)
 if user_target_weight is None or user_bmr is None:
-    st.warning("Completa il profilo.")
-    # [Qui il tuo form di configurazione profilo]
+    st.warning("⚠️ Per iniziare, configura i tuoi dati.")
+    with st.form("missing_data_form"):
+        st.subheader("📋 Configurazione Profilo")
+        gen = st.selectbox("Genere", ["Uomo", "Donna"])
+        h_val = st.number_input("Altezza (cm)", value=175.0, step=1.0)
+        w_val = st.number_input("Peso Attuale (kg)", value=81.0, step=0.5)
+        t_val = st.number_input("Peso Obiettivo (kg)", value=78.0, step=0.5)
+        
+        if st.form_submit_button("Salva e Inizia"):
+            calculated_bmr = calculate_bmr(w_val, h_val, gen)
+            try:
+                res = supabase.auth.update_user({"data": {
+                    "target_weight": float(t_val),
+                    "bmr": calculated_bmr,
+                    "height": float(h_val),
+                    "gender": gen
+                }})
+                if hasattr(res, 'user') and res.user:
+                    st.session_state["user"] = res.user
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore: {e}")
     st.stop()
 
 with st.sidebar:
@@ -166,7 +236,6 @@ if selected_page == t["t1"]:
             if len(search_q) >= 2:
                 with st.spinner('Ricerca in corso...'):
                     st.session_state["api_res"] = search_open_food_facts(search_q)
-                # Evita crash del selectbox se la vecchia selezione non esiste più
                 st.session_state.pop("prod_select", None)
                 st.session_state["last_selected"] = ""
                 st.rerun()
@@ -294,7 +363,7 @@ if selected_page == t["t1"]:
 elif selected_page == t["t2"]:
     st.subheader("📊 Riepilogo Giornaliero")
 
-    summary_date = st.date_input("Data riepilogo", value=date.today(), key="summary_date_input")
+    summary_date = st.date_input("Data riepilogo", value=date.today())
 
     daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
     meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
@@ -451,7 +520,7 @@ elif selected_page == t["t4"]:
 
         if st.form_submit_button(t["save_recipe"]):
             if not r_name.strip():
-                st.warning("Inserisci un nome valido per la ricetta.")
+                st.warning("Inserisci un nome valido per il ricetta.")
             else:
                 try:
                     supabase.table("recipes").upsert({
