@@ -76,18 +76,18 @@ if "user" not in st.session_state:
         query_params = st.query_params
         if "code" in query_params or "access_token" in query_params:
             try:
-                session = supabase.auth.get_session()
-                if session and session.session:
+                res = supabase.auth.get_session()
+                if res and res.session:
                     session_data = {
-                        "access_token": session.session.access_token,
-                        "refresh_token": session.session.refresh_token,
+                        "access_token": res.session.access_token,
+                        "refresh_token": res.session.refresh_token,
                         "user": {
-                            "id": session.user.id,
-                            "email": session.user.email,
-                            "user_metadata": session.user.user_metadata
+                            "id": res.user.id,
+                            "email": res.user.email,
+                            "user_metadata": res.user.user_metadata
                         }
                     }
-                    st.session_state["user"] = session
+                    st.session_state["user"] = res
                     controller.set("supabase_session", session_data, max_age=30*24*60*60)
                     st.query_params.clear()
                     st.rerun()
@@ -173,9 +173,7 @@ if "user" not in st.session_state:
                     st.error(f"Errore durante l'autenticazione: {e}")
         st.stop()
 else:
-    # Se l'utente è autenticato, estraiamo il display name e mostriamo il saluto dinamico
     user_obj = st.session_state["user"]
-    # Gestione compatibilità oggetto utente Streamlit / Supabase
     user_metadata = {}
     if hasattr(user_obj, "user") and hasattr(user_obj.user, "user_metadata"):
         user_metadata = user_obj.user.user_metadata or {}
