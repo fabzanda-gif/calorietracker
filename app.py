@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
 from supabase import create_client, Client
 
 # --- CSS MODERNO ---
@@ -23,7 +23,6 @@ def init_supabase() -> Client:
 
 supabase = init_supabase()
 
-# --- FUNZIONE DI RICALCOLO AUTOMATICO ---
 def refresh_daily_logs(log_date):
     meals = supabase.table("meals").select("*").eq("date", str(log_date)).execute().data
     acts = supabase.table("activities").select("*").eq("date", str(log_date)).execute().data
@@ -79,17 +78,48 @@ with tab1:
 
 # --- TAB 2: OVERVIEW ---
 with tab2:
-    st.header("🎯 Overview Giornaliera")
+    st.header("🎯 Overview Giornaliera (Proporzionale all'ora)")
     today_str = str(date.today())
-    today_log = supabase.table("daily_logs").select("*").eq("date", today_str).execute().data
-    if today_log:
-        row = today_log[0]
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Ingerite", f"{row.get('calories', 0)} kcal")
-        c2.metric("Bruciate", f"{row.get('burned_calories', 0)} kcal")
-        c3.metric("Deficit", f"{row.get('calorie_deficit', 0)} kcal")
+    
+    # Preleviamo i pasti di oggi per calcolare le ingerite
+    meals_today = supabase.table("meals").select("*").eq("date", today_str).execute().data
+    cals_in = sum(m['calories'] for m in meals_today) if meals_today else 0
+    
+    # Preleviamo le attività/base configurate oggi
+    acts_today = supabase.table("activities").select("*").eq("date", today_str).execute().data
+    
+    # Troviamo la base giornaliera (1900 o 2200), se non impostata usiamo 1900 di default
+    base_daily = 1900
+    extra_burned = 0
+    for a in acts_today:
+        if a['activity_name'] in ["Casa", "Ufficio"]:
+            base_daily = a['burned_calories']
+        elif a['activity_name'] != "Nessuna":
+            extra_burned += a['burned_calories']
+
+    # Calcolo proporzionale in base all'ora corrente
+    now = datetime.now()
+    current_hour = now.hour + (now.minute / 60.0)
+    # Evitiamo divisioni strane o ore a zero spaccato
+    hours_passed = max(current_hour, 0.1) 
+    
+    # Bruciate finora = (Base giornaliera / 24 * ore passate) + eventuali attività extra registrate
+    proportional_burned = int((base_daily / 24.0) * hours_passed + extra_burned)
+    
+    # Calcolo del deficit basato sulle ingerite e le bruciate stimate a quest'ora
+    current_deficit = cals_in - proportional_burned
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("🔥 Kcal Ingerite", f"{cals_in} kcal")
+    c2.metric("⚡ Kcal Bruciate (Stimate ad ora)", f"{proportional_burned} kcal")
+    c3.metric("📉 Deficit Attuale", f"{current_deficit} kcal")
+    
+    if current_deficit < 0:
+        st.success("💪 Ottimo lavoro! Sei in deficit calorico, continua così!")
+    elif current_deficit > 0:
+        st.warning("⚠️ Sei in surplus calorico per il momento della giornata.")
     else:
-        st.info("Nessun dato per oggi. Inserisci qualcosa nella tab Inserimento!")
+        st.info("⚖️ Sei in perfetto pareggio.")
 
 # --- TAB 3: PESO ---
 with tab3:
