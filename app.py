@@ -322,7 +322,6 @@ with tab4:
                 st.warning("Inserisci un nome valido per la ricetta.")
             else:
                 try:
-                    # Recuperiamo l'ID dell'utente loggato in modo sicuro
                     user_id = st.session_state["user"].user.id
                     
                     supabase.table("recipes").upsert({
@@ -331,23 +330,10 @@ with tab4:
                         "protein": int(prot), 
                         "carbs": int(carbs), 
                         "fat": int(fat),
-                        "user_id": user_id  # <-- Associa l'utente corrente
+                        "user_id": user_id
                     }, on_conflict="name").execute()
                     
                     st.success(t["recipe_saved"])
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore durante il salvataggio: {e}")
-                    
-    recipes = supabase.table("recipes").select("*").execute().data
-    if recipes: 
-        df_recipes = pd.DataFrame(recipes)
-        # Nascondiamo le colonne 'id' e 'user_id' se presenti nel dataframe
-        cols_to_drop = [col for col in ['id', 'user_id'] if col in df_recipes.columns]
-        df_display = df_recipes.drop(columns=cols_to_drop)
-        
-        st.dataframe(df_display, use_container_width=True)
-                    
-    recipes = supabase.table("recipes").select("*").execute().data
-    if recipes: 
-        st.dataframe(pd.DataFrame(recipes), use_container_width=True)
