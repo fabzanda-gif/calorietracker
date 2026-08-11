@@ -19,7 +19,6 @@ controller = CookieController()
 
 # --- FUNZIONE CALCOLO BMR (Formula Mifflin-St Jeor) ---
 def calculate_bmr(weight, height, gender):
-    # Usiamo un'età media standard di 30 anni
     if gender == "Uomo":
         return int((10 * weight) + (6.25 * height) - (5 * 30) + 5)
     else:
@@ -95,9 +94,43 @@ if "user" not in st.session_state:
 st.set_page_config(page_title="Tracker Pro", layout="wide")
 user_data = st.session_state["user"]
 user_id = user_data.user.id
-display_name = getattr(user_data.user, 'user_metadata', {}).get('display_name', user_data.user.email.split('@')[0])
-user_target_weight = float(getattr(user_data.user, 'user_metadata', {}).get('target_weight', 78.0))
-user_bmr = int(getattr(user_data.user, 'user_metadata', {}).get('bmr', 1900))
+user_metadata = getattr(user_data.user, 'user_metadata', {})
+
+display_name = user_metadata.get('display_name', user_data.user.email.split('@')[0])
+user_target_weight = user_metadata.get('target_weight')
+user_bmr = user_metadata.get('bmr')
+
+# --- PROMPT DINAMICO PER UTENTI SENZA DATI (es. Signup da Supabase o Google OAuth) ---
+if not user_target_weight or not user_bmr:
+    st.warning("⚠️ Per iniziare a usare Tracker Pro, abbiamo bisogno di qualche dato in più sul tuo profilo.")
+    with st.form("missing_data_form"):
+        st.subheader("📋 Configurazione Iniziale Profilo")
+        gen = st.selectbox("Genere", ["Uomo", "Donna"])
+        h_val = st.number_input("Altezza (cm)", value=175.0, step=1.0)
+        w_val = st.number_input("Peso Attuale (kg)", value=81.0, step=0.5)
+        t_val = st.number_input("Peso Obiettivo (kg)", value=78.0, step=0.5)
+        
+        if st.form_submit_button("Salva e Inizia"):
+            calculated_bmr = calculate_bmr(w_val, h_val, gen)
+            try:
+                res = supabase.auth.update_user({
+                    "data": {
+                        "target_weight": float(t_val),
+                        "bmr": calculated_bmr,
+                        "height": float(h_val),
+                        "gender": gen
+                    }
+                })
+                st.session_state["user"] = res
+                st.success("Profilo configurato con successo! Ricarico l'app...")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore durante il salvataggio: {e}")
+    st.stop()
+
+# Convertiamo in valori numerici sicuri una volta superato il blocco
+user_target_weight = float(user_target_weight)
+user_bmr = int(user_bmr)
 
 lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
 
