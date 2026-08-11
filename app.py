@@ -123,13 +123,32 @@ with tab2:
 
 # --- TAB 3: PESO ---
 with tab3:
-    st.header("Analisi Peso")
-    w = st.number_input("Peso (kg)", value=82.0, step=0.1)
+    st.header("📈 Analisi Peso")
+    
+    # Inserimento peso
+    w = st.number_input("Inserisci Peso (kg)", value=82.0, step=0.1)
     if st.button("Salva Peso"):
         supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
         st.success("Peso aggiornato!")
-    logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").execute().data
-    if logs: st.line_chart(pd.DataFrame(logs).set_index('date')['weight'])
+    
+    # Recupero dati
+    logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").order("date").execute().data
+    
+    if logs:
+        df = pd.DataFrame(logs)
+        df['date'] = pd.to_datetime(df['date'])
+        
+        # Creazione grafico con Plotly per maggiore controllo
+        import plotly.express as px
+        import plotly.graph_objects as go
+        
+        fig = px.bar(df, x='date', y='weight', title="Trend Peso", color_discrete_sequence=['#007BFF'])
+        
+        # Impostazione range Y (75-90) e linea obiettivo
+        fig.update_yaxes(range=[75, 90])
+        fig.add_hline(y=78, line_dash="dash", line_color="red", annotation_text="Goal: 78kg")
+        
+        st.plotly_chart(fig, use_container_width=True)
 
 # --- TAB 4: RICETTE ---
 with tab4:
