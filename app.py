@@ -74,7 +74,8 @@ t = {
         "add_meal": "Aggiungi Pasto",
         "meal_added": "Pasto aggiunto con successo!",
         "extra_act": "Attività Extra",
-        "extra_cals": "Calorie Bruciate"
+        "extra_cals": "Calorie Bruciate",
+        "insert_weight": "Inserisci Peso (kg)"
     },
     "English": {
         "title": greeting_en, 
@@ -87,11 +88,12 @@ t = {
         "add_meal": "Add Meal",
         "meal_added": "Meal added successfully!",
         "extra_act": "Extra Activity",
-        "extra_cals": "Burned Calories"
+        "extra_cals": "Burned Calories",
+        "insert_weight": "Insert Weight (kg)"
     }
 }[lang]
 
-# Mostra il titolo dinamico una sola volta
+# Mostra il titolo dinamico UNA SOLA VOLTA
 st.title(t["title"])
 
 # --- FUNZIONI DI SUPPORTO (AGGIORNATE E SICURE) ---
