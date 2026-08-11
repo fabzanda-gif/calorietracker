@@ -72,6 +72,7 @@ t = {
     }
 }[lang]
 
+# --- FUNZIONI API E LOGICHE ---
 def search_open_food_facts(query):
     if not query or len(query) < 3: return {}
     url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1"
@@ -79,9 +80,11 @@ def search_open_food_facts(query):
         data = requests.get(url, timeout=5).json()
         options = {}
         for p in data.get("products", []):
-            name = p.get("product_name", "Unknown")
+            name = p.get("product_name", ""); brands = p.get("brands", "")
+            if not name: continue
+            display = f"{name} ({brands})" if brands else name
             nutri = p.get("nutriments", {})
-            options[name] = {"name": name, "calories": int(nutri.get("energy-kcal_100g", 0)), "protein": int(nutri.get("proteins_100g", 0)), "carbs": int(nutri.get("carbohydrates_100g", 0)), "fat": int(nutri.get("fat_100g", 0))}
+            options[display] = {"name": name, "calories": int(nutri.get("energy-kcal_100g", 0)), "protein": int(nutri.get("proteins_100g", 0)), "carbs": int(nutri.get("carbohydrates_100g", 0)), "fat": int(nutri.get("fat_100g", 0))}
         return options
     except: return {}
 
@@ -107,38 +110,33 @@ with tab1:
             refresh_daily_logs(log_date); st.success(t["conf_saved"])
 
     st.subheader("🍽️ Inserisci Pasto")
-    search_q = st.text_input("🔍 Cerca su Open Food Facts (min 3 caratteri)")
-    api_res = search_open_food_facts(search_q) if search_q else {}
+    search_q = st.text_input("🔍 Cerca su Open Food Facts", key="search_box")
+    if search_q and len(search_q) >= 3: st.session_state["api_res"] = search_open_food_facts(search_q)
+    api_res = st.session_state.get("api_res", {})
     sel_prod = st.selectbox("Seleziona Prodotto", [""] + list(api_res.keys()))
     ref = api_res.get(sel_prod, {}) if sel_prod else {}
     
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
-        name = st.text_input(t["meal_name"], value=ref.get('name', ''))
+        name = st.text_input(t["meal_name"], value=ref.get('name', search_q if search_q else ''))
         c1, c2, c3, c4 = st.columns(4)
-        cals = c1.number_input("Kcal", value=int(ref.get('calories', 0)))
-        prot = c2.number_input("Pro (g)", value=int(ref.get('protein', 0)))
-        carbs = c3.number_input("Carbs (g)", value=int(ref.get('carbs', 0)))
-        fat = c4.number_input("Fat (g)", value=int(ref.get('fat', 0)))
+        cals, prot, carbs, fat = c1.number_input("Kcal", value=int(ref.get('calories', 0))), c2.number_input("Pro (g)", value=int(ref.get('protein', 0))), c3.number_input("Carbs (g)", value=int(ref.get('carbs', 0))), c4.number_input("Fat (g)", value=int(ref.get('fat', 0)))
         if st.form_submit_button(t["add_meal"]):
             supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
             refresh_daily_logs(log_date); st.rerun()
 
 with tab2:
     st.header(t["overview_title"])
-    today_str = str(date.today())
-    meals = supabase.table("meals").select("*").eq("date", today_str).execute().data
+    meals = supabase.table("meals").select("*").eq("date", str(date.today())).execute().data
     cals_in = sum(m['calories'] for m in meals) if meals else 0
     c1, c2, c3 = st.columns(3)
     c1.metric(t["eaten"], f"{cals_in} kcal")
-    
     latest_w = supabase.table("daily_logs").select("weight").not_.is_("weight", "null").order("date", desc=True).limit(1).execute().data
     curr_w = latest_w[0]['weight'] if latest_w else 80.9
-    target_deficit = max(0.0, curr_w - 78.0) * 10676
-    st.metric(t["goal_target"], f"{int(target_deficit):,} kcal")
+    target = max(0.0, curr_w - 78.0) * 10676
+    c3.metric(t["goal_target"], f"{int(target):,} kcal")
 
 with tab3:
-    st.header(t["weight_analysis"])
     w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
     if st.button(t["save_weight"]):
         supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
@@ -149,10 +147,10 @@ with tab3:
         df['date'] = pd.to_datetime(df['date'])
         import plotly.express as px
         fig = px.bar(df, x='date', y='weight', title="Trend Peso")
+        fig.add_hline(y=78, line_dash="dot", line_color="white", line_width=4, annotation_text="<b>🎯 GOAL: 78 kg</b>")
         st.plotly_chart(fig, use_container_width=True)
 
 with tab4:
-    st.header(t["recipes_title"])
     with st.form("recipe_add"):
         r_name = st.text_input(t["recipe_name"])
         c1, c2, c3, c4 = st.columns(4)
