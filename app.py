@@ -241,7 +241,10 @@ with tab2:
 # --- TAB 3: PESO ---
 with tab3:
     w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
-    if st.button(t["save_weight"]): supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute(); st.rerun()
+    if st.button(t["save_weight"]): 
+        supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
+        st.rerun()
+        
     logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").order("date").execute().data
     if logs:
         df = pd.DataFrame(logs)
@@ -250,11 +253,30 @@ with tab3:
         df['is_real'] = df['weight'].notnull()
         df['date_str'] = df['date'].dt.strftime('%d %b %Y')
         df['weight_str'] = df['weight'].round(1).astype(str) + " kg"
-        fig = px.bar(df, x='date', y='weight', color='is_real', color_discrete_map={True: '#007BFF', False: 'rgba(0, 123, 255, 0.3)'}, title="Trend Peso", custom_data=['date_str', 'weight_str'])
+        
+        # Grafico con colori ripristinati per distinguere reali e proiettati
+        fig = px.bar(
+            df, x='date', y='weight', 
+            color='is_real', 
+            color_discrete_map={True: '#007BFF', False: 'rgba(0, 123, 255, 0.25)'}, 
+            title="Trend Peso", 
+            custom_data=['date_str', 'weight_str']
+        )
         fig.update_traces(hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>")
         fig.update_yaxes(range=[75, 90])
-        fig.add_hline(y=78, line_dash="dot", line_color="#FF4B4B", line_width=2)
-        fig.add_annotation(xref="paper", yref="y", x=0.98, y=78.3, text="<b>🎯 GOAL: 78 kg</b>", showarrow=False, font=dict(color="#FF4B4B", size=14), align="right")
+        
+        # Linea del target ingrandita e ad altissima visibilità (Verde Neon)
+        fig.add_hline(y=78, line_dash="dash", line_color="#00FF66", line_width=4)
+        
+        # Testo del goal molto più grande, in grassetto e ben leggibile
+        fig.add_annotation(
+            xref="paper", yref="y", x=0.98, y=78.4, 
+            text="<b>🎯 GOAL: 78 kg</b>", 
+            showarrow=False, 
+            font=dict(color="#00FF66", size=18, family="sans-serif"), 
+            align="right"
+        )
+        
         fig.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True)
 
