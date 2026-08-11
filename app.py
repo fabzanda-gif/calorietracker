@@ -29,8 +29,44 @@ if "user" not in st.session_state:
                 st.error("Credenziali non valide.")
     st.stop()
 
+# --- RECUPERO DISPLAY NAME ---
+user_data = st.session_state["user"]
+user_metadata = getattr(user_data.user, 'user_metadata', {})
+display_name = user_metadata.get('display_name', user_data.user.email.split('@')[0])
+
 # --- APP PRINCIPALE ---
 st.set_page_config(page_title="Tracker Pro", layout="wide")
+
+# --- SELETTORE LINGUA ---
+lang = st.sidebar.selectbox("🌐 Lingua / Language", ["Italiano", "English"])
+
+# Dizionario traduzioni
+t = {
+    "Italiano": {
+        "title": f"⚖️ Tracker Pro - Ciao, {display_name}!",
+        "tab1": "🚀 Inserimento", "tab2": "📊 Overview", "tab3": "📈 Peso", "tab4": "🍳 Ricette",
+        "reg_day": "Registra la giornata", "day_type": "Tipo di Giornata", "extra_act": "Attività Extra",
+        "extra_cals": "Kcal Extra", "save_conf": "Salva Configurazione", "conf_saved": "Configurazione salvata!",
+        "select_recipe": "Seleziona Ricetta", "meal": "Pasto", "meal_name": "Nome Pasto", "add_meal": "Aggiungi Pasto",
+        "meal_added": "Pasto aggiunto!", "overview_title": "🎯 Overview Giornaliera", "eaten": "🔥 Kcal Ingerite",
+        "burned": "⚡ Kcal Bruciate (Stimate)", "deficit": "📉 Deficit Attuale", "weight_analysis": "📈 Analisi Peso",
+        "insert_weight": "Inserisci Peso (kg)", "save_weight": "Peso aggiornato!", "recipes_title": "🍳 Gestione Ricette",
+        "recipe_name": "Nome Ricetta", "save_recipe": "Salva Ricetta", "recipe_saved": "Ricetta salvata!",
+        "goal_target": "🎯 Obiettivo Deficit Rimanente", "goal_text": "Kcal totali da bruciare per arrivare a 78kg"
+    },
+    "English": {
+        "title": f"⚖️ Tracker Pro - Hello, {display_name}!",
+        "tab1": "🚀 Logging", "tab2": "📊 Overview", "tab3": "📈 Weight", "tab4": "🍳 Recipes",
+        "reg_day": "Log the day", "day_type": "Day Type", "extra_act": "Extra Activity",
+        "extra_cals": "Extra Cals", "save_conf": "Save Configuration", "conf_saved": "Configuration saved!",
+        "select_recipe": "Select Recipe", "meal": "Meal", "meal_name": "Meal Name", "add_meal": "Add Meal",
+        "meal_added": "Meal added!", "overview_title": "🎯 Daily Overview", "eaten": "🔥 Calories Eaten",
+        "burned": "⚡ Calories Burned (Estimated)", "deficit": "📉 Current Deficit", "weight_analysis": "📈 Weight Analysis",
+        "insert_weight": "Insert Weight (kg)", "save_weight": "Weight updated!", "recipes_title": "🍳 Recipe Management",
+        "recipe_name": "Recipe Name", "save_recipe": "Save Recipe", "recipe_saved": "Recipe saved!",
+        "goal_target": "🎯 Remaining Deficit Target", "goal_text": "Total kcal to burn to reach 78kg"
+    }
+}[lang]
 
 # --- CSS MODERNO ---
 st.markdown("""
@@ -48,38 +84,39 @@ def refresh_daily_logs(log_date):
     cals_out = sum(a['burned_calories'] for a in acts) if acts else 0
     supabase.table("daily_logs").upsert({"date": str(log_date), "calories": cals_in, "burned_calories": cals_out, "calorie_deficit": cals_in - cals_out}, on_conflict="date").execute()
 
-st.title("⚖️ Tracker Pro")
-tab1, tab2, tab3, tab4 = st.tabs(["🚀 Inserimento", "📊 Overview", "📈 Peso", "🍳 Ricette"])
+st.title(t["title"])
+tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
 with tab1:
-    log_date = st.date_input("Data", value=date.today())
+    log_date = st.date_input("Data / Date", value=date.today())
     with st.form("day_type_form"):
-        day_type = st.selectbox("Tipo di Giornata", ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
-        extra_act = st.selectbox("Attività Extra", ["Nessuna", "Padel", "Bici", "Camminata"])
-        extra_cals = st.number_input("Kcal Extra", value=0, step=50)
-        if st.form_submit_button("Salva Configurazione"):
+        day_type = st.selectbox(t["day_type"], ["Casa (1900 kcal)", "Ufficio (2200 kcal)"])
+        extra_act = st.selectbox(t["extra_act"], ["Nessuna / None", "Padel", "Bici / Bike", "Camminata / Walk"])
+        extra_cals = st.number_input(t["extra_cals"], value=0, step=50)
+        if st.form_submit_button(t["save_conf"]):
             base_cals = 2200 if "Ufficio" in day_type else 1900
             base_name = "Ufficio" if "Ufficio" in day_type else "Casa"
             supabase.table("activities").delete().eq("date", str(log_date)).execute()
-            supabase.table("activities").insert([{"date": str(log_date), "activity_name": base_name, "burned_calories": base_cals}, {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals} if extra_act != "Nessuna" else {"date": str(log_date), "activity_name": "Nessuna", "burned_calories": 0}]).execute()
+            supabase.table("activities").insert([{"date": str(log_date), "activity_name": base_name, "burned_calories": base_cals}, {"date": str(log_date), "activity_name": extra_act, "burned_calories": extra_cals} if "Nessuna" not in extra_act else {"date": str(log_date), "activity_name": "Nessuna", "burned_calories": 0}]).execute()
             refresh_daily_logs(log_date)
-            st.success("Configurazione salvata!")
+            st.success(t["conf_saved"])
 
     recipes_res = supabase.table("recipes").select("*").execute().data
     recipe_dict = {r['name']: r for r in recipes_res} if recipes_res else {}
     with st.form("meal_form"):
-        selected_recipe = st.selectbox("Seleziona Ricetta", [""] + list(recipe_dict.keys()))
+        selected_recipe = st.selectbox(t["select_recipe"], [""] + list(recipe_dict.keys()))
         ref = recipe_dict.get(selected_recipe, {})
-        m_type = st.selectbox("Pasto", ["Colazione", "Pranzo", "Cena", "Snack"])
-        name = st.text_input("Nome Pasto", value=selected_recipe)
+        m_type = st.selectbox(t["meal"], ["Colazione / Breakfast", "Pranzo / Lunch", "Cena / Dinner", "Snack"])
+        name = st.text_input(t["meal_name"], value=selected_recipe)
         c1, c2, c3, c4 = st.columns(4)
-        cals, prot, carbs, fat = c1.number_input("Kcal", value=int(ref.get('calories', 0))), c2.number_input("Pro", value=int(ref.get('protein', 0))), c3.number_input("Carbs", value=int(ref.get('carbs', 0))), c4.number_input("Fat", value=int(ref.get('fat', 0)))
-        if st.form_submit_button("Aggiungi Pasto"):
+        cals, prot, carbs, fat = c1.number_input("Kcal", value=int(ref.get('calories', 0))), c2.number_input("Pro (g)", value=int(ref.get('protein', 0))), c3.number_input("Carbs (g)", value=int(ref.get('carbs', 0))), c4.number_input("Fat (g)", value=int(ref.get('fat', 0)))
+        if st.form_submit_button(t["add_meal"]):
             supabase.table("meals").insert({"date": str(log_date), "meal_type": m_type, "name": name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}).execute()
             refresh_daily_logs(log_date)
             st.rerun()
 
 with tab2:
+    st.header(t["overview_title"])
     today_str = str(date.today())
     meals_today = supabase.table("meals").select("*").eq("date", today_str).execute().data
     cals_in = sum(m['calories'] for m in meals_today) if meals_today else 0
@@ -87,20 +124,33 @@ with tab2:
     base_daily, extra_burned = 1900, 0
     for a in acts_today:
         if a['activity_name'] in ["Casa", "Ufficio"]: base_daily = a['burned_calories']
-        elif a['activity_name'] != "Nessuna": extra_burned += a['burned_calories']
+        elif "Nessuna" not in a['activity_name']: extra_burned += a['burned_calories']
     now = datetime.now()
     current_hour = now.hour + (now.minute / 60.0)
     proportional_burned = int((base_daily / 24.0) * max(current_hour, 0.1) + extra_burned)
+    
     c1, c2, c3 = st.columns(3)
-    c1.metric("🔥 Kcal Ingerite", f"{cals_in} kcal")
-    c2.metric("⚡ Kcal Bruciate (Stimate)", f"{proportional_burned} kcal")
-    c3.metric("📉 Deficit Attuale", f"{cals_in - proportional_burned} kcal")
+    c1.metric(t["eaten"], f"{cals_in} kcal")
+    c2.metric(t["burned"], f"{proportional_burned} kcal")
+    c3.metric(t["deficit"], f"{cals_in - proportional_burned} kcal")
+    
+    st.divider()
+    
+    # Calcolo target deficit per arrivare a 78kg (2.9kg rimasti * 10676 kcal)
+    # Recuperiamo l'ultimo peso inserito per calcoli precisi
+    latest_weight_res = supabase.table("daily_logs").select("weight").not_.is_("weight", "null").order("date", desc=True).limit(1).execute().data
+    current_weight = latest_weight_res[0]['weight'] if latest_weight_res else 80.9
+    kg_to_lose = max(0.0, current_weight - 78.0)
+    total_kcal_target = kg_to_lose * 10676
+    
+    st.metric(t["goal_target"], f"{int(total_kcal_target):,} kcal", help=f"Kg to 78kg: {kg_to_lose:.1f} kg")
 
 with tab3:
-    w = st.number_input("Inserisci Peso (kg)", value=82.0, step=0.1)
-    if st.button("Salva Peso"):
+    st.header(t["weight_analysis"])
+    w = st.number_input(t["insert_weight"], value=80.9, step=0.1)
+    if st.button(t["save_weight"]):
         supabase.table("daily_logs").upsert({"date": str(date.today()), "weight": w}, on_conflict="date").execute()
-        st.success("Peso aggiornato!")
+        st.success(t["save_weight"])
     logs = supabase.table("daily_logs").select("date, weight").not_.is_("weight", "null").order("date").execute().data
     if logs:
         df = pd.DataFrame(logs)
@@ -122,11 +172,13 @@ with tab3:
         st.plotly_chart(fig, use_container_width=True)
 
 with tab4:
+    st.header(t["recipes_title"])
     with st.form("recipe_add"):
-        r_name = st.text_input("Nome Ricetta")
+        r_name = st.text_input(t["recipe_name"])
         c1, c2, c3, c4 = st.columns(4)
-        if st.form_submit_button("Salva Ricetta"):
+        if st.form_submit_button(t["save_recipe"]):
             supabase.table("recipes").upsert({"name": r_name, "calories": c1.number_input("Kcal", value=0), "protein": c2.number_input("Pro (g)", value=0), "carbs": c3.number_input("Carbs (g)", value=0), "fat": c4.number_input("Fat (g)", value=0)}, on_conflict="name").execute()
+            st.success(t["recipe_saved"])
             st.rerun()
     recipes = supabase.table("recipes").select("*").execute().data
     if recipes: st.dataframe(pd.DataFrame(recipes), use_container_width=True)
