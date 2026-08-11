@@ -65,17 +65,19 @@ if "user" not in st.session_state:
             email = st.text_input("Email")
             password = st.text_input("Password (min. 6 caratteri)", type="password")
             
-            target_weight = 78.0
-            height = 175.0
-            current_weight = 81.0
-            gender = "Uomo"
+            display_name_input = ""
+            target_weight = None
+            height = None
+            current_weight = None
+            gender = None
             
             if auth_mode == "Registrazione":
                 st.markdown("### 📋 Parametri Fisici Iniziali")
-                gender = st.selectbox("Genere", ["Uomo", "Donna"])
-                height = st.number_input("Altezza (cm)", value=175.0, step=1.0)
-                current_weight = st.number_input("Peso Attuale (kg)", value=81.0, step=0.5)
-                target_weight = st.number_input("Peso Obiettivo (kg)", value=78.0, step=0.5)
+                display_name_input = st.text_input("Display Name", value="")
+                gender = st.selectbox("Genere", ["Uomo", "Donna"], index=None, placeholder="Seleziona genere...")
+                height = st.number_input("Altezza (cm)", value=None, step=1.0, placeholder="Es. 175")
+                current_weight = st.number_input("Peso Attuale (kg)", value=None, step=0.5, placeholder="Es. 81.0")
+                target_weight = st.number_input("Peso Obiettivo (kg)", value=None, step=0.5, placeholder="Es. 78.0")
             
             submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
             if st.form_submit_button(submit_label):
@@ -98,24 +100,27 @@ if "user" not in st.session_state:
                         controller.set("supabase_session", session_data, max_age=30*24*60*60)
                         st.rerun()
                     else:
-                        calculated_bmr = calculate_bmr(current_weight, height, gender)
-                        user = supabase.auth.sign_up({
-                            "email": email, 
-                            "password": password,
-                            "options": {
-                                "data": {
-                                    "target_weight": float(target_weight),
-                                    "bmr": calculated_bmr,
-                                    "height": float(height),
-                                    "gender": gender
+                        if not height or not current_weight or not target_weight or not gender:
+                            st.warning("Per favore compila tutti i campi fisici per la registrazione.")
+                        else:
+                            calculated_bmr = calculate_bmr(current_weight, height, gender)
+                            user = supabase.auth.sign_up({
+                                "email": email, 
+                                "password": password,
+                                "options": {
+                                    "data": {
+                                        "display_name": display_name_input,
+                                        "target_weight": float(target_weight),
+                                        "bmr": calculated_bmr,
+                                        "height": float(height),
+                                        "gender": gender
+                                    }
                                 }
-                            }
-                        })
-                        st.success("Account creato con successo! Effettua il login.")
+                            })
+                            st.success("Account creato con successo! Effettua il login.")
                 except Exception as e:
                     st.error(f"Errore durante l'autenticazione: {e}")
         st.stop()
-
 # ==============================================================================
 # 3. CONFIGURAZIONE UTENTE E DATI MANCANTI (POST-LOGIN)
 # ==============================================================================
