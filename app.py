@@ -127,23 +127,48 @@ def refresh_daily_logs(log_date):
 st.title(t["title"])
 tab1, tab2, tab3, tab4 = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
 
-# --- TAB 1: INSERIMENTO (Solo Cibo & Attività Extra) ---
+# --- TAB 1: INSERIMENTO (Cibo, Ricette & Attività Extra) ---
 with tab1:
     log_date = st.date_input("Date", value=date.today())
     
     st.subheader("🍽️ Inserimento Cibo & Pasti")
-    search_q = st.text_input("🔍 Cerca per Nome o inserisci Codice a Barre", key="search_box")
     
-    if st.button("🚀 Cerca"):
-        if len(search_q) >= 2:
-            with st.spinner('Ricerca in corso...'):
-                st.session_state["api_res"] = search_open_food_facts(search_q)
-        else:
-            st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
+    # Opzione per scegliere se cercare su Open Food Facts o usare le Ricette Salvate
+    input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
+    
+    ref = {}
+    search_q = ""
+    
+    if input_source == "🔍 Cerca online (Open Food Facts)":
+        search_q = st.text_input("Cerca per Nome o inserisci Codice a Barre", key="search_box")
+        if st.button("🚀 Cerca"):
+            if len(search_q) >= 2:
+                with st.spinner('Ricerca in corso...'):
+                    st.session_state["api_res"] = search_open_food_facts(search_q)
+            else:
+                st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
 
-    api_res = st.session_state.get("api_res", {})
-    sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
-    ref = api_res.get(sel_prod, {}) if sel_prod else {}
+        api_res = st.session_state.get("api_res", {})
+        sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
+        ref = api_res.get(sel_prod, {}) if sel_prod else {}
+        if sel_prod:
+            search_q = ref.get('name', search_q)
+    else:
+        # Recupera le ricette salvate da Supabase
+        recipes_data = supabase.table("recipes").select("*").execute().data
+        recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
+        
+        sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
+        if sel_recipe and sel_recipe in recipes_dict:
+            r_obj = recipes_dict[sel_recipe]
+            ref = {
+                'name': r_obj.get('name'),
+                'calories': float(r_obj.get('calories', 0)),
+                'protein': float(r_obj.get('protein', 0)),
+                'carbs': float(r_obj.get('carbs', 0)),
+                'fat': float(r_obj.get('fat', 0))
+            }
+            search_q = r_obj.get('name')
 
     with st.form("meal_form"):
         m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"])
