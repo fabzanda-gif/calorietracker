@@ -312,7 +312,28 @@ with tab4:
     with st.form("recipe_add"):
         r_name = st.text_input(t["recipe_name"])
         c1, c2, c3, c4 = st.columns(4)
-        cals, prot, carbs, fat = c1.number_input("Kcal", key="r_cal"), c2.number_input("Pro", key="r_pro"), c3.number_input("Carbs", key="r_carbs"), c4.number_input("Fat", key="r_fat")
-        if st.form_submit_button(t["save_recipe"]): supabase.table("recipes").upsert({"name": r_name, "calories": cals, "protein": prot, "carbs": carbs, "fat": fat}, on_conflict="name").execute(); st.rerun()
+        cals = c1.number_input("Kcal", value=0.0, key="r_cal")
+        prot = c2.number_input("Pro", value=0.0, key="r_pro")
+        carbs = c3.number_input("Carbs", value=0.0, key="r_carbs")
+        fat = c4.number_input("Fat", value=0.0, key="r_fat")
+        
+        if st.form_submit_button(t["save_recipe"]):
+            if not r_name.strip():
+                st.warning("Inserisci un nome valido per la ricetta.")
+            else:
+                try:
+                    supabase.table("recipes").upsert({
+                        "name": r_name.strip(), 
+                        "calories": float(cals), 
+                        "protein": float(prot), 
+                        "carbs": float(carbs), 
+                        "fat": float(fat)
+                    }, on_conflict="name").execute()
+                    st.success(t["recipe_saved"])
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore durante il salvataggio: {e}")
+                    
     recipes = supabase.table("recipes").select("*").execute().data
-    if recipes: st.dataframe(pd.DataFrame(recipes), use_container_width=True)
+    if recipes: 
+        st.dataframe(pd.DataFrame(recipes), use_container_width=True)
