@@ -122,6 +122,7 @@ with tab2:
         st.info("⚖️ Sei in perfetto pareggio.")
 
 # --- TAB 3: PESO ---
+# --- TAB 3: PESO ---
 with tab3:
     st.header("📈 Analisi Peso")
     
@@ -139,31 +140,51 @@ with tab3:
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
         
-        # 1. Creiamo un range di date completo dal primo al'ultimo log
+        # 1. Creiamo un range di date completo dal primo all'ultimo log
         idx = pd.date_range(df.index.min(), df.index.max())
         
-        # 2. Reindicizziamo e interpoliamo (il valore fittizio)
+        # 2. Reindicizziamo e interpoliamo
         df_full = df.reindex(idx)
-        df_full['is_real'] = df_full['weight'].notnull() # Segniamo cosa è vero
-        df_full['weight'] = df_full['weight'].interpolate() # Creiamo la proiezione
+        df_full['is_real'] = df_full['weight'].notnull()
+        df_full['weight'] = df_full['weight'].interpolate()
         df_full = df_full.reset_index().rename(columns={'index': 'date'})
+        
+        # Creiamo una colonna di testo formattata per la data leggibile
+        df_full['date_str'] = df_full['date'].dt.strftime('%d %b %Y')
+        df_full['weight_str'] = df_full['weight'].round(1).astype(str) + " kg"
         
         # 3. Grafico con Plotly
         import plotly.express as px
         
-        # Creiamo un colore/opacità basato su 'is_real'
         fig = px.bar(
             df_full, x='date', y='weight', 
             color='is_real', 
-            color_discrete_map={True: '#007BFF', False: '#A0CFFF'}, # Blu scuro per vero, chiaro per proiezione
-            title="Trend Peso (con proiezioni)"
+            color_discrete_map={True: '#007BFF', False: '#A0CFFF'},
+            title="Trend Peso (con proiezioni)",
+            custom_data=['date_str', 'weight_str'] # Passiamo i dati puliti al tooltip
         )
         
-        # Impostazione range Y (75-90) e linea obiettivo
-        fig.update_yaxes(range=[75, 90])
-        fig.add_hline(y=78, line_dash="dash", line_color="red", annotation_text="Goal: 78kg")
+        # Personalizziamo il testo del tooltip (nascondiamo i dati grezzi e mostriamo solo data e peso in grassetto)
+        fig.update_traces(
+            hovertemplate="<b>📅 %{customdata[0]}</b><br>⚖️ <b>%{customdata[1]}</b><extra></extra>"
+        )
         
-        # Nascondiamo la legenda che non serve
+        # Impostazione range Y (75-90) e linea obiettivo ad alto contrasto
+        fig.update_yaxes(range=[75, 90])
+        
+        # Linea obiettivo in evidenza (Verde scuro/Smeraldo o Arancione forte)
+        fig.add_hline(
+            y=78, 
+            line_dash="dot", 
+            line_color="#28a745", 
+            line_width=3,
+            annotation_text="<b>🎯 GOAL: 78 kg</b>",
+            annotation_font_color="#28a745",
+            annotation_font_size=14,
+            annotation_position="top left"
+        )
+        
+        # Layout pulito senza legenda
         fig.update_layout(showlegend=False)
         
         st.plotly_chart(fig, use_container_width=True)
