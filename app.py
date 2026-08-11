@@ -149,7 +149,7 @@ with tab1:
         st.session_state["m_carbs"] = int(carbs)
         st.session_state["m_fat"] = int(fat)
         st.session_state["last_selected"] = selected
-        st.session_state["form_v"] += 1  # Incrementa la versione per ricreare i widget puliti
+        st.session_state["form_v"] += 1
 
     # Se cambia la fonte (Radio button), puliamo tutto
     if st.session_state["last_source"] != input_source:
@@ -198,13 +198,11 @@ with tab1:
             )
             st.rerun()
 
-    # Versione attiva per i widget
     v = st.session_state["form_v"]
 
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
 
-    # Nome del pasto collegato dinamicamente alla versione
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
     
     if not is_recipe:
@@ -246,7 +244,11 @@ with tab1:
                         "fat": int(final_fat)
                     }).execute()
                     refresh_daily_logs(log_date)
-                    st.success(f"✅ {t['meal_added']} ({final_cals} kcal)")
+                    
+                    # Pulisce automaticamente i campi e resetta lo stato
+                    reset_or_update()
+                    st.success(f"✅ Pasto aggiunto con successo! ({final_cals} kcal)")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Errore nel salvataggio: {e}")
     with col_btn2:
