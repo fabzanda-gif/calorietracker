@@ -174,47 +174,45 @@ with tab1:
             st.session_state["form_carbs"] = float(r_obj.get('carbs', 0))
             st.session_state["form_fat"] = float(r_obj.get('fat', 0))
 
-    # Form di inserimento effettivo collegato allo state
-    with st.form("meal_form"):
-        m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"], key="meal_type_input")
+    # Input liberi fuori dal form per garantire il re-rendering immediato
+    m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"], key="meal_type_input")
+    name = st.text_input(t["meal_name"], value=st.session_state["form_name"], key="meal_name_input")
+    
+    if not is_recipe:
+        grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
+        factor = grams / 100.0
+        meal_display_name = f"{name} ({grams}g)"
         
-        name = st.text_input(t["meal_name"], value=st.session_state["form_name"], key="meal_name_input")
-        
-        if not is_recipe:
-            grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
-            factor = grams / 100.0
-            meal_display_name = f"{name} ({grams}g)"
-            
-            cals_val = int(st.session_state["form_cals"] * factor)
-            prot_val = round(float(st.session_state["form_prot"] * factor), 1)
-            carbs_val = round(float(st.session_state["form_carbs"] * factor), 1)
-            fat_val = round(float(st.session_state["form_fat"] * factor), 1)
-        else:
-            meal_display_name = name
-            cals_val = int(st.session_state["form_cals"])
-            prot_val = float(st.session_state["form_prot"])
-            carbs_val = float(st.session_state["form_carbs"])
-            fat_val = float(st.session_state["form_fat"])
-        
-        c1, c2, c3, c4 = st.columns(4)
-        cals = c1.number_input("Kcal", value=cals_val, key="m_cals")
-        prot = c2.number_input("Pro (g)", value=prot_val, key="m_pro")
-        carbs = c3.number_input("Carbs (g)", value=carbs_val, key="m_carbs")
-        fat = c4.number_input("Fat (g)", value=fat_val, key="m_fat")
-        
-        if st.form_submit_button(t["add_meal"]):
-            supabase.table("meals").insert({
-                "date": str(log_date), 
-                "meal_type": m_type, 
-                "name": meal_display_name, 
-                "calories": cals, 
-                "protein": prot, 
-                "carbs": carbs, 
-                "fat": fat
-            }).execute()
-            refresh_daily_logs(log_date)
-            st.success(t["meal_added"])
-            st.rerun()
+        cals_val = int(st.session_state["form_cals"] * factor)
+        prot_val = round(float(st.session_state["form_prot"] * factor), 1)
+        carbs_val = round(float(st.session_state["form_carbs"] * factor), 1)
+        fat_val = round(float(st.session_state["form_fat"] * factor), 1)
+    else:
+        meal_display_name = name
+        cals_val = int(st.session_state["form_cals"])
+        prot_val = float(st.session_state["form_prot"])
+        carbs_val = float(st.session_state["form_carbs"])
+        fat_val = float(st.session_state["form_fat"])
+    
+    c1, c2, c3, c4 = st.columns(4)
+    cals = c1.number_input("Kcal", value=cals_val, key="m_cals")
+    prot = c2.number_input("Pro (g)", value=prot_val, key="m_pro")
+    carbs = c3.number_input("Carbs (g)", value=carbs_val, key="m_carbs")
+    fat = c4.number_input("Fat (g)", value=fat_val, key="m_fat")
+    
+    if st.button(t["add_meal"], key="submit_meal_btn"):
+        supabase.table("meals").insert({
+            "date": str(log_date), 
+            "meal_type": m_type, 
+            "name": meal_display_name, 
+            "calories": cals, 
+            "protein": prot, 
+            "carbs": carbs, 
+            "fat": fat
+        }).execute()
+        refresh_daily_logs(log_date)
+        st.success(t["meal_added"])
+        st.rerun()
 
     st.markdown("---")
     st.subheader("🏃 Attività Extra (es. Padel, Bici)")
