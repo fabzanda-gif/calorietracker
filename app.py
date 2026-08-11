@@ -34,15 +34,45 @@ def calculate_bmr(weight, height, gender):
         return int((10 * weight) + (6.25 * height) - (5 * 30) - 161)
 
 # ==============================================================================
-# 2. GESTIONE AUTENTICAZIONE
+# 2. GESTIONE AUTENTICAZIONE E SALUTO DINAMICO
 # ==============================================================================
+import datetime
+
+def get_dynamic_greeting(display_name):
+    now = datetime.datetime.now()
+    hour = now.hour
+    
+    if 5 <= hour < 12:
+        time_greeting = "Buongiorno"
+    elif 12 <= hour < 18:
+        time_greeting = "Buon pomeriggio"
+    elif 18 <= hour < 22:
+        time_greeting = "Buonasera"
+    else:
+        time_greeting = "Buonanotte"
+
+    month = now.month
+    if month in [12, 1, 2]:
+        season = "inverno"
+        weather_desc = "freddo e frizzante"
+    elif month in [3, 4, 5]:
+        season = "primavera"
+        weather_desc = "mite e fiorito"
+    elif month in [6, 7, 8]:
+        season = "estate"
+        weather_desc = "caldo e assolato"
+    else:
+        season = "autunno"
+        weather_desc = "fresco e piovoso"
+
+    return f"{time_greeting}, {display_name}! Che bello rivederti in questa splendida giornata di {season} ({weather_desc})."
+
 if "user" not in st.session_state:
     saved_session = controller.get("supabase_session")
     if saved_session:
         st.session_state["user"] = saved_session
         st.rerun()
     else:
-        # Intercettiamo eventuali parametri di ritorno da Google nell'URL
         query_params = st.query_params
         if "code" in query_params or "access_token" in query_params:
             try:
@@ -142,6 +172,18 @@ if "user" not in st.session_state:
                 except Exception as e:
                     st.error(f"Errore durante l'autenticazione: {e}")
         st.stop()
+else:
+    # Se l'utente è autenticato, estraiamo il display name e mostriamo il saluto dinamico
+    user_obj = st.session_state["user"]
+    # Gestione compatibilità oggetto utente Streamlit / Supabase
+    user_metadata = {}
+    if hasattr(user_obj, "user") and hasattr(user_obj.user, "user_metadata"):
+        user_metadata = user_obj.user.user_metadata or {}
+    elif isinstance(user_obj, dict) and "user" in user_obj:
+        user_metadata = user_obj["user"].get("user_metadata", {})
+        
+    display_name = user_metadata.get("display_name", "Utente")
+    st.title(get_dynamic_greeting(display_name))
 # ==============================================================================
 # 3. CONFIGURAZIONE UTENTE E DATI MANCANTI (POST-LOGIN)
 # ==============================================================================
