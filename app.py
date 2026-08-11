@@ -312,10 +312,10 @@ with tab4:
     with st.form("recipe_add"):
         r_name = st.text_input(t["recipe_name"])
         c1, c2, c3, c4 = st.columns(4)
-        cals = c1.number_input("Kcal", value=0.0, key="r_cal")
-        prot = c2.number_input("Pro", value=0.0, key="r_pro")
-        carbs = c3.number_input("Carbs", value=0.0, key="r_carbs")
-        fat = c4.number_input("Fat", value=0.0, key="r_fat")
+        cals = c1.number_input("Kcal", value=0, step=1, key="r_cal")
+        prot = c2.number_input("Pro", value=0.0, step=0.1, key="r_pro")
+        carbs = c3.number_input("Carbs", value=0.0, step=0.1, key="r_carbs")
+        fat = c4.number_input("Fat", value=0.0, step=0.1, key="r_fat")
         
         if st.form_submit_button(t["save_recipe"]):
             if not r_name.strip():
@@ -324,7 +324,7 @@ with tab4:
                 try:
                     supabase.table("recipes").upsert({
                         "name": r_name.strip(), 
-                        "calories": float(cals), 
+                        "calories": int(cals), # <-- Convertito in intero esplicito
                         "protein": float(prot), 
                         "carbs": float(carbs), 
                         "fat": float(fat)
@@ -334,6 +334,9 @@ with tab4:
                 except Exception as e:
                     st.error(f"Errore durante il salvataggio: {e}")
                     
+    recipes = supabase.table("recipes").select("*").execute().data
+    if recipes: 
+        st.dataframe(pd.DataFrame(recipes), use_container_width=True)
     recipes = supabase.table("recipes").select("*").execute().data
     if recipes: 
         st.dataframe(pd.DataFrame(recipes), use_container_width=True)
