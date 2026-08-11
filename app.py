@@ -237,16 +237,17 @@ with tab1:
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
-    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("last_selected", ""), ("form_v", 0), ("last_source", input_source)]:
+    for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("last_selected", ""), ("form_v", 0), ("last_source", input_source), ("grams_val", 100.0)]:
         if key not in st.session_state:
             st.session_state[key] = default
 
-    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected=""):
+    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0):
         st.session_state["m_name"] = name
         st.session_state["m_cals"] = float(cals)
         st.session_state["m_prot"] = float(prot)
         st.session_state["m_carbs"] = float(carbs)
         st.session_state["m_fat"] = float(fat)
+        st.session_state["grams_val"] = float(grams)
         st.session_state["last_selected"] = selected
         st.session_state["form_v"] += 1
 
@@ -275,7 +276,8 @@ with tab1:
                 prot=p_data.get('protein', 0),
                 carbs=p_data.get('carbohydrates_100g', p_data.get('carbs', 0)),
                 fat=p_data.get('fat_100g', p_data.get('fat', 0)),
-                selected=sel_prod
+                selected=sel_prod,
+                grams=100.0
             )
             st.rerun()
     else:
@@ -292,7 +294,8 @@ with tab1:
                 prot=r_obj.get('protein', 0),
                 carbs=r_obj.get('carbs', 0),
                 fat=r_obj.get('fat', 0),
-                selected=sel_recipe
+                selected=sel_recipe,
+                grams=1.0
             )
             st.rerun()
 
@@ -304,14 +307,17 @@ with tab1:
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
     
     if not is_recipe:
-        if f"prev_grams_{v}" not in st.session_state:
-            st.session_state[f"prev_grams_{v}"] = 100.0
+        # Funzione di callback eseguita immediatamente al cambio dei grammi
+        def update_grams_callback():
+            st.session_state["grams_val"] = st.session_state[f"meal_grams_{v}"]
 
-        grams = st.number_input("Grammi (g)", value=st.session_state.get(f"prev_grams_{v}", 100.0), step=10.0, key=f"meal_grams_{v}")
-        
-        if grams != st.session_state[f"prev_grams_{v}"]:
-            st.session_state[f"prev_grams_{v}"] = grams
-            st.rerun()
+        grams = st.number_input(
+            "Grammi (g)", 
+            value=st.session_state["grams_val"], 
+            step=10.0, 
+            key=f"meal_grams_{v}",
+            on_change=update_grams_callback
+        )
 
         factor = grams / 100.0
         meal_display_name = f"{name} ({grams}g)"
