@@ -136,7 +136,7 @@ with tab1:
     input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Ricette Salvate"], horizontal=True)
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
-    # Inizializzazione dello state per i valori del form
+    # Inizializzazione dello state
     for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0)]:
         if key not in st.session_state:
             st.session_state[key] = default
@@ -152,6 +152,8 @@ with tab1:
 
         api_res = st.session_state.get("api_res", {})
         sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key="prod_select")
+        
+        # Aggiornamento immediato dello state alla selezione del prodotto
         if sel_prod and sel_prod in api_res:
             p_data = api_res[sel_prod]
             st.session_state["m_name"] = p_data.get('name', '')
@@ -164,6 +166,8 @@ with tab1:
         recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
         
         sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key="recipe_select")
+        
+        # Aggiornamento immediato dello state alla selezione della ricetta
         if sel_recipe and sel_recipe in recipes_dict:
             r_obj = recipes_dict[sel_recipe]
             st.session_state["m_name"] = r_obj.get('name', '')
@@ -172,9 +176,9 @@ with tab1:
             st.session_state["m_carbs"] = int(r_obj.get('carbs', 0))
             st.session_state["m_fat"] = int(r_obj.get('fat', 0))
 
-    # Campi di input collegati direttamente allo state
+    # Campi di input collegati allo state per il popolamento automatico
     m_type = st.selectbox(t["meal"], ["Colazione", "Pranzo", "Cena", "Snack"], key="meal_type_input")
-    name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key="meal_name_input")
+    name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key="input_meal_name")
     
     if not is_recipe:
         grams = st.number_input("Grammi (g)", value=100.0, step=10.0, key="meal_grams")
