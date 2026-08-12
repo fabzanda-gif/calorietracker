@@ -189,8 +189,8 @@ if user_target_weight is None or user_bmr is None:
 with st.sidebar:
     lang = st.selectbox("🌐 Lingua", ["Italiano", "English"])
     translations = {
-        "Italiano": {"t1": "🚀 Inserimento", "t2": "📊 Overview", "t3": "📈 Peso", "t4": "🍳 Ricette", "meal": "Tipo di pasto", "meal_name": "Nome pasto", "add_meal": "Aggiungi pasto", "extra_act": "Attività extra", "extra_cals": "Calorie bruciate extra", "insert_weight": "Inserisci peso (kg)", "save_weight": "Salva peso", "recipe_name": "Nome ricetta", "save_recipe": "Salva ricetta", "recipe_saved": "✅ Ricetta salvata!"},
-        "English": {"t1": "🚀 Logging", "t2": "📊 Overview", "t3": "📈 Weight", "t4": "🍳 Recipes", "meal": "Meal type", "meal_name": "Meal name", "add_meal": "Add meal", "extra_act": "Extra activity", "extra_cals": "Extra calories burned", "insert_weight": "Enter weight (kg)", "save_weight": "Save weight", "recipe_name": "Recipe name", "save_recipe": "Save recipe", "recipe_saved": "✅ Recipe saved!"}
+        "Italiano": {"t1": "🚀 Inserimento", "t2": "📊 Overview", "t3": "📈 Peso", "t4": "🍳 Inserimento Rapido", "meal": "Tipo di pasto", "meal_name": "Nome pasto", "add_meal": "Aggiungi pasto", "extra_act": "Attività extra", "extra_cals": "Calorie bruciate extra", "insert_weight": "Inserisci peso (kg)", "save_weight": "Salva peso", "recipe_name": "Nome ricetta", "save_recipe": "Salva ricetta", "recipe_saved": "✅ Ricetta salvata!"},
+        "English": {"t1": "🚀 Logging", "t2": "📊 Overview", "t3": "📈 Weight", "t4": "🍳 Quick Entry", "meal": "Meal type", "meal_name": "Meal name", "add_meal": "Add meal", "extra_act": "Extra activity", "extra_cals": "Extra calories burned", "insert_weight": "Enter weight (kg)", "save_weight": "Save weight", "recipe_name": "Recipe name", "save_recipe": "Save recipe", "recipe_saved": "✅ Recipe saved!"}
     }
     t = translations[lang]
     selected_page = st.radio("📍 Navigazione", [t["t1"], t["t2"], t["t3"], t["t4"]])
@@ -523,29 +523,48 @@ elif selected_page == t["t3"]:
         st.plotly_chart(fig, use_container_width=True)
 
 elif selected_page == t["t4"]:
-    with st.form("recipe_add"):
+    st.subheader("⚡ Quick Entries")
+
+    # 1. Visualizzazione Tabella delle entrate esistenti per oggi
+    st.markdown("### 📋 Entries di oggi")
+    entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
+    if entries:
+        df_entries = pd.DataFrame(entries)
+        # Rinominiamo le colonne per chiarezza
+        df_display = df_entries.rename(columns={
+            "name": "Nome", "calories": "Kcal", 
+            "protein": "Pro", "carbs": "Carbs", "fat": "Fat"
+        })
+        st.dataframe(df_display[["Nome", "Kcal", "Pro", "Carbs", "Fat"]], use_container_width=True, hide_index=True)
+    else:
+        st.info("Nessuna entry veloce presente.")
+
+    st.markdown("---")
+
+    # 2. Form per aggiungere una nuova Quick Entry
+    with st.form("quick_entry_add"):
+        st.markdown("### ➕ Aggiungi nuova Entry")
         r_name = st.text_input(t["recipe_name"])
         c1, c2, c3, c4 = st.columns(4)
         cals = c1.number_input("Kcal", value=0, step=1, key="r_cal")
         prot = c2.number_input("Pro", value=0, step=1, key="r_pro")
         carbs = c3.number_input("Carbs", value=0, step=1, key="r_carbs")
         fat = c4.number_input("Fat", value=0, step=1, key="r_fat")
-
+        
         if st.form_submit_button(t["save_recipe"]):
             if not r_name.strip():
-                st.warning("Inserisci un nome valido per il ricetta.")
+                st.warning("Inserisci un nome valido.")
             else:
                 try:
                     supabase.table("recipes").upsert({
-                        "name": r_name.strip(),
-                        "calories": int(cals),
-                        "protein": int(prot),
-                        "carbs": int(carbs),
+                        "name": r_name.strip(), 
+                        "calories": int(cals), 
+                        "protein": int(prot), 
+                        "carbs": int(carbs), 
                         "fat": int(fat),
                         "user_id": user_id
                     }, on_conflict="user_id,name").execute()
-
                     st.success(t["recipe_saved"])
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Errore durante il salvataggio: {e}")
+                    st.error(f"Errore: {e}")
