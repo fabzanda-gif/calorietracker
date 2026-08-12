@@ -80,6 +80,14 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+/* Classe speciale per lo sfondo Blu della pagina di login */
+        .login-page-bg {
+            background-color: #1A2942 !important;
+            padding: 20px;
+            border-radius: 20px;
+        }
+        .login-page-bg h1, .login-page-bg p, .login-page-bg label { color: #FFFFFF !important; }
+    </style>
 
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
