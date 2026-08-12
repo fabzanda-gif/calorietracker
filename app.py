@@ -1006,6 +1006,12 @@ elif selected_page == t["t3"]:
 elif selected_page == t["t4"]:
     st.subheader("⚡ Immissioni Rapide")
 
+    # Inizializziamo la versione del form per la pulizia dei campi se non esiste
+    if "recipe_form_version" not in st.session_state:
+        st.session_state["recipe_form_version"] = 0
+    
+    v = st.session_state["recipe_form_version"]
+
     with st.container(border=True):
         st.markdown("### 📋 Entries salvate")
         entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
@@ -1019,9 +1025,9 @@ elif selected_page == t["t4"]:
             
             st.markdown("### 🗑️ Elimina Immissione Rapida")
             entry_options_del = {e['name']: e['name'] for e in entries}
-            sel_entry_del = st.selectbox("Seleziona Immissione Rapida da rimuovere", [""] + list(entry_options_del.keys()))
+            sel_entry_del = st.selectbox("Seleziona Immissione Rapida da rimuovere", [""] + list(entry_options_del.keys()), key=f"del_recipe_sel_{v}")
             if sel_entry_del:
-                if st.button("Elimina Immissione Rapida"):
+                if st.button("Elimina Immissione Rapida", key=f"del_recipe_btn_{v}"):
                     try:
                         supabase.table("recipes").delete().eq("user_id", user_id).eq("name", sel_entry_del).execute()
                         st.success(f"Immissione Rapida '{sel_entry_del}' eliminata!")
@@ -1032,23 +1038,24 @@ elif selected_page == t["t4"]:
             st.info("Nessuna immissione rapida presente.")
 
     with st.container(border=True):
-        with st.form("quick_entry_add"):
+        with st.form(f"quick_entry_add_{v}"):
             st.markdown("### ➕ Aggiungi Nuova Immissione Rapida")
-            r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro o Snack")
+            r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro o Snack", key=f"r_name_{v}")
             
             calc_type = st.radio(
                 "Modalità di calcolo",
                 ["Per 100g (valori scalabili)", "Per porzione fissa (valori assoluti)"],
-                horizontal=True
+                horizontal=True,
+                key=f"r_calc_type_{v}"
             )
             
             st.caption("ℹ️ *Se scegli 'Per 100g', inserisci i valori riferiti a 100g. Se scegli 'Porzione', inserisci i valori totali della singola porzione.*")
             
             c1, c2, c3, c4 = st.columns(4)
-            cals = c1.number_input("Kcal", value=0.0, min_value=0.0, step=1.0, key="r_cal")
-            prot = c2.number_input("Pro (g)", value=0.0, min_value=0.0, step=0.5, key="r_pro")
-            carbs = c3.number_input("Carbs (g)", value=0.0, min_value=0.0, step=0.5, key="r_carbs")
-            fat = c4.number_input("Fat (g)", value=0.0, min_value=0.0, step=0.5, key="r_fat")
+            cals = c1.number_input("Kcal", value=0.0, min_value=0.0, step=1.0, key=f"r_cal_{v}")
+            prot = c2.number_input("Pro (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_prot_{v}")
+            carbs = c3.number_input("Carbs (g)", value=0.0, min_value=0.0, step=0.5, key="r_carbs_{v}")
+            fat = c4.number_input("Fat (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_fat_{v}")
             
             is_per_100g = 1 if "100g" in calc_type else 0
             
@@ -1057,7 +1064,6 @@ elif selected_page == t["t4"]:
                     st.warning("Inserisci un nome valido.")
                 else:
                     try:
-                        # Usiamo int() per evitare il conflitto con i campi integer del database
                         supabase.table("recipes").insert({
                             "name": r_name.strip(), 
                             "calories": int(cals), 
@@ -1067,11 +1073,13 @@ elif selected_page == t["t4"]:
                             "is_per_100g": is_per_100g,
                             "user_id": user_id
                         }).execute()
+                        
+                        # Incrementiamo la versione per pulire il form al prossimo ricaricamento
+                        st.session_state["recipe_form_version"] += 1
                         st.success(t["recipe_saved"])
                         st.rerun()
                     except Exception as e:
                         try:
-                            # Fallback senza is_per_100g nel caso la colonna non esista su Supabase
                             supabase.table("recipes").insert({
                                 "name": r_name.strip(), 
                                 "calories": int(cals), 
@@ -1080,6 +1088,8 @@ elif selected_page == t["t4"]:
                                 "fat": int(fat),
                                 "user_id": user_id
                             }).execute()
+                            
+                            st.session_state["recipe_form_version"] += 1
                             st.success(t["recipe_saved"])
                             st.rerun()
                         except Exception as inner_e:
