@@ -885,7 +885,7 @@ elif selected_page == t["t4"]:
             if sel_entry_del:
                 if st.button("Elimina Quick Entry"):
                     try:
-                        supabase.table("recipes").delete().eq("user_id', user_id).eq("name", sel_entry_del).execute()
+                        supabase.table("recipes").delete().eq("user_id", user_id).eq("name", sel_entry_del).execute()
                         st.success(f"Quick Entry '{sel_entry_del}' eliminata!")
                         st.rerun()
                     except Exception as e:
