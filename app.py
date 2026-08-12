@@ -22,19 +22,16 @@ st.set_page_config(
 # ==============================================================================
 st.markdown("""
     <style>
-        /* Importazione del font Hanken Grotesk da Google Fonts */
+        /* Importazione del font Hanken Grotesk */
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
 
-        /* Applicazione globale del font su tutta l'app */
         html, body, [class*="css"] {
             font-family: 'Hanken Grotesk', sans-serif !important;
         }
 
-        /* Nascondi solo il menu opzioni e il footer, ma NON l'header principale */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         
-        /* Assicura che il pulsante per aprire/chiudere la sidebar sia sempre visibile e curato */
         [data-testid="collapsedControl"] {
             display: block !important;
             color: #ffffff;
@@ -45,18 +42,48 @@ st.markdown("""
             z-index: 999999;
         }
 
-        /* Stile della Sidebar con tema scuro profondo */
+        /* Sidebar con contrasto e testi ben visibili in grigio chiarissimo */
         [data-testid="stSidebar"] {
             background-color: #0d1117;
             border-right: 1px solid #30363d;
+            color: #f0f6fc;
         }
 
-        /* Stile moderno per i pulsanti */
+        [data-testid="stSidebar"] label, [data-testid="stSidebar"] span {
+            color: #f0f6fc !important;
+        }
+
+        /* TRASFORMAZIONE DEI RADIO BUTTON DELLA NAVIGAZIONE IN BOTTONI ARROTONDATI */
+        [data-testid="stSidebar"] div.row-widget.stRadio > div {
+            gap: 8px;
+        }
+
+        [data-testid="stSidebar"] div.row-widget.stRadio label {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 10px 15px;
+            width: 100%;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        [data-testid="stSidebar"] div.row-widget.stRadio label:hover {
+            background-color: #21262d;
+            border-color: #58a6ff;
+        }
+
+        /* Nascondi i pallini originali dei radio button per un look pulito */
+        [data-testid="stSidebar"] div.row-widget.stRadio input[type="radio"] {
+            display: none;
+        }
+
+        /* Pulsanti standard e Logout */
         .stButton>button {
             border-radius: 10px;
             font-weight: 600;
             background-color: #21262d;
-            color: #c9d1d9;
+            color: #f0f6fc;
             border: 1px solid #30363d;
             transition: all 0.2s ease;
         }
@@ -67,14 +94,12 @@ st.markdown("""
             background-color: #30363d;
         }
 
-        /* Linee divisorie pulite */
         hr {
             margin: 1.5rem 0;
             border-color: #30363d;
         }
     </style>
 """, unsafe_allow_html=True)
-
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
