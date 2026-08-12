@@ -90,7 +90,7 @@ st.markdown("""
         }
         
         [data-testid="stSidebar"] .stButton>button:hover {
-            background-color: #21262d ;
+            background-color: #e06c75 ;
             border-color: #e06c75 ;
             color: #30363d !important;
         }
