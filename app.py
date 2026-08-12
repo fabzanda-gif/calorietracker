@@ -22,7 +22,6 @@ st.set_page_config(
 # ==============================================================================
 st.markdown("""
     <style>
-        /* Importazione del font Hanken Grotesk */
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
 
         html, body, [class*="css"] {
@@ -42,63 +41,30 @@ st.markdown("""
             z-index: 999999;
         }
 
-        /* Sidebar con contrasto e testi ben visibili */
         [data-testid="stSidebar"] {
             background-color: #0d1117;
             border-right: 1px solid #30363d;
-            color: #f0f6fc;
         }
 
-        [data-testid="stSidebar"] label, [data-testid="stSidebar"] span {
+        [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div {
             color: #f0f6fc !important;
         }
 
-        /* TRASFORMAZIONE TOTALE DEI RADIO BUTTON IN BOTTONI RETTANGOLARI */
-        [data-testid="stSidebar"] .stRadio > div {
-            gap: 10px;
-        }
-
-        [data-testid="stSidebar"] .stRadio label {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 10px;
-            padding: 12px 16px;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        [data-testid="stSidebar"] .stRadio label:hover {
-            background-color: #21262d;
-            border-color: #58a6ff;
-        }
-
-        /* Nasconde completamente i cerchietti/pallini nativi dei radio button */
-        [data-testid="stSidebar"] .stRadio input[type="radio"] {
-            display: none !important;
-        }
-
-        /* Nasconde il contenitore del pallino per evitare spazi vuoti */
-        [data-testid="stSidebar"] .stRadio div[data-testid="stMarkdownContainer"] {
-            margin-left: 0px !important;
-        }
-
-        /* Pulsanti standard e Logout */
-        .stButton>button {
-            border-radius: 10px;
-            font-weight: 600;
-            background-color: #21262d;
-            color: #f0f6fc;
-            border: 1px solid #30363d;
-            transition: all 0.2s ease;
+        /* Forza il contrasto e lo stile rettangolare arrotondato su TUTTI i bottoni dell'app */
+        .stButton>button, div.stFormSubmitButton>button {
+            border-radius: 10px !important;
+            font-weight: 500 !important;
+            background-color: #21262d !important;
+            color: #f0f6fc !important;
+            border: 1px solid #30363d !important;
+            padding: 10px 15px !important;
+            transition: all 0.2s ease !important;
         }
         
-        .stButton>button:hover {
-            border-color: #58a6ff;
-            color: #58a6ff;
-            background-color: #30363d;
+        .stButton>button:hover, div.stFormSubmitButton>button:hover {
+            background-color: #30363d !important;
+            border-color: #58a6ff !important;
+            color: #ffffff !important;
         }
 
         hr {
