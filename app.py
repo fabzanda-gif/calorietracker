@@ -813,7 +813,7 @@ elif selected_page == t["t3"]:
                 
                 fig.add_bar(
                     x=df_real['date'], y=df_real['weight'],
-                    marker_color='#007BFF', marker_opacity=1.0,
+                    marker_color='#e06c75', marker_opacity=1.0,
                     customdata=df_real[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>",
                     name="Reale"
@@ -821,7 +821,7 @@ elif selected_page == t["t3"]:
                 
                 fig.add_bar(
                     x=df_interp['date'], y=df_interp['weight'],
-                    marker_color='#007BFF', marker_opacity=0.25,
+                    marker_color='#e06c75', marker_opacity=0.25,
                     customdata=df_interp[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
                     name="Proiezione"
