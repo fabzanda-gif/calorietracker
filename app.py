@@ -19,39 +19,8 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - CARD ROSA TENUE & CONTRASTO BOTTONI
+# STYLING CUSTOM (CSS) - UNIFICATO E OTTIMIZZATO
 # ==============================================================================
-st.markdown("""
-    <style>
-        /* Testo nero per i pulsanti PRIMARI (attivi) dentro la sidebar */
-        section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {
-            color: #000000 !important;
-        }
-        
-        /* Testo scuro anche per l'effetto hover sul pulsante attivo, per sicurezza */
-        section[data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
-            color: #000000 !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-st.markdown("""
-    <style>
-        /* Bordo color corallo per i pulsanti standard fuori dalla sidebar */
-        div.stButton > button:not([data-baseweb="tab"]) {
-            border: 1px solid #e06c75 !important;
-            color: #31333F;
-            background-color: transparent;
-            transition: all 0.3s ease;
-        }
-        
-        /* Colore rosso tenue e testo scuro quando ci passi sopra con il cursore (hover) */
-        div.stButton > button:not([data-baseweb="tab"]):hover {
-            background-color: #fcf2f4 !important;
-            border-color: #a6323f !important;
-            color: #a6323f !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
@@ -102,27 +71,39 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
+        /* Hover sui bottoni normali della sidebar */
         [data-testid="stSidebar"] .stButton>button:hover {
             background-color: #21262d !important;
             border-color: #e06c75 !important;
             color: #ffffff !important;
         }
 
-        /* Bottoni nel corpo centrale dell'app */
-        .main .stButton>button, .main div.stFormSubmitButton>button {
+        /* Pulsante ATTIVO (Primary) della sidebar: testo nero in ogni condizione */
+        section[data-testid="stSidebar"] div.stButton > button[kind="primary"],
+        section[data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
+            color: #000000 !important;
+            background-color: #fcf2f4 !important;
+            border-color: #a6323f !important;
+        }
+
+        /* BOTTONI NEL CORPO CENTRALE DELL'APP (inclusi form, salva ricetta, aggiungi attività) */
+        .main div.stButton > button:not([data-baseweb="tab"]), 
+        .main div.stFormSubmitButton > button {
             border-radius: 10px !important;
             font-weight: 500 !important;
-            background-color: #ffffff !important;
-            color: #24292e !important;
-            border: 1px solid #d1d5da !important;
+            background-color: transparent !important;
+            color: #31333F !important;
+            border: 1px solid #e06c75 !important;
             padding: 10px 15px !important;
             transition: all 0.2s ease !important;
         }
         
-        .main .stButton>button:hover, .main div.stFormSubmitButton>button:hover {
-            background-color: #f6f8fa !important;
-            border-color: #e06c75 !important;
-            color: #e06c75 !important;
+        /* Effetto Hover con rosso tenue per tutti i bottoni del corpo centrale */
+        .main div.stButton > button:not([data-baseweb="tab"]):hover, 
+        .main div.stFormSubmitButton > button:hover {
+            background-color: #fcf2f4 !important;
+            border-color: #a6323f !important;
+            color: #a6323f !important;
         }
 
         hr {
