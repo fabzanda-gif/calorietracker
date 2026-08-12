@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - UNIFICATO E OTTIMIZZATO
+# STYLING CUSTOM (CSS) - CORRETTO E RIPRISTINATO
 # ==============================================================================
 st.markdown("""
     <style>
@@ -60,7 +60,7 @@ st.markdown("""
             border-radius: 14px !important;
         }
 
-        /* STILE SPECIFICO PER I BOTTONI DELLA SIDEBAR */
+        /* 1. BOTTONI DELLA SIDEBAR (Stato normale e hover) */
         [data-testid="stSidebar"] .stButton>button {
             border-radius: 10px !important;
             font-weight: 500 !important;
@@ -71,22 +71,26 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        /* Hover sui bottoni normali della sidebar */
         [data-testid="stSidebar"] .stButton>button:hover {
             background-color: #21262d !important;
             border-color: #e06c75 !important;
             color: #ffffff !important;
         }
 
-        /* Pulsante ATTIVO (Primary) della sidebar: testo nero in ogni condizione */
-        section[data-testid="stSidebar"] div.stButton > button[kind="primary"],
-        section[data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
+        /* 2. BOTTONE ATTIVO (PRIMARY) DELLA SIDEBAR */
+        section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {
+            background-color: #fcf2f4 !important;
+            border: 1px solid #e06c75 !important;
             color: #000000 !important;
+        }
+        
+        section[data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
             background-color: #fcf2f4 !important;
             border-color: #a6323f !important;
+            color: #000000 !important;
         }
 
-        /* BOTTONI NEL CORPO CENTRALE DELL'APP (inclusi form, salva ricetta, aggiungi attività) */
+        /* 3. BOTTONI NEL CORPO CENTRALE DELL'APP (Bordo corallo + hover rosso tenue) */
         .main div.stButton > button:not([data-baseweb="tab"]), 
         .main div.stFormSubmitButton > button {
             border-radius: 10px !important;
@@ -98,7 +102,6 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        /* Effetto Hover con rosso tenue per tutti i bottoni del corpo centrale */
         .main div.stButton > button:not([data-baseweb="tab"]):hover, 
         .main div.stFormSubmitButton > button:hover {
             background-color: #fcf2f4 !important;
