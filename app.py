@@ -1011,7 +1011,6 @@ elif selected_page == t["t4"]:
         entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
         if entries:
             df_entries = pd.DataFrame(entries)
-            # Mostriamo i dati principali
             df_display = df_entries.rename(columns={
                 "name": "Nome", "calories": "Kcal", 
                 "protein": "Pro", "carbs": "Carbs", "fat": "Fat"
@@ -1051,7 +1050,6 @@ elif selected_page == t["t4"]:
             carbs = c3.number_input("Carbs (g)", value=0.0, min_value=0.0, step=0.5, key="r_carbs")
             fat = c4.number_input("Fat (g)", value=0.0, min_value=0.0, step=0.5, key="r_fat")
             
-            # 1 se per 100g, 0 se per porzione
             is_per_100g = 1 if "100g" in calc_type else 0
             
             if st.form_submit_button(t["save_recipe"], use_container_width=True):
@@ -1059,30 +1057,29 @@ elif selected_page == t["t4"]:
                     st.warning("Inserisci un nome valido.")
                 else:
                     try:
-                        # Nota: Assicurati che la tabella 'recipes' abbia la colonna 'is_per_100g'
-                        # Se non esiste, rimuovi la riga corrispondente sotto
-                        supabase.table("recipes").upsert({
+                        # Usiamo int() per evitare il conflitto con i campi integer del database
+                        supabase.table("recipes").insert({
                             "name": r_name.strip(), 
-                            "calories": float(cals), 
-                            "protein": float(prot), 
-                            "carbs": float(carbs), 
-                            "fat": float(fat),
+                            "calories": int(cals), 
+                            "protein": int(prot), 
+                            "carbs": int(carbs), 
+                            "fat": int(fat),
                             "is_per_100g": is_per_100g,
                             "user_id": user_id
-                        }, on_conflict="user_id,name").execute()
+                        }).execute()
                         st.success(t["recipe_saved"])
                         st.rerun()
                     except Exception as e:
-                        # Backup se la colonna is_per_100g non esiste ancora
                         try:
-                            supabase.table("recipes").upsert({
+                            # Fallback senza is_per_100g nel caso la colonna non esista su Supabase
+                            supabase.table("recipes").insert({
                                 "name": r_name.strip(), 
-                                "calories": float(cals), 
-                                "protein": float(prot), 
-                                "carbs": float(carbs), 
-                                "fat": float(fat),
+                                "calories": int(cals), 
+                                "protein": int(prot), 
+                                "carbs": int(carbs), 
+                                "fat": int(fat),
                                 "user_id": user_id
-                            }, on_conflict="user_id,name").execute()
+                            }).execute()
                             st.success(t["recipe_saved"])
                             st.rerun()
                         except Exception as inner_e:
