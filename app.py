@@ -19,23 +19,22 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - CARD ROSA TENUE & CONTRASTO BOTTONI
+# STYLING CUSTOM (CSS) - BLU NAVY, ROSA CORALLO & BIANCO
 # ==============================================================================
 st.markdown("""
     <style>
-        /* Bordo color corallo per i pulsanti standard fuori dalla sidebar */
+        /* Bordo e accenti color Rosa Corallo per i pulsanti standard fuori dalla sidebar */
         div.stButton > button:not([data-baseweb="tab"]) {
-            border: 1px solid #e06c75 ;
-            color: #31333F;
-            background-color: transparent;
+            border: 1px solid #FF8B8B ;
+            color: #1A2942;
+            background-color: #FFFFFF;
             transition: all 0.3s ease;
         }
         
-        /* Colore rosso tenue e testo scuro quando ci passi sopra con il cursore (hover) */
         div.stButton > button:not([data-baseweb="tab"]):hover {
-            background-color: #fcf2f4 ;
-            border-color: #a6323f ;
-            color: #a6323f ;
+            background-color: #FFF5F5 ;
+            border-color: #1A2942 ;
+            color: #1A2942 ;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -46,6 +45,7 @@ st.markdown("""
 
         html, body, [class*="css"] {
             font-family: 'Hanken Grotesk', sans-serif ;
+            color: #1A2942;
         }
 
         #MainMenu {visibility: hidden;}
@@ -53,69 +53,70 @@ st.markdown("""
         
         [data-testid="collapsedControl"] {
             display: block ;
-            color: #ffffff;
-            background-color: #161b22;
+            color: #FFFFFF;
+            background-color: #1A2942;
             border-radius: 50%;
             padding: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             z-index: 999999;
         }
 
-        /* Sidebar con tema scuro e testi chiarissimi */
+        /* Sidebar con tema Blu Navy e testi bianchi */
         [data-testid="stSidebar"] {
-            background-color: #0d1117;
-            border-right: 1px solid #30363d;
+            background-color: #1A2942;
+            border-right: 1px solid #2A3B58;
         }
 
         [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div {
-            color: #f0f6fc ;
+            color: #FFFFFF !important;
         }
 
-        /* STILE MIRATO ESCLUSIVAMENTE ALLE CARD DELLE METRICHE (Overview) */
+        /* STILE MIRATO ALLE CARD DELLE METRICHE (Overview) */
         [data-testid="stMetric"] {
-            background-color: #fcf2f4 ;
-            border: 1px solid #f2d6dc ;
+            background-color: #FFFFFF ;
+            border: 1px solid #FF8B8B ;
             padding: 15px ;
             border-radius: 14px ;
+            box-shadow: 0 2px 6px rgba(26,41,66,0.04);
         }
 
         /* STILE SPECIFICO PER I BOTTONI DELLA SIDEBAR */
         [data-testid="stSidebar"] .stButton>button {
             border-radius: 10px ;
             font-weight: 500 ;
-            background-color: #161b22 ;
-            color: #f0f6fc ;
-            border: 1px solid #30363d ;
+            background-color: #2A3B58 ;
+            color: #FFFFFF !important;
+            border: 1px solid #3A4B68 ;
             padding: 10px 15px ;
             transition: all 0.2s ease ;
         }
         
         [data-testid="stSidebar"] .stButton>button:hover {
-            background-color: #e06c75 ;
-            border-color: #e06c75 ;
-            color: #30363d !important;
+            background-color: #FF8B8B ;
+            border-color: #FF8B8B ;
+            color: #1A2942 !important;
         }
 
         /* Bottoni nel corpo centrale dell'app */
         .main .stButton>button, .main div.stFormSubmitButton>button {
             border-radius: 10px ;
             font-weight: 500 ;
-            background-color: #ffffff ;
-            color: #24292e ;
-            border: 1px solid #d1d5da ;
+            background-color: #FFFFFF ;
+            color: #1A2942 ;
+            border: 1px solid #FF8B8B ;
             padding: 10px 15px ;
             transition: all 0.2s ease ;
         }
         
         .main .stButton>button:hover, .main div.stFormSubmitButton>button:hover {
-            background-color: #f6f8fa ;
-            border-color: #e06c75 ;
-            color: #e06c75 ;
+            background-color: #FFF5F5 ;
+            border-color: #1A2942 ;
+            color: #1A2942 ;
         }
 
         hr {
             margin: 1.5rem 0;
-            border-color: #e1e4e8;
+            border-color: #E2E8F0;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -270,16 +271,16 @@ def show_login_page():
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #ffffff;
-            color: #3c4043;
-            border: 1px solid #dadce0;
+            background-color: #FFFFFF;
+            color: #1A2942;
+            border: 1px solid #FF8B8B;
             border-radius: 8px;
             padding: 12px 24px;
             font-family: 'Hanken Grotesk', Roboto, Arial, sans-serif;
             font-size: 16px;
             font-weight: 500;
             text-decoration: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px rgba(26,41,66,0.08);
             transition: background-color 0.2s, box-shadow 0.2s;
             width: 100%;
         ">
@@ -373,7 +374,6 @@ if "user" not in st.session_state or st.session_state["user"] is None:
             except Exception as e:
                 st.error(f"Login OAuth fallito: {str(e)}")
         else:
-            # Pulisce semplicemente l'URL senza mostrare messaggi di errore a schermo
             st.query_params.clear()
 
     if "user" not in st.session_state or st.session_state["user"] is None:
@@ -765,6 +765,33 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
+# Script JavaScript per chiudere automaticamente la sidebar su mobile dopo un click
+st.markdown("""
+    <script>
+        function isMobile() {
+            return window.innerWidth <= 768;
+        }
+
+        document.addEventListener('click', function(event) {
+            const sidebar = document.querySelector('[data-testid="stSidebar"]');
+            if (sidebar && sidebar.contains(event.target) && isMobile()) {
+                const closeBtn = document.querySelector('[data-testid="stSidebarNav"] button, [data-testid="stSidebar"] button');
+                if (closeBtn) {
+                    setTimeout(() => {
+                        const toggleTrigger = document.querySelector('[data-testid="collapsedControl"]');
+                        if (toggleTrigger) {
+                            const expanded = sidebar.getAttribute("aria-expanded");
+                            if (expanded === "true" || !expanded) {
+                                toggleTrigger.click();
+                            }
+                        }
+                    }, 150);
+                }
+            }
+        });
+    </script>
+""", unsafe_allow_html=True)
+
 # ==============================================================================
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
@@ -953,14 +980,14 @@ elif selected_page == t["t2"]:
     ideal_target_cals = max(0, total_estimated_burned - 500)
     diff_from_ideal = ideal_target_cals - total_cals_in
 
-    in_bg, in_border = "#e6f4ea", "#ceead6"
+    in_bg, in_border = "#FFFFFF", "#FF8B8B"
     in_msg = t["in_msg_deficit"](ideal_target_cals, diff_from_ideal)
 
     if extra_burned > 0:
-        burn_bg, burn_border = "#e6f4ea", "#ceead6"
+        burn_bg, burn_border = "#FFFFFF", "#FF8B8B"
         burn_msg = t["burn_msg_yes"](extra_burned)
     else:
-        burn_bg, burn_border = "#fcf2f4", "#f2d6dc"
+        burn_bg, burn_border = "#FFFFFF", "#FF8B8B"
         burn_msg = t["burn_msg_no"]
 
     weight_to_lose = (current_weight if current_weight else initial_weight) - target_weight
@@ -968,28 +995,18 @@ elif selected_page == t["t2"]:
         daily_deficit_abs = abs(deficit)
         total_kcal_needed = weight_to_lose * 7700
         estimated_days = int(total_kcal_needed / daily_deficit_abs) if daily_deficit_abs > 0 else 0
-        bilancio_bg, bilancio_border = "#e6f4ea", "#ceead6"
+        bilancio_bg, bilancio_border = "#FFFFFF", "#FF8B8B"
         bilancio_msg = t["balance_days"](estimated_days)
     elif weight_to_lose <= 0:
-        bilancio_bg, bilancio_border = "#e6f4ea", "#ceead6"
+        bilancio_bg, bilancio_border = "#FFFFFF", "#FF8B8B"
         bilancio_msg = "🎯 Target di peso raggiunto o superato!"
     else:
-        bilancio_bg, bilancio_border = "#fcf2f4", "#f2d6dc"
+        bilancio_bg, bilancio_border = "#FFFFFF", "#FF8B8B"
         bilancio_msg = t["balance_surplus"]
 
-    weight_bg, weight_border = "#fcf2f4", "#f2d6dc"
+    weight_bg, weight_border = "#FFFFFF", "#FF8B8B"
     weight_msg = t["weight_msg_default"]
     if current_weight:
-        total_span = initial_weight - target_weight
-        current_progress = (initial_weight - current_weight) / total_span if total_span > 0 else 1.0
-        current_progress = max(0.0, min(1.0, current_progress))
-        
-        r = int(252 + (230 - 252) * current_progress)
-        g = int(242 + (244 - 242) * current_progress)
-        b = int(244 + (234 - 244) * current_progress)
-        weight_bg = f"rgb({r}, {g}, {b})"
-        weight_border = f"rgb({max(0, r-25)}, {max(0, g-25)}, {max(0, b-25)})"
-        
         diff_ini = current_weight - initial_weight
         diff_tgt = current_weight - target_weight
         weight_msg = t["weight_msg_val"](initial_weight, diff_ini, target_weight, diff_tgt)
@@ -1167,14 +1184,14 @@ elif selected_page == t["t3"]:
                         est_date_str = estimated_date.strftime('%d %B %Y')
                         
                         forecast_markdown = f"""
-                        <div style="background-color: #e6f4ea; border: 1px solid #ceead6; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #137333; font-weight: 500;">
+                        <div style="background-color: #FFFFFF; border: 1px solid #FF8B8B; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #1A2942; font-weight: 500;">
                             {t['weight_forecast_title']}<br>
                             <span style="font-size: 14px; font-weight: 400;">{t['forecast_days'](days_to_goal, est_date_str)}</span>
                         </div>
                         """
                     else:
                         forecast_markdown = f"""
-                        <div style="background-color: #fcf2f4; border: 1px solid #f2d6dc; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #a6323f; font-weight: 500;">
+                        <div style="background-color: #FFFFFF; border: 1px solid #FF8B8B; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #1A2942; font-weight: 500;">
                             {t['weight_forecast_title']}<br>
                             <span style="font-size: 14px; font-weight: 400;">{t['forecast_flat_up']}</span>
                         </div>
@@ -1190,7 +1207,7 @@ elif selected_page == t["t3"]:
                 
                 fig.add_bar(
                     x=df_real['date'], y=df_real['weight'],
-                    marker_color='rgba(224, 108, 117, 1.0)',
+                    marker_color='#FF8B8B',
                     customdata=df_real[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>",
                     name="Reale"
@@ -1198,7 +1215,7 @@ elif selected_page == t["t3"]:
                 
                 fig.add_bar(
                     x=df_interp['date'], y=df_interp['weight'],
-                    marker_color='rgba(180, 180, 180, 0.45)',
+                    marker_color='rgba(26, 41, 66, 0.2)',
                     customdata=df_interp[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
                     name="Proiezione"
@@ -1212,8 +1229,8 @@ elif selected_page == t["t3"]:
                         x=[first_real_date, estimated_date],
                         y=[first_real_weight, target_val],
                         mode='lines+markers',
-                        line=dict(color='#a6323f', width=3, dash='dash'),
-                        marker=dict(size=6, color='#a6323f'),
+                        line=dict(color='#FF8B8B', width=3, dash='dash'),
+                        marker=dict(size=6, color='#FF8B8B'),
                         name="Trend Globale"
                     )
                 
@@ -1224,7 +1241,7 @@ elif selected_page == t["t3"]:
                 fig.add_hline(
                     y=target_val, 
                     line_dash="solid", 
-                    line_color='#a6323f', 
+                    line_color='#1A2942', 
                     line_width=2.5
                 )
                 
@@ -1232,20 +1249,21 @@ elif selected_page == t["t3"]:
                     xref="paper", yref="y", x=0.98, y=target_val + 2.0,
                     text=f"<b>🎯 GOAL: {target_val} kg</b>",
                     showarrow=False,
-                    font=dict(color="#a6323f", size=14, family="sans-serif"),
+                    font=dict(color="#1A2942", size=14, family="sans-serif"),
                     align="right",
-                    bgcolor="rgba(255, 255, 255, 0.85)",
-                    bordercolor="#a6323f",
+                    bgcolor="rgba(255, 255, 255, 0.9)",
+                    bordercolor="#FF8B8B",
                     borderwidth=1,
                     borderpad=4
                 )
                 
                 fig.update_layout(
                     showlegend=False,
-                    plot_bgcolor="rgba(252, 242, 244, 0.6)", 
+                    plot_bgcolor="#FFFFFF", 
                     paper_bgcolor="rgba(0,0,0,0)",
                     barmode='overlay',
-                    hovermode='x unified'
+                    hovermode='x unified',
+                    font=dict(color="#1A2942")
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 
@@ -1364,7 +1382,7 @@ elif selected_page == t["t5"]:
     except Exception:
         day_steps = 0
 
-    move_bg, move_border = ("#e6f4ea", "#ceead6") if day_steps >= 10000 else ("#fff8e1", "#ffe082") if day_steps >= 5000 else ("#fcf2f4", "#f2d6dc")
+    move_bg, move_border = "#FFFFFF", "#FF8B8B"
     if day_steps >= 10000:
         move_msg = t["status_very_active"]
     elif day_steps >= 5000:
