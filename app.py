@@ -469,7 +469,7 @@ with st.sidebar:
 # ==============================================================================
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
-elif selected_page == t["t1"]:
+if selected_page == t["t1"]:
     log_date = st.date_input("📅 Data", value=date.today())
     
     st.subheader("🍽️ Inserimento Cibo & Pasti")
