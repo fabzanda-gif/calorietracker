@@ -1,20 +1,55 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 import requests
 from supabase import create_client
 from streamlit_cookies_controller import CookieController
 import plotly.express as px
-import hashlib
-import base64
-import secrets
-import traceback
 
-## ==============================================================================
-## 1. SETUP & CONFIGURATION
-## ==============================================================================
-st.set_page_config(page_title="Tracker Pro", layout="wide")
+# ==============================================================================
+# 1. SETUP INIZIALE E CONFIGURAZIONE PAGINA (QUESTO DEVE ESSERE IL PRIMO COMANDO)
+# ==============================================================================
+st.set_page_config(
+    page_title="Tracker Pro",
+    layout="wide",
+)
 
+# ==============================================================================
+# STYLING CUSTOM (CSS) - FONT HANKEN GROTESK & GRAFICA ACCATTIVANTE
+# ==============================================================================
+st.markdown("""
+    <style>
+        /* Importazione del font Hanken Grotesk da Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
+
+        /* Applicazione globale del font su tutta l'app Streamlit */
+        html, body, [class*="css"] {
+            font-family: 'Hanken Grotesk', sans-serif !important;
+        }
+
+        /* Nascondi il menu di Streamlit e il footer per un look pulito */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+
+        /* Arrotondamento e stile moderno per i pulsanti */
+        .stButton>button {
+            border-radius: 8px;
+            font-weight: 600;
+            width: 100%;
+        }
+        
+        /* Stile dei separatori */
+        hr {
+            margin: 1.5rem 0;
+            border-color: #30363d;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==============================================================================
+# SUPABASE URL & KEY SETUP
+# ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
