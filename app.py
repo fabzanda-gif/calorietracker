@@ -21,66 +21,31 @@ st.set_page_config(
 # ==============================================================================
 # STYLING CUSTOM (CSS) - CORRETTO PER LEGGIBILITÀ SIDEBAR
 # ==============================================================================
-st.markdown("""
-    <style>
-        /* Font globale */
+<style>
+        /* CSS GLOBALE (Sfondo standard per le pagine interne) */
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
         html, body, [class*="css"] { font-family: 'Hanken Grotesk', sans-serif; color: #1A2942; }
 
-        /* Sidebar Blu Navy */
+        /*Sidebar Blu Navy*/
         [data-testid="stSidebar"] { background-color: #1A2942; }
         [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label { color: #FFFFFF !important; }
 
-        /* PULSANTI SIDEBAR INATTIVI (Bianco con testo Blu Navy ben visibile) */
+        /* Bordo Corallo per TUTTI gli input (inclusi quelli di login) */
+        input, textarea, select {
+            border: 2px solid #FF8B8B !important;
+            border-radius: 8px !important;
+        }
+
+        /* Pulsanti Sidebar */
         [data-testid="stSidebar"] .stButton>button {
-            border-radius: 12px;
-            font-weight: 600;
-            background-color: #FFFFFF !important; 
-            color: #1A2942 !important;  /* Testo scuro */
-            border: 2px solid #FFFFFF;
-            padding: 10px 20px;
-            width: 100%;
-            transition: all 0.2s ease;
+            border-radius: 12px; font-weight: 600; background-color: #FFFFFF !important; 
+            color: #1A2942 !important; border: 2px solid #FFFFFF; width: 100%;
+        }
+        [data-testid="stSidebar"] .stButton>button:hover, [data-testid="stSidebar"] .stButton>button[kind="primary"] {
+            background-color: #FF8B8B !important; border-color: #FF8B8B !important; color: #1A2942 !important;
         }
         
-        /* Assicura che anche gli elementi interni al bottone ereditino il testo scuro */
-        [data-testid="stSidebar"] .stButton>button * {
-            color: #1A2942 !important;
-        }
-
-        /* PULSANTE ATTIVO / HOVER (Rosa Corallo con testo scuro) */
-        [data-testid="stSidebar"] .stButton>button[kind="primary"],
-        [data-testid="stSidebar"] .stButton>button:hover, 
-        [data-testid="stSidebar"] .stButton>button:focus {
-            background-color: #FF8B8B !important; /* Rosa Corallo */
-            border-color: #FF8B8B !important;
-            color: #1A2942 !important;
-        }
-        
-        [data-testid="stSidebar"] .stButton>button[kind="primary"] *,
-        [data-testid="stSidebar"] .stButton>button:hover * {
-            color: #1A2942 !important;
-        }
-
-        /* Pulsanti corpo centrale */
-        .main .stButton>button {
-            border-radius: 10px;
-            background-color: #FFFFFF;
-            color: #1A2942;
-            border: 1px solid #FF8B8B;
-        }
-        .main .stButton>button:hover { background-color: #FFF5F5; border-color: #1A2942; }
-
-        /* Metric Cards */
-        [data-testid="stMetric"] {
-            background-color: #FFFFFF;
-            border: 1px solid #FF8B8B;
-            padding: 15px;
-            border-radius: 14px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-/* Classe speciale per lo sfondo Blu della pagina di login */
+        /* Classe speciale per lo sfondo Blu della pagina di login */
         .login-page-bg {
             background-color: #1A2942 !important;
             padding: 20px;
