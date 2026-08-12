@@ -469,7 +469,7 @@ with st.sidebar:
 # ==============================================================================
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
-if selected_page == t["t1"]:
+elif selected_page == t["t1"]:
     log_date = st.date_input("📅 Data", value=date.today())
     
     st.subheader("🍽️ Inserimento Cibo & Pasti")
@@ -483,12 +483,22 @@ if selected_page == t["t1"]:
     is_recipe = (input_source == "🍳 Immissione Rapida")
     v = st.session_state["form_version"]
     
+    # Inizializziamo lo stato dei valori base se non esistono
+    if "base_cals" not in st.session_state:
+        st.session_state["base_cals"] = 0.0
+        st.session_state["base_prot"] = 0.0
+        st.session_state["base_carbs"] = 0.0
+        st.session_state["base_fat"] = 0.0
+        st.session_state["m_name"] = ""
+        st.session_state["grams_val"] = 100.0
+        st.session_state["is_per_100g_val"] = True
+    
     def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0, is_100g=True):
         st.session_state["m_name"] = name
-        st.session_state["m_cals"] = float(cals)
-        st.session_state["m_prot"] = float(prot)
-        st.session_state["m_carbs"] = float(carbs)
-        st.session_state["m_fat"] = float(fat)
+        st.session_state["base_cals"] = float(cals)
+        st.session_state["base_prot"] = float(prot)
+        st.session_state["base_carbs"] = float(carbs)
+        st.session_state["base_fat"] = float(fat)
         st.session_state["grams_val"] = float(grams)
         st.session_state["is_per_100g_val"] = is_100g
         st.session_state["last_selected"] = selected
@@ -546,7 +556,6 @@ if selected_page == t["t1"]:
                 
                 if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
                     r_obj = recipes_dict[sel_recipe]
-                    # Controlliamo se è per 100g o per porzione (default 100g se non specificato)
                     is_100g = bool(r_obj.get('is_per_100g', 1))
                     reset_or_update(
                         name=r_obj.get('name', ''),
@@ -570,38 +579,40 @@ if selected_page == t["t1"]:
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
     
-    # Gestione dinamica: Grammi vs Porzioni
     is_per_100g = st.session_state.get("is_per_100g_val", True)
     
+    # Funzione di callback per forzare il refresh immediato quando cambi i grammi o le porzioni
+    def update_quantity():
+        st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
+
     if is_per_100g or not is_recipe:
-        # Input in Grammi
         quantity = st.number_input(
             "Grammi (g)",
-            value=st.session_state["grams_val"],
+            value=float(st.session_state["grams_val"]),
             min_value=1.0,
             step=10.0,
-            key=f"meal_grams_{v}",
+            key=f"dyn_qty_{v}",
+            on_change=update_quantity
         )
-        st.session_state["grams_val"] = quantity
         factor = quantity / 100.0
         meal_display_name = f"{name} ({quantity}g)"
     else:
-        # Input in Porzioni
         quantity = st.number_input(
             "Numero di porzioni",
-            value=float(st.session_state.get("grams_val", 1.0)),
+            value=float(st.session_state["grams_val"]),
             min_value=0.25,
             step=0.25,
-            key=f"meal_portions_{v}",
+            key=f"dyn_qty_{v}",
+            on_change=update_quantity
         )
-        st.session_state["grams_val"] = quantity
         factor = quantity
         meal_display_name = f"{name} ({quantity} porzion{'e' if quantity == 1 else 'i'})"
     
-    calc_cals = int(st.session_state["m_cals"] * factor)
-    calc_prot = int(st.session_state["m_prot"] * factor)
-    calc_carbs = int(st.session_state["m_carbs"] * factor)
-    calc_fat = int(st.session_state["m_fat"] * factor)
+    # Calcolo istantaneo basato sul fattore
+    calc_cals = int(st.session_state["base_cals"] * factor)
+    calc_prot = int(st.session_state["base_prot"] * factor)
+    calc_carbs = int(st.session_state["base_carbs"] * factor)
+    calc_fat = int(st.session_state["base_fat"] * factor)
     
     c1, c2, c3, c4 = st.columns(4)
     final_cals = c1.number_input("Kcal", value=calc_cals, step=1, key=f"input_cals_{v}")
@@ -629,7 +640,10 @@ if selected_page == t["t1"]:
                     
                     refresh_daily_logs(log_date)
                     reset_or_update()
-                    st.success(f"✅ Pasto aggiunto! ({final_cals} kcal)")
+                    
+                    # Notifica esplicita di successo con st.success
+                    st.success(f"✅ Pasto inserito con successo! ({final_cals} kcal aggiunte)")
+                    st.balloons()
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore nel salvataggio: {e}")
@@ -664,7 +678,7 @@ if selected_page == t["t1"]:
                         "burned_calories": int(extra_cals)
                     }).execute()
                     refresh_daily_logs(log_date)
-                    st.success("✅ Attività extra salvata!")
+                    st.success("✅ Attività extra salvata con successo!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore: {e}")
