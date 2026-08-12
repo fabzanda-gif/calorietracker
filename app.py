@@ -39,6 +39,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
@@ -212,10 +213,38 @@ def search_open_food_facts(query):
         return results
     except Exception as e:
         st.error(f"Errore nella ricerca: {e}")
-        return {}# 
-==============================================================================
-# 4.1  FUNZIONE DI LOGIN (Da inserire prima dei controlli di sessione)
+        return {}
+
 # ==============================================================================
+# 4. AUTHENTICATION & SESSION MANAGEMENT (PERSISTENTE CON COOKIE PKCE)
+# ==============================================================================
+def generate_pkce_pair():
+    code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode('utf-8')).digest()
+    ).decode('utf-8').rstrip('=')
+    
+    controller.set("pkce_verifier_cookie", code_verifier, max_age=300)
+    return code_verifier, code_challenge
+
+def save_authenticated_session(response):
+    try:
+        user = response.user if hasattr(response, 'user') and response.user else response.session.user
+        st.session_state["user"] = user
+        
+        if response.session:
+            controller.set(
+                "supabase_session", 
+                {
+                    "access_token": response.session.access_token, 
+                    "refresh_token": response.session.refresh_token
+                }, 
+                max_age=30*24*60*60
+            )
+    except Exception as e:
+        st.error(f"Errore nel salvataggio della sessione: {e}")
+        print(traceback.format_exc())
+
 def show_login_page():
     st.title("🔐 Accesso Tracker Pro")
     
@@ -322,45 +351,10 @@ def show_login_page():
                 st.error(f"Errore durante l'autenticazione: {str(e)}")
                 print(traceback.format_exc())
 
-# ==============================================================================
-# 4.2 AUTHENTICATION & SESSION MANAGEMENT (CORRETTO)
-# ==============================================================================
-controller = CookieController()
-
-def generate_pkce_pair():
-    code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
-    code_challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(code_verifier.encode('utf-8')).digest()
-    ).decode('utf-8').rstrip('=')
-    
-    # Salviamo il verificatore anche nei cookie per evitare che scada durante il redirect di Google
-    controller.set("pkce_verifier_cookie", code_verifier, max_age=300) # scade in 5 minuti
-    return code_verifier, code_challenge
-
-def save_authenticated_session(response):
-    try:
-        user = response.user if hasattr(response, 'user') and response.user else response.session.user
-        st.session_state["user"] = user
-        
-        if response.session:
-            controller.set(
-                "supabase_session", 
-                {
-                    "access_token": response.session.access_token, 
-                    "refresh_token": response.session.refresh_token
-                }, 
-                max_age=30*24*60*60 # Salvataggio persistente per 30 giorni nei cookie
-            )
-    except Exception as e:
-        st.error(f"Errore nel salvataggio della sessione: {e}")
-        print(traceback.format_exc())
-
 # --- ESECUZIONE DEL CONTROLLO SESSIONE ALL'AVVIO ---
 if "user" not in st.session_state or st.session_state["user"] is None:
-    # 1. Controlla se arriviamo da un redirect OAuth di Google con un 'code'
     query_code = st.query_params.get("code")
     if query_code:
-        # Prende il verifier dallo state o, se perso, dal cookie temporaneo
         verifier = st.session_state.get("pkce_verifier")
         if not verifier:
             verifier = controller.get("pkce_verifier_cookie")
@@ -374,7 +368,7 @@ if "user" not in st.session_state or st.session_state["user"] is None:
                 save_authenticated_session(response)
                 st.query_params.clear()
                 st.session_state.pkce_verifier = None
-                controller.set("pkce_verifier_cookie", None, max_age=0) # Pulisci il cookie temporaneo
+                controller.set("pkce_verifier_cookie", None, max_age=0)
                 st.rerun()
             except Exception as e:
                 st.error(f"Login OAuth fallito: {str(e)}")
@@ -382,7 +376,6 @@ if "user" not in st.session_state or st.session_state["user"] is None:
             st.error("❌ Sessione PKCE scaduta. Accedi di nuovo.")
             st.query_params.clear()
 
-    # 2. Se non c'è un utente in memoria, prova a recuperarlo dai Cookie del browser
     if "user" not in st.session_state or st.session_state["user"] is None:
         try:
             saved_cookie = controller.get("supabase_session")
@@ -396,24 +389,6 @@ if "user" not in st.session_state or st.session_state["user"] is None:
                     st.rerun()
         except Exception as e:
             print(f"Cookie restore error: {e}")
-
-# ==============================================================================
-# 5. BLOCCO DI ACCESSO (MOSTRA LOGIN SE NON AUTENTICATO)
-# ==============================================================================
-if "user" not in st.session_state or st.session_state["user"] is None:
-    # Inserisci qui la tua funzione show_login_page() esistente
-    show_login_page()
-    st.stop()
-# ==============================================================================
-# 5. AUTHENTICATION FLOW
-# ==============================================================================
-if "user" not in st.session_state or st.session_state["user"] is None:
-    if handle_oauth_callback():
-        st.rerun()
-
-if "user" not in st.session_state or st.session_state["user"] is None:
-    if restore_session_from_cookie():
-        st.rerun()
 
 if "user" not in st.session_state or st.session_state["user"] is None:
     show_login_page()
@@ -470,9 +445,8 @@ if profile_incomplete:
     st.stop()
 
 # ==============================================================================
-# 8. NAVIGATION & LANGUAGE - VERSIONE CORRETTA E ORDINATA
+# 8. NAVIGATION & LANGUAGE
 # ==============================================================================
-
 translations = {
     "Italiano": {
         "t1": "🚀 Inserimento", 
@@ -757,12 +731,11 @@ translations = {
         "forecast_flat_up": "💡 De huidige trend is vlak of stijgend: de tijdlijnprognose wordt alleen geactiveerd bij een actieve gewichtsverliestrend.",
     }
 }
+
 with st.sidebar:
-    # 2. Ora possiamo richiamare in sicurezza il selettore della lingua
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands"], key="lang_selector")
     t = translations[current_lang]
     
-    # 3. Gestione dello stato della pagina con ID stabili per evitare schermate bianche
     pages_map = {
         t["t1"]: "t1",
         t["t2"]: "t2",
@@ -791,6 +764,7 @@ with st.sidebar:
         controller.set("supabase_session", None, max_age=0)
         st.session_state.clear()
         st.rerun()
+
 # ==============================================================================
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
@@ -975,9 +949,7 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    # Calcolo spesa energetica totale stimata a fine giornata (BMR giornaliero + extra)
     total_estimated_burned = user_bmr + extra_burned
-    # Target ideale con 500 kcal di deficit a fine giornata
     ideal_target_cals = max(0, total_estimated_burned - 500)
     diff_from_ideal = ideal_target_cals - total_cals_in
 
@@ -991,10 +963,8 @@ elif selected_page == t["t2"]:
         burn_bg, burn_border = "#fcf2f4", "#f2d6dc"
         burn_msg = t["burn_msg_no"]
 
-    # Calcolo giorni stimati al target (7700 kcal = 1 kg)
     weight_to_lose = (current_weight if current_weight else initial_weight) - target_weight
     if deficit < 0 and weight_to_lose > 0:
-        # deficit è negativo quando bruci più di quanto mangi (es. -500 kcal)
         daily_deficit_abs = abs(deficit)
         total_kcal_needed = weight_to_lose * 7700
         estimated_days = int(total_kcal_needed / daily_deficit_abs) if daily_deficit_abs > 0 else 0
@@ -1176,7 +1146,6 @@ elif selected_page == t["t3"]:
                 real_dates = set(df['date'])
                 df_full['is_real'] = df_full['date'].isin(real_dates)
                 
-                # Calcolo Insight / Trend di discesa per prevedere la data di arrivo al goal
                 target_val = float(user_target_weight) if user_target_weight else 75.0
                 latest_weight = df['weight'].iloc[-1]
                 
@@ -1219,7 +1188,6 @@ elif selected_page == t["t3"]:
                 
                 fig = px.bar()
                 
-                # 1. Barra dati reali (Rosso/Rosa pieno)
                 fig.add_bar(
                     x=df_real['date'], y=df_real['weight'],
                     marker_color='rgba(224, 108, 117, 1.0)',
@@ -1228,7 +1196,6 @@ elif selected_page == t["t3"]:
                     name="Reale"
                 )
                 
-                # 2. Barra proiezioni future (Grigio chiaro)
                 fig.add_bar(
                     x=df_interp['date'], y=df_interp['weight'],
                     marker_color='rgba(180, 180, 180, 0.45)',
@@ -1237,7 +1204,6 @@ elif selected_page == t["t3"]:
                     name="Proiezione"
                 )
 
-                # 3. Linea di tendenza/proiezione (parte dall'inizio della storia reale fino al goal)
                 if len(df) >= 3 and latest_weight > target_val and estimated_date and days_to_goal > 0:
                     first_real_date = df_real['date'].iloc[0]
                     first_real_weight = df_real['weight'].iloc[0]
@@ -1255,7 +1221,6 @@ elif selected_page == t["t3"]:
                 max_weight = max(90, float(user_target_weight) + 10) if user_target_weight else 90
                 fig.update_yaxes(range=[min_weight, max_weight])
                 
-                # Linea del goal orizzontale
                 fig.add_hline(
                     y=target_val, 
                     line_dash="solid", 
@@ -1277,14 +1242,13 @@ elif selected_page == t["t3"]:
                 
                 fig.update_layout(
                     showlegend=False,
-                    plot_bgcolor="rgba(252, 242, 244, 0.6)",  # Sfondo corallo tenue nella zona futura
+                    plot_bgcolor="rgba(252, 242, 244, 0.6)", 
                     paper_bgcolor="rgba(0,0,0,0)",
                     barmode='overlay',
                     hovermode='x unified'
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # Banner informativo in basso
                 if forecast_markdown:
                     st.markdown(forecast_markdown, unsafe_allow_html=True)
             else:
@@ -1346,7 +1310,7 @@ elif selected_page == t["t4"]:
             c1, c2, c3, c4 = st.columns(4)
             cals = c1.number_input("Kcal", value=0.0, min_value=0.0, step=1.0, key=f"r_cal_{v}")
             prot = c2.number_input("Pro (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_prot_{v}")
-            carbs = c3.number_input("Carbs (g)", value=0.0, min_value=0.0, step=0.5, key="r_carbs_{v}")
+            carbs = c3.number_input("Carbs (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_carbs_{v}")
             fat = c4.number_input("Fat (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_fat_{v}")
             
             is_per_100g = 1 if "100g" in calc_type else 0
