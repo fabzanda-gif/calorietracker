@@ -774,25 +774,31 @@ elif selected_page == t["t2"]:
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
         ## Delete meal functionality
-        with st.expander("🗑️ Elimina un pasto"):
-            meal_names = [f"{m['meal_type']} - {m['name']}" for m in meals_data]
-            meal_to_delete_idx = st.selectbox(
-                "Seleziona il pasto da eliminare",
-                range(len(meal_names)),
-                format_func=lambda i: meal_names[i]
-            )
-            if st.button("Elimina questo pasto"):
-                try:
-                    meal_to_delete = meals_data[meal_to_delete_idx]
-                    supabase.table("meals").delete().eq("id", meal_to_delete["id"]).execute()
-                    st.success("✅ Pasto eliminato!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Errore nell'eliminazione: {e}")
+st.markdown("---")
+    st.markdown("### 🍽️ Cibi inseriti")
+    if meals_data:
+        # Recuperiamo anche gli ID dei pasti per poterli cancellare
+        meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
+        
+        df_meals = pd.DataFrame(meals_with_id)
+        df_display = df_meals.rename(columns={
+            "meal_type": "Pasto", "name": "Nome", "calories": "Kcal", 
+            "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)"
+        })
+        st.dataframe(df_display[["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]], use_container_width=True, hide_index=True)
+        
+        # Selettore per eliminare un pasto specifico
+        meal_options_del = {f"{m['meal_type']} - {m['name']} ({m['calories']} kcal)": m['id'] for m in meals_with_id}
+        selected_meal_to_del = st.selectbox("Seleziona un pasto da eliminare", [""] + list(meal_options_del.keys()))
+        
+        if selected_meal_to_del:
+            if st.button("🗑️ Elimina Pasto Selezionato"):
+                meal_id_to_delete = meal_options_del[selected_meal_to_del]
+                supabase.table("meals").delete().eq("id", meal_id_to_del).execute()
+                st.success("Pasto eliminato con successo!")
+                st.rerun()
     else:
         st.info("Nessun pasto registrato per questa data.")
-    
-    st.markdown("---")
     
     ## Activities
     st.markdown("#### 🏃 Calorie Bruciate & Attività")
@@ -950,28 +956,64 @@ elif selected_page == t["t4"]:
             st.dataframe(df_display, use_container_width=True, hide_index=True)
             
             ## Delete recipe
-            with st.expander("🗑️ Elimina una ricetta"):
-                recipe_names = df_entries["name"].tolist()
-                recipe_to_delete_idx = st.selectbox(
-                    "Seleziona ricetta da eliminare",
-                    range(len(recipe_names)),
-                    format_func=lambda i: recipe_names[i]
-                )
-                if st.button("Elimina ricetta"):
-                    try:
-                        recipe_id = df_entries.iloc[recipe_to_delete_idx].get("id")
-                        supabase.table("recipes").delete().eq("id", recipe_id).execute()
-                        st.success("✅ Ricetta eliminata!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Errore: {e}")
-        else:
-            st.info("Nessuna ricetta salvata ancora.")
-    except Exception as e:
-        st.error(f"Errore nel caricamento ricette: {e}")
-        print(traceback.format_exc())
-    
+elif selected_page == t["t4"]:
+    st.subheader("⚡ Quick Entries")
+
+    # 1. Visualizzazione Tabella
+    st.markdown("### 📋 Entries salvate")
+    entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
+    if entries:
+        df_entries = pd.DataFrame(entries)
+        df_display = df_entries.rename(columns={
+            "name": "Nome", "calories": "Kcal", 
+            "protein": "Pro", "carbs": "Carbs", "fat": "Fat"
+        })
+        st.dataframe(df_display[["Nome", "Kcal", "Pro", "Carbs", "Fat"]], use_container_width=True, hide_index=True)
+        
+        # Sezione Eliminazione Quick Entry / Ricetta
+        st.markdown("### 🗑️ Elimina Quick Entry")
+        entry_options_del = {e['name']: e['name'] for e in entries}
+        sel_entry_del = st.selectbox("Seleziona Quick Entry da rimuovere", [""] + list(entry_options_del.keys()))
+        if sel_entry_del:
+            if st.button("Elimina Quick Entry"):
+                try:
+                    supabase.table("recipes").delete().eq("user_id", user_id).eq("name", sel_entry_del).execute()
+                    st.success(f"Quick Entry '{sel_entry_del}' eliminata!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore durante l'eliminazione: {e}")
+    else:
+        st.info("Nessuna entry veloce presente.")
+
     st.markdown("---")
+
+    # 2. Form per aggiungere una nuova Quick Entry (Salvataggio)
+    with st.form("quick_entry_add"):
+        st.markdown("### ➕ Aggiungi nuova Quick Entry")
+        r_name = st.text_input(t["recipe_name"])
+        c1, c2, c3, c4 = st.columns(4)
+        cals = c1.number_input("Kcal", value=0, step=1, key="r_cal")
+        prot = c2.number_input("Pro", value=0, step=1, key="r_pro")
+        carbs = c3.number_input("Carbs", value=0, step=1, key="r_carbs")
+        fat = c4.number_input("Fat", value=0, step=1, key="r_fat")
+        
+        if st.form_submit_button(t["save_recipe"]):
+            if not r_name.strip():
+                st.warning("Inserisci un nome valido.")
+            else:
+                try:
+                    supabase.table("recipes").upsert({
+                        "name": r_name.strip(), 
+                        "calories": int(cals), 
+                        "protein": int(prot), 
+                        "carbs": int(carbs), 
+                        "fat": int(fat),
+                        "user_id": user_id
+                    }, on_conflict="user_id,name").execute()
+                    st.success(t["recipe_saved"])
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore: {e}")
     
     st.markdown("#### ➕ Aggiungi Nuova Ricetta")
     with st.form("quick_entry_add"):
