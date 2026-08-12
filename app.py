@@ -510,6 +510,12 @@ translations = {
         "input_source_lbl": "Fonte inserimento",
         "opt_off": "🔍 Cerca online (Open Food Facts)",
         "opt_quick": "🍳 Immissione Rapida",
+        # --- NUOVE CHIAVI AGGIUNTE PER LE CARD ---
+        "card_kcal_in": "Kcal Ingerite",
+        "card_kcal_burn": "Kcal Bruciate",
+        "card_balance": "Bilancio",
+        "card_weight": "Peso",
+        # ----------------------------------------
         "in_msg_low": lambda p: f"⚠️ Proiezione bassa ({p} kcal previste). Mangia di più!",
         "in_msg_high": lambda p: f"✅ Ottima proiezione ({p} kcal stimate a fine giornata).",
         "burn_msg_yes": lambda e: f"🌟 Ottimo lavoro! Hai fatto attività extra (+{e} kcal).",
@@ -593,6 +599,12 @@ translations = {
         "input_source_lbl": "Input source",
         "opt_off": "🔍 Search online (Open Food Facts)",
         "opt_quick": "🍳 Quick Entry",
+        # --- NUOVE CHIAVI AGGIUNTE PER LE CARD ---
+        "card_kcal_in": "Calories In",
+        "card_kcal_burn": "Calories Burned",
+        "card_balance": "Balance",
+        "card_weight": "Weight",
+        # ----------------------------------------
         "in_msg_low": lambda p: f"⚠️ Low projection ({p} kcal expected). Eat more!",
         "in_msg_high": lambda p: f"✅ Great projection ({p} kcal estimated by end of day).",
         "burn_msg_yes": lambda e: f"🌟 Great job! You did extra activity (+{e} kcal).",
@@ -676,6 +688,12 @@ translations = {
         "input_source_lbl": "Invoerbron",
         "opt_off": "🔍 Online zoeken (Open Food Facts)",
         "opt_quick": "🍳 Snelle Invoer",
+        # --- NUOVE CHIAVI AGGIUNTE PER LE CARD ---
+        "card_kcal_in": "Gegeten Kcal",
+        "card_kcal_burn": "Verbrande Kcal",
+        "card_balance": "Balans",
+        "card_weight": "Gewicht",
+        # ----------------------------------------
         "in_msg_low": lambda p: f"⚠️ Lage projectie ({p} kcal verwacht). Eet meer!",
         "in_msg_high": lambda p: f"✅ Geweldige projectie ({p} kcal geschat aan het einde van de dag).",
         "burn_msg_yes": lambda e: f"🌟 Goed gedaan! Je hebt extra activiteiten gedaan (+{e} kcal).",
@@ -690,7 +708,6 @@ translations = {
         "status_lazy": "🛋️ Luie dag, probeer meer te bewegen."
     }
 }
-
 with st.sidebar:
     # 2. Ora possiamo richiamare in sicurezza il selettore della lingua
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands"], key="lang_selector")
