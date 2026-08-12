@@ -18,31 +18,56 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - FONT HANKEN GROTESK & GRAFICA ACCATTIVANTE
+# STYLING CUSTOM (CSS) - FONT HANKEN GROTESK & SIDEBAR FIX
 # ==============================================================================
 st.markdown("""
     <style>
         /* Importazione del font Hanken Grotesk da Google Fonts */
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
 
-        /* Applicazione globale del font su tutta l'app Streamlit */
+        /* Applicazione globale del font su tutta l'app */
         html, body, [class*="css"] {
             font-family: 'Hanken Grotesk', sans-serif !important;
         }
 
-        /* Nascondi il menu di Streamlit e il footer per un look pulito */
+        /* Nascondi solo il menu opzioni e il footer, ma NON l'header principale */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        header {visibility: hidden;}
+        
+        /* Assicura che il pulsante per aprire/chiudere la sidebar sia sempre visibile e curato */
+        [data-testid="collapsedControl"] {
+            display: block !important;
+            color: #ffffff;
+            background-color: #161b22;
+            border-radius: 50%;
+            padding: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 999999;
+        }
 
-        /* Arrotondamento e stile moderno per i pulsanti */
+        /* Stile della Sidebar con tema scuro profondo */
+        [data-testid="stSidebar"] {
+            background-color: #0d1117;
+            border-right: 1px solid #30363d;
+        }
+
+        /* Stile moderno per i pulsanti */
         .stButton>button {
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: 600;
-            width: 100%;
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            transition: all 0.2s ease;
         }
         
-        /* Stile dei separatori */
+        .stButton>button:hover {
+            border-color: #58a6ff;
+            color: #58a6ff;
+            background-color: #30363d;
+        }
+
+        /* Linee divisorie pulite */
         hr {
             margin: 1.5rem 0;
             border-color: #30363d;
