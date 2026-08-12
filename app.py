@@ -18,105 +18,56 @@ st.set_page_config(
     layout="wide",
 )
 
-# ==============================================================================
-# STYLING CUSTOM (CSS) - BLU NAVY, ROSA CORALLO & BIANCO
-# ==============================================================================
-st.markdown("""
-    <style>
-        /* Bordo e accenti color Rosa Corallo per i pulsanti standard fuori dalla sidebar */
-        div.stButton > button:not([data-baseweb="tab"]) {
-            border: 1px solid #FF8B8B ;
-            color: #1A2942;
-            background-color: #FFFFFF;
-            transition: all 0.3s ease;
-        }
-        
-        div.stButton > button:not([data-baseweb="tab"]):hover {
-            background-color: #FFF5F5 ;
-            border-color: #1A2942 ;
-            color: #1A2942 ;
-        }
-    </style>
-""", unsafe_allow_html=True)
 
+# ==============================================================================
+# STYLING CUSTOM (CSS) - CORRETTO PER LEGGIBILITÀ SIDEBAR
+# ==============================================================================
 st.markdown("""
     <style>
+        /* Font globale */
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
+        html, body, [class*="css"] { font-family: 'Hanken Grotesk', sans-serif; color: #1A2942; }
 
-        html, body, [class*="css"] {
-            font-family: 'Hanken Grotesk', sans-serif ;
-            color: #1A2942;
-        }
+        /* Sidebar Blu Navy */
+        [data-testid="stSidebar"] { background-color: #1A2942; }
+        [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label { color: #FFFFFF !important; }
 
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        
-        [data-testid="collapsedControl"] {
-            display: block ;
-            color: #FFFFFF;
-            background-color: #1A2942;
-            border-radius: 50%;
-            padding: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            z-index: 999999;
-        }
-
-        /* Sidebar con tema Blu Navy e testi bianchi */
-        [data-testid="stSidebar"] {
-            background-color: #1A2942;
-            border-right: 1px solid #2A3B58;
-        }
-
-        [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div {
-            color: #FFFFFF !important;
-        }
-
-        /* STILE MIRATO ALLE CARD DELLE METRICHE (Overview) */
-        [data-testid="stMetric"] {
-            background-color: #FFFFFF ;
-            border: 1px solid #FF8B8B ;
-            padding: 15px ;
-            border-radius: 14px ;
-            box-shadow: 0 2px 6px rgba(26,41,66,0.04);
-        }
-
-        /* STILE SPECIFICO PER I BOTTONI DELLA SIDEBAR */
+        /* PULSANTI SIDEBAR - ORA LEGGIBILI */
         [data-testid="stSidebar"] .stButton>button {
-            border-radius: 10px ;
-            font-weight: 500 ;
-            background-color: #2A3B58 ;
-            color: #1A2942 !important;
-            border: 1px solid #3A4B68 ;
-            padding: 10px 15px ;
-            transition: all 0.2s ease ;
+            border-radius: 12px;
+            font-weight: 600;
+            background-color: #FFFFFF; /* Bianco */
+            color: #1A2942 !important;  /* Testo Blu Navy */
+            border: 2px solid #FFFFFF;
+            padding: 10px 20px;
+            width: 100%;
+            transition: all 0.2s ease;
         }
         
-        [data-testid="stSidebar"] .stButton>button:hover {
-            background-color: #FF8B8B ;
-            border-color: #FF8B8B ;
+        /* Hover e Active - Rosa Corallo */
+        [data-testid="stSidebar"] .stButton>button:hover, 
+        [data-testid="stSidebar"] .stButton>button:active,
+        [data-testid="stSidebar"] .stButton>button:focus {
+            background-color: #FF8B8B; /* Rosa Corallo */
+            border-color: #FF8B8B;
             color: #1A2942 !important;
         }
 
-        /* Bottoni nel corpo centrale dell'app */
-        .main .stButton>button, .main div.stFormSubmitButton>button {
-            border-radius: 10px ;
-            font-weight: 500 ;
-            background-color: #FFFFFF ;
-            color: #1A2942 ;
-            border: 1px solid #FF8B8B ;
-            padding: 10px 15px ;
-            transition: all 0.2s ease ;
+        /* Pulsanti corpo centrale */
+        .main .stButton>button {
+            border-radius: 10px;
+            background-color: #FFFFFF;
+            color: #1A2942;
+            border: 1px solid #FF8B8B;
         }
-        
-        .main .stButton>button:hover, .main div.stFormSubmitButton>button:hover {
-            background-color: #FFF5F5 ;
-            border-color: #1A2942 ;
-            color: #1A2942 ;
-        }
+        .main .stButton>button:hover { background-color: #FFF5F5; border-color: #1A2942; }
 
-        hr {
-            margin: 1.5rem 0;
-            border-color: #E2E8F0;
+        /* Metric Cards */
+        [data-testid="stMetric"] {
+            background-color: #FFFFFF;
+            border: 1px solid #FF8B8B;
+            padding: 15px;
+            border-radius: 14px;
         }
     </style>
 """, unsafe_allow_html=True)
