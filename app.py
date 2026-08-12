@@ -1079,39 +1079,55 @@ elif selected_page == t["t5"]:
     # 3. Griglia di inserimento
     col_a1, col_a2, col_a3 = st.columns(3)
     
-    # Inserimento Passi
+    # Inserimento Passi (Logica Cumulativa / Upsert)
     with col_a1:
         with st.container(border=True):
-            st.markdown("### 👣 Passi")
+            st.markdown("### 👣 Passi (Totali)")
             new_steps = st.number_input("Totale passi", value=int(day_steps), min_value=0, step=500)
-            if st.button("💾 Salva Passi", use_container_width=True):
+            if st.button("💾 Aggiorna Passi", use_container_width=True):
+                # 1. Aggiorna o inserisce il totale dei passi nel log giornaliero
                 supabase.table("daily_logs").upsert({"user_id": user_id, "date": str(act_date), "steps": int(new_steps)}, on_conflict="user_id,date").execute()
+                
+                # 2. Calcoliamo le calorie totali basate sul totale dei passi
                 estim_cals = int(new_steps * 0.04)
-                supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Passi (Stima)", "burned_calories": estim_cals}).execute()
-                st.success(f"Registrati {estim_cals} kcal!")
+                
+                # 3. Gestiamo la tabella activities: verifichiamo se esiste già una voce "Passi (Stima)" per oggi
+                existing_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
+                
+                if existing_act:
+                    # Se esiste già, aggiorniamo il record con le nuove calorie totali
+                    act_id = existing_act[0]["id"]
+                    supabase.table("activities").update({"burned_calories": estim_cals}).eq("id", act_id).execute()
+                else:
+                    # Altrimenti lo creiamo
+                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Passi (Stima)", "burned_calories": estim_cals}).execute()
+                
+                refresh_daily_logs(act_date)
+                st.success(f"Passi aggiornati! ({estim_cals} kcal totali stimate)")
                 st.rerun()
 
-    # Inserimento Minuti Bici
+    # Inserimento Minuti Bici (Logica Additiva)
     with col_a2:
         with st.container(border=True):
-            st.markdown("### 🚲 Bici")
+            st.markdown("### 🚲 Bici (Sessione)")
             bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5)
-            if st.button("💾 Salva Bici", use_container_width=True):
+            if st.button("💾 Aggiungi Bici", use_container_width=True):
                 if bike_min > 0:
                     estim_cals = int(bike_min * 8)
+                    # La bici è additiva: ogni inserimento aggiunge un record alla tabella activities
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Bici", "burned_calories": estim_cals}).execute()
                     refresh_daily_logs(act_date)
-                    st.success(f"Registrate {estim_cals} kcal!")
+                    st.success(f"Aggiunte {bike_min} min di bici ({estim_cals} kcal)!")
                     st.rerun()
 
-    # Altre Attività
+    # Altre Attività (Logica Additiva)
     with col_a3:
         with st.container(border=True):
             st.markdown("### 🏋️ Altro")
             with st.form("activity_form", clear_on_submit=True):
                 extra_act = st.selectbox("Attività", ["Padel", "Palestra", "Nuoto", "Altro"])
                 extra_cals = st.number_input("Kcal bruciate", value=0, min_value=0, step=50)
-                if st.form_submit_button("💾 Salva", use_container_width=True):
+                if st.form_submit_button("💾 Aggiungi", use_container_width=True):
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
                     refresh_daily_logs(act_date)
                     st.rerun()
