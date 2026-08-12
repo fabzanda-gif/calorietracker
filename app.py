@@ -453,7 +453,7 @@ elif selected_page == t["t3"]:
             st.rerun()
 
     with col_w2:
-        new_target = st.number_input("Aggiorna Peso Obiettivo (kg)", value=user_target_weight, step=0.5)
+        new_target = st.number_input("Aggiorna Peso Obiettivo (kg)", value=float(user_target_weight), step=0.5)
         if st.button("Salva Obiettivo"):
             try:
                 res = supabase.auth.update_user({
