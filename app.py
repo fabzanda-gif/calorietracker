@@ -680,7 +680,6 @@ elif selected_page == t["t2"]:
         meals_data = supabase.table("meals").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
         raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
         
-        # Recuperiamo anche lo storico del peso per trovare il peso iniziale (il primo log in assoluto)
         all_weight_logs = supabase.table("daily_logs").select("weight, date").eq("user_id", user_id).not_.is_("weight", "null").order("date", desc=False).execute().data or []
     except Exception as e:
         st.error(f"Errore nel caricamento dati: {e}")
@@ -698,72 +697,100 @@ elif selected_page == t["t2"]:
         row = daily_log_res[0]
         current_weight = row.get('weight')
     
-    # Determiniamo il peso iniziale e il peso obiettivo (target)
-    initial_weight = all_weight_logs[0]['weight'] if all_weight_logs else (current_weight or 80.0)
-    target_weight = float(user_target_weight) if user_target_weight else initial_weight
+    initial_weight = 89.0  # Valore di partenza fisso come richiesto o ricavabile
+    if all_weight_logs:
+        initial_weight = all_weight_logs[0]['weight']
+    target_weight = float(user_target_weight) if user_target_weight else 78.0
     
     now = datetime.now()
     if summary_date == date.today():
-        minutes_passed = now.hour * 60 + now.minute
+        minutes_passed = max(60, now.hour * 60 + now.minute)
         bmr_so_far = int((user_bmr / (24 * 60)) * minutes_passed)
+        
+        # Calcolo proiezione calorie a fine giornata (24 ore = 1440 minuti)
+        projected_cals_in = int((total_cals_in / minutes_passed) * 1440) if minutes_passed > 30 else total_cals_in
     else:
         bmr_so_far = user_bmr
+        projected_cals_in = total_cals_in
+        minutes_passed = 1440
     
     extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    # Logica colori e messaggi per il Bilancio
-    alert_msg = ""
-    if total_cals_in < 1500:
-        bilancio_bg = "#fcf2f4"
-        bilancio_border = "#f2d6dc"
-        alert_msg = "⚠️ Attenzione: hai assunto meno di 1500kcal. Ricordati di mangiare!"
-    elif deficit <= 0:
-        bilancio_bg = "#e6f4ea"
-        bilancio_border = "#ceead6"
+    # 1. CARD INGERITE: Valutazione sulla proiezione (< 1500 kcal proiettate)
+    if projected_cals_in < 1500:
+        in_bg, in_border = "#fcf2f4", "#f2d6dc"
+        in_msg = f"⚠️ Proiezione bassa ({projected_cals_in} kcal previste). Mangia di più!"
     else:
-        bilancio_bg = "#fcf2f4"
-        bilancio_border = "#f2d6dc"
-        
-    # Logica colore condizionale per la card del Peso (Scala da Rosso a Verde)
-    weight_bg = "#fcf2f4"
-    weight_border = "#f2d6dc"
-    weight_diff_ini = 0.0
-    weight_diff_tgt = 0.0
-    
-    if current_weight:
-        # Calcoliamo la percentuale di progresso tra il peso iniziale e il target
-        # Se initial == target, evitiamo divisioni per zero
-        if initial_weight != target_weight:
-            progress = (initial_weight - current_weight) / (initial_weight - target_weight)
-        else:
-            progress = 1.0 if current_weight <= target_weight else 0.0
-            
-        progress = max(0.0, min(1.0, progress)) # Blocchiamo tra 0 e 1
-        
-        # Sfumatura dinamica: da Rosso (252, 242, 244) a Verde (230, 244, 234)
-        r = int(252 + (230 - 252) * progress)
-        g = int(242 + (244 - 242) * progress)
-        b = int(244 + (234 - 244) * progress)
-        weight_bg = f"rgb({r}, {g}, {b})"
-        
-        # Bordo leggermente più scuro coordinato
-        br = max(0, r - 25)
-        bg = max(0, g - 25)
-        bb = max(0, b - 25)
-        weight_border = f"rgb({br}, {bg}, {bb})"
-        
-        weight_diff_ini = current_weight - initial_weight
-        weight_diff_tgt = current_weight - target_weight
+        in_bg, in_border = "#e6f4ea", "#ceead6"
+        in_msg = f"✅ Ottima proiezione ({projected_cals_in} kcal stimate a fine giornata)."
 
+    # 2. CARD BRUCIATE: Invito o complimento se c'è attività extra
+    if extra_burned > 0:
+        burn_bg, burn_border = "#e6f4ea", "#ceead6"
+        burn_msg = f"🌟 Ottimo lavoro! Hai fatto attività extra (+{extra_burned} kcal)."
+    else:
+        burn_bg, burn_border = "#fcf2f4", "#f2d6dc"
+        burn_msg = "💡 Nessuna attività extra registrata. Che ne dici di muoverti un po'?"
+
+    # 3. CARD BILANCIO
+    if deficit <= 0:
+        bilancio_bg, bilancio_border = "#e6f4ea", "#ceead6"
+        bilancio_msg = "🎯 Ottimo, sei in perfetto deficit calorico."
+    else:
+        bilancio_bg, bilancio_border = "#fcf2f4", "#f2d6dc"
+        bilancio_msg = "⚠️ Attenzione: sei in surplus calorico."
+
+    # 4. CARD PESO: Scala da Rosso (partenza 89kg) a Verde (obiettivo 78kg)
+    weight_bg, weight_border = "#fcf2f4", "#f2d6dc"
+    weight_msg = "📈 Continua così per raggiungere il target."
+    if current_weight:
+        # Progresso da 89kg a 78kg (range totale = 11kg)
+        total_span = initial_weight - target_weight
+        current_progress = (initial_weight - current_weight) / total_span if total_span > 0 else 1.0
+        current_progress = max(0.0, min(1.0, current_progress))
+        
+        # Sfumatura da Rosso (252, 242, 244) a Verde brillante (230, 244, 234)
+        r = int(252 + (230 - 252) * current_progress)
+        g = int(242 + (244 - 242) * current_progress)
+        b = int(244 + (234 - 244) * current_progress)
+        weight_bg = f"rgb({r}, {g}, {b})"
+        weight_border = f"rgb({max(0, r-25)}, {max(0, g-25)}, {max(0, b-25)})"
+        
+        diff_ini = current_weight - initial_weight
+        diff_tgt = current_weight - target_weight
+        weight_msg = f"Iniziale: {initial_weight} kg ({diff_ini:+.1f}) | Target: {target_weight} kg ({diff_tgt:+.1f})"
+
+    # RENDER DELLE 4 COLONNE CON STILI DINAMICI INLINE
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+    
     with col_c1:
+        st.markdown(f"""
+            <style>
+                div[data-testid="stMetric"]:has(div:contains("Kcal Ingerite")) {{
+                    background-color: {in_bg} !important;
+                    border: 1px solid {in_border} !important;
+                }}
+            </style>
+        """, unsafe_allow_html=True)
         with st.container(border=True):
             st.metric("🍽️ Kcal Ingerite", f"{total_cals_in} kcal")
+            st.caption(in_msg)
+            
     with col_c2:
+        st.markdown(f"""
+            <style>
+                div[data-testid="stMetric"]:has(div:contains("Kcal Bruciate")) {{
+                    background-color: {burn_bg} !important;
+                    border: 1px solid {burn_border} !important;
+                }}
+            </style>
+        """, unsafe_allow_html=True)
         with st.container(border=True):
             st.metric("🔥 Kcal Bruciate", f"{total_burned_finora} kcal")
+            st.caption(burn_msg)
+            
     with col_c3:
         st.markdown(f"""
             <style>
@@ -775,8 +802,8 @@ elif selected_page == t["t2"]:
         """, unsafe_allow_html=True)
         with st.container(border=True):
             st.metric("⚖️ Bilancio", f"{deficit:+d} kcal", delta_color="inverse")
-            if alert_msg:
-                st.caption(alert_msg)
+            st.caption(bilancio_msg)
+            
     with col_c4:
         st.markdown(f"""
             <style>
@@ -788,8 +815,7 @@ elif selected_page == t["t2"]:
         """, unsafe_allow_html=True)
         with st.container(border=True):
             st.metric("📉 Peso", f"{current_weight} kg" if current_weight else "N/D")
-            if current_weight:
-                st.caption(f"Iniziale: {initial_weight} kg ({weight_diff_ini:+.1f})\nTarget: {target_weight} kg ({weight_diff_tgt:+.1f})")
+            st.caption(weight_msg)
     
     with st.container(border=True):
         st.markdown("### 🍽️ Cibi inseriti")
