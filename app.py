@@ -934,8 +934,12 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
+    # --- LOGICA CORRETTA PER IL TARGET E IL DEFICIT ---
+    # Dispendio totale stimato (BMR intero + attività loggate)
     total_estimated_burned = user_bmr + extra_burned
+    # Target calorico ideale per avere 500 kcal di deficit (es. 2200 - 500 = 1700)
     ideal_target_cals = max(0, total_estimated_burned - 500)
+    # Differenza rispetto al budget ideale (positivo se sei sotto target, negativo se hai sforato)
     diff_from_ideal = ideal_target_cals - total_cals_in
 
     in_bg, in_border = "#FFFFFF", "#FF8B8B"
