@@ -512,57 +512,36 @@ if profile_incomplete:
 with st.sidebar:
     lang = st.selectbox("🌐 Lingua", ["Italiano", "English"])
     translations = {
-        "Italiano": {
-            "t1": "🚀 Registrazione", 
-            "t2": "📊 Panoramica Giornaliera", 
-            "t3": "📈 Peso", 
-            "t4": "⚡ Quick Entries",
-            "meal": "Tipo di pasto", 
-            "meal_name": "Nome pasto", 
-            "add_meal": "Aggiungi pasto", 
-            "extra_act": "Attività extra", 
-            "extra_cals": "Calorie bruciate extra", 
-            "insert_weight": "Inserisci peso (kg)", 
-            "save_weight": "Salva peso", 
-            "recipe_name": "Nome Info", 
-            "save_recipe": "Salva Informazione", 
-            "recipe_saved": "✅ Informazione salvata!"
-        },
-        "English": {
-            "t1": "🚀 Logging", 
-            "t2": "📊 Daily Overview", 
-            "t3": "📈 Weight Journey", 
-            "t4": "⚡ Quick Entries",
-            "meal": "Meal type", 
-            "meal_name": "Meal name", 
-            "add_meal": "Add meal", 
-            "extra_act": "Extra activity", 
-            "extra_cals": "Extra calories burned", 
-            "insert_weight": "Enter weight (kg)", 
-            "save_weight": "Save weight", 
-            "recipe_name": "Info name", 
-            "save_recipe": "Save Info", 
-            "recipe_saved": "✅ Info saved!"
-        }
+        "Italiano": {"t1": "🚀 Inserimento", "t2": "📊 Overview", "t3": "📈 Peso", "t4": "⚡ Quick Entries", "meal": "Tipo di pasto", "meal_name": "Nome pasto", "add_meal": "Aggiungi pasto", "extra_act": "Attività extra", "extra_cals": "Calorie bruciate extra", "insert_weight": "Inserisci peso (kg)", "save_weight": "Salva peso", "recipe_name": "Nome ricetta", "save_recipe": "Salva ricetta", "recipe_saved": "✅ Ricetta salvata!"},
+        "English": {"t1": "🚀 Logging", "t2": "📊 Overview", "t3": "📈 Weight", "t4": "⚡ Quick Entries", "meal": "Meal type", "meal_name": "Meal name", "add_meal": "Add meal", "extra_act": "Extra activity", "extra_cals": "Extra calories burned", "insert_weight": "Enter weight (kg)", "save_weight": "Save weight", "recipe_name": "Recipe name", "save_recipe": "Save recipe", "recipe_saved": "✅ Recipe saved!"}
     }
     t = translations[lang]
     
-    st.write(f"👤 {display_name}")
-    st.markdown("---")
-    
-    selected_page = st.radio("📍 Navigazione", [t["t1"], t["t2"], t["t3"], t["t4"]])
-    
-    if st.button("🚪 Logout", use_container_width=True):
-        try:
-            supabase.auth.sign_out()
-        except:
-            pass
-        
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        
-        st.rerun()
+    # Inizializza la pagina corrente se non esiste
+    if "selected_page" not in st.session_state:
+        st.session_state.selected_page = t["t1"]
 
+    st.markdown("### 📍 Navigazione")
+    
+    # Pulsanti di navigazione personalizzati stile card
+    pages = [t["t1"], t["t2"], t["t3"], t["t4"]]
+    for page in pages:
+        # Se la pagina è quella attiva, diamo un bordo o uno sfondo più chiaro per evidenziarla
+        is_active = (st.session_state.selected_page == page)
+        btn_type = "primary" if is_active else "secondary"
+        
+        if st.button(page, key=f"nav_{page}", use_container_width=True):
+            st.session_state.selected_page = page
+            st.rerun()
+
+    selected_page = st.session_state.selected_page
+
+    st.markdown("---")
+    if st.button("🚪 Logout", use_container_width=True):
+        supabase.auth.sign_out()
+        controller.set("supabase_session", None, max_age=0)
+        st.session_state.clear()
+        st.rerun()
 ## ==============================================================================
 ## 9. PAGE 1: MEAL LOGGING
 ## ==============================================================================
