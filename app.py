@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - FORZATURA DEFINITIVA BOTTONI
+# STYLING CUSTOM (CSS) - UNIVERSALE PER BOTTONI E SIDEBAR
 # ==============================================================================
 st.markdown("""
     <style>
@@ -60,7 +60,7 @@ st.markdown("""
             border-radius: 14px !important;
         }
 
-        /* 1. BOTTONI DELLA SIDEBAR (Tutti uniformi) */
+        /* BOTTONI DELLA SIDEBAR (Tutti uniformi) */
         [data-testid="stSidebar"] button {
             border-radius: 10px !important;
             font-weight: 500 !important;
@@ -82,27 +82,21 @@ st.markdown("""
             -webkit-text-fill-color: #f0f6fc !important;
         }
 
-        /* 2. BOTTONI FUORI DALLA SIDEBAR (Inattivi: Bordo rigorosamente color corallo) */
-        .main .stButton button, 
-        .main .stFormSubmitButton button,
+        /* 1. BOTTONI FUORI DALLA SIDEBAR (Inattivi: Bordo corallo universale) */
         .main button {
-            border-radius: 10px !important;
-            font-weight: 500 !important;
+            border: 1px solid #e06c75 !important;
             background-color: transparent !important;
             color: #31333F !important;
-            border: 1px solid #e06c75 !important;
+            border-radius: 10px !important;
+            font-weight: 500 !important;
             padding: 10px 15px !important;
             transition: all 0.2s ease !important;
         }
         
-        /* 3. BOTTONI FUORI DALLA SIDEBAR (Hover / Attivi: Sfondo corallo tenue, testo nero e bordo corallo scuro) */
-        .main .stButton button:hover, 
-        .main .stFormSubmitButton button:hover,
-        .main button:hover,
-        .main .stButton button:hover *, 
-        .main .stFormSubmitButton button:hover *,
+        /* 2. BOTTONI FUORI DALLA SIDEBAR (Hover / Attivi: Sfondo corallo pieno e testo nero) */
+        .main button:hover, 
         .main button:hover * {
-            background-color: #fcf2f4 !important;
+            background-color: #e06c75 !important;
             border-color: #a6323f !important;
             color: #000000 !important;
             -webkit-text-fill-color: #000000 !important;
