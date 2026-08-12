@@ -18,7 +18,6 @@ st.set_page_config(
     layout="wide",
 )
 
-
 # ==============================================================================
 # STYLING CUSTOM (CSS) - CORRETTO PER LEGGIBILITÀ SIDEBAR
 # ==============================================================================
@@ -426,7 +425,6 @@ translations = {
         "save_recipe": "Salva ricetta", 
         "recipe_saved": "✅ Ricetta salvata!",
         "lang_label": "🌐 Lingua",
-        "nav": "Navigazione",
         "logout": "🚪 Logout",
         "search_food": "🔍 Cerca per Nome o Codice a Barre",
         "search_btn": "🚀 Cerca",
@@ -520,7 +518,6 @@ translations = {
         "save_recipe": "Save recipe", 
         "recipe_saved": "✅ Recipe saved!",
         "lang_label": "🌐 Language",
-        "nav": "Navigation",
         "logout": "🚪 Logout",
         "search_food": "🔍 Search by Name or Barcode",
         "search_btn": "🚀 Search",
@@ -614,7 +611,6 @@ translations = {
         "save_recipe": "Recept opslaan", 
         "recipe_saved": "✅ Recept opgeslagen!",
         "lang_label": "🌐 Taal",
-        "nav": "Navigatie",
         "logout": "🚪 Uitloggen",
         "search_food": "🔍 Zoek op naam of streepjescode",
         "search_btn": "🚀 Zoeken",
@@ -708,8 +704,6 @@ with st.sidebar:
     if "current_page_id" not in st.session_state:
         st.session_state.current_page_id = "t1"
 
-    st.markdown(f"### 📍 {t['nav']}")
-    
     for page_name, page_id in pages_map.items():
         is_active = (st.session_state.current_page_id == page_id)
         if st.button(page_name, key=f"nav_{page_id}", use_container_width=True, type="primary" if is_active else "secondary"):
