@@ -51,33 +51,34 @@ st.markdown("""
             color: #f0f6fc !important;
         }
 
-        /* FORZATURA SFONDO ROSA/ROSA TENUE SU TUTTI I CONTAINER CON BORDO */
+        /* SFONDO ROSA TENUE PER TUTTI I CONTAINER CON BORDURA (border=True) */
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            background-color: #261618 !important;
-            border: 1px solid #4a282d !important;
-            border-radius: 12px !important;
+            background-color: #fcf2f4 !important;
+            border: 1px solid #f2d6dc !important;
+            border-radius: 14px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        /* Stile rettangolare arrotondato su TUTTI i bottoni dell'app */
+        /* Stile dei bottoni */
         .stButton>button, div.stFormSubmitButton>button {
             border-radius: 10px !important;
             font-weight: 500 !important;
-            background-color: #21262d !important;
-            color: #f0f6fc !important;
-            border: 1px solid #30363d !important;
+            background-color: #ffffff !important;
+            color: #24292e !important;
+            border: 1px solid #d1d5da !important;
             padding: 10px 15px !important;
             transition: all 0.2s ease !important;
         }
         
         .stButton>button:hover, div.stFormSubmitButton>button:hover {
-            background-color: #30363d !important;
-            border-color: #ff7b72 !important;
-            color: #ffffff !important;
+            background-color: #f6f8fa !important;
+            border-color: #e06c75 !important;
+            color: #e06c75 !important;
         }
 
         hr {
             margin: 1.5rem 0;
-            border-color: #30363d;
+            border-color: #e1e4e8;
         }
     </style>
 """, unsafe_allow_html=True)
