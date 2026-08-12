@@ -14,7 +14,7 @@ import plotly.express as px
 # 1. SETUP INIZIALE E CONFIGURAZIONE PAGINA
 # ==============================================================================
 st.set_page_config(
-    page_title="Tracker Pro",
+    page_title="SanoSync",
     layout="wide",
 )
 
@@ -82,16 +82,6 @@ st.markdown("""
             border: 1px solid #FF8B8B;
             padding: 15px;
             border-radius: 14px;
-        }
-
-        /* Classe per lo sfondo Blu Navy della pagina di login */
-        .login-page-bg {
-            background-color: #1A2942 !important;
-            padding: 30px;
-            border-radius: 20px;
-        }
-        .login-page-bg h1, .login-page-bg h2, .login-page-bg h3, .login-page-bg p, .login-page-bg label { 
-            color: #FFFFFF !important; 
         }
     </style>
 """, unsafe_allow_html=True)
@@ -222,7 +212,7 @@ def save_authenticated_session(response):
         print(traceback.format_exc())
 
 def show_login_page():
-    st.title("🔐 Accesso Tracker Pro")
+    st.title("SanoSync")
     
     verifier, challenge = generate_pkce_pair()
     st.session_state.pkce_verifier = verifier
