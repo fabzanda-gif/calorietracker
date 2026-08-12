@@ -18,13 +18,11 @@ st.set_page_config(
     layout="wide",
 )
 
+# ==============================================================================
+# STYLING CUSTOM (CSS) - CORRETTO PER LEGGIBILITÀ SIDEBAR
+# ==============================================================================
 st.markdown("""
     <style>
-        /* Sfondo standard per TUTTE le pagine (Bianco) */
-        [data-testid="stAppViewContainer"] {
-            background-color: #FFFFFF !important;
-        }
-        
         /* Font globale */
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
         html, body, [class*="css"] { font-family: 'Hanken Grotesk', sans-serif; color: #1A2942; }
@@ -32,8 +30,54 @@ st.markdown("""
         /* Sidebar Blu Navy */
         [data-testid="stSidebar"] { background-color: #1A2942; }
         [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label { color: #FFFFFF !important; }
+
+        /* PULSANTI SIDEBAR INATTIVI (Bianco con testo Blu Navy ben visibile) */
+        [data-testid="stSidebar"] .stButton>button {
+            border-radius: 12px;
+            font-weight: 600;
+            background-color: #FFFFFF !important; 
+            color: #1A2942 !important;  /* Testo scuro */
+            border: 2px solid #FFFFFF;
+            padding: 10px 20px;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
         
-        /* ... resto del CSS (bottoni, input, ecc) ... */
+        /* Assicura che anche gli elementi interni al bottone ereditino il testo scuro */
+        [data-testid="stSidebar"] .stButton>button * {
+            color: #1A2942 !important;
+        }
+
+        /* PULSANTE ATTIVO / HOVER (Rosa Corallo con testo scuro) */
+        [data-testid="stSidebar"] .stButton>button[kind="primary"],
+        [data-testid="stSidebar"] .stButton>button:hover, 
+        [data-testid="stSidebar"] .stButton>button:focus {
+            background-color: #FF8B8B !important; /* Rosa Corallo */
+            border-color: #FF8B8B !important;
+            color: #1A2942 !important;
+        }
+        
+        [data-testid="stSidebar"] .stButton>button[kind="primary"] *,
+        [data-testid="stSidebar"] .stButton>button:hover * {
+            color: #1A2942 !important;
+        }
+
+        /* Pulsanti corpo centrale */
+        .main .stButton>button {
+            border-radius: 10px;
+            background-color: #FFFFFF;
+            color: #1A2942;
+            border: 1px solid #FF8B8B;
+        }
+        .main .stButton>button:hover { background-color: #FFF5F5; border-color: #1A2942; }
+
+        /* Metric Cards */
+        [data-testid="stMetric"] {
+            background-color: #FFFFFF;
+            border: 1px solid #FF8B8B;
+            padding: 15px;
+            border-radius: 14px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
