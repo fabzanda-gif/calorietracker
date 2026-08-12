@@ -438,7 +438,6 @@ if profile_incomplete:
 # 8. NAVIGATION & LANGUAGE - VERSIONE CORRETTA E ORDINATA
 # ==============================================================================
 
-# 1. Definiamo prima di tutto il dizionario delle traduzioni
 translations = {
     "Italiano": {
         "t1": "🚀 Inserimento", 
@@ -510,12 +509,10 @@ translations = {
         "input_source_lbl": "Fonte inserimento",
         "opt_off": "🔍 Cerca online (Open Food Facts)",
         "opt_quick": "🍳 Immissione Rapida",
-        # --- NUOVE CHIAVI AGGIUNTE PER LE CARD ---
         "card_kcal_in": "Kcal Ingerite",
         "card_kcal_burn": "Kcal Bruciate",
         "card_balance": "Bilancio",
         "card_weight": "Peso",
-        # ----------------------------------------
         "in_msg_low": lambda p: f"⚠️ Proiezione bassa ({p} kcal previste). Mangia di più!",
         "in_msg_high": lambda p: f"✅ Ottima proiezione ({p} kcal stimate a fine giornata).",
         "burn_msg_yes": lambda e: f"🌟 Ottimo lavoro! Hai fatto attività extra (+{e} kcal).",
@@ -527,10 +524,10 @@ translations = {
         "status_move_title": "👣 Status Movimento",
         "status_very_active": "🌟 Ottimo! Giornata molto attiva.",
         "status_good": "🚶 Buona attività, continua così.",
-        "status_lazy": "🛋️ Giornata pigra, prova a muoverti di più."
+        "status_lazy": "🛋️ Giornata pigra, prova a muoverti di più.",
         "in_msg_deficit": lambda target_in, diff: f"🎯 Per un deficit ideale di 500 kcal, puoi assumere ancora circa {target_in} kcal (mancano {diff:+d} kcal).",
         "balance_days": lambda d: f"⏳ Al ritmo attuale, stimati circa {d} giorni per raggiungere il target.",
-        "balance_surplus": "⚠️ In surplus: impossibile stimare i giorni al target.",
+        "balance_surplus": "⚠️ In surplus: impossibile stimare i giorni al target."
     },
     "English": {
         "t1": "🚀 Logging", 
@@ -602,12 +599,10 @@ translations = {
         "input_source_lbl": "Input source",
         "opt_off": "🔍 Search online (Open Food Facts)",
         "opt_quick": "🍳 Quick Entry",
-        # --- NUOVE CHIAVI AGGIUNTE PER LE CARD ---
         "card_kcal_in": "Calories In",
         "card_kcal_burn": "Calories Burned",
         "card_balance": "Balance",
         "card_weight": "Weight",
-        # ----------------------------------------
         "in_msg_low": lambda p: f"⚠️ Low projection ({p} kcal expected). Eat more!",
         "in_msg_high": lambda p: f"✅ Great projection ({p} kcal estimated by end of day).",
         "burn_msg_yes": lambda e: f"🌟 Great job! You did extra activity (+{e} kcal).",
@@ -619,10 +614,10 @@ translations = {
         "status_move_title": "👣 Movement Status",
         "status_very_active": "🌟 Great! Very active day.",
         "status_good": "🚶 Good activity, keep it up.",
-        "status_lazy": "🛋️ Lazy day, try to move more."
+        "status_lazy": "🛋️ Lazy day, try to move more.",
         "in_msg_deficit": lambda target_in, diff: f"🎯 For an ideal 500 kcal deficit, you can still eat about {target_in} kcal ({diff:+d} kcal).",
         "balance_days": lambda d: f"⏳ At the current pace, about {d} days estimated to reach target.",
-        "balance_surplus": "⚠️ In surplus: cannot estimate days to target.",
+        "balance_surplus": "⚠️ In surplus: cannot estimate days to target."
     },
     "Nederlands": {
         "t1": "🚀 Invoer", 
@@ -694,12 +689,10 @@ translations = {
         "input_source_lbl": "Invoerbron",
         "opt_off": "🔍 Online zoeken (Open Food Facts)",
         "opt_quick": "🍳 Snelle Invoer",
-        # --- NUOVE CHIAVI AGGIUNTE PER LE CARD ---
         "card_kcal_in": "Gegeten Kcal",
         "card_kcal_burn": "Verbrande Kcal",
         "card_balance": "Balans",
         "card_weight": "Gewicht",
-        # ----------------------------------------
         "in_msg_low": lambda p: f"⚠️ Lage projectie ({p} kcal verwacht). Eet meer!",
         "in_msg_high": lambda p: f"✅ Geweldige projectie ({p} kcal geschat aan het einde van de dag).",
         "burn_msg_yes": lambda e: f"🌟 Goed gedaan! Je hebt extra activiteiten gedaan (+{e} kcal).",
@@ -711,10 +704,10 @@ translations = {
         "status_move_title": "👣 Bewegingsstatus",
         "status_very_active": "🌟 Geweldig! Zeer actieve dag.",
         "status_good": "🚶 Goede activiteit, ga zo door.",
-        "status_lazy": "🛋️ Luie dag, probeer meer te bewegen."
+        "status_lazy": "🛋️ Luie dag, probeer meer te bewegen.",
         "in_msg_deficit": lambda target_in, diff: f"🎯 Voor een ideaal tekort van 500 kcal kun je nog ongeveer {target_in} kcal eten ({diff:+d} kcal).",
         "balance_days": lambda d: f"⏳ In dit tempo duurt het ongeveer {d} dagen om het doel te bereiken.",
-        "balance_surplus": "⚠️ In overschot: kan dagen tot doel niet schatten.",
+        "balance_surplus": "⚠️ In overschot: kan dagen tot doel niet schatten."
     }
 }
 with st.sidebar:
