@@ -691,7 +691,7 @@ translations = {
 
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
-    st.sidebar.image("https://inhmvbdujpxrqrlcgmqw.supabase.co/storage/v1/object/sign/public-assets/logo%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jZTZjYWVhZi00MTYxLTQyYzctODliZS05ODY1ZGZiMzFlN2EiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwdWJsaWMtYXNzZXRzL2xvZ28gKDEpLnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODY1NjAzMzYsImV4cCI6MTgxODA5NjMzNn0.oKI_9WH9547Ezxk45HvYKYDgE_eMyUkwdM4954ODDn4", use_container_width=True)
+    st.sidebar.image("https://inhmvbdujpxrqrlcgmqw.supabase.co/storage/v1/object/sign/public-assets/logo2.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jZTZjYWVhZi00MTYxLTQyYzctODliZS05ODY1ZGZiMzFlN2EiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwdWJsaWMtYXNzZXRzL2xvZ28yLnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODY1NjA3MjAsImV4cCI6MTgxODA5NjcyMH0.jrnw8BnoiAmsuywkaLe5Uk1ruiHpEjF4nxNnrJyF3s4", use_container_width=True)
     st.markdown("---") # Linea di separazione dopo il logo
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands"], key="lang_selector")
     t = translations[current_lang]
