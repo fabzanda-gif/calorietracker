@@ -51,14 +51,14 @@ st.markdown("""
             color: #f0f6fc !important;
         }
 
-        /* Riquadri con bordo e sfondo rosa/rosso leggerissimo e soffuso */
-        [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] [data-testid="stVerticalBlockBorderWrapper"] {
-            background-color: rgba(224, 108, 117, 0.04) !important;
-            border: 1px solid rgba(224, 108, 117, 0.2) !important;
+        /* FORZATURA SFONDO ROSA/ROSA TENUE SU TUTTI I CONTAINER CON BORDO */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            background-color: #261618 !important;
+            border: 1px solid #4a282d !important;
             border-radius: 12px !important;
         }
 
-        /* Forza il contrasto e lo stile rettangolare arrotondato su TUTTI i bottoni dell'app */
+        /* Stile rettangolare arrotondato su TUTTI i bottoni dell'app */
         .stButton>button, div.stFormSubmitButton>button {
             border-radius: 10px !important;
             font-weight: 500 !important;
