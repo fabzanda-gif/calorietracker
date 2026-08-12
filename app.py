@@ -936,7 +936,7 @@ elif selected_page == t["t2"]:
     # Dispendio totale stimato a fine giornata (BMR intero + attività extra logdate)
     total_estimated_burned = user_bmr + extra_burned
     # Target calorico ideale a fine giornata per mantenere 500 kcal di deficit
-    ideal_target_cals = max(0, total_estimated_burned - 500)
+    ideal_target_cals = max(0, user_bmr - 500)
     # Differenza rispetto al target ideale (positivo se sei sotto, negativo se hai sforato)
     diff_from_ideal = ideal_target_cals - total_cals_in
 
