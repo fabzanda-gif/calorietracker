@@ -400,7 +400,7 @@ elif selected_page == t["t2"]:
     extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
     total_burned_finora = bmr_so_far + extra_burned
     
-    deficit = total_burned_finora - total_cals_in
+    deficit =  total_cals_in - total_burned_finora
 
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     col_c1.metric("Kcal Ingerite", f"{total_cals_in} kcal")
