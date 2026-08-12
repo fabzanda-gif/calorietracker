@@ -373,7 +373,7 @@ if "user" not in st.session_state or st.session_state["user"] is None:
             except Exception as e:
                 st.error(f"Login OAuth fallito: {str(e)}")
         else:
-            st.error("❌ Sessione PKCE scaduta. Accedi di nuovo.")
+            # Pulisce semplicemente l'URL senza mostrare messaggi di errore a schermo
             st.query_params.clear()
 
     if "user" not in st.session_state or st.session_state["user"] is None:
