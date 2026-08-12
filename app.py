@@ -580,12 +580,6 @@ if selected_page == t["t1"]:
     
     is_per_100g = st.session_state.get("is_per_100g_val", True)
     
-    def update_quantity():
-        st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
-
-is_per_100g = st.session_state.get("is_per_100g_val", True)
-    
-    # Gestione dinamica dei grammi / porzioni con callback immediata
     def on_qty_change():
         st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
 
@@ -612,7 +606,6 @@ is_per_100g = st.session_state.get("is_per_100g_val", True)
         factor = quantity
         meal_display_name = f"{name} ({quantity} porzion{'e' if quantity == 1 else 'i'})"
     
-    # Ricalcolo immediato dei valori basati sul fattore aggiornato
     calc_cals = int(st.session_state["base_cals"] * factor)
     calc_prot = int(st.session_state["base_prot"] * factor)
     calc_carbs = int(st.session_state["base_carbs"] * factor)
