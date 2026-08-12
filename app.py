@@ -924,22 +924,20 @@ elif selected_page == t["t2"]:
     if summary_date == date.today():
         minutes_passed = max(60, now.hour * 60 + now.minute)
         bmr_so_far = int((user_bmr / (24 * 60)) * minutes_passed)
-        projected_cals_in = int((total_cals_in / minutes_passed) * 1440) if minutes_passed > 30 else total_cals_in
     else:
         bmr_so_far = user_bmr
-        projected_cals_in = total_cals_in
         minutes_passed = 1440
     
     extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    # --- LOGICA CORRETTA PER IL TARGET E IL DEFICIT ---
-    # Dispendio totale stimato (BMR intero + attività loggate)
+    # --- CORREZIONE: PROIEZIONE E TARGET BASATI SUL DISPENDIO TOTALE GIORNALIERO ---
+    # Dispendio totale stimato a fine giornata (BMR intero + attività extra logdate)
     total_estimated_burned = user_bmr + extra_burned
-    # Target calorico ideale per avere 500 kcal di deficit (es. 2200 - 500 = 1700)
+    # Target calorico ideale a fine giornata per mantenere 500 kcal di deficit
     ideal_target_cals = max(0, total_estimated_burned - 500)
-    # Differenza rispetto al budget ideale (positivo se sei sotto target, negativo se hai sforato)
+    # Differenza rispetto al target ideale (positivo se sei sotto, negativo se hai sforato)
     diff_from_ideal = ideal_target_cals - total_cals_in
 
     in_bg, in_border = "#FFFFFF", "#FF8B8B"
