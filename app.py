@@ -25,7 +25,7 @@ st.markdown("""
     <style>
         /* Bordo color corallo per i pulsanti standard fuori dalla sidebar */
         div.stButton > button:not([data-baseweb="tab"]) {
-            border: 1px solid #e06c75 !important;
+            border: 1px solid #e06c75 ;
             color: #31333F;
             background-color: transparent;
             transition: all 0.3s ease;
@@ -33,9 +33,9 @@ st.markdown("""
         
         /* Colore rosso tenue e testo scuro quando ci passi sopra con il cursore (hover) */
         div.stButton > button:not([data-baseweb="tab"]):hover {
-            background-color: #fcf2f4 !important;
-            border-color: #a6323f !important;
-            color: #a6323f !important;
+            background-color: #fcf2f4 ;
+            border-color: #a6323f ;
+            color: #a6323f ;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -44,14 +44,14 @@ st.markdown("""
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
 
         html, body, [class*="css"] {
-            font-family: 'Hanken Grotesk', sans-serif !important;
+            font-family: 'Hanken Grotesk', sans-serif ;
         }
 
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         
         [data-testid="collapsedControl"] {
-            display: block !important;
+            display: block ;
             color: #ffffff;
             background-color: #161b22;
             border-radius: 50%;
@@ -67,26 +67,26 @@ st.markdown("""
         }
 
         [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div {
-            color: #f0f6fc !important;
+            color: #f0f6fc ;
         }
 
         /* STILE MIRATO ESCLUSIVAMENTE ALLE CARD DELLE METRICHE (Overview) */
         [data-testid="stMetric"] {
-            background-color: #fcf2f4 !important;
-            border: 1px solid #f2d6dc !important;
-            padding: 15px !important;
-            border-radius: 14px !important;
+            background-color: #fcf2f4 ;
+            border: 1px solid #f2d6dc ;
+            padding: 15px ;
+            border-radius: 14px ;
         }
 
         /* STILE SPECIFICO PER I BOTTONI DELLA SIDEBAR */
         [data-testid="stSidebar"] .stButton>button {
-            border-radius: 10px !important;
-            font-weight: 500 !important;
-            background-color: #161b22 !important;
-            color: #f0f6fc !important;
-            border: 1px solid #30363d !important;
-            padding: 10px 15px !important;
-            transition: all 0.2s ease !important;
+            border-radius: 10px ;
+            font-weight: 500 ;
+            background-color: #161b22 ;
+            color: #f0f6fc ;
+            border: 1px solid #30363d ;
+            padding: 10px 15px ;
+            transition: all 0.2s ease ;
         }
         
         [data-testid="stSidebar"] .stButton>button:hover {
@@ -97,19 +97,19 @@ st.markdown("""
 
         /* Bottoni nel corpo centrale dell'app */
         .main .stButton>button, .main div.stFormSubmitButton>button {
-            border-radius: 10px !important;
-            font-weight: 500 !important;
-            background-color: #ffffff !important;
-            color: #24292e !important;
-            border: 1px solid #d1d5da !important;
-            padding: 10px 15px !important;
-            transition: all 0.2s ease !important;
+            border-radius: 10px ;
+            font-weight: 500 ;
+            background-color: #ffffff ;
+            color: #24292e ;
+            border: 1px solid #d1d5da ;
+            padding: 10px 15px ;
+            transition: all 0.2s ease ;
         }
         
         .main .stButton>button:hover, .main div.stFormSubmitButton>button:hover {
-            background-color: #f6f8fa !important;
-            border-color: #e06c75 !important;
-            color: #e06c75 !important;
+            background-color: #f6f8fa ;
+            border-color: #e06c75 ;
+            color: #e06c75 ;
         }
 
         hr {
@@ -1009,10 +1009,10 @@ elif selected_page == t["t2"]:
 
     st.markdown("""
         <style>
-            .metric-card-in { background-color: var(--bg-in) !important; border: 1px solid var(--border-in) !important; padding: 15px !important; border-radius: 14px !important; }
-            .metric-card-burn { background-color: var(--bg-burn) !important; border: 1px solid var(--border-burn) !important; padding: 15px !important; border-radius: 14px !important; }
-            .metric-card-balance { background-color: var(--bg-bal) !important; border: 1px solid var(--border-bal) !important; padding: 15px !important; border-radius: 14px !important; }
-            .metric-card-weight { background-color: var(--bg-weight) !important; border: 1px solid var(--border-weight) !important; padding: 15px !important; border-radius: 14px !important; }
+            .metric-card-in { background-color: var(--bg-in) ; border: 1px solid var(--border-in) ; padding: 15px ; border-radius: 14px ; }
+            .metric-card-burn { background-color: var(--bg-burn) ; border: 1px solid var(--border-burn) ; padding: 15px ; border-radius: 14px ; }
+            .metric-card-balance { background-color: var(--bg-bal) ; border: 1px solid var(--border-bal) ; padding: 15px ; border-radius: 14px ; }
+            .metric-card-weight { background-color: var(--bg-weight) ; border: 1px solid var(--border-weight) ; padding: 15px ; border-radius: 14px ; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1391,7 +1391,7 @@ elif selected_page == t["t5"]:
     else:
         move_msg = t["status_lazy"]
 
-    st.markdown(f"""<style>div[data-testid="stMetric"]:has(div:contains("Status")) {{ background-color: {move_bg} !important; border: 1px solid {move_border} !important; padding: 15px; border-radius: 10px; }}</style>""", unsafe_allow_html=True)
+    st.markdown(f"""<style>div[data-testid="stMetric"]:has(div:contains("Status")) {{ background-color: {move_bg} ; border: 1px solid {move_border} ; padding: 15px; border-radius: 10px; }}</style>""", unsafe_allow_html=True)
     
     with st.container(border=True):
         st.metric(t["status_move_title"], f"{day_steps} passi")
