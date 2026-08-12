@@ -1052,7 +1052,7 @@ elif selected_page == t["t4"]:
                             st.error(f"Errore durante il salvataggio: {inner_e}")
                             print(traceback.format_exc())
 
-                            # ==============================================================================
+# ==============================================================================
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
 # ==============================================================================
 elif selected_page == t["t5"]:
@@ -1060,84 +1060,57 @@ elif selected_page == t["t5"]:
     
     act_date = st.date_input("📅 Data", value=date.today())
     
-    # Recuperiamo i passi esistenti per la data selezionata
+    # Recupero passi esistenti
     try:
         existing_log = supabase.table("daily_logs").select("steps").eq("date", str(act_date)).eq("user_id", user_id).execute().data
         day_steps = existing_log[0].get("steps", 0) if existing_log and existing_log[0].get("steps") else 0
     except:
         day_steps = 0
 
-    # Logica colore per Status Movimento (Visualizzazione dinamica)
-    if day_steps >= 10000:
-        move_bg, move_border = "#e6f4ea", "#ceead6" # Verde
-        move_msg = "🌟 Giornata molto attiva!"
-    elif day_steps >= 5000:
-        move_bg, move_border = "#fff8e1", "#ffe082" # Giallo/Arancio tenue
-        move_msg = "🚶 Buona attività, continua così."
-    else:
-        move_bg, move_border = "#fcf2f4", "#f2d6dc" # Rosso
-        move_msg = "🛋️ Giornata pigra, prova a muoverti di più."
+    # Valutazione Status Movimento
+    move_bg, move_border = ("#e6f4ea", "#ceead6") if day_steps >= 10000 else ("#fff8e1", "#ffe082") if day_steps >= 5000 else ("#fcf2f4", "#f2d6dc")
+    move_msg = "🌟 Ottimo! Giornata molto attiva." if day_steps >= 10000 else "🚶 Buona attività, continua così." if day_steps >= 5000 else "🛋️ Giornata pigra, prova a muoverti di più."
 
-    # Visualizzazione Card Status Movimento
-    st.markdown(f"""
-        <style>
-            div[data-testid="stMetric"]:has(div:contains("Status Movimento")) {{
-                background-color: {move_bg} !important;
-                border: 1px solid {move_border} !important;
-                padding: 15px;
-                border-radius: 10px;
-            }}
-        </style>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<style>div[data-testid="stMetric"]:has(div:contains("Status")) {{ background-color: {move_bg} !important; border: 1px solid {move_border} !important; padding: 15px; border-radius: 10px; }}</style>""", unsafe_allow_html=True)
     
     with st.container(border=True):
         st.metric("👣 Status Movimento", f"{day_steps} passi")
         st.caption(move_msg)
 
-    # Form di inserimento (Passi e Attività Extra)
-    col_a1, col_a2 = st.columns(2)
+    # Griglia di inserimento
+    col_a1, col_a2, col_a3 = st.columns(3)
     
+    # 1. Inserimento Passi
     with col_a1:
         with st.container(border=True):
-            st.markdown("### 👣 Inserisci Passi")
-            new_steps = st.number_input("Numero di passi", value=day_steps, min_value=0, step=500)
+            st.markdown("### 👣 Passi")
+            new_steps = st.number_input("Totale passi", value=day_steps, min_value=0, step=500)
             if st.button("💾 Salva Passi", use_container_width=True):
-                try:
-                    supabase.table("daily_logs").upsert({
-                        "user_id": user_id,
-                        "date": str(act_date),
-                        "steps": int(new_steps)
-                    }, on_conflict="user_id,date").execute()
-                    st.success("✅ Passi salvati!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Errore: {e}")
+                supabase.table("daily_logs").upsert({"user_id": user_id, "date": str(act_date), "steps": int(new_steps)}, on_conflict="user_id,date").execute()
+                st.rerun()
 
+    # 2. Inserimento Minuti Bici
     with col_a2:
         with st.container(border=True):
-            st.markdown("### 🏋️ Attività Extra")
+            st.markdown("### 🚲 Bici")
+            bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5)
+            # Stima: 8 kcal al minuto di media
+            bike_cals = bike_min * 8 
+            if st.button("💾 Salva Bici", use_container_width=True):
+                if bike_min > 0:
+                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Bici", "burned_calories": bike_cals}).execute()
+                    refresh_daily_logs(act_date)
+                    st.success(f"Registrati {bike_cals} kcal!")
+                    st.rerun()
+
+    # 3. Altre Attività
+    with col_a3:
+        with st.container(border=True):
+            st.markdown("### 🏋️ Altro")
             with st.form("activity_form", clear_on_submit=True):
-                extra_act = st.selectbox(
-                    "Tipo di attività", 
-                    ["Padel", "Bici", "Camminata", "Corsa", "Palestra", "Nuoto", "Altro"]
-                )
-                extra_cals = st.number_input(
-                    "Kcal bruciate", 
-                    value=0, 
-                    min_value=0,
-                    step=50
-                )
-                
-                if st.form_submit_button("💾 Salva Attività", use_container_width=True):
-                    try:
-                        supabase.table("activities").insert({
-                            "user_id": user_id,
-                            "date": str(act_date),
-                            "activity_name": extra_act,
-                            "burned_calories": int(extra_cals)
-                        }).execute()
-                        refresh_daily_logs(act_date) 
-                        st.success("✅ Attività registrata!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Errore: {e}")
+                extra_act = st.selectbox("Attività", ["Padel", "Camminata", "Corsa", "Palestra", "Nuoto", "Altro"])
+                extra_cals = st.number_input("Kcal bruciate", value=0, min_value=0, step=50)
+                if st.form_submit_button("💾 Salva", use_container_width=True):
+                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
+                    refresh_daily_logs(act_date)
+                    st.rerun()
