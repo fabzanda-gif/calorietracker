@@ -23,6 +23,24 @@ st.set_page_config(
 # ==============================================================================
 st.markdown("""
     <style>
+        /* Bordo color corallo per i pulsanti standard fuori dalla sidebar */
+        div.stButton > button:not([data-baseweb="tab"]) {
+            border: 1px solid #e06c75 !important;
+            color: #31333F;
+            background-color: transparent;
+            transition: all 0.3s ease;
+        }
+        
+        /* Colore rosso tenue e testo scuro quando ci passi sopra con il cursore (hover) */
+        div.stButton > button:not([data-baseweb="tab"]):hover {
+            background-color: #fcf2f4 !important;
+            border-color: #a6323f !important;
+            color: #a6323f !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+st.markdown("""
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
 
         html, body, [class*="css"] {
