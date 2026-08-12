@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - DEFINITIVO
+# STYLING CUSTOM (CSS) - FORZATURA DEFINITIVA BOTTONI
 # ==============================================================================
 st.markdown("""
     <style>
@@ -61,8 +61,7 @@ st.markdown("""
         }
 
         /* 1. BOTTONI DELLA SIDEBAR (Tutti uniformi) */
-        [data-testid="stSidebar"] div.stButton > button,
-        [data-testid="stSidebar"] div.stButton > button[kind="primary"] {
+        [data-testid="stSidebar"] button {
             border-radius: 10px !important;
             font-weight: 500 !important;
             background-color: #161b22 !important;
@@ -72,23 +71,21 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        [data-testid="stSidebar"] div.stButton > button:hover,
-        [data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
+        [data-testid="stSidebar"] button:hover {
             background-color: #21262d !important;
             border-color: #e06c75 !important;
             color: #ffffff !important;
         }
         
-        [data-testid="stSidebar"] div.stButton > button *,
-        [data-testid="stSidebar"] div.stButton > button[kind="primary"] * {
+        [data-testid="stSidebar"] button * {
             color: #f0f6fc !important;
             -webkit-text-fill-color: #f0f6fc !important;
         }
 
         /* 2. BOTTONI FUORI DALLA SIDEBAR (Inattivi: Bordo rigorosamente color corallo) */
-        .main button[kind="secondary"],
-        .main div.stButton > button, 
-        .main div.stFormSubmitButton > button {
+        .main .stButton button, 
+        .main .stFormSubmitButton button,
+        .main button {
             border-radius: 10px !important;
             font-weight: 500 !important;
             background-color: transparent !important;
@@ -99,12 +96,12 @@ st.markdown("""
         }
         
         /* 3. BOTTONI FUORI DALLA SIDEBAR (Hover / Attivi: Sfondo corallo tenue, testo nero e bordo corallo scuro) */
-        .main button[kind="secondary"]:hover,
-        .main div.stButton > button:hover, 
-        .main div.stFormSubmitButton > button:hover,
-        .main button[kind="secondary"]:hover *,
-        .main div.stButton > button:hover *, 
-        .main div.stFormSubmitButton > button:hover * {
+        .main .stButton button:hover, 
+        .main .stFormSubmitButton button:hover,
+        .main button:hover,
+        .main .stButton button:hover *, 
+        .main .stFormSubmitButton button:hover *,
+        .main button:hover * {
             background-color: #fcf2f4 !important;
             border-color: #a6323f !important;
             color: #000000 !important;
@@ -117,6 +114,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
