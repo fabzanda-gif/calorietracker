@@ -483,7 +483,6 @@ elif selected_page == t["t1"]:
     is_recipe = (input_source == "🍳 Immissione Rapida")
     v = st.session_state["form_version"]
     
-    # Inizializziamo lo stato dei valori base se non esistono
     if "base_cals" not in st.session_state:
         st.session_state["base_cals"] = 0.0
         st.session_state["base_prot"] = 0.0
@@ -581,7 +580,6 @@ elif selected_page == t["t1"]:
     
     is_per_100g = st.session_state.get("is_per_100g_val", True)
     
-    # Funzione di callback per forzare il refresh immediato quando cambi i grammi o le porzioni
     def update_quantity():
         st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
 
@@ -608,7 +606,6 @@ elif selected_page == t["t1"]:
         factor = quantity
         meal_display_name = f"{name} ({quantity} porzion{'e' if quantity == 1 else 'i'})"
     
-    # Calcolo istantaneo basato sul fattore
     calc_cals = int(st.session_state["base_cals"] * factor)
     calc_prot = int(st.session_state["base_prot"] * factor)
     calc_carbs = int(st.session_state["base_carbs"] * factor)
@@ -641,7 +638,6 @@ elif selected_page == t["t1"]:
                     refresh_daily_logs(log_date)
                     reset_or_update()
                     
-                    # Notifica esplicita di successo con st.success
                     st.success(f"✅ Pasto inserito con successo! ({final_cals} kcal aggiunte)")
                     st.balloons()
                     st.rerun()
