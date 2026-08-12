@@ -51,10 +51,10 @@ st.markdown("""
             color: #f0f6fc !important;
         }
 
-        /* Personalizzazione dei container con bordo (sfondo rosso/rosa tenue) */
+        /* Riquadri con bordo e sfondo rosa/rosso leggerissimo e soffuso */
         [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] [data-testid="stVerticalBlockBorderWrapper"] {
-            background-color: #241416 !important;
-            border: 1px solid #4a2529 !important;
+            background-color: rgba(224, 108, 117, 0.04) !important;
+            border: 1px solid rgba(224, 108, 117, 0.2) !important;
             border-radius: 12px !important;
         }
 
