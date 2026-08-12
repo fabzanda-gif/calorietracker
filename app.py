@@ -705,6 +705,19 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
+    # Logica colori e messaggi condizionali per la card del Bilancio
+    alert_msg = ""
+    if total_cals_in < 1500:
+        bilancio_bg = "#fcf2f4"  # Rosa/Rosso allerta (< 1500 kcal)
+        bilancio_border = "#f2d6dc"
+        alert_msg = "⚠️ Attenzione: hai assunto meno di 1500kcal. Ricordati di mangiare!"
+    elif deficit <= 0:
+        bilancio_bg = "#e6f4ea"  # Verde pastello (in deficit corretto)
+        bilancio_border = "#ceead6"
+    else:
+        bilancio_bg = "#fcf2f4"  # Rosa/Rosso (surplus)
+        bilancio_border = "#f2d6dc"
+    
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     with col_c1:
         with st.container(border=True):
@@ -713,8 +726,18 @@ elif selected_page == t["t2"]:
         with st.container(border=True):
             st.metric("🔥 Kcal Bruciate", f"{total_burned_finora} kcal")
     with col_c3:
+        st.markdown(f"""
+            <style>
+                div[data-testid="stMetric"]:has(div:contains("Bilancio")) {{
+                    background-color: {bilancio_bg} !important;
+                    border: 1px solid {bilancio_border} !important;
+                }}
+            </style>
+        """, unsafe_allow_html=True)
         with st.container(border=True):
             st.metric("⚖️ Bilancio", f"{deficit:+d} kcal", delta_color="inverse")
+            if alert_msg:
+                st.caption(alert_msg)
     with col_c4:
         with st.container(border=True):
             st.metric("📉 Peso", f"{current_weight} kg" if current_weight else "N/D")
