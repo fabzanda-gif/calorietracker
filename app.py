@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import date, datetime
 import requests
 import base64
+import secrets
 from supabase import create_client
 from streamlit_cookies_controller import CookieController
 import plotly.express as px
