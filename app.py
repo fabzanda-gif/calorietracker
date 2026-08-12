@@ -1202,18 +1202,18 @@ elif selected_page == t["t3"]:
                     name="Proiezione"
                 )
 
-                # 3. Linea di tendenza/proiezione (parte dall'ultimo punto reale e si estende verso il futuro)
+                # 3. Linea di tendenza/proiezione (parte dall'inizio della storia reale fino al goal)
                 if len(df) >= 3 and latest_weight > target_val and estimated_date and days_to_goal > 0:
-                    last_real_date = df_real['date'].iloc[-1]
-                    last_real_weight = df_real['weight'].iloc[-1]
+                    first_real_date = df_real['date'].iloc[0]
+                    first_real_weight = df_real['weight'].iloc[0]
                     
                     fig.add_scatter(
-                        x=[last_real_date, estimated_date],
-                        y=[last_real_weight, target_val],
+                        x=[first_real_date, estimated_date],
+                        y=[first_real_weight, target_val],
                         mode='lines+markers',
                         line=dict(color='#a6323f', width=3, dash='dash'),
                         marker=dict(size=6, color='#a6323f'),
-                        name="Trend Futuro"
+                        name="Trend Globale"
                     )
                 
                 min_weight = min(75, float(user_target_weight) - 3) if user_target_weight else 75
@@ -1249,7 +1249,7 @@ elif selected_page == t["t3"]:
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # Banner informativo spostato in basso
+                # Banner informativo in basso
                 if forecast_markdown:
                     st.markdown(forecast_markdown, unsafe_allow_html=True)
             else:
