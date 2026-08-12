@@ -766,12 +766,29 @@ elif selected_page == t["t2"]:
     st.markdown("---")
     
     ## Meals table
-    st.markdown("#### 🍽️ Cibi Inseriti")
+    st.markdown("---")
+    st.markdown("### 🍽️ Cibi inseriti")
     if meals_data:
-        df_meals = pd.DataFrame(meals_data)
-        df_display = df_meals[["meal_type", "name", "calories", "protein", "carbs", "fat"]].copy()
-        df_display.columns = ["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
+        
+        df_meals = pd.DataFrame(meals_with_id)
+        df_display = df_meals.rename(columns={
+            "meal_type": "Pasto", "name": "Nome", "calories": "Kcal", 
+            "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)"
+        })
+        st.dataframe(df_display[["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]], use_container_width=True, hide_index=True)
+        
+        meal_options_del = {f"{m['meal_type']} - {m['name']} ({m['calories']} kcal)": m['id'] for m in meals_with_id}
+        selected_meal_to_del = st.selectbox("Seleziona un pasto da eliminare", [""] + list(meal_options_del.keys()))
+        
+        if selected_meal_to_del:
+            if st.button("🗑️ Elimina Pasto Selezionato"):
+                meal_id_to_delete = meal_options_del[selected_meal_to_del]
+                supabase.table("meals").delete().eq("id", meal_id_to_delete).execute()
+                st.success("Pasto eliminato con successo!")
+                st.rerun()
+    else:
+        st.info("Nessun pasto registrato per questa data.")
         
         ## Delete meal functionality
 st.markdown("---")
