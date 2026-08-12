@@ -679,11 +679,15 @@ elif selected_page == t["t2"]:
         daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
         meals_data = supabase.table("meals").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
         raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+        
+        # Recuperiamo anche lo storico del peso per trovare il peso iniziale (il primo log in assoluto)
+        all_weight_logs = supabase.table("daily_logs").select("weight, date").eq("user_id", user_id).not_.is_("weight", "null").order("date", desc=False).execute().data or []
     except Exception as e:
         st.error(f"Errore nel caricamento dati: {e}")
         daily_log_res = []
         meals_data = []
         raw_activities = []
+        all_weight_logs = []
     
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
     
@@ -693,6 +697,10 @@ elif selected_page == t["t2"]:
     if daily_log_res and len(daily_log_res) > 0:
         row = daily_log_res[0]
         current_weight = row.get('weight')
+    
+    # Determiniamo il peso iniziale e il peso obiettivo (target)
+    initial_weight = all_weight_logs[0]['weight'] if all_weight_logs else (current_weight or 80.0)
+    target_weight = float(user_target_weight) if user_target_weight else initial_weight
     
     now = datetime.now()
     if summary_date == date.today():
@@ -705,19 +713,50 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    # Logica colori e messaggi condizionali per la card del Bilancio
+    # Logica colori e messaggi per il Bilancio
     alert_msg = ""
     if total_cals_in < 1500:
-        bilancio_bg = "#fcf2f4"  # Rosa/Rosso allerta (< 1500 kcal)
+        bilancio_bg = "#fcf2f4"
         bilancio_border = "#f2d6dc"
         alert_msg = "⚠️ Attenzione: hai assunto meno di 1500kcal. Ricordati di mangiare!"
     elif deficit <= 0:
-        bilancio_bg = "#e6f4ea"  # Verde pastello (in deficit corretto)
+        bilancio_bg = "#e6f4ea"
         bilancio_border = "#ceead6"
     else:
-        bilancio_bg = "#fcf2f4"  # Rosa/Rosso (surplus)
+        bilancio_bg = "#fcf2f4"
         bilancio_border = "#f2d6dc"
+        
+    # Logica colore condizionale per la card del Peso (Scala da Rosso a Verde)
+    weight_bg = "#fcf2f4"
+    weight_border = "#f2d6dc"
+    weight_diff_ini = 0.0
+    weight_diff_tgt = 0.0
     
+    if current_weight:
+        # Calcoliamo la percentuale di progresso tra il peso iniziale e il target
+        # Se initial == target, evitiamo divisioni per zero
+        if initial_weight != target_weight:
+            progress = (initial_weight - current_weight) / (initial_weight - target_weight)
+        else:
+            progress = 1.0 if current_weight <= target_weight else 0.0
+            
+        progress = max(0.0, min(1.0, progress)) # Blocchiamo tra 0 e 1
+        
+        # Sfumatura dinamica: da Rosso (252, 242, 244) a Verde (230, 244, 234)
+        r = int(252 + (230 - 252) * progress)
+        g = int(242 + (244 - 242) * progress)
+        b = int(244 + (234 - 244) * progress)
+        weight_bg = f"rgb({r}, {g}, {b})"
+        
+        # Bordo leggermente più scuro coordinato
+        br = max(0, r - 25)
+        bg = max(0, g - 25)
+        bb = max(0, b - 25)
+        weight_border = f"rgb({br}, {bg}, {bb})"
+        
+        weight_diff_ini = current_weight - initial_weight
+        weight_diff_tgt = current_weight - target_weight
+
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     with col_c1:
         with st.container(border=True):
@@ -739,8 +778,18 @@ elif selected_page == t["t2"]:
             if alert_msg:
                 st.caption(alert_msg)
     with col_c4:
+        st.markdown(f"""
+            <style>
+                div[data-testid="stMetric"]:has(div:contains("Peso")) {{
+                    background-color: {weight_bg} !important;
+                    border: 1px solid {weight_border} !important;
+                }}
+            </style>
+        """, unsafe_allow_html=True)
         with st.container(border=True):
             st.metric("📉 Peso", f"{current_weight} kg" if current_weight else "N/D")
+            if current_weight:
+                st.caption(f"Iniziale: {initial_weight} kg ({weight_diff_ini:+.1f})\nTarget: {target_weight} kg ({weight_diff_tgt:+.1f})")
     
     with st.container(border=True):
         st.markdown("### 🍽️ Cibi inseriti")
