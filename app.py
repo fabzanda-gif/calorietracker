@@ -100,6 +100,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
@@ -142,7 +143,7 @@ for key, default in state_defaults.items():
 # 3. UTILITY FUNCTIONS
 # ==============================================================================
 def calculate_bmr(weight, height, gender):
-    if gender == "Uomo":
+    if gender in ["Uomo", "Male", "Man"]:
         return int((10 * weight) + (6.25 * height) - (5 * 30) + 5)
     else:
         return int((10 * weight) + (6.25 * height) - (5 * 30) - 161)
@@ -437,14 +438,14 @@ if profile_incomplete:
 # 8. NAVIGATION & LANGUAGE
 # ==============================================================================
 with st.sidebar:
-    lang = st.selectbox("🌐 Lingua", ["Italiano", "English"])
+    lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands"])
     translations = {
         "Italiano": {
             "t1": "🚀 Inserimento", 
             "t2": "📊 Panoramica", 
             "t3": "📈 Peso", 
             "t4": "⚡ Immissione Rapida", 
-            "t5": "🏃 Attività",  # Nuova voce
+            "t5": "🏃 Attività",  
             "meal": "Tipo di pasto", 
             "meal_name": "Nome pasto", 
             "add_meal": "Aggiungi pasto", 
@@ -454,14 +455,63 @@ with st.sidebar:
             "save_weight": "Salva peso", 
             "recipe_name": "Nome ricetta", 
             "save_recipe": "Salva ricetta", 
-            "recipe_saved": "✅ Ricetta salvata!"
+            "recipe_saved": "✅ Ricetta salvata!",
+            "nav": "Navigazione",
+            "logout": "🚪 Logout",
+            "search_food": "🔍 Cerca per Nome o Codice a Barre",
+            "search_btn": "🚀 Cerca",
+            "select_db": "Seleziona dal database",
+            "select_recipe": "Seleziona una ricetta",
+            "no_recipes": "Nessuna ricetta salvata.",
+            "calc_mode": "Inserimento basato su:",
+            "per_100g": "Per 100g",
+            "per_portion": "Per Porzione",
+            "qty_label": "Quantità (g o Porzioni)",
+            "num_portions": "Numero di porzioni",
+            "kcal": "Kcal",
+            "pro": "Pro (g)",
+            "carbs": "Carbs (g)",
+            "fat": "Fat (g)",
+            "inserted": "✅ Inserito",
+            "daily_summary": "📊 Riepilogo Giornaliero",
+            "summary_date": "📅 Data riepilogo",
+            "logged_foods": "🍽️ Cibi inseriti",
+            "del_meal": "Seleziona un pasto da eliminare",
+            "del_meal_btn": "🗑️ Elimina Pasto Selezionato",
+            "meal_del_success": "Pasto eliminato con successo!",
+            "no_meals": "Nessun pasto registrato per questa data.",
+            "burned_acts": "#### 🏃 Calorie Bruciate & Attività",
+            "weight_tracking": "⚖️ Tracciamento Peso",
+            "log_today_weight": "📥 Registra Peso Oggi",
+            "update_target": "🎯 Aggiorna Obiettivo",
+            "save_target": "Salva Obiettivo",
+            "target_updated": "✅ Obiettivo aggiornato!",
+            "quick_entries": "⚡ Immissioni Rapide",
+            "saved_entries": "📋 Entries salvate",
+            "del_quick": "🗑️ Elimina Immissione Rapida",
+            "select_quick_del": "Seleziona Immissione Rapida da rimuovere",
+            "del_quick_btn": "Elimina Immissione Rapida",
+            "quick_add_title": "➕ Aggiungi Nuova Immissione Rapida",
+            "calc_mode_radio": "Modalità di calcolo",
+            "caption_calc": "ℹ️ *Se scegli 'Per 100g', inserisci i valori riferiti a 100g. Se scegli 'Porzione', inserisci i valori totali della singola porzione.*",
+            "register_activity": "🏃 Registra Attività & Movimento",
+            "act_date": "📅 Data",
+            "steps_title": "👣 Passi (Totali)",
+            "update_steps": "💾 Aggiorna Passi",
+            "steps_updated": "Passi aggiornati!",
+            "bike_title": "🚲 Bici (Sessione)",
+            "bike_min": "Minuti Bici",
+            "add_bike": "💾 Aggiungi Bici",
+            "other_act": "🏋️ Altro",
+            "activity_label": "Attività",
+            "add_act_btn": "💾 Aggiungi"
         },
         "English": {
             "t1": "🚀 Logging", 
             "t2": "📊 Overview", 
             "t3": "📈 Weight", 
             "t4": "⚡ Quick Entries", 
-            "t5": "🏃 Activity",  # Nuova voce
+            "t5": "🏃 Activity",  
             "meal": "Meal type", 
             "meal_name": "Meal name", 
             "add_meal": "Add meal", 
@@ -471,7 +521,122 @@ with st.sidebar:
             "save_weight": "Save weight", 
             "recipe_name": "Recipe name", 
             "save_recipe": "Save recipe", 
-            "recipe_saved": "✅ Recipe saved!"
+            "recipe_saved": "✅ Recipe saved!",
+            "nav": "Navigation",
+            "logout": "🚪 Logout",
+            "search_food": "🔍 Search by Name or Barcode",
+            "search_btn": "🚀 Search",
+            "select_db": "Select from database",
+            "select_recipe": "Select a recipe",
+            "no_recipes": "No recipes saved.",
+            "calc_mode": "Entry based on:",
+            "per_100g": "Per 100g",
+            "per_portion": "Per Portion",
+            "qty_label": "Quantity (g or Portions)",
+            "num_portions": "Number of portions",
+            "kcal": "Kcal",
+            "pro": "Pro (g)",
+            "carbs": "Carbs (g)",
+            "fat": "Fat (g)",
+            "inserted": "✅ Inserted",
+            "daily_summary": "📊 Daily Overview",
+            "summary_date": "📅 Summary date",
+            "logged_foods": "🍽️ Logged Foods",
+            "del_meal": "Select a meal to delete",
+            "del_meal_btn": "🗑️ Delete Selected Meal",
+            "meal_del_success": "Meal deleted successfully!",
+            "no_meals": "No meals recorded for this date.",
+            "burned_acts": "#### 🏃 Burned Calories & Activities",
+            "weight_tracking": "⚖️ Weight Tracking",
+            "log_today_weight": "📥 Log Today's Weight",
+            "update_target": "🎯 Update Target",
+            "save_target": "Save Target",
+            "target_updated": "✅ Target updated!",
+            "quick_entries": "⚡ Quick Entries",
+            "saved_entries": "📋 Saved Entries",
+            "del_quick": "🗑️ Delete Quick Entry",
+            "select_quick_del": "Select Quick Entry to remove",
+            "del_quick_btn": "Delete Quick Entry",
+            "quick_add_title": "➕ Add New Quick Entry",
+            "calc_mode_radio": "Calculation Mode",
+            "caption_calc": "ℹ️ *If you choose 'Per 100g', enter values relative to 100g. If you choose 'Portion', enter total values for a single portion.*",
+            "register_activity": "🏃 Register Activity & Movement",
+            "act_date": "📅 Date",
+            "steps_title": "👣 Steps (Total)",
+            "update_steps": "💾 Update Steps",
+            "steps_updated": "Steps updated!",
+            "bike_title": "🚲 Bike (Session)",
+            "bike_min": "Bike Minutes",
+            "add_bike": "💾 Add Bike",
+            "other_act": "🏋️ Other",
+            "activity_label": "Activity",
+            "add_act_btn": "💾 Add"
+        },
+        "Nederlands": {
+            "t1": "🚀 Invoer", 
+            "t2": "📊 Overzicht", 
+            "t3": "📈 Gewicht", 
+            "t4": "⚡ Snelle Invoer", 
+            "t5": "🏃 Activiteit",  
+            "meal": "Maaltijdtype", 
+            "meal_name": "Maaltijdnaam", 
+            "add_meal": "Maaltijd toevoegen", 
+            "extra_act": "Extra activiteit", 
+            "extra_cals": "Extra verbrande calorieën", 
+            "insert_weight": "Voer gewicht in (kg)", 
+            "save_weight": "Gewicht opslaan", 
+            "recipe_name": "Receptnaam", 
+            "save_recipe": "Recept opslaan", 
+            "recipe_saved": "✅ Recept opgeslagen!",
+            "nav": "Navigatie",
+            "logout": "🚪 Uitloggen",
+            "search_food": "🔍 Zoek op naam of streepjescode",
+            "search_btn": "🚀 Zoeken",
+            "select_db": "Selecteer uit database",
+            "select_recipe": "Selecteer een recept",
+            "no_recipes": "Geen recepten opgeslagen.",
+            "calc_mode": "Invoer gebaseerd op:",
+            "per_100g": "Per 100g",
+            "per_portion": "Per Portie",
+            "qty_label": "Hoeveelheid (g of Porties)",
+            "num_portions": "Aantal porties",
+            "kcal": "Kcal",
+            "pro": "Pro (g)",
+            "carbs": "Koolh (g)",
+            "fat": "Vet (g)",
+            "inserted": "✅ Ingevoerd",
+            "daily_summary": "📊 Dagelijks Overzicht",
+            "summary_date": "📅 Overichtsdatum",
+            "logged_foods": "🍽️ Ingelogde Voeding",
+            "del_meal": "Selecteer een maaltijd om te verwijderen",
+            "del_meal_btn": "🗑️ Geselecteerde Maaltijd Verwijderen",
+            "meal_del_success": "Maaltijd succesvol verwijderd!",
+            "no_meals": "Geen maaltijden geregistreerd voor deze datum.",
+            "burned_acts": "#### 🏃 Verbrande Calorieën & Activiteiten",
+            "weight_tracking": "⚖️ Gewicht Volgen",
+            "log_today_weight": "📥 Vandaag Gewicht Registreren",
+            "update_target": "🎯 Doel Bijwerken",
+            "save_target": "Doel Opslaan",
+            "target_updated": "✅ Doel bijgewerkt!",
+            "quick_entries": "⚡ Snelle Invoer",
+            "saved_entries": "📋 Opgeslagen Items",
+            "del_quick": "🗑️ Snelle Invoer Verwijderen",
+            "select_quick_del": "Selecteer te verwijderen snelle invoer",
+            "del_quick_btn": "Snelle Invoer Verwijderen",
+            "quick_add_title": "➕ Nieuwe Snelle Invoer Toevoegen",
+            "calc_mode_radio": "Berekeningsmodus",
+            "caption_calc": "ℹ️ *Als je kiest voor 'Per 100g', vul dan de waarden per 100g in. Als je kiest voor 'Portie', vul dan de totale waarden voor een enkele portie in.*",
+            "register_activity": "🏃 Registreer Activiteit & Beweging",
+            "act_date": "📅 Datum",
+            "steps_title": "👣 Stappen (Totaal)",
+            "update_steps": "💾 Stappen Bijwerken",
+            "steps_updated": "Stappen bijgewerkt!",
+            "bike_title": "🚲 Fietsen (Sessie)",
+            "bike_min": "Fietsminuten",
+            "add_bike": "💾 Fietsen Toevoegen",
+            "other_act": "🏋️ Overig",
+            "activity_label": "Activiteit",
+            "add_act_btn": "💾 Toevoegen"
         }
     }
     t = translations[lang]
@@ -479,12 +644,10 @@ with st.sidebar:
     if "selected_page" not in st.session_state:
         st.session_state.selected_page = t["t1"]
 
-    st.markdown("### 📍 Navigazione")
+    st.markdown(f"### 📍 {t['nav']}")
     
-    # Lista aggiornata con la nuova pagina
     pages = [t["t1"], t["t2"], t["t3"], t["t4"], t["t5"]]
     for page in pages:
-        # Nota: usiamo lo stile per evidenziare il bottone attivo
         is_active = (st.session_state.selected_page == page)
         
         if st.button(page, key=f"nav_{page}", use_container_width=True, type="primary" if is_active else "secondary"):
@@ -494,7 +657,7 @@ with st.sidebar:
     selected_page = st.session_state.selected_page
 
     st.markdown("---")
-    if st.button("🚪 Logout", use_container_width=True):
+    if st.button(t["logout"], use_container_width=True):
         supabase.auth.sign_out()
         controller.set("supabase_session", None, max_age=0)
         st.session_state.clear()
@@ -543,8 +706,8 @@ if selected_page == t["t1"]:
         st.rerun()
     
     if not is_recipe:
-        search_q = st.text_input("🔍 Cerca per Nome o Codice a Barre")
-        if st.button("🚀 Cerca"):
+        search_q = st.text_input(t["search_food"])
+        if st.button(t["search_btn"]):
             if len(search_q) >= 2:
                 with st.spinner('Ricerca in corso...'):
                     st.session_state["api_res"] = search_open_food_facts(search_q)
@@ -556,7 +719,7 @@ if selected_page == t["t1"]:
         
         api_res = st.session_state.get("api_res", {})
         if api_res:
-            sel_prod = st.selectbox("Seleziona dal database", [""] + list(api_res.keys()), key=f"prod_select_{v}")
+            sel_prod = st.selectbox(t["select_db"], [""] + list(api_res.keys()), key=f"prod_select_{v}")
             if sel_prod and sel_prod != st.session_state.get("last_selected"):
                 p_data = api_res[sel_prod]
                 reset_or_update(p_data.get('name',''), p_data.get('calories',0), p_data.get('protein',0), p_data.get('carbs',0), p_data.get('fat',0), sel_prod, 100.0, True)
@@ -566,14 +729,14 @@ if selected_page == t["t1"]:
             recipes_data = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
             recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
             if recipes_dict:
-                sel_recipe = st.selectbox("Seleziona una ricetta", [""] + list(recipes_dict.keys()), key=f"recipe_select_{v}")
+                sel_recipe = st.selectbox(t["select_recipe"], [""] + list(recipes_dict.keys()), key=f"recipe_select_{v}")
                 if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
                     r = recipes_dict[sel_recipe]
                     is_100g = bool(r.get('is_per_100g', 1))
                     reset_or_update(r.get('name',''), r.get('calories',0), r.get('protein',0), r.get('carbs',0), r.get('fat',0), sel_recipe, 100.0 if is_100g else 1.0, is_100g)
                     st.rerun()
             else:
-                st.info("Nessuna ricetta salvata.")
+                st.info(t["no_recipes"])
         except Exception as e:
             st.error(f"Errore: {e}")
     
@@ -582,14 +745,13 @@ if selected_page == t["t1"]:
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
     
-    # SELETTORE MODALITÀ DI CALCOLO (Manuale)
-    mode = st.radio("Inserimento basato su:", ["Per 100g", "Per Porzione"], index=0 if st.session_state["is_per_100g_val"] else 1, horizontal=True)
+    mode = st.radio(t["calc_mode"], [t["per_100g"], t["per_portion"]], index=0 if st.session_state["is_per_100g_val"] else 1, horizontal=True)
     
     def on_qty_change():
         st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
 
     quantity = st.number_input(
-        "Quantità (g o Porzioni)" if mode == "Per 100g" else "Numero di porzioni",
+        t["qty_label"] if mode == t["per_100g"] else t["num_portions"],
         value=float(st.session_state["grams_val"]),
         min_value=0.25,
         step=0.25,
@@ -597,20 +759,19 @@ if selected_page == t["t1"]:
         on_change=on_qty_change
     )
     
-    factor = (quantity / 100.0) if mode == "Per 100g" else quantity
-    meal_display_name = f"{name} ({quantity}{'g' if mode == 'Per 100g' else ' porz.'})"
+    factor = (quantity / 100.0) if mode == t["per_100g"] else quantity
+    meal_display_name = f"{name} ({quantity}{'g' if mode == t['per_100g'] else ' porz.'})"
     
-    # Ricalcolo automatico dei macro
     final_cals = int(st.session_state["base_cals"] * factor)
     final_prot = int(st.session_state["base_prot"] * factor)
     final_carbs = int(st.session_state["base_carbs"] * factor)
     final_fat = int(st.session_state["base_fat"] * factor)
     
     c1, c2, c3, c4 = st.columns(4)
-    cals_in = c1.number_input("Kcal", value=final_cals, step=1)
-    prot_in = c2.number_input("Pro (g)", value=final_prot, step=1)
-    carbs_in = c3.number_input("Carbs (g)", value=final_carbs, step=1)
-    fat_in = c4.number_input("Fat (g)", value=final_fat, step=1)
+    cals_in = c1.number_input(t["kcal"], value=final_cals, step=1)
+    prot_in = c2.number_input(t["pro"], value=final_prot, step=1)
+    carbs_in = c3.number_input(t["carbs"], value=final_carbs, step=1)
+    fat_in = c4.number_input(t["fat"], value=final_fat, step=1)
     
     if st.button(t["add_meal"], use_container_width=True):
         try:
@@ -621,15 +782,16 @@ if selected_page == t["t1"]:
             }).execute()
             refresh_daily_logs(log_date)
             reset_or_update()
-            st.success(f"✅ Inserito: {meal_display_name} ({cals_in} kcal)")
+            st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
             st.rerun()
         except Exception as e:
             st.error(f"Errore: {e}")
+
 # ==============================================================================
 # 10. PAGE 2: DAILY OVERVIEW
 # ==============================================================================
 elif selected_page == t["t2"]:
-    st.subheader("📊 Riepilogo Giornaliero")
+    st.subheader(t["daily_summary"])
     
     if "last_nav_page" not in st.session_state or st.session_state.last_nav_page != selected_page:
         st.session_state.overview_date = date.today()
@@ -639,7 +801,7 @@ elif selected_page == t["t2"]:
         st.session_state.overview_date = st.session_state.get("widget_overview_date", date.today())
     
     summary_date = st.date_input(
-        "📅 Data riepilogo", 
+        t["summary_date"], 
         value=st.session_state.overview_date, 
         key="widget_overview_date",
         on_change=update_overview_date
@@ -659,7 +821,6 @@ elif selected_page == t["t2"]:
         all_weight_logs = []
     
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
-    
     total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
     
     current_weight = None
@@ -667,7 +828,7 @@ elif selected_page == t["t2"]:
         row = daily_log_res[0]
         current_weight = row.get('weight')
     
-    initial_weight = 89.0  # Valore di partenza fisso come richiesto o ricavabile
+    initial_weight = 89.0 
     if all_weight_logs:
         initial_weight = all_weight_logs[0]['weight']
     target_weight = float(user_target_weight) if user_target_weight else 78.0
@@ -676,8 +837,6 @@ elif selected_page == t["t2"]:
     if summary_date == date.today():
         minutes_passed = max(60, now.hour * 60 + now.minute)
         bmr_so_far = int((user_bmr / (24 * 60)) * minutes_passed)
-        
-        # Calcolo proiezione calorie a fine giornata (24 ore = 1440 minuti)
         projected_cals_in = int((total_cals_in / minutes_passed) * 1440) if minutes_passed > 30 else total_cals_in
     else:
         bmr_so_far = user_bmr
@@ -688,7 +847,6 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    # 1. CARD INGERITE: Valutazione sulla proiezione (< 1500 kcal proiettate)
     if projected_cals_in < 1500:
         in_bg, in_border = "#fcf2f4", "#f2d6dc"
         in_msg = f"⚠️ Proiezione bassa ({projected_cals_in} kcal previste). Mangia di più!"
@@ -696,7 +854,6 @@ elif selected_page == t["t2"]:
         in_bg, in_border = "#e6f4ea", "#ceead6"
         in_msg = f"✅ Ottima proiezione ({projected_cals_in} kcal stimate a fine giornata)."
 
-    # 2. CARD BRUCIATE: Invito o complimento se c'è attività extra
     if extra_burned > 0:
         burn_bg, burn_border = "#e6f4ea", "#ceead6"
         burn_msg = f"🌟 Ottimo lavoro! Hai fatto attività extra (+{extra_burned} kcal)."
@@ -704,7 +861,6 @@ elif selected_page == t["t2"]:
         burn_bg, burn_border = "#fcf2f4", "#f2d6dc"
         burn_msg = "💡 Nessuna attività extra registrata. Che ne dici di muoverti un po'?"
 
-    # 3. CARD BILANCIO
     if deficit <= 0:
         bilancio_bg, bilancio_border = "#e6f4ea", "#ceead6"
         bilancio_msg = "🎯 Ottimo, sei in perfetto deficit calorico."
@@ -712,16 +868,13 @@ elif selected_page == t["t2"]:
         bilancio_bg, bilancio_border = "#fcf2f4", "#f2d6dc"
         bilancio_msg = "⚠️ Attenzione: sei in surplus calorico."
 
-    # 4. CARD PESO: Scala da Rosso (partenza 89kg) a Verde (obiettivo 78kg)
     weight_bg, weight_border = "#fcf2f4", "#f2d6dc"
     weight_msg = "📈 Continua così per raggiungere il target."
     if current_weight:
-        # Progresso da 89kg a 78kg (range totale = 11kg)
         total_span = initial_weight - target_weight
         current_progress = (initial_weight - current_weight) / total_span if total_span > 0 else 1.0
         current_progress = max(0.0, min(1.0, current_progress))
         
-        # Sfumatura da Rosso (252, 242, 244) a Verde brillante (230, 244, 234)
         r = int(252 + (230 - 252) * current_progress)
         g = int(242 + (244 - 242) * current_progress)
         b = int(244 + (234 - 244) * current_progress)
@@ -732,7 +885,6 @@ elif selected_page == t["t2"]:
         diff_tgt = current_weight - target_weight
         weight_msg = f"Iniziale: {initial_weight} kg ({diff_ini:+.1f}) | Target: {target_weight} kg ({diff_tgt:+.1f})"
 
-    # RENDER DELLE 4 COLONNE CON STILI DINAMICI INLINE
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     
     with col_c1:
@@ -788,7 +940,7 @@ elif selected_page == t["t2"]:
             st.caption(weight_msg)
     
     with st.container(border=True):
-        st.markdown("### 🍽️ Cibi inseriti")
+        st.markdown(f"### {t['logged_foods']}")
         if meals_data:
             meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
             
@@ -800,19 +952,19 @@ elif selected_page == t["t2"]:
             st.dataframe(df_display[["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]], use_container_width=True, hide_index=True)
             
             meal_options_del = {f"{m['meal_type']} - {m['name']} ({m['calories']} kcal)": m['id'] for m in meals_with_id}
-            selected_meal_to_del = st.selectbox("Seleziona un pasto da eliminare", [""] + list(meal_options_del.keys()))
+            selected_meal_to_del = st.selectbox(t["del_meal"], [""] + list(meal_options_del.keys()))
             
             if selected_meal_to_del:
-                if st.button("🗑️ Elimina Pasto Selezionato"):
+                if st.button(t["del_meal_btn"]):
                     meal_id_to_delete = meal_options_del[selected_meal_to_del]
                     supabase.table("meals").delete().eq("id", meal_id_to_delete).execute()
-                    st.success("Pasto eliminato con successo!")
+                    st.success(t["meal_del_success"])
                     st.rerun()
         else:
-            st.info("Nessun pasto registrato per questa data.")
+            st.info(t["no_meals"])
     
     with st.container(border=True):
-        st.markdown("#### 🏃 Calorie Bruciate & Attività")
+        st.markdown(t["burned_acts"])
         rows_acts = [{"Attività": "BMR (Base)", "Kcal Bruciate": bmr_so_far}]
         if activities_data:
             for act in activities_data:
@@ -828,13 +980,13 @@ elif selected_page == t["t2"]:
 # 11. PAGE 3: WEIGHT TRACKING
 # ==============================================================================
 elif selected_page == t["t3"]:
-    st.subheader("⚖️ Tracciamento Peso")
+    st.subheader(t["weight_tracking"])
     
     with st.container(border=True):
         col_w1, col_w2 = st.columns(2)
         
         with col_w1:
-            st.markdown("#### 📥 Registra Peso Oggi")
+            st.markdown(f"#### {t['log_today_weight']}")
             w = st.number_input(
                 t["insert_weight"], 
                 value=80.0, 
@@ -855,7 +1007,7 @@ elif selected_page == t["t3"]:
                     st.error(f"Errore: {e}")
         
         with col_w2:
-            st.markdown("#### 🎯 Aggiorna Obiettivo")
+            st.markdown(f"#### {t['update_target']}")
             new_target = st.number_input(
                 "Peso Obiettivo (kg)", 
                 value=float(user_target_weight) if user_target_weight else 75.0,
@@ -863,14 +1015,14 @@ elif selected_page == t["t3"]:
                 max_value=300.0,
                 step=0.5
             )
-            if st.button("Salva Obiettivo", use_container_width=True):
+            if st.button(t["save_target"], use_container_width=True):
                 try:
                     res = supabase.auth.update_user({
                         "data": {"target_weight": float(new_target)}
                     })
                     if res.user:
                         st.session_state["user"] = res.user
-                    st.success("✅ Obiettivo aggiornato!")
+                    st.success(t["target_updated"])
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore: {e}")
@@ -897,7 +1049,6 @@ elif selected_page == t["t3"]:
                 
                 fig = px.bar()
                 
-                # Barra dati reali (Rosso/Rosa pieno)
                 fig.add_bar(
                     x=df_real['date'], y=df_real['weight'],
                     marker_color='rgba(224, 108, 117, 1.0)',
@@ -906,7 +1057,6 @@ elif selected_page == t["t3"]:
                     name="Reale"
                 )
                 
-                # Barra proiezioni (Rosso/Rosa trasparente)
                 fig.add_bar(
                     x=df_interp['date'], y=df_interp['weight'],
                     marker_color='rgba(224, 108, 117, 0.25)',
@@ -921,7 +1071,6 @@ elif selected_page == t["t3"]:
                 
                 target_val = float(user_target_weight) if user_target_weight else 75
                 
-                # Linea del goal: Rosso scuro elegante e continuo
                 fig.add_hline(
                     y=target_val, 
                     line_dash="solid", 
@@ -929,7 +1078,6 @@ elif selected_page == t["t3"]:
                     line_width=2.5
                 )
                 
-                # Etichetta del goal in alto a destra, pulita e leggibile
                 fig.add_annotation(
                     xref="paper", yref="y", x=0.98, y=target_val + 2.0,
                     text=f"<b>🎯 GOAL: {target_val} kg</b>",
@@ -960,16 +1108,15 @@ elif selected_page == t["t3"]:
 # 12. PAGE 4: QUICK ENTRIES (IMMISSIONI RAPIDE)
 # ==============================================================================
 elif selected_page == t["t4"]:
-    st.subheader("⚡ Immissioni Rapide")
+    st.subheader(t["quick_entries"])
 
-    # Inizializziamo la versione del form per la pulizia dei campi se non esiste
     if "recipe_form_version" not in st.session_state:
         st.session_state["recipe_form_version"] = 0
     
     v = st.session_state["recipe_form_version"]
 
     with st.container(border=True):
-        st.markdown("### 📋 Entries salvate")
+        st.markdown(f"### {t['saved_entries']}")
         entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
         if entries:
             df_entries = pd.DataFrame(entries)
@@ -979,11 +1126,11 @@ elif selected_page == t["t4"]:
             })
             st.dataframe(df_display[["Nome", "Kcal", "Pro", "Carbs", "Fat"]], use_container_width=True, hide_index=True)
             
-            st.markdown("### 🗑️ Elimina Immissione Rapida")
+            st.markdown(f"### {t['del_quick']}")
             entry_options_del = {e['name']: e['name'] for e in entries}
-            sel_entry_del = st.selectbox("Seleziona Immissione Rapida da rimuovere", [""] + list(entry_options_del.keys()), key=f"del_recipe_sel_{v}")
+            sel_entry_del = st.selectbox(t["select_quick_del"], [""] + list(entry_options_del.keys()), key=f"del_recipe_sel_{v}")
             if sel_entry_del:
-                if st.button("Elimina Immissione Rapida", key=f"del_recipe_btn_{v}"):
+                if st.button(t["del_quick_btn"], key=f"del_recipe_btn_{v}"):
                     try:
                         supabase.table("recipes").delete().eq("user_id", user_id).eq("name", sel_entry_del).execute()
                         st.success(f"Immissione Rapida '{sel_entry_del}' eliminata!")
@@ -995,17 +1142,17 @@ elif selected_page == t["t4"]:
 
     with st.container(border=True):
         with st.form(f"quick_entry_add_{v}"):
-            st.markdown("### ➕ Aggiungi Nuova Immissione Rapida")
+            st.markdown(f"### {t['quick_add_title']}")
             r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro o Snack", key=f"r_name_{v}")
             
             calc_type = st.radio(
-                "Modalità di calcolo",
+                t["calc_mode_radio"],
                 ["Per 100g (valori scalabili)", "Per porzione fissa (valori assoluti)"],
                 horizontal=True,
                 key=f"r_calc_type_{v}"
             )
             
-            st.caption("ℹ️ *Se scegli 'Per 100g', inserisci i valori riferiti a 100g. Se scegli 'Porzione', inserisci i valori totali della singola porzione.*")
+            st.caption(t["caption_calc"])
             
             c1, c2, c3, c4 = st.columns(4)
             cals = c1.number_input("Kcal", value=0.0, min_value=0.0, step=1.0, key=f"r_cal_{v}")
@@ -1030,7 +1177,6 @@ elif selected_page == t["t4"]:
                             "user_id": user_id
                         }).execute()
                         
-                        # Incrementiamo la versione per pulire il form al prossimo ricaricamento
                         st.session_state["recipe_form_version"] += 1
                         st.success(t["recipe_saved"])
                         st.rerun()
@@ -1056,17 +1202,15 @@ elif selected_page == t["t4"]:
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
 # ==============================================================================
 elif selected_page == t["t5"]:
-    st.subheader("🏃 Registra Attività & Movimento")
-    act_date = st.date_input("📅 Data", value=date.today())
+    st.subheader(t["register_activity"])
+    act_date = st.date_input(t["act_date"], value=date.today())
     
-    # 1. Recupero sicuro dei passi esistenti per la data selezionata
     try:
         existing_log = supabase.table("daily_logs").select("steps").eq("date", str(act_date)).eq("user_id", user_id).execute().data
         day_steps = existing_log[0].get("steps", 0) if existing_log and existing_log[0].get("steps") else 0
     except Exception:
         day_steps = 0
 
-    # 2. Valutazione Status Movimento (Card visiva)
     move_bg, move_border = ("#e6f4ea", "#ceead6") if day_steps >= 10000 else ("#fff8e1", "#ffe082") if day_steps >= 5000 else ("#fcf2f4", "#f2d6dc")
     move_msg = "🌟 Ottimo! Giornata molto attiva." if day_steps >= 10000 else "🚶 Buona attività, continua così." if day_steps >= 5000 else "🛋️ Giornata pigra, prova a muoverti di più."
 
@@ -1076,15 +1220,13 @@ elif selected_page == t["t5"]:
         st.metric("👣 Status Movimento", f"{day_steps} passi")
         st.caption(move_msg)
 
-    # 3. Griglia di inserimento
     col_a1, col_a2, col_a3 = st.columns(3)
     
-    # Inserimento Passi
     with col_a1:
         with st.container(border=True):
-            st.markdown("### 👣 Passi (Totali)")
+            st.markdown(f"### {t['steps_title']}")
             new_steps = st.number_input("Totale passi", value=int(day_steps), min_value=0, step=500)
-            if st.button("💾 Aggiorna Passi", use_container_width=True):
+            if st.button(t["update_steps"], use_container_width=True):
                 try:
                     existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(act_date)).execute().data
                     
@@ -1103,43 +1245,38 @@ elif selected_page == t["t5"]:
                     
                     refresh_daily_logs(act_date)
                     
-                    # Messaggio di conferma esplicito
                     st.toast(f"✅ Passi aggiornati con successo! ({estim_cals} kcal stimate)", icon="👣")
-                    st.success(f"✅ Passi aggiornati! ({estim_cals} kcal totali stimate)")
+                    st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal totali stimate)")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore nel salvataggio dei passi: {e}")
 
-    # Inserimento Minuti Bici
     with col_a2:
         with st.container(border=True):
-            st.markdown("### 🚲 Bici (Sessione)")
-            bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5)
-            if st.button("💾 Aggiungi Bici", use_container_width=True):
+            st.markdown(f"### {t['bike_title']}")
+            bike_min = st.number_input(t["bike_min"], value=0, min_value=0, step=5)
+            if st.button(t["add_bike"], use_container_width=True):
                 if bike_min > 0:
                     estim_cals = int(bike_min * 8)
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Bici", "burned_calories": estim_cals}).execute()
                     refresh_daily_logs(act_date)
                     
-                    # Messaggio di conferma esplicito
                     st.toast(f"✅ Aggiunti {bike_min} min di bici! ({estim_cals} kcal)", icon="🚲")
                     st.success(f"✅ Aggiunte {bike_min} min di bici ({estim_cals} kcal)!")
                     st.rerun()
                 else:
                     st.warning("Inserisci almeno 1 minuto di bici.")
 
-    # Altre Attività
     with col_a3:
         with st.container(border=True):
-            st.markdown("### 🏋️ Altro")
+            st.markdown(f"### {t['other_act']}")
             with st.form("activity_form", clear_on_submit=True):
-                extra_act = st.selectbox("Attività", ["Padel", "Palestra", "Nuoto", "Altro"])
+                extra_act = st.selectbox(t["activity_label"], ["Padel", "Palestra", "Nuoto", "Altro"])
                 extra_cals = st.number_input("Kcal bruciate", value=0, min_value=0, step=50)
-                if st.form_submit_button("💾 Aggiungi", use_container_width=True):
+                if st.form_submit_button(t["add_act_btn"], use_container_width=True):
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
                     refresh_daily_logs(act_date)
                     
-                    # Messaggio di conferma esplicito
                     st.toast(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)", icon="🎯")
                     st.success(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)")
                     st.rerun()
