@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - CORRETTO E RIPRISTINATO
+# STYLING CUSTOM (CSS) - DEFINITIVO PER BOTTONI E SIDEBAR
 # ==============================================================================
 st.markdown("""
     <style>
@@ -52,7 +52,7 @@ st.markdown("""
             color: #f0f6fc !important;
         }
 
-        /* STILE MIRATO ESCLUSIVAMENTE ALLE CARD DELLE METRICHE (Overview) */
+        /* CARD DELLE METRICHE (Overview) */
         [data-testid="stMetric"] {
             background-color: #fcf2f4 !important;
             border: 1px solid #f2d6dc !important;
@@ -60,8 +60,8 @@ st.markdown("""
             border-radius: 14px !important;
         }
 
-        /* 1. BOTTONI DELLA SIDEBAR (Stato normale e hover) */
-        [data-testid="stSidebar"] .stButton>button {
+        /* 1. BOTTONI DELLA SIDEBAR (Stato normale) */
+        [data-testid="stSidebar"] div.stButton > button {
             border-radius: 10px !important;
             font-weight: 500 !important;
             background-color: #161b22 !important;
@@ -71,27 +71,27 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        [data-testid="stSidebar"] .stButton>button:hover {
+        [data-testid="stSidebar"] div.stButton > button:hover {
             background-color: #21262d !important;
             border-color: #e06c75 !important;
             color: #ffffff !important;
         }
 
-        /* 2. BOTTONE ATTIVO (PRIMARY) DELLA SIDEBAR */
-        section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {
+        /* 2. BOTTONE ATTIVO (PRIMARY) DELLA SIDEBAR - Testo nero ben visibile */
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"],
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
             background-color: #fcf2f4 !important;
             border: 1px solid #e06c75 !important;
             color: #000000 !important;
         }
         
-        section[data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
-            background-color: #fcf2f4 !important;
-            border-color: #a6323f !important;
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"] p,
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"] span {
             color: #000000 !important;
         }
 
-        /* 3. BOTTONI NEL CORPO CENTRALE DELL'APP (Bordo corallo + hover rosso tenue) */
-        .main div.stButton > button:not([data-baseweb="tab"]), 
+        /* 3. BOTTONI NEL CORPO CENTRALE (Bordo corallo forzato su qualsiasi bottone secondario) */
+        .main div.stButton > button:not([kind="primary"]), 
         .main div.stFormSubmitButton > button {
             border-radius: 10px !important;
             font-weight: 500 !important;
@@ -102,7 +102,8 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        .main div.stButton > button:not([data-baseweb="tab"]):hover, 
+        /* Effetto Hover rosso tenue per i bottoni centrali */
+        .main div.stButton > button:not([kind="primary"]):hover, 
         .main div.stFormSubmitButton > button:hover {
             background-color: #fcf2f4 !important;
             border-color: #a6323f !important;
@@ -115,6 +116,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
