@@ -527,7 +527,11 @@ translations = {
         "status_lazy": "🛋️ Giornata pigra, prova a muoverti di più.",
         "in_msg_deficit": lambda target_in, diff: f"🎯 Per un deficit ideale di 500 kcal, puoi assumere ancora circa {target_in} kcal (mancano {diff:+d} kcal).",
         "balance_days": lambda d: f"⏳ Al ritmo attuale, stimati circa {d} giorni per raggiungere il target.",
-        "balance_surplus": "⚠️ In surplus: impossibile stimare i giorni al target."
+        "balance_surplus": "⚠️ In surplus: impossibile stimare i giorni al target.",
+        "weight_forecast_title": "🔮 Previsione Raggiungimento Obiettivo",
+        "forecast_days": lambda d, date_str: f"🎯 Al ritmo attuale ({d} giorni stimati), potresti raggiungere il tuo obiettivo intorno al **{date_str}**!",
+        "forecast_steady": "📉 Mantenendo questo trend costante, il traguardo si avvicina.",
+        "forecast_flat_up": "💡 Il trend attuale è stabile o in salita: la proiezione temporale si attiva solo con un trend di perdita attivo.",
     },
     "English": {
         "t1": "🚀 Logging", 
@@ -617,7 +621,11 @@ translations = {
         "status_lazy": "🛋️ Lazy day, try to move more.",
         "in_msg_deficit": lambda target_in, diff: f"🎯 For an ideal 500 kcal deficit, you can still eat about {target_in} kcal ({diff:+d} kcal).",
         "balance_days": lambda d: f"⏳ At the current pace, about {d} days estimated to reach target.",
-        "balance_surplus": "⚠️ In surplus: cannot estimate days to target."
+        "balance_surplus": "⚠️ In surplus: cannot estimate days to target.",
+        "weight_forecast_title": "🔮 Goal Achievement Forecast",
+        "forecast_days": lambda d, date_str: f"🎯 At your current pace ({d} estimated days), you could reach your goal around **{date_str}**!",
+        "forecast_steady": "📉 Maintaining this steady trend, your milestone is getting closer.",
+        "forecast_flat_up": "💡 Current trend is flat or increasing: the timeline projection activates only with an active weight-loss trend.",
     },
     "Nederlands": {
         "t1": "🚀 Invoer", 
@@ -707,7 +715,11 @@ translations = {
         "status_lazy": "🛋️ Luie dag, probeer meer te bewegen.",
         "in_msg_deficit": lambda target_in, diff: f"🎯 Voor een ideaal tekort van 500 kcal kun je nog ongeveer {target_in} kcal eten ({diff:+d} kcal).",
         "balance_days": lambda d: f"⏳ In dit tempo duurt het ongeveer {d} dagen om het doel te bereiken.",
-        "balance_surplus": "⚠️ In overschot: kan dagen tot doel niet schatten."
+        "balance_surplus": "⚠️ In overschot: kan dagen tot doel niet schatten.",
+        "weight_forecast_title": "🔮 Doelbereik Prognose",
+        "forecast_days": lambda d, date_str: f"🎯 In dit tempo ({d} geschatte dagen), zou je jouw doel rond **{date_str}** kunnen bereiken!",
+        "forecast_steady": "📉 Als je deze gestage trend aanhoudt, komt je mijlpaal dichterbij.",
+        "forecast_flat_up": "💡 De huidige trend is vlak of stijgend: de tijdlijnprognose wordt alleen geactiveerd bij een actieve gewichtsverliestrend.",
     }
 }
 with st.sidebar:
@@ -1129,6 +1141,42 @@ elif selected_page == t["t3"]:
                 real_dates = set(df['date'])
                 df_full['is_real'] = df_full['date'].isin(real_dates)
                 
+                # Calcolo Insight / Trend di discesa per prevedere la data di arrivo al goal
+                target_val = float(user_target_weight) if user_target_weight else 75.0
+                latest_weight = df['weight'].iloc[-1]
+                
+                forecast_markdown = ""
+                if len(df) >= 3 and latest_weight > target_val:
+                    # Consideriamo gli ultimi 14 giorni o ultimi 5 punti per calcolare il trend recente
+                    recent_df = df.tail(min(len(df), 14))
+                    days_diff = (recent_df['date'].max() - recent_df['date'].min()).days
+                    weight_diff = recent_df['weight'].iloc[-1] - recent_df['weight'].iloc[0] # Negativo se scende
+                    
+                    if days_diff > 0 and weight_diff < 0:
+                        kg_per_day = abs(weight_diff / days_diff)
+                        kg_to_lose = latest_weight - target_val
+                        days_to_goal = int(kg_to_lose / kg_per_day)
+                        
+                        estimated_date = datetime.now() + pd.Timedelta(days=days_to_goal)
+                        est_date_str = estimated_date.strftime('%d %B %Y')
+                        
+                        forecast_markdown = f"""
+                        <div style="background-color: #e6f4ea; border: 1px solid #ceead6; padding: 12px 16px; border-radius: 10px; margin-bottom: 15px; color: #137333; font-weight: 500;">
+                            {t['weight_forecast_title']}<br>
+                            <span style="font-size: 14px; font-weight: 400;">{t['forecast_days'](days_to_goal, est_date_str)}</span>
+                        </div>
+                        """
+                    else:
+                        forecast_markdown = f"""
+                        <div style="background-color: #fcf2f4; border: 1px solid #f2d6dc; padding: 12px 16px; border-radius: 10px; margin-bottom: 15px; color: #a6323f; font-weight: 500;">
+                            {t['weight_forecast_title']}<br>
+                            <span style="font-size: 14px; font-weight: 400;">{t['forecast_flat_up']}</span>
+                        </div>
+                        """
+                
+                if forecast_markdown:
+                    st.markdown(forecast_markdown, unsafe_allow_html=True)
+
                 df_full['date_str'] = df_full['date'].dt.strftime('%d %b %Y')
                 df_full['weight_str'] = df_full['weight'].round(1).astype(str) + " kg"
                 
@@ -1137,6 +1185,7 @@ elif selected_page == t["t3"]:
                 
                 fig = px.bar()
                 
+                # 1. Barra dati reali (Rosso/Rosa pieno)
                 fig.add_bar(
                     x=df_real['date'], y=df_real['weight'],
                     marker_color='rgba(224, 108, 117, 1.0)',
@@ -1145,9 +1194,10 @@ elif selected_page == t["t3"]:
                     name="Reale"
                 )
                 
+                # 2. Barra proiezioni future (Grigio chiaro, con colori invertiti/sfondo corallo gestito dal layout)
                 fig.add_bar(
                     x=df_interp['date'], y=df_interp['weight'],
-                    marker_color='rgba(224, 108, 117, 0.25)',
+                    marker_color='rgba(180, 180, 180, 0.45)', # Grigio chiaro
                     customdata=df_interp[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
                     name="Proiezione"
@@ -1157,8 +1207,7 @@ elif selected_page == t["t3"]:
                 max_weight = max(90, float(user_target_weight) + 10) if user_target_weight else 90
                 fig.update_yaxes(range=[min_weight, max_weight])
                 
-                target_val = float(user_target_weight) if user_target_weight else 75
-                
+                # Linea del goal
                 fig.add_hline(
                     y=target_val, 
                     line_dash="solid", 
@@ -1178,9 +1227,10 @@ elif selected_page == t["t3"]:
                     borderpad=4
                 )
                 
+                # Inversione cromatica del grafico futuro: Sfondo generale leggermente corallo/pesca delicato
                 fig.update_layout(
                     showlegend=False,
-                    plot_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(252, 242, 244, 0.6)",  # Sfondo rosa/corallo tenue
                     paper_bgcolor="rgba(0,0,0,0)",
                     barmode='overlay',
                     hovermode='x unified'
