@@ -92,7 +92,7 @@ st.markdown("""
         [data-testid="stSidebar"] .stButton>button:hover {
             background-color: #21262d !important;
             border-color: #e06c75 !important;
-            color: #ffffff !important;
+            color: #30363d !important;
         }
 
         /* Bottoni nel corpo centrale dell'app */
