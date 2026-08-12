@@ -19,8 +19,26 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - UNIVERSALE PER BOTTONI E SIDEBAR
+# STYLING CUSTOM (CSS) - CARD ROSA TENUE & CONTRASTO BOTTONI
 # ==============================================================================
+st.markdown("""
+    <style>
+        /* Bordo color corallo per i pulsanti standard fuori dalla sidebar */
+        div.stButton > button:not([data-baseweb="tab"]) {
+            border: 1px solid #e06c75 !important;
+            color: #31333F;
+            background-color: transparent;
+            transition: all 0.3s ease;
+        }
+        
+        /* Colore rosso tenue e testo scuro quando ci passi sopra con il cursore (hover) */
+        div.stButton > button:not([data-baseweb="tab"]):hover {
+            background-color: #fcf2f4 !important;
+            border-color: #a6323f !important;
+            color: #a6323f !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
@@ -52,7 +70,7 @@ st.markdown("""
             color: #f0f6fc !important;
         }
 
-        /* CARD DELLE METRICHE (Overview) */
+        /* STILE MIRATO ESCLUSIVAMENTE ALLE CARD DELLE METRICHE (Overview) */
         [data-testid="stMetric"] {
             background-color: #fcf2f4 !important;
             border: 1px solid #f2d6dc !important;
@@ -60,8 +78,8 @@ st.markdown("""
             border-radius: 14px !important;
         }
 
-        /* BOTTONI DELLA SIDEBAR (Tutti uniformi) */
-        [data-testid="stSidebar"] button {
+        /* STILE SPECIFICO PER I BOTTONI DELLA SIDEBAR */
+        [data-testid="stSidebar"] .stButton>button {
             border-radius: 10px !important;
             font-weight: 500 !important;
             background-color: #161b22 !important;
@@ -71,35 +89,27 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        [data-testid="stSidebar"] button:hover {
+        [data-testid="stSidebar"] .stButton>button:hover {
             background-color: #21262d !important;
             border-color: #e06c75 !important;
             color: #ffffff !important;
         }
-        
-        [data-testid="stSidebar"] button * {
-            color: #f0f6fc !important;
-            -webkit-text-fill-color: #f0f6fc !important;
-        }
 
-        /* 1. BOTTONI FUORI DALLA SIDEBAR (Inattivi: Bordo corallo universale) */
-        .main button {
-            border: 1px solid #e06c75 !important;
-            background-color: transparent !important;
-            color: #31333F !important;
+        /* Bottoni nel corpo centrale dell'app */
+        .main .stButton>button, .main div.stFormSubmitButton>button {
             border-radius: 10px !important;
             font-weight: 500 !important;
+            background-color: #ffffff !important;
+            color: #24292e !important;
+            border: 1px solid #d1d5da !important;
             padding: 10px 15px !important;
             transition: all 0.2s ease !important;
         }
         
-        /* 2. BOTTONI FUORI DALLA SIDEBAR (Hover / Attivi: Sfondo corallo pieno e testo nero) */
-        .main button:hover, 
-        .main button:hover * {
-            background-color: #e06c75 !important;
-            border-color: #a6323f !important;
-            color: #000000 !important;
-            -webkit-text-fill-color: #000000 !important;
+        .main .stButton>button:hover, .main div.stFormSubmitButton>button:hover {
+            background-color: #f6f8fa !important;
+            border-color: #e06c75 !important;
+            color: #e06c75 !important;
         }
 
         hr {
