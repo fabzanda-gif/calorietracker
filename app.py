@@ -5,12 +5,13 @@ import requests
 import base64
 import secrets
 import hashlib
+import traceback
 from supabase import create_client
 from streamlit_cookies_controller import CookieController
 import plotly.express as px
 
 # ==============================================================================
-# 1. SETUP INIZIALE E CONFIGURAZIONE PAGINA (QUESTO DEVE ESSERE IL PRIMO COMANDO)
+# 1. SETUP INIZIALE E CONFIGURAZIONE PAGINA
 # ==============================================================================
 st.set_page_config(
     page_title="Tracker Pro",
@@ -18,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - FONT HANKEN GROTESK & SIDEBAR FIX
+# STYLING CUSTOM (CSS) - FONT HANKEN GROTESK & CONTRASTO BOTTONI
 # ==============================================================================
 st.markdown("""
     <style>
@@ -73,6 +74,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
@@ -85,9 +87,9 @@ if "supabase" not in st.session_state:
 supabase = st.session_state["supabase"]
 controller = CookieController()
 
-## ==============================================================================
-## 2. INITIALIZE SESSION STATE
-## ==============================================================================
+# ==============================================================================
+# 2. INITIALIZE SESSION STATE
+# ==============================================================================
 state_defaults = {
     "user": None,
     "pkce_verifier": None,
@@ -111,22 +113,19 @@ for key, default in state_defaults.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
-## ==============================================================================
-## 3. UTILITY FUNCTIONS
-## ==============================================================================
+# ==============================================================================
+# 3. UTILITY FUNCTIONS
+# ==============================================================================
 def calculate_bmr(weight, height, gender):
-    """Calculate Basal Metabolic Rate using Mifflin-St Jeor equation"""
     if gender == "Uomo":
         return int((10 * weight) + (6.25 * height) - (5 * 30) + 5)
     else:
         return int((10 * weight) + (6.25 * height) - (5 * 30) - 161)
 
 def refresh_daily_logs(log_date):
-    """Placeholder for daily log refresh logic"""
     pass
 
 def search_open_food_facts(query):
-    """Search Open Food Facts database"""
     query = query.strip()
     if not query:
         return {}
@@ -171,11 +170,10 @@ def search_open_food_facts(query):
         st.error(f"Errore nella ricerca: {e}")
         return {}
 
-## ==============================================================================
-## 4. AUTHENTICATION FUNCTIONS
-## ==============================================================================
+# ==============================================================================
+# 4. AUTHENTICATION FUNCTIONS
+# ==============================================================================
 def generate_pkce_pair():
-    """Generate PKCE code_verifier and code_challenge for OAuth security"""
     code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
     code_challenge = base64.urlsafe_b64encode(
         hashlib.sha256(code_verifier.encode('utf-8')).digest()
@@ -183,7 +181,6 @@ def generate_pkce_pair():
     return code_verifier, code_challenge
 
 def save_authenticated_session(response):
-    """Save authenticated user session to state and cookies"""
     try:
         user = response.user if hasattr(response, 'user') and response.user else response.session.user
         st.session_state["user"] = user
@@ -202,7 +199,6 @@ def save_authenticated_session(response):
         print(traceback.format_exc())
 
 def restore_session_from_cookie():
-    """Restore user session from stored cookies"""
     try:
         saved = controller.get("supabase_session")
         if not isinstance(saved, dict) or not saved.get("access_token"):
@@ -218,7 +214,6 @@ def restore_session_from_cookie():
         return False
 
 def handle_oauth_callback():
-    """Handle OAuth callback from Google redirect"""
     code = st.query_params.get("code")
     if not code:
         return False
@@ -243,12 +238,8 @@ def handle_oauth_callback():
         return False
 
 def show_login_page():
-    """Display login/registration page"""
     st.title("🔐 Accesso Tracker Pro")
     
-   # ==============================================================================
-    # Google OAuth Login con Pulsante Personalizzato e Logo Ufficiale
-    # ==============================================================================
     verifier, challenge = generate_pkce_pair()
     st.session_state.pkce_verifier = verifier
     
@@ -297,7 +288,6 @@ def show_login_page():
     st.markdown(google_button_html, unsafe_allow_html=True)
     st.markdown("---")
     
-    ## Email Authentication
     auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
     
     with st.form("auth_form"):
@@ -313,42 +303,16 @@ def show_login_page():
         if auth_mode == "Registrazione":
             st.markdown("#### 📋 Parametri Fisici Iniziali")
             display_name_input = st.text_input("Display Name", value="")
-            gender = st.selectbox(
-                "Genere", 
-                ["Uomo", "Donna"], 
-                index=None, 
-                placeholder="Seleziona genere..."
-            )
-            height = st.number_input(
-                "Altezza (cm)", 
-                value=175.0, 
-                min_value=100.0, 
-                max_value=250.0, 
-                step=1.0
-            )
-            current_weight = st.number_input(
-                "Peso Attuale (kg)", 
-                value=80.0, 
-                min_value=20.0, 
-                max_value=300.0, 
-                step=0.5
-            )
-            target_weight = st.number_input(
-                "Peso Obiettivo (kg)", 
-                value=75.0, 
-                min_value=20.0, 
-                max_value=300.0, 
-                step=0.5
-            )
+            gender = st.selectbox("Genere", ["Uomo", "Donna"], index=None, placeholder="Seleziona genere...")
+            height = st.number_input("Altezza (cm)", value=175.0, min_value=100.0, max_value=250.0, step=1.0)
+            current_weight = st.number_input("Peso Attuale (kg)", value=80.0, min_value=20.0, max_value=300.0, step=0.5)
+            target_weight = st.number_input("Peso Obiettivo (kg)", value=75.0, min_value=20.0, max_value=300.0, step=0.5)
         
         submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
         if st.form_submit_button(submit_label):
             try:
                 if auth_mode == "Login":
-                    response = supabase.auth.sign_in_with_password({
-                        "email": email, 
-                        "password": password
-                    })
+                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
                     if response and response.session:
                         save_authenticated_session(response)
                         st.success("Login effettuato!")
@@ -379,9 +343,9 @@ def show_login_page():
                 st.error(f"Errore durante l'autenticazione: {str(e)}")
                 print(traceback.format_exc())
 
-## ==============================================================================
-## 5. AUTHENTICATION FLOW
-## ==============================================================================
+# ==============================================================================
+# 5. AUTHENTICATION FLOW
+# ==============================================================================
 if "user" not in st.session_state or st.session_state["user"] is None:
     if handle_oauth_callback():
         st.rerun()
@@ -394,9 +358,9 @@ if "user" not in st.session_state or st.session_state["user"] is None:
     show_login_page()
     st.stop()
 
-## ==============================================================================
-## 6. USER DATA RETRIEVAL
-## ==============================================================================
+# ==============================================================================
+# 6. USER DATA RETRIEVAL
+# ==============================================================================
 user = st.session_state["user"]
 user_id = user.id
 u_meta = user.user_metadata or {}
@@ -407,9 +371,9 @@ user_bmr = u_meta.get("bmr")
 user_height = u_meta.get("height")
 user_gender = u_meta.get("gender")
 
-## ==============================================================================
-## 7. PROFILE COMPLETION CHECK
-## ==============================================================================
+# ==============================================================================
+# 7. PROFILE COMPLETION CHECK
+# ==============================================================================
 profile_incomplete = (
     user_target_weight is None or 
     user_bmr is None or 
@@ -421,32 +385,10 @@ if profile_incomplete:
     st.warning("⚠️ Per iniziare, configura i tuoi dati.")
     with st.form("missing_data_form"):
         st.subheader("📋 Configurazione Profilo")
-        gen = st.selectbox(
-            "Genere", 
-            ["Uomo", "Donna"], 
-            index=0 if user_gender is None else (0 if user_gender == "Uomo" else 1)
-        )
-        h_val = st.number_input(
-            "Altezza (cm)", 
-            value=float(user_height) if user_height else 175.0,
-            min_value=100.0,
-            max_value=250.0,
-            step=1.0
-        )
-        w_val = st.number_input(
-            "Peso Attuale (kg)", 
-            value=float(user_target_weight) if user_target_weight else 80.0,
-            min_value=20.0,
-            max_value=300.0,
-            step=0.5
-        )
-        t_val = st.number_input(
-            "Peso Obiettivo (kg)", 
-            value=float(user_target_weight) if user_target_weight else 75.0,
-            min_value=20.0,
-            max_value=300.0,
-            step=0.5
-        )
+        gen = st.selectbox("Genere", ["Uomo", "Donna"], index=0 if user_gender is None else (0 if user_gender == "Uomo" else 1))
+        h_val = st.number_input("Altezza (cm)", value=float(user_height) if user_height else 175.0, min_value=100.0, max_value=250.0, step=1.0)
+        w_val = st.number_input("Peso Attuale (kg)", value=float(user_target_weight) if user_target_weight else 80.0, min_value=20.0, max_value=300.0, step=0.5)
+        t_val = st.number_input("Peso Obiettivo (kg)", value=float(user_target_weight) if user_target_weight else 75.0, min_value=20.0, max_value=300.0, step=0.5)
         
         if st.form_submit_button("Salva e Inizia"):
             calculated_bmr = calculate_bmr(w_val, h_val, gen)
@@ -459,12 +401,6 @@ if profile_incomplete:
                 }})
                 if hasattr(res, 'user') and res.user:
                     st.session_state["user"] = res.user
-                    user = res.user
-                    u_meta = user.user_metadata or {}
-                    user_target_weight = u_meta.get("target_weight")
-                    user_bmr = u_meta.get("bmr")
-                    user_height = u_meta.get("height")
-                    user_gender = u_meta.get("gender")
                 st.success("✅ Profilo aggiornato!")
                 st.rerun()
             except Exception as e:
@@ -472,9 +408,9 @@ if profile_incomplete:
                 print(traceback.format_exc())
     st.stop()
 
-## ==============================================================================
-## 8. NAVIGATION & LANGUAGE
-## ==============================================================================
+# ==============================================================================
+# 8. NAVIGATION & LANGUAGE
+# ==============================================================================
 with st.sidebar:
     lang = st.selectbox("🌐 Lingua", ["Italiano", "English"])
     translations = {
@@ -483,18 +419,14 @@ with st.sidebar:
     }
     t = translations[lang]
     
-    # Inizializza la pagina corrente se non esiste
     if "selected_page" not in st.session_state:
         st.session_state.selected_page = t["t1"]
 
     st.markdown("### 📍 Navigazione")
     
-    # Pulsanti di navigazione personalizzati stile card
     pages = [t["t1"], t["t2"], t["t3"], t["t4"]]
     for page in pages:
-        # Se la pagina è quella attiva, diamo un bordo o uno sfondo più chiaro per evidenziarla
         is_active = (st.session_state.selected_page == page)
-        btn_type = "primary" if is_active else "secondary"
         
         if st.button(page, key=f"nav_{page}", use_container_width=True):
             st.session_state.selected_page = page
@@ -508,9 +440,10 @@ with st.sidebar:
         controller.set("supabase_session", None, max_age=0)
         st.session_state.clear()
         st.rerun()
-## ==============================================================================
-## 9. PAGE 1: MEAL LOGGING
-## ==============================================================================
+
+# ==============================================================================
+# 9. PAGE 1: MEAL LOGGING
+# ==============================================================================
 if selected_page == t["t1"]:
     log_date = st.date_input("📅 Data", value=date.today())
     
@@ -523,7 +456,6 @@ if selected_page == t["t1"]:
     )
     
     is_recipe = (input_source == "🍳 Immissione Rapida")
-    
     v = st.session_state["form_version"]
     
     def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0):
@@ -541,7 +473,6 @@ if selected_page == t["t1"]:
         reset_or_update()
         st.rerun()
     
-    ## Search Mode
     if not is_recipe:
         search_q = st.text_input("🔍 Cerca per Nome o Codice a Barre")
         if st.button("🚀 Cerca"):
@@ -574,8 +505,6 @@ if selected_page == t["t1"]:
                     grams=100.0
                 )
                 st.rerun()
-    
-    ## Recipe Mode
     else:
         try:
             recipes_data = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
@@ -607,7 +536,6 @@ if selected_page == t["t1"]:
     
     st.markdown("---")
     
-    ## Meal Input Form
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
@@ -669,13 +597,12 @@ if selected_page == t["t1"]:
                     print(traceback.format_exc())
     
     with col_btn2:
-        if st.button("🗑️ Pulisci", key=f"clear_btn_{v}"):
+        if st.button("🗑️ Pulisci", key=f"clear_btn_{v}", use_container_width=True):
             reset_or_update()
             st.rerun()
     
     st.markdown("---")
     
-    ## Extra Activities
     st.subheader("🏃 Attività Extra")
     with st.form("extra_act_form"):
         extra_act = st.selectbox(
@@ -688,7 +615,7 @@ if selected_page == t["t1"]:
             min_value=0,
             step=50
         )
-        if st.form_submit_button("💾 Salva Attività"):
+        if st.form_submit_button("💾 Salva Attività", use_container_width=True):
             try:
                 supabase.table("activities").insert({
                     "user_id": user_id,
@@ -703,9 +630,9 @@ if selected_page == t["t1"]:
                 st.error(f"Errore: {e}")
                 print(traceback.format_exc())
 
-## ==============================================================================
-## 10. PAGE 2: DAILY OVERVIEW
-## ==============================================================================
+# ==============================================================================
+# 10. PAGE 2: DAILY OVERVIEW
+# ==============================================================================
 elif selected_page == t["t2"]:
     st.subheader("📊 Riepilogo Giornaliero")
     
@@ -733,10 +660,8 @@ elif selected_page == t["t2"]:
         meals_data = []
         raw_activities = []
     
-    ## Filter activities
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
     
-    ## Calculate calories
     total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
     
     current_weight = None
@@ -744,7 +669,6 @@ elif selected_page == t["t2"]:
         row = daily_log_res[0]
         current_weight = row.get('weight')
     
-    ## Calculate BMR
     now = datetime.now()
     if summary_date == date.today():
         minutes_passed = now.hour * 60 + now.minute
@@ -756,17 +680,22 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    ## Display metrics
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-    col_c1.metric("Kcal Ingerite", f"{total_cals_in} kcal")
-    col_c2.metric("Kcal Bruciate", f"{total_burned_finora} kcal")
-    col_c3.metric("Bilancio", f"{deficit:+d} kcal", delta_color="inverse")
-    col_c4.metric("Peso", f"{current_weight} kg" if current_weight else "N/D")
+    with col_c1:
+        with st.container(border=True):
+            st.metric("🍽️ Kcal Ingerite", f"{total_cals_in} kcal")
+    with col_c2:
+        with st.container(border=True):
+            st.metric("🔥 Kcal Bruciate", f"{total_burned_finora} kcal")
+    with col_c3:
+        with st.container(border=True):
+            st.metric("⚖️ Bilancio", f"{deficit:+d} kcal", delta_color="inverse")
+    with col_c4:
+        with st.container(border=True):
+            st.metric("📉 Peso", f"{current_weight} kg" if current_weight else "N/D")
     
     st.markdown("---")
     
-    ## Meals table
-    st.markdown("---")
     st.markdown("### 🍽️ Cibi inseriti")
     if meals_data:
         meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
@@ -789,35 +718,8 @@ elif selected_page == t["t2"]:
                 st.rerun()
     else:
         st.info("Nessun pasto registrato per questa data.")
-        
-        ## Delete meal functionality
-st.markdown("---")
-    st.markdown("### 🍽️ Cibi inseriti")
-    if meals_data:
-        # Recuperiamo anche gli ID dei pasti per poterli cancellare
-        meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
-        
-        df_meals = pd.DataFrame(meals_with_id)
-        df_display = df_meals.rename(columns={
-            "meal_type": "Pasto", "name": "Nome", "calories": "Kcal", 
-            "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)"
-        })
-        st.dataframe(df_display[["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]], use_container_width=True, hide_index=True)
-        
-        # Selettore per eliminare un pasto specifico
-        meal_options_del = {f"{m['meal_type']} - {m['name']} ({m['calories']} kcal)": m['id'] for m in meals_with_id}
-        selected_meal_to_del = st.selectbox("Seleziona un pasto da eliminare", [""] + list(meal_options_del.keys()))
-        
-        if selected_meal_to_del:
-            if st.button("🗑️ Elimina Pasto Selezionato"):
-                meal_id_to_delete = meal_options_del[selected_meal_to_del]
-                supabase.table("meals").delete().eq("id", meal_id_to_del).execute()
-                st.success("Pasto eliminato con successo!")
-                st.rerun()
-    else:
-        st.info("Nessun pasto registrato per questa data.")
     
-    ## Activities
+    st.markdown("---")
     st.markdown("#### 🏃 Calorie Bruciate & Attività")
     rows_acts = [{"Attività": "BMR (Base)", "Kcal Bruciate": bmr_so_far}]
     if activities_data:
@@ -830,9 +732,9 @@ st.markdown("---")
     df_acts = pd.DataFrame(rows_acts)
     st.dataframe(df_acts, use_container_width=True, hide_index=True)
 
-## ==============================================================================
-## 11. PAGE 3: WEIGHT TRACKING
-## ==============================================================================
+# ==============================================================================
+# 11. PAGE 3: WEIGHT TRACKING
+# ==============================================================================
 elif selected_page == t["t3"]:
     st.subheader("⚖️ Tracciamento Peso")
     
@@ -883,7 +785,6 @@ elif selected_page == t["t3"]:
     
     st.markdown("---")
     
-    ## Weight chart
     try:
         logs = supabase.table("daily_logs").select("date, weight").eq("user_id", user_id).not_.is_("weight", "null").order("date", desc=False).execute().data
         
@@ -891,7 +792,6 @@ elif selected_page == t["t3"]:
             df = pd.DataFrame(logs)
             df['date'] = pd.to_datetime(df['date'])
             
-            ## Interpolate missing dates
             df_full = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index().rename(columns={'index': 'date'})
             
             real_dates = set(df['date'])
@@ -956,27 +856,12 @@ elif selected_page == t["t3"]:
         st.error(f"Errore nel caricamento grafico: {e}")
         print(traceback.format_exc())
 
-## ==============================================================================
-## 12. PAGE 4: QUICK ENTRIES
-## ==============================================================================
-elif selected_page == t["t4"]:
-    st.subheader("⚡ Quick Entries - Ricette Salvate")
-    
-    st.markdown("#### 📋 Le tue ricette")
-    try:
-        entries = supabase.table("recipes").select("*").eq("user_id", user_id).order("name").execute().data
-        
-        if entries:
-            df_entries = pd.DataFrame(entries)
-            df_display = df_entries[["name", "calories", "protein", "carbs", "fat"]].copy()
-            df_display.columns = ["Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
-            
-            ## Delete recipe
+# ==============================================================================
+# 12. PAGE 4: QUICK ENTRIES
+# ==============================================================================
 elif selected_page == t["t4"]:
     st.subheader("⚡ Quick Entries")
 
-    # 1. Visualizzazione Tabella
     st.markdown("### 📋 Entries salvate")
     entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
     if entries:
@@ -987,7 +872,6 @@ elif selected_page == t["t4"]:
         })
         st.dataframe(df_display[["Nome", "Kcal", "Pro", "Carbs", "Fat"]], use_container_width=True, hide_index=True)
         
-        # Sezione Eliminazione Quick Entry / Ricetta
         st.markdown("### 🗑️ Elimina Quick Entry")
         entry_options_del = {e['name']: e['name'] for e in entries}
         sel_entry_del = st.selectbox("Seleziona Quick Entry da rimuovere", [""] + list(entry_options_del.keys()))
@@ -1004,42 +888,14 @@ elif selected_page == t["t4"]:
 
     st.markdown("---")
 
-    # 2. Form per aggiungere una nuova Quick Entry (Salvataggio)
     with st.form("quick_entry_add"):
-        st.markdown("### ➕ Aggiungi nuova Quick Entry")
-        r_name = st.text_input(t["recipe_name"])
-        c1, c2, c3, c4 = st.columns(4)
-        cals = c1.number_input("Kcal", value=0, step=1, key="r_cal")
-        prot = c2.number_input("Pro", value=0, step=1, key="r_pro")
-        carbs = c3.number_input("Carbs", value=0, step=1, key="r_carbs")
-        fat = c4.number_input("Fat", value=0, step=1, key="r_fat")
-        
-        if st.form_submit_button(t["save_recipe"]):
-            if not r_name.strip():
-                st.warning("Inserisci un nome valido.")
-            else:
-                try:
-                    supabase.table("recipes").upsert({
-                        "name": r_name.strip(), 
-                        "calories": int(cals), 
-                        "protein": int(prot), 
-                        "carbs": int(carbs), 
-                        "fat": int(fat),
-                        "user_id": user_id
-                    }, on_conflict="user_id,name").execute()
-                    st.success(t["recipe_saved"])
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Errore: {e}")
-    
-    st.markdown("#### ➕ Aggiungi Nuova Ricetta")
-    with st.form("quick_entry_add"):
+        st.markdown("### ➕ Aggiungi Nuova Quick Entry")
         r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro")
         c1, c2, c3, c4 = st.columns(4)
-        cals = c1.number_input("Kcal", value=0, min_value=0, step=1)
-        prot = c2.number_input("Pro (g)", value=0, min_value=0, step=1)
-        carbs = c3.number_input("Carbs (g)", value=0, min_value=0, step=1)
-        fat = c4.number_input("Fat (g)", value=0, min_value=0, step=1)
+        cals = c1.number_input("Kcal", value=0, min_value=0, step=1, key="r_cal")
+        prot = c2.number_input("Pro (g)", value=0, min_value=0, step=1, key="r_pro")
+        carbs = c3.number_input("Carbs (g)", value=0, min_value=0, step=1, key="r_carbs")
+        fat = c4.number_input("Fat (g)", value=0, min_value=0, step=1, key="r_fat")
         
         if st.form_submit_button(t["save_recipe"], use_container_width=True):
             if not r_name.strip():
