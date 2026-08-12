@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# STYLING CUSTOM (CSS) - DEFINITIVO PER BOTTONI E SIDEBAR
+# STYLING CUSTOM (CSS) - DEFINITIVO
 # ==============================================================================
 st.markdown("""
     <style>
@@ -60,7 +60,7 @@ st.markdown("""
             border-radius: 14px !important;
         }
 
-        /* 1. BOTTONI DELLA SIDEBAR (Tutti uniformi, inclusi attivi e inattivi) */
+        /* 1. BOTTONI DELLA SIDEBAR (Tutti uniformi) */
         [data-testid="stSidebar"] div.stButton > button,
         [data-testid="stSidebar"] div.stButton > button[kind="primary"] {
             border-radius: 10px !important;
@@ -79,15 +79,15 @@ st.markdown("""
             color: #ffffff !important;
         }
         
-        /* Forza il testo interno della sidebar a rimanere bianco/chiaro uniformemente */
         [data-testid="stSidebar"] div.stButton > button *,
         [data-testid="stSidebar"] div.stButton > button[kind="primary"] * {
             color: #f0f6fc !important;
             -webkit-text-fill-color: #f0f6fc !important;
         }
 
-        /* 2. BOTTONI FUORI DALLA SIDEBAR (Inattivi: bordo corallo) */
-        .main div.stButton > button:not([kind="primary"]), 
+        /* 2. BOTTONI FUORI DALLA SIDEBAR (Inattivi: Bordo rigorosamente color corallo) */
+        .main button[kind="secondary"],
+        .main div.stButton > button, 
         .main div.stFormSubmitButton > button {
             border-radius: 10px !important;
             font-weight: 500 !important;
@@ -98,12 +98,14 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        /* 3. BOTTONI FUORI DALLA SIDEBAR (Attivi / Hover: Sfondo corallo pieno e testo nero) */
-        .main div.stButton > button:not([kind="primary"]):hover, 
+        /* 3. BOTTONI FUORI DALLA SIDEBAR (Hover / Attivi: Sfondo corallo tenue, testo nero e bordo corallo scuro) */
+        .main button[kind="secondary"]:hover,
+        .main div.stButton > button:hover, 
         .main div.stFormSubmitButton > button:hover,
-        .main div.stButton > button:not([kind="primary"]):hover *,
+        .main button[kind="secondary"]:hover *,
+        .main div.stButton > button:hover *, 
         .main div.stFormSubmitButton > button:hover * {
-            background-color: #e06c75 !important;
+            background-color: #fcf2f4 !important;
             border-color: #a6323f !important;
             color: #000000 !important;
             -webkit-text-fill-color: #000000 !important;
@@ -115,7 +117,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
