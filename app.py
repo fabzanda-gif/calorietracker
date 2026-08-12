@@ -212,10 +212,117 @@ def search_open_food_facts(query):
         return results
     except Exception as e:
         st.error(f"Errore nella ricerca: {e}")
-        return {}
+        return {}# ==============================================================================
+# 4.1  FUNZIONE DI LOGIN (Da inserire prima dei controlli di sessione)
+# ==============================================================================
+def show_login_page():
+    st.title("🔐 Accesso Tracker Pro")
+    
+    verifier, challenge = generate_pkce_pair()
+    st.session_state.pkce_verifier = verifier
+    
+    try:
+        login_url = supabase.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": "https://diario-alimentare.streamlit.app",
+                "code_challenge": challenge,
+                "code_challenge_method": "s256"
+            }
+        }).url
+    except Exception as e:
+        st.error(f"Errore nell'inizializzazione Google login: {e}")
+        login_url = "#"
+    
+    google_button_html = f"""
+    <div style="display: flex; justify-content: center; margin: 10px 0 20px 0;">
+        <a href="{login_url}" target="_self" style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+            color: #3c4043;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-family: 'Hanken Grotesk', Roboto, Arial, sans-serif;
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: background-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+        ">
+            <svg style="width: 20px; height: 20px; margin-right: 12px;" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.18v3.15C3.15 21.3 7.22 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.61H1.18C.43 8.13 0 9.87 0 12s.43 3.87 1.18 5.39l4.09-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.15 2.7 1.18 6.61l4.09 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/>
+            </svg>
+            Accedi con Google
+        </a>
+    </div>
+    """
+    st.markdown(google_button_html, unsafe_allow_html=True)
+    st.markdown("---")
+    
+    auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
+    
+    with st.form("auth_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password (min. 6 caratteri)", type="password")
+        
+        display_name_input = ""
+        target_weight = None
+        height = None
+        current_weight = None
+        gender = None
+        
+        if auth_mode == "Registrazione":
+            st.markdown("#### 📋 Parametri Fisici Iniziali")
+            display_name_input = st.text_input("Display Name", value="")
+            gender = st.selectbox("Genere", ["Uomo", "Donna"], index=None, placeholder="Seleziona genere...")
+            height = st.number_input("Altezza (cm)", value=175.0, min_value=100.0, max_value=250.0, step=1.0)
+            current_weight = st.number_input("Peso Attuale (kg)", value=80.0, min_value=20.0, max_value=300.0, step=0.5)
+            target_weight = st.number_input("Peso Obiettivo (kg)", value=75.0, min_value=20.0, max_value=300.0, step=0.5)
+        
+        submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
+        if st.form_submit_button(submit_label):
+            try:
+                if auth_mode == "Login":
+                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    if response and response.session:
+                        save_authenticated_session(response)
+                        st.success("Login effettuato!")
+                        st.rerun()
+                    else:
+                        st.error("Credenziali non valide")
+                else:
+                    if not height or not current_weight or not target_weight or not gender:
+                        st.warning("Per favore compila tutti i campi fisici per la registrazione.")
+                    else:
+                        calculated_bmr = calculate_bmr(current_weight, height, gender)
+                        supabase.auth.sign_up({
+                            "email": email, 
+                            "password": password,
+                            "options": {
+                                "data": {
+                                    "display_name": display_name_input or email.split("@")[0],
+                                    "target_weight": float(target_weight),
+                                    "bmr": calculated_bmr,
+                                    "height": float(height),
+                                    "gender": gender
+                                }
+                            }
+                        })
+                        st.success("✅ Account creato con successo! Effettua il login.")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"Errore durante l'autenticazione: {str(e)}")
+                print(traceback.format_exc())
 
 # ==============================================================================
-# 4. AUTHENTICATION & SESSION MANAGEMENT (CORRETTO)
+# 4.2 AUTHENTICATION & SESSION MANAGEMENT (CORRETTO)
 # ==============================================================================
 controller = CookieController()
 
