@@ -1146,11 +1146,13 @@ elif selected_page == t["t3"]:
                 latest_weight = df['weight'].iloc[-1]
                 
                 forecast_markdown = ""
+                days_to_goal = 0
+                estimated_date = None
+                
                 if len(df) >= 3 and latest_weight > target_val:
-                    # Consideriamo gli ultimi 14 giorni o ultimi 5 punti per calcolare il trend recente
                     recent_df = df.tail(min(len(df), 14))
                     days_diff = (recent_df['date'].max() - recent_df['date'].min()).days
-                    weight_diff = recent_df['weight'].iloc[-1] - recent_df['weight'].iloc[0] # Negativo se scende
+                    weight_diff = recent_df['weight'].iloc[-1] - recent_df['weight'].iloc[0]
                     
                     if days_diff > 0 and weight_diff < 0:
                         kg_per_day = abs(weight_diff / days_diff)
@@ -1194,20 +1196,34 @@ elif selected_page == t["t3"]:
                     name="Reale"
                 )
                 
-                # 2. Barra proiezioni future (Grigio chiaro, con colori invertiti/sfondo corallo gestito dal layout)
+                # 2. Barra proiezioni future (Grigio chiaro)
                 fig.add_bar(
                     x=df_interp['date'], y=df_interp['weight'],
-                    marker_color='rgba(180, 180, 180, 0.45)', # Grigio chiaro
+                    marker_color='rgba(180, 180, 180, 0.45)',
                     customdata=df_interp[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
                     name="Proiezione"
                 )
+
+                # 3. Linea di tendenza/proiezione diretta sul grafico
+                if len(df) >= 3 and latest_weight > target_val and estimated_date and days_to_goal > 0:
+                    last_real_date = df_real['date'].iloc[-1]
+                    last_real_weight = df_real['weight'].iloc[-1]
+                    
+                    fig.add_scatter(
+                        x=[last_real_date, estimated_date],
+                        y=[last_real_weight, target_val],
+                        mode='lines+markers',
+                        line=dict(color='#a6323f', width=3, dash='dash'),
+                        marker=dict(size=6, color='#a6323f'),
+                        name="Trend Futuro"
+                    )
                 
                 min_weight = min(75, float(user_target_weight) - 3) if user_target_weight else 75
                 max_weight = max(90, float(user_target_weight) + 10) if user_target_weight else 90
                 fig.update_yaxes(range=[min_weight, max_weight])
                 
-                # Linea del goal
+                # Linea del goal orizzontale
                 fig.add_hline(
                     y=target_val, 
                     line_dash="solid", 
@@ -1227,10 +1243,9 @@ elif selected_page == t["t3"]:
                     borderpad=4
                 )
                 
-                # Inversione cromatica del grafico futuro: Sfondo generale leggermente corallo/pesca delicato
                 fig.update_layout(
                     showlegend=False,
-                    plot_bgcolor="rgba(252, 242, 244, 0.6)",  # Sfondo rosa/corallo tenue
+                    plot_bgcolor="rgba(252, 242, 244, 0.6)",  # Sfondo corallo tenue nella zona futura
                     paper_bgcolor="rgba(0,0,0,0)",
                     barmode='overlay',
                     hovermode='x unified'
