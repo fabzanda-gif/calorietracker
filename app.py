@@ -435,22 +435,268 @@ if profile_incomplete:
     st.stop()
 
 # ==============================================================================
-# 8. NAVIGATION & LANGUAGE - VERSIONE CORRETTA
+# 8. NAVIGATION & LANGUAGE - VERSIONE CORRETTA E ORDINATA
 # ==============================================================================
+
+# 1. Definiamo prima di tutto il dizionario delle traduzioni
+translations = {
+    "Italiano": {
+        "t1": "🚀 Inserimento", 
+        "t2": "📊 Panoramica", 
+        "t3": "📈 Peso", 
+        "t4": "⚡ Immissione Rapida", 
+        "t5": "🏃 Attività",  
+        "meal": "Tipo di pasto", 
+        "meal_name": "Nome pasto", 
+        "add_meal": "Aggiungi pasto", 
+        "extra_act": "Attività extra", 
+        "extra_cals": "Calorie bruciate extra", 
+        "insert_weight": "Inserisci peso (kg)", 
+        "save_weight": "Salva peso", 
+        "recipe_name": "Nome ricetta", 
+        "save_recipe": "Salva ricetta", 
+        "recipe_saved": "✅ Ricetta salvata!",
+        "lang_label": "🌐 Lingua",
+        "nav": "Navigazione",
+        "logout": "🚪 Logout",
+        "search_food": "🔍 Cerca per Nome o Codice a Barre",
+        "search_btn": "🚀 Cerca",
+        "select_db": "Seleziona dal database",
+        "select_recipe": "Seleziona una ricetta",
+        "no_recipes": "Nessuna ricetta salvata.",
+        "calc_mode": "Inserimento basato su:",
+        "per_100g": "Per 100g",
+        "per_portion": "Per Porzione",
+        "qty_label": "Quantità (g o Porzioni)",
+        "num_portions": "Numero di porzioni",
+        "kcal": "Kcal",
+        "pro": "Pro (g)",
+        "carbs": "Carbs (g)",
+        "fat": "Fat (g)",
+        "inserted": "✅ Inserito",
+        "daily_summary": "📊 Riepilogo Giornaliero",
+        "summary_date": "📅 Data riepilogo",
+        "logged_foods": "🍽️ Cibi inseriti",
+        "del_meal": "Seleziona un pasto da eliminare",
+        "del_meal_btn": "🗑️ Elimina Pasto Selezionato",
+        "meal_del_success": "Pasto eliminato con successo!",
+        "no_meals": "Nessun pasto registrato per questa data.",
+        "burned_acts": "#### 🏃 Calorie Bruciate & Attività",
+        "weight_tracking": "⚖️ Tracciamento Peso",
+        "log_today_weight": "📥 Registra Peso Oggi",
+        "update_target": "🎯 Aggiorna Obiettivo",
+        "save_target": "Salva Obiettivo",
+        "target_updated": "✅ Obiettivo aggiornato!",
+        "quick_entries": "⚡ Immissioni Rapide",
+        "saved_entries": "📋 Entries salvate",
+        "del_quick": "🗑️ Elimina Immissione Rapida",
+        "select_quick_del": "Seleziona Immissione Rapida da rimuovere",
+        "del_quick_btn": "Elimina Immissione Rapida",
+        "quick_add_title": "➕ Aggiungi Nuova Immissione Rapida",
+        "calc_mode_radio": "Modalità di calcolo",
+        "caption_calc": "ℹ️ *Se scegli 'Per 100g', inserisci i valori riferiti a 100g. Se scegli 'Porzione', inserisci i valori totali della singola porzione.*",
+        "register_activity": "🏃 Registra Attività & Movimento",
+        "act_date": "📅 Data",
+        "steps_title": "👣 Passi (Totali)",
+        "update_steps": "💾 Aggiorna Passi",
+        "steps_updated": "Passi aggiornati!",
+        "bike_title": "🚲 Bici (Sessione)",
+        "bike_min": "Minuti Bici",
+        "add_bike": "💾 Aggiungi Bici",
+        "other_act": "🏋️ Altro",
+        "activity_label": "Attività",
+        "add_act_btn": "💾 Aggiungi",
+        "tab1_title": "🍽️ Inserimento Cibo & Pasti",
+        "input_source_lbl": "Fonte inserimento",
+        "opt_off": "🔍 Cerca online (Open Food Facts)",
+        "opt_quick": "🍳 Immissione Rapida",
+        "in_msg_low": lambda p: f"⚠️ Proiezione bassa ({p} kcal previste). Mangia di più!",
+        "in_msg_high": lambda p: f"✅ Ottima proiezione ({p} kcal stimate a fine giornata).",
+        "burn_msg_yes": lambda e: f"🌟 Ottimo lavoro! Hai fatto attività extra (+{e} kcal).",
+        "burn_msg_no": "💡 Nessuna attività extra registrata. Che ne dici di muoverti un po'?",
+        "bilancio_ok": "🎯 Ottimo, sei in perfetto deficit calorico.",
+        "bilancio_bad": "⚠️ Attenzione: sei in surplus calorico.",
+        "weight_msg_default": "📈 Continua così per raggiungere il target.",
+        "weight_msg_val": lambda i, d_ini, t, d_tgt: f"Iniziale: {i} kg ({d_ini:+.1f}) | Target: {t} kg ({d_tgt:+.1f})",
+        "status_move_title": "👣 Status Movimento",
+        "status_very_active": "🌟 Ottimo! Giornata molto attiva.",
+        "status_good": "🚶 Buona attività, continua così.",
+        "status_lazy": "🛋️ Giornata pigra, prova a muoverti di più."
+    },
+    "English": {
+        "t1": "🚀 Logging", 
+        "t2": "📊 Overview", 
+        "t3": "📈 Weight", 
+        "t4": "⚡ Quick Entries", 
+        "t5": "🏃 Activity",  
+        "meal": "Meal type", 
+        "meal_name": "Meal name", 
+        "add_meal": "Add meal", 
+        "extra_act": "Extra activity", 
+        "extra_cals": "Extra calories burned", 
+        "insert_weight": "Enter weight (kg)", 
+        "save_weight": "Save weight", 
+        "recipe_name": "Recipe name", 
+        "save_recipe": "Save recipe", 
+        "recipe_saved": "✅ Recipe saved!",
+        "lang_label": "🌐 Language",
+        "nav": "Navigation",
+        "logout": "🚪 Logout",
+        "search_food": "🔍 Search by Name or Barcode",
+        "search_btn": "🚀 Search",
+        "select_db": "Select from database",
+        "select_recipe": "Select a recipe",
+        "no_recipes": "No recipes saved.",
+        "calc_mode": "Entry based on:",
+        "per_100g": "Per 100g",
+        "per_portion": "Per Portion",
+        "qty_label": "Quantity (g or Portions)",
+        "num_portions": "Number of portions",
+        "kcal": "Kcal",
+        "pro": "Pro (g)",
+        "carbs": "Carbs (g)",
+        "fat": "Fat (g)",
+        "inserted": "✅ Inserted",
+        "daily_summary": "📊 Daily Overview",
+        "summary_date": "📅 Summary date",
+        "logged_foods": "🍽️ Logged Foods",
+        "del_meal": "Select a meal to delete",
+        "del_meal_btn": "🗑️ Delete Selected Meal",
+        "meal_del_success": "Meal deleted successfully!",
+        "no_meals": "No meals recorded for this date.",
+        "burned_acts": "#### 🏃 Burned Calories & Activities",
+        "weight_tracking": "⚖️ Weight Tracking",
+        "log_today_weight": "📥 Log Today's Weight",
+        "update_target": "🎯 Update Target",
+        "save_target": "Save Target",
+        "target_updated": "✅ Target updated!",
+        "quick_entries": "⚡ Quick Entries",
+        "saved_entries": "📋 Saved Entries",
+        "del_quick": "🗑️ Delete Quick Entry",
+        "select_quick_del": "Select Quick Entry to remove",
+        "del_quick_btn": "Delete Quick Entry",
+        "quick_add_title": "➕ Add New Quick Entry",
+        "calc_mode_radio": "Calculation Mode",
+        "caption_calc": "ℹ️ *If you choose 'Per 100g', enter values relative to 100g. If you choose 'Portion', enter total values for a single portion.*",
+        "register_activity": "🏃 Register Activity & Movement",
+        "act_date": "📅 Date",
+        "steps_title": "👣 Steps (Total)",
+        "update_steps": "💾 Update Steps",
+        "steps_updated": "Steps updated!",
+        "bike_title": "🚲 Bike (Session)",
+        "bike_min": "Bike Minutes",
+        "add_bike": "💾 Add Bike",
+        "other_act": "🏋️ Other",
+        "activity_label": "Activity",
+        "add_act_btn": "💾 Add",
+        "tab1_title": "🍽️ Food & Meal Logging",
+        "input_source_lbl": "Input source",
+        "opt_off": "🔍 Search online (Open Food Facts)",
+        "opt_quick": "🍳 Quick Entry",
+        "in_msg_low": lambda p: f"⚠️ Low projection ({p} kcal expected). Eat more!",
+        "in_msg_high": lambda p: f"✅ Great projection ({p} kcal estimated by end of day).",
+        "burn_msg_yes": lambda e: f"🌟 Great job! You did extra activity (+{e} kcal).",
+        "burn_msg_no": "💡 No extra activity recorded. How about moving a bit?",
+        "bilancio_ok": "🎯 Great, you are in a perfect caloric deficit.",
+        "bilancio_bad": "⚠️ Warning: you are in a caloric surplus.",
+        "weight_msg_default": "📈 Keep it up to reach your target.",
+        "weight_msg_val": lambda i, d_ini, t, d_tgt: f"Initial: {i} kg ({d_ini:+.1f}) | Target: {t} kg ({d_tgt:+.1f})",
+        "status_move_title": "👣 Movement Status",
+        "status_very_active": "🌟 Great! Very active day.",
+        "status_good": "🚶 Good activity, keep it up.",
+        "status_lazy": "🛋️ Lazy day, try to move more."
+    },
+    "Nederlands": {
+        "t1": "🚀 Invoer", 
+        "t2": "📊 Overzicht", 
+        "t3": "📈 Gewicht", 
+        "t4": "⚡ Snelle Invoer", 
+        "t5": "🏃 Activiteit",  
+        "meal": "Maaltijdtype", 
+        "meal_name": "Maaltijdnaam", 
+        "add_meal": "Maaltijd toevoegen", 
+        "extra_act": "Extra activiteit", 
+        "extra_cals": "Extra verbrande calorieën", 
+        "insert_weight": "Voer gewicht in (kg)", 
+        "save_weight": "Gewicht opslaan", 
+        "recipe_name": "Receptnaam", 
+        "save_recipe": "Recept opslaan", 
+        "recipe_saved": "✅ Recept opgeslagen!",
+        "lang_label": "🌐 Taal",
+        "nav": "Navigatie",
+        "logout": "🚪 Uitloggen",
+        "search_food": "🔍 Zoek op naam of streepjescode",
+        "search_btn": "🚀 Zoeken",
+        "select_db": "Selecteer uit database",
+        "select_recipe": "Selecteer een recept",
+        "no_recipes": "Geen recepten opgeslagen.",
+        "calc_mode": "Invoer gebaseerd op:",
+        "per_100g": "Per 100g",
+        "per_portion": "Per Portie",
+        "qty_label": "Hoeveelheid (g of Porties)",
+        "num_portions": "Aantal porties",
+        "kcal": "Kcal",
+        "pro": "Pro (g)",
+        "carbs": "Koolh (g)",
+        "fat": "Vet (g)",
+        "inserted": "✅ Ingevoerd",
+        "daily_summary": "📊 Dagelijks Overzicht",
+        "summary_date": "📅 Overichtsdatum",
+        "logged_foods": "🍽️ Ingelogde Voeding",
+        "del_meal": "Selecteer een maaltijd om te verwijderen",
+        "del_meal_btn": "🗑️ Geselecteerde Maaltijd Verwijderen",
+        "meal_del_success": "Maaltijd succesvol verwijderd!",
+        "no_meals": "Geen maaltijden geregistreerd voor deze datum.",
+        "burned_acts": "#### 🏃 Verbrande Calorieën & Activiteiten",
+        "weight_tracking": "⚖️ Gewicht Volgen",
+        "log_today_weight": "📥 Vandaag Gewicht Registreren",
+        "update_target": "🎯 Doel Bijwerken",
+        "save_target": "Doel Opslaan",
+        "target_updated": "✅ Doel bijgewerkt!",
+        "quick_entries": "⚡ Snelle Invoer",
+        "saved_entries": "📋 Opgeslagen Items",
+        "del_quick": "🗑️ Snelle Invoer Verwijderen",
+        "select_quick_del": "Selecteer te verwijderen snelle invoer",
+        "del_quick_btn": "Snelle Invoer Verwijderen",
+        "quick_add_title": "➕ Nieuwe Snelle Invoer Toevoegen",
+        "calc_mode_radio": "Berekeningsmodus",
+        "caption_calc": "ℹ️ *Als je kiest voor 'Per 100g', vul dan de waarden per 100g in. Als je kiest voor 'Portie', vul dan de totale waarden voor een enkele portie in.*",
+        "register_activity": "🏃 Registreer Activiteit & Beweging",
+        "act_date": "📅 Datum",
+        "steps_title": "👣 Stappen (Totaal)",
+        "update_steps": "💾 Stappen Bijwerken",
+        "steps_updated": "Stappen bijgewerkt!",
+        "bike_title": "🚲 Fietsen (Sessie)",
+        "bike_min": "Fietsminuten",
+        "add_bike": "💾 Fietsen Toevoegen",
+        "other_act": "🏋️ Overig",
+        "activity_label": "Activiteit",
+        "add_act_btn": "💾 Toevoegen",
+        "tab1_title": "🍽️ Voeding & Maaltijden Invoeren",
+        "input_source_lbl": "Invoerbron",
+        "opt_off": "🔍 Online zoeken (Open Food Facts)",
+        "opt_quick": "🍳 Snelle Invoer",
+        "in_msg_low": lambda p: f"⚠️ Lage projectie ({p} kcal verwacht). Eet meer!",
+        "in_msg_high": lambda p: f"✅ Geweldige projectie ({p} kcal geschat aan het einde van de dag).",
+        "burn_msg_yes": lambda e: f"🌟 Goed gedaan! Je hebt extra activiteiten gedaan (+{e} kcal).",
+        "burn_msg_no": "💡 Geen extra activiteiten geregistreerd. Wat dacht je van wat beweging?",
+        "bilancio_ok": "🎯 Uitstekend, je zit in een perfect calorie-tekort.",
+        "bilancio_bad": "⚠️ Waarschuwing: je hebt een calorie-overschot.",
+        "weight_msg_default": "📈 Ga zo door om je doel te bereiken.",
+        "weight_msg_val": lambda i, d_ini, t, d_tgt: f"Start: {i} kg ({d_ini:+.1f}) | Doel: {t} kg ({d_tgt:+.1f})",
+        "status_move_title": "👣 Bewegingsstatus",
+        "status_very_active": "🌟 Geweldig! Zeer actieve dag.",
+        "status_good": "🚶 Goede activiteit, ga zo door.",
+        "status_lazy": "🛋️ Luie dag, probeer meer te bewegen."
+    }
+}
+
 with st.sidebar:
-    # 1. Definiamo le lingue disponibili
-    languages = ["Italiano", "English", "Nederlands"]
-    
-    # 2. Selezionatore lingua con callback per evitare il reset della pagina
-    current_lang = st.selectbox("🌐 Lingua", languages, key="lang_selector")
-    
-    # Dizionario delle traduzioni (uguale al tuo)
+    # 2. Ora possiamo richiamare in sicurezza il selettore della lingua
+    current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands"], key="lang_selector")
     t = translations[current_lang]
     
-    # 3. LOGICA DI NAVIGAZIONE
-    st.markdown(f"### 📍 {t['nav']}")
-    
-    # Definiamo le pagine in base alla lingua
+    # 3. Gestione dello stato della pagina con ID stabili per evitare schermate bianche
     pages_map = {
         t["t1"]: "t1",
         t["t2"]: "t2",
@@ -459,19 +705,18 @@ with st.sidebar:
         t["t5"]: "t5"
     }
     
-    # Manteniamo la pagina selezionata come "ID" (t1, t2...) invece che come testo
-    # Così quando cambi lingua, la pagina rimane la stessa (es: t1 rimane t1)
     if "current_page_id" not in st.session_state:
         st.session_state.current_page_id = "t1"
-        
+
+    st.markdown(f"### 📍 {t['nav']}")
+    
     for page_name, page_id in pages_map.items():
-        if st.button(page_name, key=f"nav_{page_id}", use_container_width=True, 
-                     type="primary" if st.session_state.current_page_id == page_id else "secondary"):
+        is_active = (st.session_state.current_page_id == page_id)
+        if st.button(page_name, key=f"nav_{page_id}", use_container_width=True, type="primary" if is_active else "secondary"):
             st.session_state.current_page_id = page_id
             st.rerun()
 
     selected_page_id = st.session_state.current_page_id
-    # Mappiamo l'ID corrente alla traduzione corretta per il resto dello script
     selected_page = t[selected_page_id]
 
     st.markdown("---")
@@ -480,7 +725,6 @@ with st.sidebar:
         controller.set("supabase_session", None, max_age=0)
         st.session_state.clear()
         st.rerun()
-
 # ==============================================================================
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
