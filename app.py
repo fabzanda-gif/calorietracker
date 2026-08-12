@@ -189,8 +189,8 @@ if user_target_weight is None or user_bmr is None:
 with st.sidebar:
     lang = st.selectbox("🌐 Lingua", ["Italiano", "English"])
     translations = {
-        "Italiano": {"t1": "🚀 Registrazione", "t2": "📊 Panoramica", "t3": "📈 Peso", "t4": "🍳 Inserimento Rapido", "meal": "Tipo di pasto", "meal_name": "Nome pasto", "add_meal": "Aggiungi pasto", "extra_act": "Attività extra", "extra_cals": "Calorie bruciate extra", "insert_weight": "Inserisci peso (kg)", "save_weight": "Salva peso", "recipe_name": "Nome Info", "save_recipe": "Salva Informazione", "recipe_saved": "✅  Informazione salvata!"},
-        "English": {"t1": "🚀 Logging", "t2": "📊 Overview", "t3": "📈 Weight", "t4": "🍳 Quick Entry", "meal": "Meal type", "meal_name": "Meal name", "add_meal": "Add meal", "extra_act": "Extra activity", "extra_cals": "Extra calories burned", "insert_weight": "Enter weight (kg)", "save_weight": "Save weight", "recipe_name": "Info name", "save_recipe": "Save Info", "recipe_saved": "✅ Info saved!"}
+        "Italiano": {"t1": "🚀 Registrazione", "t2": "📊 Panoramica Giornaliera", "t3": "📈 Peso", "t4": "🍳 Inserimento Rapido", "meal": "Tipo di pasto", "meal_name": "Nome pasto", "add_meal": "Aggiungi pasto", "extra_act": "Attività extra", "extra_cals": "Calorie bruciate extra", "insert_weight": "Inserisci peso (kg)", "save_weight": "Salva peso", "recipe_name": "Nome Info", "save_recipe": "Salva Informazione", "recipe_saved": "✅  Informazione salvata!"},
+        "English": {"t1": "🚀 Logging", "t2": "📊 Daily Overview", "t3": "📈 Weight Journey", "t4": "🍳 Quick Entry", "meal": "Meal type", "meal_name": "Meal name", "add_meal": "Add meal", "extra_act": "Extra activity", "extra_cals": "Extra calories burned", "insert_weight": "Enter weight (kg)", "save_weight": "Save weight", "recipe_name": "Info name", "save_recipe": "Save Info", "recipe_saved": "✅ Info saved!"}
     }
     t = translations[lang]
     selected_page = st.radio("📍 Navigazione", [t["t1"], t["t2"], t["t3"], t["t4"]])
@@ -208,7 +208,7 @@ if selected_page == t["t1"]:
 
     st.subheader("🍽️ Inserimento Cibo & Pasti")
 
-    input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Da Quick Entries"], horizontal=True)
+    input_source = st.radio("Fonte inserimento", ["🔍 Cerca online (Open Food Facts)", "🍳 Immissione Rapida"], horizontal=True)
     is_recipe = (input_source == "🍳 Da Ricette Salvate")
 
     for key, default in [("m_name", ""), ("m_cals", 0), ("m_prot", 0), ("m_carbs", 0), ("m_fat", 0), ("last_selected", ""), ("form_v", 0), ("last_source", input_source), ("grams_val", 100.0)]:
