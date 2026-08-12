@@ -1163,21 +1163,18 @@ elif selected_page == t["t3"]:
                         est_date_str = estimated_date.strftime('%d %B %Y')
                         
                         forecast_markdown = f"""
-                        <div style="background-color: #e6f4ea; border: 1px solid #ceead6; padding: 12px 16px; border-radius: 10px; margin-bottom: 15px; color: #137333; font-weight: 500;">
+                        <div style="background-color: #e6f4ea; border: 1px solid #ceead6; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #137333; font-weight: 500;">
                             {t['weight_forecast_title']}<br>
                             <span style="font-size: 14px; font-weight: 400;">{t['forecast_days'](days_to_goal, est_date_str)}</span>
                         </div>
                         """
                     else:
                         forecast_markdown = f"""
-                        <div style="background-color: #fcf2f4; border: 1px solid #f2d6dc; padding: 12px 16px; border-radius: 10px; margin-bottom: 15px; color: #a6323f; font-weight: 500;">
+                        <div style="background-color: #fcf2f4; border: 1px solid #f2d6dc; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #a6323f; font-weight: 500;">
                             {t['weight_forecast_title']}<br>
                             <span style="font-size: 14px; font-weight: 400;">{t['forecast_flat_up']}</span>
                         </div>
                         """
-                
-                if forecast_markdown:
-                    st.markdown(forecast_markdown, unsafe_allow_html=True)
 
                 df_full['date_str'] = df_full['date'].dt.strftime('%d %b %Y')
                 df_full['weight_str'] = df_full['weight'].round(1).astype(str) + " kg"
@@ -1205,7 +1202,7 @@ elif selected_page == t["t3"]:
                     name="Proiezione"
                 )
 
-                # 3. Linea di tendenza/proiezione diretta sul grafico
+                # 3. Linea di tendenza/proiezione (parte dall'ultimo punto reale e si estende verso il futuro)
                 if len(df) >= 3 and latest_weight > target_val and estimated_date and days_to_goal > 0:
                     last_real_date = df_real['date'].iloc[-1]
                     last_real_weight = df_real['weight'].iloc[-1]
@@ -1251,6 +1248,10 @@ elif selected_page == t["t3"]:
                     hovermode='x unified'
                 )
                 st.plotly_chart(fig, use_container_width=True)
+                
+                # Banner informativo spostato in basso
+                if forecast_markdown:
+                    st.markdown(forecast_markdown, unsafe_allow_html=True)
             else:
                 st.info("📊 Nessun dato di peso registrato ancora. Inizia registrando il tuo peso!")
         except Exception as e:
