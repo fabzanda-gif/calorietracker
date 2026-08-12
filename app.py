@@ -884,7 +884,7 @@ elif selected_page == t["t3"]:
 # 12. PAGE 4: QUICK ENTRIES
 # ==============================================================================
 elif selected_page == t["t4"]:
-    st.subheader("⚡ Quick Entries")
+    st.subheader("⚡ Immissioni Rapide")
 
     with st.container(border=True):
         st.markdown("### 📋 Entries salvate")
@@ -897,23 +897,23 @@ elif selected_page == t["t4"]:
             })
             st.dataframe(df_display[["Nome", "Kcal", "Pro", "Carbs", "Fat"]], use_container_width=True, hide_index=True)
             
-            st.markdown("### 🗑️ Elimina Quick Entry")
+            st.markdown("### 🗑️ Elimina Immissione Rapida")
             entry_options_del = {e['name']: e['name'] for e in entries}
-            sel_entry_del = st.selectbox("Seleziona Quick Entry da rimuovere", [""] + list(entry_options_del.keys()))
+            sel_entry_del = st.selectbox("Seleziona Immissione Rapida da rimuovere", [""] + list(entry_options_del.keys()))
             if sel_entry_del:
-                if st.button("Elimina Quick Entry"):
+                if st.button("Elimina Immissione Rapida"):
                     try:
                         supabase.table("recipes").delete().eq("user_id", user_id).eq("name", sel_entry_del).execute()
-                        st.success(f"Quick Entry '{sel_entry_del}' eliminata!")
+                        st.success(f"Immissione Rapida '{sel_entry_del}' eliminata!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Errore durante l'eliminazione: {e}")
         else:
-            st.info("Nessuna entry veloce presente.")
+            st.info("Nessuna immissione rapida presente.")
 
     with st.container(border=True):
         with st.form("quick_entry_add"):
-            st.markdown("### ➕ Aggiungi Nuova Quick Entry")
+            st.markdown("### ➕ Aggiungi Nuova Immissione Rapida")
             r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro")
             c1, c2, c3, c4 = st.columns(4)
             cals = c1.number_input("Kcal", value=0, min_value=0, step=1, key="r_cal")
