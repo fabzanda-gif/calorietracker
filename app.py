@@ -32,24 +32,34 @@ st.markdown("""
         [data-testid="stSidebar"] { background-color: #1A2942; }
         [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label { color: #FFFFFF !important; }
 
-        /* PULSANTI SIDEBAR - ORA LEGGIBILI */
+        /* PULSANTI SIDEBAR INATTIVI (Bianco con testo Blu Navy ben visibile) */
         [data-testid="stSidebar"] .stButton>button {
             border-radius: 12px;
             font-weight: 600;
-            background-color: #FFFFFF; /* Bianco */
-            color: #1A2942 !important;  /* Testo Blu Navy */
+            background-color: #FFFFFF !important; 
+            color: #1A2942 !important;  /* Testo scuro */
             border: 2px solid #FFFFFF;
             padding: 10px 20px;
             width: 100%;
             transition: all 0.2s ease;
         }
         
-        /* Hover e Active - Rosa Corallo */
+        /* Assicura che anche gli elementi interni al bottone ereditino il testo scuro */
+        [data-testid="stSidebar"] .stButton>button * {
+            color: #1A2942 !important;
+        }
+
+        /* PULSANTE ATTIVO / HOVER (Rosa Corallo con testo scuro) */
+        [data-testid="stSidebar"] .stButton>button[kind="primary"],
         [data-testid="stSidebar"] .stButton>button:hover, 
-        [data-testid="stSidebar"] .stButton>button:active,
         [data-testid="stSidebar"] .stButton>button:focus {
-            background-color: #FF8B8B; /* Rosa Corallo */
-            border-color: #FF8B8B;
+            background-color: #FF8B8B !important; /* Rosa Corallo */
+            border-color: #FF8B8B !important;
+            color: #1A2942 !important;
+        }
+        
+        [data-testid="stSidebar"] .stButton>button[kind="primary"] *,
+        [data-testid="stSidebar"] .stButton>button:hover * {
             color: #1A2942 !important;
         }
 
