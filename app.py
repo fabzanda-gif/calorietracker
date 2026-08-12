@@ -528,6 +528,9 @@ translations = {
         "status_very_active": "🌟 Ottimo! Giornata molto attiva.",
         "status_good": "🚶 Buona attività, continua così.",
         "status_lazy": "🛋️ Giornata pigra, prova a muoverti di più."
+        "in_msg_deficit": lambda target_in, diff: f"🎯 Per un deficit ideale di 500 kcal, puoi assumere ancora circa {target_in} kcal (mancano {diff:+d} kcal).",
+        "balance_days": lambda d: f"⏳ Al ritmo attuale, stimati circa {d} giorni per raggiungere il target.",
+        "balance_surplus": "⚠️ In surplus: impossibile stimare i giorni al target.",
     },
     "English": {
         "t1": "🚀 Logging", 
@@ -617,6 +620,9 @@ translations = {
         "status_very_active": "🌟 Great! Very active day.",
         "status_good": "🚶 Good activity, keep it up.",
         "status_lazy": "🛋️ Lazy day, try to move more."
+        "in_msg_deficit": lambda target_in, diff: f"🎯 For an ideal 500 kcal deficit, you can still eat about {target_in} kcal ({diff:+d} kcal).",
+        "balance_days": lambda d: f"⏳ At the current pace, about {d} days estimated to reach target.",
+        "balance_surplus": "⚠️ In surplus: cannot estimate days to target.",
     },
     "Nederlands": {
         "t1": "🚀 Invoer", 
@@ -706,6 +712,9 @@ translations = {
         "status_very_active": "🌟 Geweldig! Zeer actieve dag.",
         "status_good": "🚶 Goede activiteit, ga zo door.",
         "status_lazy": "🛋️ Luie dag, probeer meer te bewegen."
+        "in_msg_deficit": lambda target_in, diff: f"🎯 Voor een ideaal tekort van 500 kcal kun je nog ongeveer {target_in} kcal eten ({diff:+d} kcal).",
+        "balance_days": lambda d: f"⏳ In dit tempo duurt het ongeveer {d} dagen om het doel te bereiken.",
+        "balance_surplus": "⚠️ In overschot: kan dagen tot doel niet schatten.",
     }
 }
 with st.sidebar:
@@ -926,12 +935,14 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    if projected_cals_in < 1500:
-        in_bg, in_border = "#fcf2f4", "#f2d6dc"
-        in_msg = t["in_msg_low"](projected_cals_in)
-    else:
-        in_bg, in_border = "#e6f4ea", "#ceead6"
-        in_msg = t["in_msg_high"](projected_cals_in)
+    # Calcolo spesa energetica totale stimata a fine giornata (BMR giornaliero + extra)
+    total_estimated_burned = user_bmr + extra_burned
+    # Target ideale con 500 kcal di deficit a fine giornata
+    ideal_target_cals = max(0, total_estimated_burned - 500)
+    diff_from_ideal = ideal_target_cals - total_cals_in
+
+    in_bg, in_border = "#e6f4ea", "#ceead6"
+    in_msg = t["in_msg_deficit"](ideal_target_cals, diff_from_ideal)
 
     if extra_burned > 0:
         burn_bg, burn_border = "#e6f4ea", "#ceead6"
@@ -940,12 +951,21 @@ elif selected_page == t["t2"]:
         burn_bg, burn_border = "#fcf2f4", "#f2d6dc"
         burn_msg = t["burn_msg_no"]
 
-    if deficit <= 0:
+    # Calcolo giorni stimati al target (7700 kcal = 1 kg)
+    weight_to_lose = (current_weight if current_weight else initial_weight) - target_weight
+    if deficit < 0 and weight_to_lose > 0:
+        # deficit è negativo quando bruci più di quanto mangi (es. -500 kcal)
+        daily_deficit_abs = abs(deficit)
+        total_kcal_needed = weight_to_lose * 7700
+        estimated_days = int(total_kcal_needed / daily_deficit_abs) if daily_deficit_abs > 0 else 0
         bilancio_bg, bilancio_border = "#e6f4ea", "#ceead6"
-        bilancio_msg = t["bilancio_ok"]
+        bilancio_msg = t["balance_days"](estimated_days)
+    elif weight_to_lose <= 0:
+        bilancio_bg, bilancio_border = "#e6f4ea", "#ceead6"
+        bilancio_msg = "🎯 Target di peso raggiunto o superato!"
     else:
         bilancio_bg, bilancio_border = "#fcf2f4", "#f2d6dc"
-        bilancio_msg = t["bilancio_bad"]
+        bilancio_msg = t["balance_surplus"]
 
     weight_bg, weight_border = "#fcf2f4", "#f2d6dc"
     weight_msg = t["weight_msg_default"]
@@ -964,7 +984,6 @@ elif selected_page == t["t2"]:
         diff_tgt = current_weight - target_weight
         weight_msg = t["weight_msg_val"](initial_weight, diff_ini, target_weight, diff_tgt)
 
-    # Styling basato su classi CSS e variabili root (indipendente dalla lingua)
     st.markdown("""
         <style>
             .metric-card-in { background-color: var(--bg-in) !important; border: 1px solid var(--border-in) !important; padding: 15px !important; border-radius: 14px !important; }
