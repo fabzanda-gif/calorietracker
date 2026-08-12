@@ -1079,7 +1079,7 @@ elif selected_page == t["t5"]:
     # 3. Griglia di inserimento
     col_a1, col_a2, col_a3 = st.columns(3)
     
-    # Inserimento Passi (Controllo manuale aggiornato)
+    # Inserimento Passi
     with col_a1:
         with st.container(border=True):
             st.markdown("### 👣 Passi (Totali)")
@@ -1102,12 +1102,15 @@ elif selected_page == t["t5"]:
                         supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Passi (Stima)", "burned_calories": estim_cals}).execute()
                     
                     refresh_daily_logs(act_date)
-                    st.success(f"Passi aggiornati! ({estim_cals} kcal totali stimate)")
+                    
+                    # Messaggio di conferma esplicito
+                    st.toast(f"✅ Passi aggiornati con successo! ({estim_cals} kcal stimate)", icon="👣")
+                    st.success(f"✅ Passi aggiornati! ({estim_cals} kcal totali stimate)")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore nel salvataggio dei passi: {e}")
 
-    # Inserimento Minuti Bici (Logica Additiva)
+    # Inserimento Minuti Bici
     with col_a2:
         with st.container(border=True):
             st.markdown("### 🚲 Bici (Sessione)")
@@ -1117,10 +1120,15 @@ elif selected_page == t["t5"]:
                     estim_cals = int(bike_min * 8)
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Bici", "burned_calories": estim_cals}).execute()
                     refresh_daily_logs(act_date)
-                    st.success(f"Aggiunte {bike_min} min di bici ({estim_cals} kcal)!")
+                    
+                    # Messaggio di conferma esplicito
+                    st.toast(f"✅ Aggiunti {bike_min} min di bici! ({estim_cals} kcal)", icon="🚲")
+                    st.success(f"✅ Aggiunte {bike_min} min di bici ({estim_cals} kcal)!")
                     st.rerun()
+                else:
+                    st.warning("Inserisci almeno 1 minuto di bici.")
 
-    # Altre Attività (Logica Additiva)
+    # Altre Attività
     with col_a3:
         with st.container(border=True):
             st.markdown("### 🏋️ Altro")
@@ -1130,4 +1138,8 @@ elif selected_page == t["t5"]:
                 if st.form_submit_button("💾 Aggiungi", use_container_width=True):
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
                     refresh_daily_logs(act_date)
+                    
+                    # Messaggio di conferma esplicito
+                    st.toast(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)", icon="🎯")
+                    st.success(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)")
                     st.rerun()
