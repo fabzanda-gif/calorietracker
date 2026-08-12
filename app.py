@@ -362,31 +362,44 @@ if selected_page == t["t1"]:
 
 elif selected_page == t["t2"]:
     st.subheader("📊 Riepilogo Giornaliero")
+    
+    # Logica per forzare la data di oggi all'apertura della tab
+    if "last_nav_page" not in st.session_state or st.session_state.last_nav_page != selected_page:
+        st.session_state.overview_date = date.today()
+        st.session_state.last_nav_page = selected_page
 
-    summary_date = st.date_input("Data riepilogo", value=date.today())
+    def update_overview_date():
+        st.session_state.overview_date = st.session_state.widget_overview_date
 
+    summary_date = st.date_input(
+        "Data riepilogo", 
+        value=st.session_state.overview_date, 
+        key="widget_overview_date",
+        on_change=update_overview_date
+    )
+    
     daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
     meals_data = supabase.table("meals").select("meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
-
+    
     raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
     activities_data = [a for a in raw_activities if a.get("activity_name") not in ["Ufficio", "Base"]] if raw_activities else []
-
+    
     total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
     current_weight = None
     if daily_log_res:
         row = daily_log_res[0]
         current_weight = row.get('weight')
-
+        
     now = datetime.now()
-
+    
     if summary_date == date.today():
         bmr_so_far = int((user_bmr / 24.0) * (now.hour + now.minute / 60.0))
     else:
         bmr_so_far = user_bmr
-
+        
     extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
     total_burned_finora = bmr_so_far + extra_burned
-
+    
     deficit = total_burned_finora - total_cals_in
 
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
@@ -394,9 +407,9 @@ elif selected_page == t["t2"]:
     col_c2.metric("Kcal Bruciate", f"{total_burned_finora} kcal")
     col_c3.metric("Bilancio / Deficit", f"{deficit:+d} kcal")
     col_c4.metric("Peso", f"{current_weight} kg" if current_weight else "N/D")
-
+        
     st.markdown("---")
-
+    
     st.markdown("### 🍽️ Cibi inseriti")
     if meals_data:
         df_meals = pd.DataFrame(meals_data)
@@ -411,9 +424,9 @@ elif selected_page == t["t2"]:
         st.dataframe(df_meals, use_container_width=True, hide_index=True)
     else:
         st.info("Nessun pasto registrato per questa data.")
-
+        
     st.markdown("---")
-
+    
     st.markdown("### 🏃 Calorie Bruciate & Attività")
     rows_acts = [{"Attività": "BMR (Base)", "Kcal Bruciate": bmr_so_far}]
     if activities_data:
@@ -422,7 +435,7 @@ elif selected_page == t["t2"]:
                 "Attività": act.get("activity_name"),
                 "Kcal Bruciate": act.get("burned_calories")
             })
-
+            
     df_acts = pd.DataFrame(rows_acts)
     st.dataframe(df_acts, use_container_width=True, hide_index=True)
 
