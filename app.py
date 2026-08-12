@@ -947,59 +947,56 @@ elif selected_page == t["t2"]:
         diff_tgt = current_weight - target_weight
         weight_msg = t["weight_msg_val"](initial_weight, diff_ini, target_weight, diff_tgt)
 
+    # Styling basato su classi CSS e variabili root (indipendente dalla lingua)
+    st.markdown("""
+        <style>
+            .metric-card-in { background-color: var(--bg-in) !important; border: 1px solid var(--border-in) !important; padding: 15px !important; border-radius: 14px !important; }
+            .metric-card-burn { background-color: var(--bg-burn) !important; border: 1px solid var(--border-burn) !important; padding: 15px !important; border-radius: 14px !important; }
+            .metric-card-balance { background-color: var(--bg-bal) !important; border: 1px solid var(--border-bal) !important; padding: 15px !important; border-radius: 14px !important; }
+            .metric-card-weight { background-color: var(--bg-weight) !important; border: 1px solid var(--border-weight) !important; padding: 15px !important; border-radius: 14px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+        <style>
+            :root {{
+                --bg-in: {in_bg}; --border-in: {in_border};
+                --bg-burn: {burn_bg}; --border-burn: {burn_border};
+                --bg-bal: {bilancio_bg}; --border-bal: {bilancio_border};
+                --bg-weight: {weight_bg}; --border-weight: {weight_border};
+            }}
+        </style>
+    """, unsafe_allow_html=True)
+
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     
     with col_c1:
-        st.markdown(f"""
-            <style>
-                div[data-testid="stMetric"]:has(div:contains("Kcal Ingerite")) {{
-                    background-color: {in_bg} !important;
-                    border: 1px solid {in_border} !important;
-                }}
-            </style>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="metric-card-in">', unsafe_allow_html=True)
         with st.container(border=True):
-            st.metric("🍽️ Kcal Ingerite", f"{total_cals_in} kcal")
+            st.metric(f"🍽️ {t['card_kcal_in']}", f"{total_cals_in} kcal")
             st.caption(in_msg)
+        st.markdown('</div>', unsafe_allow_html=True)
             
     with col_c2:
-        st.markdown(f"""
-            <style>
-                div[data-testid="stMetric"]:has(div:contains("Kcal Bruciate")) {{
-                    background-color: {burn_bg} !important;
-                    border: 1px solid {burn_border} !important;
-                }}
-            </style>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="metric-card-burn">', unsafe_allow_html=True)
         with st.container(border=True):
-            st.metric("🔥 Kcal Bruciate", f"{total_burned_finora} kcal")
+            st.metric(f"🔥 {t['card_kcal_burn']}", f"{total_burned_finora} kcal")
             st.caption(burn_msg)
+        st.markdown('</div>', unsafe_allow_html=True)
             
     with col_c3:
-        st.markdown(f"""
-            <style>
-                div[data-testid="stMetric"]:has(div:contains("Bilancio")) {{
-                    background-color: {bilancio_bg} !important;
-                    border: 1px solid {bilancio_border} !important;
-                }}
-            </style>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="metric-card-balance">', unsafe_allow_html=True)
         with st.container(border=True):
-            st.metric("⚖️ Bilancio", f"{deficit:+d} kcal", delta_color="inverse")
+            st.metric(f"⚖️ {t['card_balance']}", f"{deficit:+d} kcal", delta_color="inverse")
             st.caption(bilancio_msg)
+        st.markdown('</div>', unsafe_allow_html=True)
             
     with col_c4:
-        st.markdown(f"""
-            <style>
-                div[data-testid="stMetric"]:has(div:contains("Peso")) {{
-                    background-color: {weight_bg} !important;
-                    border: 1px solid {weight_border} !important;
-                }}
-            </style>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="metric-card-weight">', unsafe_allow_html=True)
         with st.container(border=True):
-            st.metric("📉 Peso", f"{current_weight} kg" if current_weight else "N/D")
+            st.metric(f"📉 {t['card_weight']}", f"{current_weight} kg" if current_weight else "N/D")
             st.caption(weight_msg)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with st.container(border=True):
         st.markdown(f"### {t['logged_foods']}")
