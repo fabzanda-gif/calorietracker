@@ -60,8 +60,9 @@ st.markdown("""
             border-radius: 14px !important;
         }
 
-        /* 1. BOTTONI DELLA SIDEBAR (Stato normale) */
-        [data-testid="stSidebar"] div.stButton > button {
+        /* 1. BOTTONI DELLA SIDEBAR (Tutti uniformi, inclusi attivi e inattivi) */
+        [data-testid="stSidebar"] div.stButton > button,
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"] {
             border-radius: 10px !important;
             font-weight: 500 !important;
             background-color: #161b22 !important;
@@ -71,26 +72,21 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        [data-testid="stSidebar"] div.stButton > button:hover {
+        [data-testid="stSidebar"] div.stButton > button:hover,
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
             background-color: #21262d !important;
             border-color: #e06c75 !important;
             color: #ffffff !important;
         }
-
-        /* 2. BOTTONE ATTIVO (PRIMARY) DELLA SIDEBAR - Testo nero ben visibile */
-        [data-testid="stSidebar"] div.stButton > button[kind="primary"],
-        [data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
-            background-color: #fcf2f4 !important;
-            border: 1px solid #e06c75 !important;
-            color: #000000 !important;
-        }
         
-        [data-testid="stSidebar"] div.stButton > button[kind="primary"] p,
-        [data-testid="stSidebar"] div.stButton > button[kind="primary"] span {
-            color: #000000 !important;
+        /* Forza il testo interno della sidebar a rimanere bianco/chiaro uniformemente */
+        [data-testid="stSidebar"] div.stButton > button *,
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"] * {
+            color: #f0f6fc !important;
+            -webkit-text-fill-color: #f0f6fc !important;
         }
 
-        /* 3. BOTTONI NEL CORPO CENTRALE (Bordo corallo forzato su qualsiasi bottone secondario) */
+        /* 2. BOTTONI FUORI DALLA SIDEBAR (Inattivi: bordo corallo) */
         .main div.stButton > button:not([kind="primary"]), 
         .main div.stFormSubmitButton > button {
             border-radius: 10px !important;
@@ -102,12 +98,15 @@ st.markdown("""
             transition: all 0.2s ease !important;
         }
         
-        /* Effetto Hover rosso tenue per i bottoni centrali */
+        /* 3. BOTTONI FUORI DALLA SIDEBAR (Attivi / Hover: Sfondo corallo pieno e testo nero) */
         .main div.stButton > button:not([kind="primary"]):hover, 
-        .main div.stFormSubmitButton > button:hover {
-            background-color: #fcf2f4 !important;
+        .main div.stFormSubmitButton > button:hover,
+        .main div.stButton > button:not([kind="primary"]):hover *,
+        .main div.stFormSubmitButton > button:hover * {
+            background-color: #e06c75 !important;
             border-color: #a6323f !important;
-            color: #a6323f !important;
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
         }
 
         hr {
