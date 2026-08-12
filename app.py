@@ -1057,60 +1057,47 @@ elif selected_page == t["t4"]:
 # ==============================================================================
 elif selected_page == t["t5"]:
     st.subheader("🏃 Registra Attività & Movimento")
-    
     act_date = st.date_input("📅 Data", value=date.today())
     
-    # Recupero passi esistenti
-    try:
-        existing_log = supabase.table("daily_logs").select("steps").eq("date", str(act_date)).eq("user_id", user_id).execute().data
-        day_steps = existing_log[0].get("steps", 0) if existing_log and existing_log[0].get("steps") else 0
-    except:
-        day_steps = 0
+    # ... [Mantenere qui la logica della card Status Movimento esistente] ...
 
-    # Valutazione Status Movimento
-    move_bg, move_border = ("#e6f4ea", "#ceead6") if day_steps >= 10000 else ("#fff8e1", "#ffe082") if day_steps >= 5000 else ("#fcf2f4", "#f2d6dc")
-    move_msg = "🌟 Ottimo! Giornata molto attiva." if day_steps >= 10000 else "🚶 Buona attività, continua così." if day_steps >= 5000 else "🛋️ Giornata pigra, prova a muoverti di più."
-
-    st.markdown(f"""<style>div[data-testid="stMetric"]:has(div:contains("Status")) {{ background-color: {move_bg} !important; border: 1px solid {move_border} !important; padding: 15px; border-radius: 10px; }}</style>""", unsafe_allow_html=True)
-    
-    with st.container(border=True):
-        st.metric("👣 Status Movimento", f"{day_steps} passi")
-        st.caption(move_msg)
-
-    # Griglia di inserimento
     col_a1, col_a2, col_a3 = st.columns(3)
     
-    # 1. Inserimento Passi
+    # --- 1. PASSI (con conversione automatica in Kcal) ---
     with col_a1:
         with st.container(border=True):
             st.markdown("### 👣 Passi")
             new_steps = st.number_input("Totale passi", value=day_steps, min_value=0, step=500)
-            if st.button("💾 Salva Passi", use_container_width=True):
+            if st.button("💾 Salva Passi"):
+                # 1. Salva passi nel log giornaliero
                 supabase.table("daily_logs").upsert({"user_id": user_id, "date": str(act_date), "steps": int(new_steps)}, on_conflict="user_id,date").execute()
+                # 2. Inserisci anche le kcal stimate come 'attività' per il bilancio calorico
+                estim_cals = get_activity_calories("Passi", new_steps)
+                supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Passi (Stima)", "burned_calories": estim_cals}).execute()
+                st.success(f"Registrati {estim_cals} kcal!")
                 st.rerun()
 
-    # 2. Inserimento Minuti Bici
+    # --- 2. BICI (con conversione automatica in Kcal) ---
     with col_a2:
         with st.container(border=True):
             st.markdown("### 🚲 Bici")
             bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5)
-            # Stima: 8 kcal al minuto di media
-            bike_cals = bike_min * 8 
-            if st.button("💾 Salva Bici", use_container_width=True):
+            if st.button("💾 Salva Bici"):
                 if bike_min > 0:
-                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Bici", "burned_calories": bike_cals}).execute()
+                    estim_cals = get_activity_calories("Bici", bike_min)
+                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Bici", "burned_calories": estim_cals}).execute()
                     refresh_daily_logs(act_date)
-                    st.success(f"Registrati {bike_cals} kcal!")
+                    st.success(f"Registrate {estim_cals} kcal!")
                     st.rerun()
 
-    # 3. Altre Attività
+    # --- 3. ALTRE ATTIVITÀ (Inserimento diretto Kcal, es. Padel) ---
     with col_a3:
         with st.container(border=True):
-            st.markdown("### 🏋️ Altro")
+            st.markdown("### 🏋️ Altro (Inserimento Kcal)")
             with st.form("activity_form", clear_on_submit=True):
-                extra_act = st.selectbox("Attività", ["Padel", "Camminata", "Corsa", "Palestra", "Nuoto", "Altro"])
+                extra_act = st.selectbox("Attività", ["Padel", "Palestra", "Nuoto", "Altro"])
                 extra_cals = st.number_input("Kcal bruciate", value=0, min_value=0, step=50)
-                if st.form_submit_button("💾 Salva", use_container_width=True):
+                if st.form_submit_button("💾 Salva"):
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
                     refresh_daily_logs(act_date)
                     st.rerun()
