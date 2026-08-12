@@ -42,7 +42,7 @@ st.markdown("""
             z-index: 999999;
         }
 
-        /* Sidebar con contrasto e testi ben visibili in grigio chiarissimo */
+        /* Sidebar con contrasto e testi ben visibili */
         [data-testid="stSidebar"] {
             background-color: #0d1117;
             border-right: 1px solid #30363d;
@@ -53,29 +53,36 @@ st.markdown("""
             color: #f0f6fc !important;
         }
 
-        /* TRASFORMAZIONE DEI RADIO BUTTON DELLA NAVIGAZIONE IN BOTTONI ARROTONDATI */
-        [data-testid="stSidebar"] div.row-widget.stRadio > div {
-            gap: 8px;
+        /* TRASFORMAZIONE TOTALE DEI RADIO BUTTON IN BOTTONI RETTANGOLARI */
+        [data-testid="stSidebar"] .stRadio > div {
+            gap: 10px;
         }
 
-        [data-testid="stSidebar"] div.row-widget.stRadio label {
+        [data-testid="stSidebar"] .stRadio label {
             background-color: #161b22;
             border: 1px solid #30363d;
             border-radius: 10px;
-            padding: 10px 15px;
+            padding: 12px 16px;
             width: 100%;
-            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
             cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        [data-testid="stSidebar"] div.row-widget.stRadio label:hover {
+        [data-testid="stSidebar"] .stRadio label:hover {
             background-color: #21262d;
             border-color: #58a6ff;
         }
 
-        /* Nascondi i pallini originali dei radio button per un look pulito */
-        [data-testid="stSidebar"] div.row-widget.stRadio input[type="radio"] {
-            display: none;
+        /* Nasconde completamente i cerchietti/pallini nativi dei radio button */
+        [data-testid="stSidebar"] .stRadio input[type="radio"] {
+            display: none !important;
+        }
+
+        /* Nasconde il contenitore del pallino per evitare spazi vuoti */
+        [data-testid="stSidebar"] .stRadio div[data-testid="stMarkdownContainer"] {
+            margin-left: 0px !important;
         }
 
         /* Pulsanti standard e Logout */
