@@ -932,27 +932,18 @@ elif selected_page == t["t2"]:
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
     
-    # --- CORREZIONE: PROIEZIONE E TARGET BASATI SUL DISPENDIO TOTALE GIORNALIERO ---
-    # Dispendio totale stimato a fine giornata (BMR intero + attività extra logdate)
+    # --- CALCOLO TARGET E DEFICIT (BMR + EXTRA - 500) ---
     total_estimated_burned = user_bmr + extra_burned
-    # --- CALCOLO CORRETTO CON BMR + ATTIVITÀ BRUCIATE ---
-    # Dispendio totale stimato (BMR intero + calorie extra bruciate)
-    total_estimated_burned = user_bmr + extra_burned
-    
-    # Target calorico ideale: (BMR + attività) - 500 kcal di deficit
     ideal_target_cals = max(0, total_estimated_burned - 500)
-    
-    # Differenza rispetto al target ideale
     diff_from_ideal = ideal_target_cals - total_cals_in
 
-    in_bg, in_border = "#FFFFFF", "#FF8B8B"
+    # Sfondo corallo leggerissimo (#FFF5F5) con bordo corallo (#FF8B8B)
+    coral_light_bg, coral_border = "#FFF5F5", "#FF8B8B"
     in_msg = t["in_msg_deficit"](ideal_target_cals, diff_from_ideal)
 
     if extra_burned > 0:
-        burn_bg, burn_border = "#FFFFFF", "#FF8B8B"
         burn_msg = t["burn_msg_yes"](extra_burned)
     else:
-        burn_bg, burn_border = "#FFFFFF", "#FF8B8B"
         burn_msg = t["burn_msg_no"]
 
     weight_to_lose = (current_weight if current_weight else initial_weight) - target_weight
@@ -960,38 +951,45 @@ elif selected_page == t["t2"]:
         daily_deficit_abs = abs(deficit)
         total_kcal_needed = weight_to_lose * 7700
         estimated_days = int(total_kcal_needed / daily_deficit_abs) if daily_deficit_abs > 0 else 0
-        bilancio_bg, bilancio_border = "#FFFFFF", "#FF8B8B"
         bilancio_msg = t["balance_days"](estimated_days)
     elif weight_to_lose <= 0:
-        bilancio_bg, bilancio_border = "#FFFFFF", "#FF8B8B"
         bilancio_msg = "🎯 Target di peso raggiunto o superato!"
     else:
-        bilancio_bg, bilancio_border = "#FFFFFF", "#FF8B8B"
         bilancio_msg = t["balance_surplus"]
 
-    weight_bg, weight_border = "#FFFFFF", "#FF8B8B"
     weight_msg = t["weight_msg_default"]
     if current_weight:
         diff_ini = current_weight - initial_weight
         diff_tgt = current_weight - target_weight
         weight_msg = t["weight_msg_val"](initial_weight, diff_ini, target_weight, diff_tgt)
 
-    st.markdown("""
-        <style>
-            .metric-card-in { background-color: var(--bg-in) ; border: 1px solid var(--border-in) ; padding: 15px ; border-radius: 14px ; }
-            .metric-card-burn { background-color: var(--bg-burn) ; border: 1px solid var(--border-burn) ; padding: 15px ; border-radius: 14px ; }
-            .metric-card-balance { background-color: var(--bg-bal) ; border: 1px solid var(--border-bal) ; padding: 15px ; border-radius: 14px ; }
-            .metric-card-weight { background-color: var(--bg-weight) ; border: 1px solid var(--border-weight) ; padding: 15px ; border-radius: 14px ; }
-        </style>
-    """, unsafe_allow_html=True)
-
+    # CSS per i widget con sfondo corallo soft ed eliminazione bordi doppi
     st.markdown(f"""
         <style>
-            :root {{
-                --bg-in: {in_bg}; --border-in: {in_border};
-                --bg-burn: {burn_bg}; --border-burn: {burn_border};
-                --bg-bal: {bilancio_bg}; --border-bal: {bilancio_border};
-                --bg-weight: {weight_bg}; --border-weight: {weight_border};
+            .custom-card {{
+                background-color: {coral_light_bg};
+                border: 1.5px solid {coral_border};
+                border-radius: 16px;
+                padding: 16px;
+                height: 100%;
+                box-shadow: 0 2px 6px rgba(255, 139, 139, 0.08);
+            }}
+            .custom-card-title {{
+                font-size: 0.95rem;
+                font-weight: 600;
+                color: #1A2942;
+                margin-bottom: 4px;
+            }}
+            .custom-card-value {{
+                font-size: 1.8rem;
+                font-weight: 700;
+                color: #1A2942;
+                margin-bottom: 8px;
+            }}
+            .custom-card-caption {{
+                font-size: 0.82rem;
+                color: #555555;
+                line-height: 1.35;
             }}
         </style>
     """, unsafe_allow_html=True)
@@ -999,33 +997,44 @@ elif selected_page == t["t2"]:
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     
     with col_c1:
-        st.markdown('<div class="metric-card-in">', unsafe_allow_html=True)
-        with st.container(border=True):
-            st.metric(f"🍽️ {t['card_kcal_in']}", f"{total_cals_in} kcal")
-            st.caption(in_msg)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="custom-card-title">🍽️ {t['card_kcal_in']}</div>
+                <div class="custom-card-value">{total_cals_in} kcal</div>
+                <div class="custom-card-caption">{in_msg}</div>
+            </div>
+        """, unsafe_allow_html=True)
             
     with col_c2:
-        st.markdown('<div class="metric-card-burn">', unsafe_allow_html=True)
-        with st.container(border=True):
-            st.metric(f"🔥 {t['card_kcal_burn']}", f"{total_burned_finora} kcal")
-            st.caption(burn_msg)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="custom-card-title">🔥 {t['card_kcal_burn']}</div>
+                <div class="custom-card-value">{total_burned_finora} kcal</div>
+                <div class="custom-card-caption">{burn_msg}</div>
+            </div>
+        """, unsafe_allow_html=True)
             
     with col_c3:
-        st.markdown('<div class="metric-card-balance">', unsafe_allow_html=True)
-        with st.container(border=True):
-            st.metric(f"⚖️ {t['card_balance']}", f"{deficit:+d} kcal", delta_color="inverse")
-            st.caption(bilancio_msg)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="custom-card-title">⚖️ {t['card_balance']}</div>
+                <div class="custom-card-value">{deficit:+d} kcal</div>
+                <div class="custom-card-caption">{bilancio_msg}</div>
+            </div>
+        """, unsafe_allow_html=True)
             
     with col_c4:
-        st.markdown('<div class="metric-card-weight">', unsafe_allow_html=True)
-        with st.container(border=True):
-            st.metric(f"📉 {t['card_weight']}", f"{current_weight} kg" if current_weight else "N/D")
-            st.caption(weight_msg)
-        st.markdown('</div>', unsafe_allow_html=True)
+        weight_str = f"{current_weight} kg" if current_weight else "N/D"
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="custom-card-title">📉 {t['card_weight']}</div>
+                <div class="custom-card-value">{weight_str}</div>
+                <div class="custom-card-caption">{weight_msg}</div>
+            </div>
+        """, unsafe_allow_html=True)
     
+    st.markdown("<br>", unsafe_allow_html=True)
+
     with st.container(border=True):
         st.markdown(f"### {t['logged_foods']}")
         if meals_data:
