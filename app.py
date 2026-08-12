@@ -439,8 +439,40 @@ if profile_incomplete:
 with st.sidebar:
     lang = st.selectbox("🌐 Lingua", ["Italiano", "English"])
     translations = {
-        "Italiano": {"t1": "🚀 Inserimento", "t2": "📊 Panoramica", "t3": "📈 Peso", "t4": "⚡ Immissione Rapida", "meal": "Tipo di pasto", "meal_name": "Nome pasto", "add_meal": "Aggiungi pasto", "extra_act": "Attività extra", "extra_cals": "Calorie bruciate extra", "insert_weight": "Inserisci peso (kg)", "save_weight": "Salva peso", "recipe_name": "Nome ricetta", "save_recipe": "Salva ricetta", "recipe_saved": "✅ Ricetta salvata!"},
-        "English": {"t1": "🚀 Logging", "t2": "📊 Overview", "t3": "📈 Weight", "t4": "⚡ Quick Entries", "meal": "Meal type", "meal_name": "Meal name", "add_meal": "Add meal", "extra_act": "Extra activity", "extra_cals": "Extra calories burned", "insert_weight": "Enter weight (kg)", "save_weight": "Save weight", "recipe_name": "Recipe name", "save_recipe": "Save recipe", "recipe_saved": "✅ Recipe saved!"}
+        "Italiano": {
+            "t1": "🚀 Inserimento", 
+            "t2": "📊 Panoramica", 
+            "t3": "📈 Peso", 
+            "t4": "⚡ Immissione Rapida", 
+            "t5": "🏃 Attività",  # Nuova voce
+            "meal": "Tipo di pasto", 
+            "meal_name": "Nome pasto", 
+            "add_meal": "Aggiungi pasto", 
+            "extra_act": "Attività extra", 
+            "extra_cals": "Calorie bruciate extra", 
+            "insert_weight": "Inserisci peso (kg)", 
+            "save_weight": "Salva peso", 
+            "recipe_name": "Nome ricetta", 
+            "save_recipe": "Salva ricetta", 
+            "recipe_saved": "✅ Ricetta salvata!"
+        },
+        "English": {
+            "t1": "🚀 Logging", 
+            "t2": "📊 Overview", 
+            "t3": "📈 Weight", 
+            "t4": "⚡ Quick Entries", 
+            "t5": "🏃 Activity",  # Nuova voce
+            "meal": "Meal type", 
+            "meal_name": "Meal name", 
+            "add_meal": "Add meal", 
+            "extra_act": "Extra activity", 
+            "extra_cals": "Extra calories burned", 
+            "insert_weight": "Enter weight (kg)", 
+            "save_weight": "Save weight", 
+            "recipe_name": "Recipe name", 
+            "save_recipe": "Save recipe", 
+            "recipe_saved": "✅ Recipe saved!"
+        }
     }
     t = translations[lang]
     
@@ -449,11 +481,13 @@ with st.sidebar:
 
     st.markdown("### 📍 Navigazione")
     
-    pages = [t["t1"], t["t2"], t["t3"], t["t4"]]
+    # Lista aggiornata con la nuova pagina
+    pages = [t["t1"], t["t2"], t["t3"], t["t4"], t["t5"]]
     for page in pages:
+        # Nota: usiamo lo stile per evidenziare il bottone attivo
         is_active = (st.session_state.selected_page == page)
         
-        if st.button(page, key=f"nav_{page}", use_container_width=True):
+        if st.button(page, key=f"nav_{page}", use_container_width=True, type="primary" if is_active else "secondary"):
             st.session_state.selected_page = page
             st.rerun()
 
