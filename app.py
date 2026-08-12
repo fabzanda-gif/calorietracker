@@ -42,6 +42,7 @@ st.markdown("""
             z-index: 999999;
         }
 
+        /* Sidebar con tema scuro e testi chiarissimi */
         [data-testid="stSidebar"] {
             background-color: #0d1117;
             border-right: 1px solid #30363d;
@@ -51,37 +52,54 @@ st.markdown("""
             color: #f0f6fc !important;
         }
 
-        /* FORZATURA SFONDO ROSA/ROSA TENUE SU TUTTI I CONTAINER CON BORDO */
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            background-color: #261618 !important;
-            border: 1px solid #4a282d !important;
-            border-radius: 12px !important;
+        /* STILE MIRATO ESCLUSIVAMENTE ALLE CARD DELLE METRICHE (Overview) */
+        [data-testid="stMetric"] {
+            background-color: #fcf2f4 !important;
+            border: 1px solid #f2d6dc !important;
+            padding: 15px !important;
+            border-radius: 14px !important;
         }
 
-        /* Stile rettangolare arrotondato su TUTTI i bottoni dell'app */
-        .stButton>button, div.stFormSubmitButton>button {
+        /* STILE SPECIFICO PER I BOTTONI DELLA SIDEBAR */
+        [data-testid="stSidebar"] .stButton>button {
             border-radius: 10px !important;
             font-weight: 500 !important;
-            background-color: #21262d !important;
+            background-color: #161b22 !important;
             color: #f0f6fc !important;
             border: 1px solid #30363d !important;
             padding: 10px 15px !important;
             transition: all 0.2s ease !important;
         }
         
-        .stButton>button:hover, div.stFormSubmitButton>button:hover {
-            background-color: #30363d !important;
-            border-color: #ff7b72 !important;
+        [data-testid="stSidebar"] .stButton>button:hover {
+            background-color: #21262d !important;
+            border-color: #e06c75 !important;
             color: #ffffff !important;
+        }
+
+        /* Bottoni nel corpo centrale dell'app */
+        .main .stButton>button, .main div.stFormSubmitButton>button {
+            border-radius: 10px !important;
+            font-weight: 500 !important;
+            background-color: #ffffff !important;
+            color: #24292e !important;
+            border: 1px solid #d1d5da !important;
+            padding: 10px 15px !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .main .stButton>button:hover, .main div.stFormSubmitButton>button:hover {
+            background-color: #f6f8fa !important;
+            border-color: #e06c75 !important;
+            color: #e06c75 !important;
         }
 
         hr {
             margin: 1.5rem 0;
-            border-color: #30363d;
+            border-color: #e1e4e8;
         }
     </style>
 """, unsafe_allow_html=True)
-
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
