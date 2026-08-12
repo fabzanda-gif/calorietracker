@@ -212,7 +212,8 @@ def search_open_food_facts(query):
         return results
     except Exception as e:
         st.error(f"Errore nella ricerca: {e}")
-        return {}# ==============================================================================
+        return {}# 
+==============================================================================
 # 4.1  FUNZIONE DI LOGIN (Da inserire prima dei controlli di sessione)
 # ==============================================================================
 def show_login_page():
@@ -331,6 +332,9 @@ def generate_pkce_pair():
     code_challenge = base64.urlsafe_b64encode(
         hashlib.sha256(code_verifier.encode('utf-8')).digest()
     ).decode('utf-8').rstrip('=')
+    
+    # Salviamo il verificatore anche nei cookie per evitare che scada durante il redirect di Google
+    controller.set("pkce_verifier_cookie", code_verifier, max_age=300) # scade in 5 minuti
     return code_verifier, code_challenge
 
 def save_authenticated_session(response):
@@ -356,7 +360,11 @@ if "user" not in st.session_state or st.session_state["user"] is None:
     # 1. Controlla se arriviamo da un redirect OAuth di Google con un 'code'
     query_code = st.query_params.get("code")
     if query_code:
+        # Prende il verifier dallo state o, se perso, dal cookie temporaneo
         verifier = st.session_state.get("pkce_verifier")
+        if not verifier:
+            verifier = controller.get("pkce_verifier_cookie")
+            
         if verifier:
             try:
                 response = supabase.auth.exchange_code_for_session({
@@ -366,6 +374,7 @@ if "user" not in st.session_state or st.session_state["user"] is None:
                 save_authenticated_session(response)
                 st.query_params.clear()
                 st.session_state.pkce_verifier = None
+                controller.set("pkce_verifier_cookie", None, max_age=0) # Pulisci il cookie temporaneo
                 st.rerun()
             except Exception as e:
                 st.error(f"Login OAuth fallito: {str(e)}")
