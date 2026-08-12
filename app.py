@@ -901,17 +901,19 @@ elif selected_page == t["t3"]:
                 
                 fig = px.bar()
                 
+                # Barra dati reali (Rosso/Rosa pieno)
                 fig.add_bar(
                     x=df_real['date'], y=df_real['weight'],
-                    marker_color='#e06c75', marker_opacity=1.0,
+                    marker_color='rgba(224, 108, 117, 1.0)',
                     customdata=df_real[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>",
                     name="Reale"
                 )
                 
+                # Barra proiezioni (Rosso/Rosa trasparente)
                 fig.add_bar(
                     x=df_interp['date'], y=df_interp['weight'],
-                    marker_color='#e06c75', marker_opacity=0.25,
+                    marker_color='rgba(224, 108, 117, 0.25)',
                     customdata=df_interp[['date_str', 'weight_str']],
                     hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
                     name="Proiezione"
@@ -921,20 +923,26 @@ elif selected_page == t["t3"]:
                 max_weight = max(90, float(user_target_weight) + 10) if user_target_weight else 90
                 fig.update_yaxes(range=[min_weight, max_weight])
                 
+                target_val = float(user_target_weight) if user_target_weight else 75
+                
+                # Linea del goal: Rosso scuro elegante e continuo
                 fig.add_hline(
-                    y=float(user_target_weight) if user_target_weight else 75, 
-                    line_dash="dash", 
-                    line_color='#FFD700', 
-                    line_width=3.5
+                    y=target_val, 
+                    line_dash="solid", 
+                    line_color='#a6323f', 
+                    line_width=2.5
                 )
                 
+                # Etichetta del goal in alto a destra, pulita e leggibile
                 fig.add_annotation(
-                    xref="paper", yref="y", x=0.98, y=float(user_target_weight) + 2.5 if user_target_weight else 77.5,
-                    text=f"<b>🎯 GOAL: {user_target_weight} kg</b>",
+                    xref="paper", yref="y", x=0.98, y=target_val + 2.0,
+                    text=f"<b>🎯 GOAL: {target_val} kg</b>",
                     showarrow=False,
-                    font=dict(color="#FFD700", size=16, family="sans-serif"),
+                    font=dict(color="#a6323f", size=14, family="sans-serif"),
                     align="right",
-                    bgcolor="rgba(0,0,0,0.5)",
+                    bgcolor="rgba(255, 255, 255, 0.85)",
+                    bordercolor="#a6323f",
+                    borderwidth=1,
                     borderpad=4
                 )
                 
