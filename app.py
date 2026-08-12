@@ -305,4 +305,627 @@ if "user" not in st.session_state or st.session_state["user"] is None:
 ## ==============================================================================
 ## 6. USER DATA RETRIEVAL
 ## ==============================================================================
-user
+user = st.session_state["user"]
+user_id = user.id
+u_meta = user.user_metadata or {}
+
+display_name = u_meta.get("display_name") or user.email.split("@")[0] or "User"
+user_target_weight = u_meta.get("target_weight")
+user_bmr = u_meta.get("bmr")
+user_height = u_meta.get("height")
+user_gender = u_meta.get("gender")
+
+## ==============================================================================
+## 7. PROFILE COMPLETION CHECK
+## ==============================================================================
+profile_incomplete = (
+    user_target_weight is None or 
+    user_bmr is None or 
+    user_height is None or 
+    user_gender is None
+)
+
+if profile_incomplete:
+    st.warning("⚠️ Per iniziare, configura i tuoi dati.")
+    with st.form("missing_data_form"):
+        st.subheader("📋 Configurazione Profilo")
+        gen = st.selectbox(
+            "Genere", 
+            ["Uomo", "Donna"], 
+            index=0 if user_gender is None else (0 if user_gender == "Uomo" else 1)
+        )
+        h_val = st.number_input(
+            "Altezza (cm)", 
+            value=float(user_height) if user_height else 175.0,
+            min_value=100.0,
+            max_value=250.0,
+            step=1.0
+        )
+        w_val = st.number_input(
+            "Peso Attuale (kg)", 
+            value=float(user_target_weight) if user_target_weight else 80.0,
+            min_value=20.0,
+            max_value=300.0,
+            step=0.5
+        )
+        t_val = st.number_input(
+            "Peso Obiettivo (kg)", 
+            value=float(user_target_weight) if user_target_weight else 75.0,
+            min_value=20.0,
+            max_value=300.0,
+            step=0.5
+        )
+        
+        if st.form_submit_button("Salva e Inizia"):
+            calculated_bmr = calculate_bmr(w_val, h_val, gen)
+            try:
+                res = supabase.auth.update_user({"data": {
+                    "target_weight": float(t_val),
+                    "bmr": calculated_bmr,
+                    "height": float(h_val),
+                    "gender": gen
+                }})
+                if hasattr(res, 'user') and res.user:
+                    st.session_state["user"] = res.user
+                    user = res.user
+                    u_meta = user.user_metadata or {}
+                    user_target_weight = u_meta.get("target_weight")
+                    user_bmr = u_meta.get("bmr")
+                    user_height = u_meta.get("height")
+                    user_gender = u_meta.get("gender")
+                st.success("✅ Profilo aggiornato!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore: {e}")
+                print(traceback.format_exc())
+    st.stop()
+
+## ==============================================================================
+## 8. NAVIGATION & LANGUAGE
+## ==============================================================================
+with st.sidebar:
+    lang = st.selectbox("🌐 Lingua", ["Italiano", "English"])
+    translations = {
+        "Italiano": {
+            "t1": "🚀 Registrazione", 
+            "t2": "📊 Panoramica Giornaliera", 
+            "t3": "📈 Peso", 
+            "t4": "⚡ Quick Entries",
+            "meal": "Tipo di pasto", 
+            "meal_name": "Nome pasto", 
+            "add_meal": "Aggiungi pasto", 
+            "extra_act": "Attività extra", 
+            "extra_cals": "Calorie bruciate extra", 
+            "insert_weight": "Inserisci peso (kg)", 
+            "save_weight": "Salva peso", 
+            "recipe_name": "Nome Info", 
+            "save_recipe": "Salva Informazione", 
+            "recipe_saved": "✅ Informazione salvata!"
+        },
+        "English": {
+            "t1": "🚀 Logging", 
+            "t2": "📊 Daily Overview", 
+            "t3": "📈 Weight Journey", 
+            "t4": "⚡ Quick Entries",
+            "meal": "Meal type", 
+            "meal_name": "Meal name", 
+            "add_meal": "Add meal", 
+            "extra_act": "Extra activity", 
+            "extra_cals": "Extra calories burned", 
+            "insert_weight": "Enter weight (kg)", 
+            "save_weight": "Save weight", 
+            "recipe_name": "Info name", 
+            "save_recipe": "Save Info", 
+            "recipe_saved": "✅ Info saved!"
+        }
+    }
+    t = translations[lang]
+    
+    st.write(f"👤 {display_name}")
+    st.markdown("---")
+    
+    selected_page = st.radio("📍 Navigazione", [t["t1"], t["t2"], t["t3"], t["t4"]])
+    
+    if st.button("🚪 Logout", use_container_width=True):
+        try:
+            supabase.auth.sign_out()
+        except:
+            pass
+        
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        
+        st.rerun()
+
+## ==============================================================================
+## 9. PAGE 1: MEAL LOGGING
+## ==============================================================================
+if selected_page == t["t1"]:
+    log_date = st.date_input("📅 Data", value=date.today())
+    
+    st.subheader("🍽️ Inserimento Cibo & Pasti")
+    
+    input_source = st.radio(
+        "Fonte inserimento", 
+        ["🔍 Cerca online (Open Food Facts)", "🍳 Immissione Rapida"], 
+        horizontal=True
+    )
+    
+    is_recipe = (input_source == "🍳 Immissione Rapida")
+    
+    v = st.session_state["form_version"]
+    
+    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0):
+        st.session_state["m_name"] = name
+        st.session_state["m_cals"] = float(cals)
+        st.session_state["m_prot"] = float(prot)
+        st.session_state["m_carbs"] = float(carbs)
+        st.session_state["m_fat"] = float(fat)
+        st.session_state["grams_val"] = float(grams)
+        st.session_state["last_selected"] = selected
+        st.session_state["form_version"] += 1
+    
+    if st.session_state.get("last_source") != input_source:
+        st.session_state["last_source"] = input_source
+        reset_or_update()
+        st.rerun()
+    
+    ## Search Mode
+    if not is_recipe:
+        search_q = st.text_input("🔍 Cerca per Nome o Codice a Barre")
+        if st.button("🚀 Cerca"):
+            if len(search_q) >= 2:
+                with st.spinner('Ricerca in corso...'):
+                    st.session_state["api_res"] = search_open_food_facts(search_q)
+                st.session_state["prod_select"] = ""
+                st.session_state["last_selected"] = ""
+                st.rerun()
+            else:
+                st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
+        
+        api_res = st.session_state.get("api_res", {})
+        if api_res:
+            sel_prod = st.selectbox(
+                "Seleziona dal database", 
+                [""] + list(api_res.keys()), 
+                key=f"prod_select_{v}"
+            )
+            
+            if sel_prod and sel_prod != st.session_state.get("last_selected"):
+                p_data = api_res[sel_prod]
+                reset_or_update(
+                    name=p_data.get('name', ''),
+                    cals=p_data.get('calories', 0),
+                    prot=p_data.get('protein', 0),
+                    carbs=p_data.get('carbs', 0),
+                    fat=p_data.get('fat', 0),
+                    selected=sel_prod,
+                    grams=100.0
+                )
+                st.rerun()
+    
+    ## Recipe Mode
+    else:
+        try:
+            recipes_data = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
+            recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
+            
+            if recipes_dict:
+                sel_recipe = st.selectbox(
+                    "Seleziona una ricetta", 
+                    [""] + list(recipes_dict.keys()), 
+                    key=f"recipe_select_{v}"
+                )
+                
+                if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
+                    r_obj = recipes_dict[sel_recipe]
+                    reset_or_update(
+                        name=r_obj.get('name', ''),
+                        cals=r_obj.get('calories', 0),
+                        prot=r_obj.get('protein', 0),
+                        carbs=r_obj.get('carbs', 0),
+                        fat=r_obj.get('fat', 0),
+                        selected=sel_recipe,
+                        grams=1.0
+                    )
+                    st.rerun()
+            else:
+                st.info("Nessuna ricetta salvata. Creane una nella sezione ⚡ Quick Entries")
+        except Exception as e:
+            st.error(f"Errore nel caricamento ricette: {e}")
+    
+    st.markdown("---")
+    
+    ## Meal Input Form
+    meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
+    m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
+    name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
+    
+    if not is_recipe:
+        grams = st.number_input(
+            "Grammi (g)",
+            value=st.session_state["grams_val"],
+            min_value=1.0,
+            step=10.0,
+            key=f"meal_grams_{v}",
+        )
+        st.session_state["grams_val"] = grams
+        
+        factor = grams / 100.0
+        meal_display_name = f"{name} ({grams}g)"
+        
+        calc_cals = int(st.session_state["m_cals"] * factor)
+        calc_prot = int(st.session_state["m_prot"] * factor)
+        calc_carbs = int(st.session_state["m_carbs"] * factor)
+        calc_fat = int(st.session_state["m_fat"] * factor)
+    else:
+        meal_display_name = name
+        calc_cals = int(st.session_state["m_cals"])
+        calc_prot = int(st.session_state["m_prot"])
+        calc_carbs = int(st.session_state["m_carbs"])
+        calc_fat = int(st.session_state["m_fat"])
+    
+    c1, c2, c3, c4 = st.columns(4)
+    final_cals = c1.number_input("Kcal", value=calc_cals, step=1, key=f"input_cals_{v}")
+    final_prot = c2.number_input("Pro (g)", value=calc_prot, step=1, key=f"input_prot_{v}")
+    final_carbs = c3.number_input("Carbs (g)", value=calc_carbs, step=1, key=f"input_carbs_{v}")
+    final_fat = c4.number_input("Fat (g)", value=calc_fat, step=1, key=f"input_fat_{v}")
+    
+    col_btn1, col_btn2 = st.columns([3, 1])
+    with col_btn1:
+        if st.button(t["add_meal"], key=f"submit_meal_btn_{v}", use_container_width=True):
+            if not name.strip():
+                st.warning("Inserisci un nome valido per il pasto.")
+            else:
+                try:
+                    supabase.table("meals").insert({
+                        "user_id": user_id,
+                        "date": str(log_date),
+                        "meal_type": m_type,
+                        "name": meal_display_name,
+                        "calories": int(final_cals),
+                        "protein": int(final_prot),
+                        "carbs": int(final_carbs),
+                        "fat": int(final_fat)
+                    }).execute()
+                    
+                    refresh_daily_logs(log_date)
+                    reset_or_update()
+                    st.success(f"✅ Pasto aggiunto! ({final_cals} kcal)")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore nel salvataggio: {e}")
+                    print(traceback.format_exc())
+    
+    with col_btn2:
+        if st.button("🗑️ Pulisci", key=f"clear_btn_{v}"):
+            reset_or_update()
+            st.rerun()
+    
+    st.markdown("---")
+    
+    ## Extra Activities
+    st.subheader("🏃 Attività Extra")
+    with st.form("extra_act_form"):
+        extra_act = st.selectbox(
+            t["extra_act"], 
+            ["Padel", "Bici", "Camminata", "Corsa", "Palestra", "Nuoto", "Altro"]
+        )
+        extra_cals = st.number_input(
+            t["extra_cals"], 
+            value=0, 
+            min_value=0,
+            step=50
+        )
+        if st.form_submit_button("💾 Salva Attività"):
+            try:
+                supabase.table("activities").insert({
+                    "user_id": user_id,
+                    "date": str(log_date),
+                    "activity_name": extra_act,
+                    "burned_calories": int(extra_cals)
+                }).execute()
+                refresh_daily_logs(log_date)
+                st.success("✅ Attività extra salvata!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore: {e}")
+                print(traceback.format_exc())
+
+## ==============================================================================
+## 10. PAGE 2: DAILY OVERVIEW
+## ==============================================================================
+elif selected_page == t["t2"]:
+    st.subheader("📊 Riepilogo Giornaliero")
+    
+    if "last_nav_page" not in st.session_state or st.session_state.last_nav_page != selected_page:
+        st.session_state.overview_date = date.today()
+        st.session_state.last_nav_page = selected_page
+    
+    def update_overview_date():
+        st.session_state.overview_date = st.session_state.get("widget_overview_date", date.today())
+    
+    summary_date = st.date_input(
+        "📅 Data riepilogo", 
+        value=st.session_state.overview_date, 
+        key="widget_overview_date",
+        on_change=update_overview_date
+    )
+    
+    try:
+        daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+        meals_data = supabase.table("meals").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+        raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+    except Exception as e:
+        st.error(f"Errore nel caricamento dati: {e}")
+        daily_log_res = []
+        meals_data = []
+        raw_activities = []
+    
+    ## Filter activities
+    activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
+    
+    ## Calculate calories
+    total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
+    
+    current_weight = None
+    if daily_log_res and len(daily_log_res) > 0:
+        row = daily_log_res[0]
+        current_weight = row.get('weight')
+    
+    ## Calculate BMR
+    now = datetime.now()
+    if summary_date == date.today():
+        minutes_passed = now.hour * 60 + now.minute
+        bmr_so_far = int((user_bmr / (24 * 60)) * minutes_passed)
+    else:
+        bmr_so_far = user_bmr
+    
+    extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
+    total_burned_finora = bmr_so_far + extra_burned
+    deficit = total_cals_in - total_burned_finora
+    
+    ## Display metrics
+    col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+    col_c1.metric("Kcal Ingerite", f"{total_cals_in} kcal")
+    col_c2.metric("Kcal Bruciate", f"{total_burned_finora} kcal")
+    col_c3.metric("Bilancio", f"{deficit:+d} kcal", delta_color="inverse")
+    col_c4.metric("Peso", f"{current_weight} kg" if current_weight else "N/D")
+    
+    st.markdown("---")
+    
+    ## Meals table
+    st.markdown("#### 🍽️ Cibi Inseriti")
+    if meals_data:
+        df_meals = pd.DataFrame(meals_data)
+        df_display = df_meals[["meal_type", "name", "calories", "protein", "carbs", "fat"]].copy()
+        df_display.columns = ["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        
+        ## Delete meal functionality
+        with st.expander("🗑️ Elimina un pasto"):
+            meal_names = [f"{m['meal_type']} - {m['name']}" for m in meals_data]
+            meal_to_delete_idx = st.selectbox(
+                "Seleziona il pasto da eliminare",
+                range(len(meal_names)),
+                format_func=lambda i: meal_names[i]
+            )
+            if st.button("Elimina questo pasto"):
+                try:
+                    meal_ to_delete = meals_data[meal_to_delete_idx]
+                    supabase.table("meals").delete().eq("id", meal_to_delete["id"]).execute()
+                    st.success("✅ Pasto eliminato!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore nell'eliminazione: {e}")
+    else:
+        st.info("Nessun pasto registrato per questa data.")
+    
+    st.markdown("---")
+    
+    ## Activities
+    st.markdown("#### 🏃 Calorie Bruciate & Attività")
+    rows_acts = [{"Attività": "BMR (Base)", "Kcal Bruciate": bmr_so_far}]
+    if activities_data:
+        for act in activities_data:
+            rows_acts.append({
+                "Attività": act.get("activity_name"),
+                "Kcal Bruciate": act.get("burned_calories")
+            })
+    
+    df_acts = pd.DataFrame(rows_acts)
+    st.dataframe(df_acts, use_container_width=True, hide_index=True)
+
+## ==============================================================================
+## 11. PAGE 3: WEIGHT TRACKING
+## ==============================================================================
+elif selected_page == t["t3"]:
+    st.subheader("⚖️ Tracciamento Peso")
+    
+    col_w1, col_w2 = st.columns(2)
+    
+    with col_w1:
+        st.markdown("#### 📥 Registra Peso Oggi")
+        w = st.number_input(
+            t["insert_weight"], 
+            value=80.0, 
+            min_value=20.0, 
+            max_value=300.0,
+            step=0.1
+        )
+        if st.button(t["save_weight"], use_container_width=True):
+            try:
+                supabase.table("daily_logs").upsert({
+                    "user_id": user_id,
+                    "date": str(date.today()),
+                    "weight": w
+                }, on_conflict="user_id,date").execute()
+                st.success("✅ Peso salvato!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore: {e}")
+    
+    with col_w2:
+        st.markdown("#### 🎯 Aggiorna Obiettivo")
+        new_target = st.number_input(
+            "Peso Obiettivo (kg)", 
+            value=float(user_target_weight) if user_target_weight else 75.0,
+            min_value=20.0,
+            max_value=300.0,
+            step=0.5
+        )
+        if st.button("Salva Obiettivo", use_container_width=True):
+            try:
+                res = supabase.auth.update_user({
+                    "data": {"target_weight": float(new_target)}
+                })
+                if res.user:
+                    st.session_state["user"] = res.user
+                st.success("✅ Obiettivo aggiornato!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore: {e}")
+                print(traceback.format_exc())
+    
+    st.markdown("---")
+    
+    ## Weight chart
+    try:
+        logs = supabase.table("daily_logs").select("date, weight").eq("user_id", user_id).not_.is_("weight", "null").order("date", desc=False).execute().data
+        
+        if logs:
+            df = pd.DataFrame(logs)
+            df['date'] = pd.to_datetime(df['date'])
+            
+            ## Interpolate missing dates
+            df_full = df.set_index('date').reindex(pd.date_range(df['date'].min(), df['date'].max())).interpolate().reset_index().rename(columns={'index': 'date'})
+            
+            real_dates = set(df['date'])
+            df_full['is_real'] = df_full['date'].isin(real_dates)
+            
+            df_full['date_str'] = df_full['date'].dt.strftime('%d %b %Y')
+            df_full['weight_str'] = df_full['weight'].round(1).astype(str) + " kg"
+            
+            df_real = df_full[df_full['is_real']]
+            df_interp = df_full[~df_full['is_real']]
+            
+            fig = px.bar()
+            
+            fig.add_bar(
+                x=df_real['date'], y=df_real['weight'],
+                marker_color='##007BFF', marker_opacity=1.0,
+                customdata=df_real[['date_str', 'weight_str']],
+                hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>",
+                name="Reale"
+            )
+            
+            fig.add_bar(
+                x=df_interp['date'], y=df_interp['weight'],
+                marker_color='##007BFF', marker_opacity=0.25,
+                customdata=df_interp[['date_str', 'weight_str']],
+                hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
+                name="Proiezione"
+            )
+            
+            min_weight = min(75, float(user_target_weight) - 3) if user_target_weight else 75
+            max_weight = max(90, float(user_target_weight) + 10) if user_target_weight else 90
+            fig.update_yaxes(range=[min_weight, max_weight])
+            
+            fig.add_hline(
+                y=float(user_target_weight) if user_target_weight else 75, 
+                line_dash="dash", 
+                line_color="##FFD700", 
+                line_width=3.5
+            )
+            
+            fig.add_annotation(
+                xref="paper", yref="y", x=0.98, y=float(user_target_weight) + 2.5 if user_target_weight else 77.5,
+                text=f"<b>🎯 GOAL: {user_target_weight} kg</b>",
+                showarrow=False,
+                font=dict(color="##FFD700", size=16, family="sans-serif"),
+                align="right",
+                bgcolor="rgba(0,0,0,0.5)",
+                borderpad=4
+            )
+            
+            fig.update_layout(
+                showlegend=False,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                barmode='overlay',
+                hovermode='x unified'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("📊 Nessun dato di peso registrato ancora. Inizia registrando il tuo peso!")
+    except Exception as e:
+        st.error(f"Errore nel caricamento grafico: {e}")
+        print(traceback.format_exc())
+
+## ==============================================================================
+## 12. PAGE 4: QUICK ENTRIES
+## ==============================================================================
+elif selected_page == t["t4"]:
+    st.subheader("⚡ Quick Entries - Ricette Salvate")
+    
+    st.markdown("#### 📋 Le tue ricette")
+    try:
+        entries = supabase.table("recipes").select("*").eq("user_id", user_id).order("name").execute().data
+        
+        if entries:
+            df_entries = pd.DataFrame(entries)
+            df_display = df_entries[["name", "calories", "protein", "carbs", "fat"]].copy()
+            df_display.columns = ["Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            
+            ## Delete recipe
+            with st.expander("🗑️ Elimina una ricetta"):
+                recipe_names = df_entries["name"].tolist()
+                recipe_to_delete_idx = st.selectbox(
+                    "Seleziona ricetta da eliminare",
+                    range(len(recipe_names)),
+                    format_func=lambda i: recipe_names[i]
+                )
+                if st.button("Elimina ricetta"):
+                    try:
+                        recipe_id = df_entries.iloc[recipe_to_delete_idx].get("id")
+                        supabase.table("recipes").delete().eq("id", recipe_id).execute()
+                        st.success("✅ Ricetta eliminata!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Errore: {e}")
+        else:
+            st.info("Nessuna ricetta salvata ancora.")
+    except Exception as e:
+        st.error(f"Errore nel caricamento ricette: {e}")
+        print(traceback.format_exc())
+    
+    st.markdown("---")
+    
+    st.markdown("#### ➕ Aggiungi Nuova Ricetta")
+    with st.form("quick_entry_add"):
+        r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro")
+        c1, c2, c3, c4 = st.columns(4)
+        cals = c1.number_input("Kcal", value=0, min_value=0, step=1)
+        prot = c2.number_input("Pro (g)", value=0, min_value=0, step=1)
+        carbs = c3.number_input("Carbs (g)", value=0, min_value=0, step=1)
+        fat = c4.number_input("Fat (g)", value=0, min_value=0, step=1)
+        
+        if st.form_submit_button(t["save_recipe"], use_container_width=True):
+            if not r_name.strip():
+                st.warning("Inserisci un nome valido.")
+            else:
+                try:
+                    supabase.table("recipes").upsert({
+                        "name": r_name.strip(), 
+                        "calories": int(cals), 
+                        "protein": int(prot), 
+                        "carbs": int(carbs), 
+                        "fat": int(fat),
+                        "user_id": user_id
+                    }, on_conflict="user_id,name").execute()
+                    st.success(t["recipe_saved"])
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore: {e}")
+                    print(traceback.format_exc())
