@@ -997,6 +997,8 @@ elif selected_page == t["t4"]:
         entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
         if entries:
             df_entries = pd.DataFrame(entries)
+            # Mostriamo anche la modalità se presente nel db
+            cols_to_show = ["name", "calories", "protein", "carbs", "fat"]
             df_display = df_entries.rename(columns={
                 "name": "Nome", "calories": "Kcal", 
                 "protein": "Pro", "carbs": "Carbs", "fat": "Fat"
@@ -1020,12 +1022,24 @@ elif selected_page == t["t4"]:
     with st.container(border=True):
         with st.form("quick_entry_add"):
             st.markdown("### ➕ Aggiungi Nuova Immissione Rapida")
-            r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro")
+            r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro o Snack")
+            
+            # Scelta della tipologia di inserimento
+            calc_type = st.radio(
+                "Modalità di calcolo",
+                ["Per 100g (valori scalabili)", "Per porzione fissa (valori assoluti)"],
+                horizontal=True
+            )
+            
+            st.caption("ℹ️ *Se scegli 'Per 100g', inserisci i macronutrienti riferiti a 100 grammi di prodotto. Se scegli 'Porzione', inserisci i valori totali della singola porzione.*")
+            
             c1, c2, c3, c4 = st.columns(4)
-            cals = c1.number_input("Kcal", value=0, min_value=0, step=1, key="r_cal")
-            prot = c2.number_input("Pro (g)", value=0, min_value=0, step=1, key="r_pro")
-            carbs = c3.number_input("Carbs (g)", value=0, min_value=0, step=1, key="r_carbs")
-            fat = c4.number_input("Fat (g)", value=0, min_value=0, step=1, key="r_fat")
+            cals = c1.number_input("Kcal", value=0.0, min_value=0.0, step=1.0, key="r_cal")
+            prot = c2.number_input("Pro (g)", value=0.0, min_value=0.0, step=0.5, key="r_pro")
+            carbs = c3.number_input("Carbs (g)", value=0.0, min_value=0.0, step=0.5, key="r_carbs")
+            fat = c4.number_input("Fat (g)", value=0.0, min_value=0.5, step=0.5, key="r_fat")
+            
+            is_per_100g = 1 if "100g" in calc_type else 0
             
             if st.form_submit_button(t["save_recipe"], use_container_width=True):
                 if not r_name.strip():
@@ -1034,14 +1048,28 @@ elif selected_page == t["t4"]:
                     try:
                         supabase.table("recipes").upsert({
                             "name": r_name.strip(), 
-                            "calories": int(cals), 
-                            "protein": int(prot), 
-                            "carbs": int(carbs), 
-                            "fat": int(fat),
+                            "calories": float(cals), 
+                            "protein": float(prot), 
+                            "carbs": float(carbs), 
+                            "fat": float(fat),
+                            "is_per_100g": is_per_100g,  # Salviamo la modalità nel database (assicurati di avere la colonna o usa un campo simile)
                             "user_id": user_id
                         }, on_conflict="user_id,name").execute()
                         st.success(t["recipe_saved"])
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Errore: {e}")
-                        print(traceback.format_exc())
+                        # Fallback nel caso la colonna is_per_100g non esista ancora nella tabella Supabase
+                        try:
+                            supabase.table("recipes").upsert({
+                                "name": r_name.strip(), 
+                                "calories": float(cals), 
+                                "protein": float(prot), 
+                                "carbs": float(carbs), 
+                                "fat": float(fat),
+                                "user_id": user_id
+                            }, on_conflict="user_id,name").execute()
+                            st.success(t["recipe_saved"])
+                            st.rerun()
+                        except Exception as inner_e:
+                            st.error(f"Errore: {inner_e}")
+                            print(traceback.format_exc())
