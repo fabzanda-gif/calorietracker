@@ -690,6 +690,9 @@ translations = {
 }
 
 with st.sidebar:
+    # --- INSERIMENTO LOGO ---
+    st.sidebar.image("https://inhmvbdujpxrqrlcgmqw.supabase.co/storage/v1/object/sign/public-assets/logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jZTZjYWVhZi00MTYxLTQyYzctODliZS05ODY1ZGZiMzFlN2EiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwdWJsaWMtYXNzZXRzL2xvZ28ucG5nIiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4NjU2MDE0MiwiZXhwIjoxODE4MDk2MTQyfQ.d_gb_OrDcKRjVrtC9HykTbDC2FURV1Wn0BEb0WvpHDM", use_container_width=True)
+    st.markdown("---") # Linea di separazione dopo il logo
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands"], key="lang_selector")
     t = translations[current_lang]
     
