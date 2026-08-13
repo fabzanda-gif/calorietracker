@@ -827,13 +827,32 @@ if selected_page == t["t1"]:
         except Exception as e:
             st.error(f"Errore: {e}")
     
-    st.markdown("---")
+ st.markdown("---")
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
     
-    mode = st.radio(t["calc_mode"], [t["per_100g"], t["per_portion"]], index=0 if st.session_state["is_per_100g_val"] else 1, horizontal=True)
+    # 1. Radio button con callback per gestire il cambio valore istantaneo
+    def on_mode_change():
+        new_mode = st.session_state[f"mode_radio_{v}"]
+        if new_mode == t["per_100g"]:
+            st.session_state["grams_val"] = 100.0
+            st.session_state["is_per_100g_val"] = True
+        else:
+            st.session_state["grams_val"] = 1.0
+            st.session_state["is_per_100g_val"] = False
+        st.session_state[f"dyn_qty_{v}"] = st.session_state["grams_val"]
+
+    mode = st.radio(
+        t["calc_mode"], 
+        [t["per_100g"], t["per_portion"]], 
+        index=0 if st.session_state["is_per_100g_val"] else 1, 
+        horizontal=True,
+        key=f"mode_radio_{v}",
+        on_change=on_mode_change
+    )
     
+    # 2. Number input che usa il valore di sessione aggiornato dalla callback
     def on_qty_change():
         st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
 
