@@ -827,7 +827,7 @@ if selected_page == t["t1"]:
         except Exception as e:
             st.error(f"Errore: {e}")
     
-st.markdown("---")
+    st.markdown("---")
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
@@ -852,7 +852,6 @@ st.markdown("---")
         st.session_state[f"dyn_qty_{v}"] = st.session_state["grams_val"]
         st.rerun()
     
-    # 2. Number input che usa il valore di sessione aggiornato dalla callback
     def on_qty_change():
         st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
 
@@ -892,7 +891,6 @@ st.markdown("---")
             st.rerun()
         except Exception as e:
             st.error(f"Errore: {e}")
-
 # ==============================================================================
 # 10. PAGE 2: DAILY OVERVIEW
 # ==============================================================================
