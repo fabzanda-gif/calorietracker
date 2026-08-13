@@ -1024,9 +1024,9 @@ elif selected_page == t["t2"]:
             
     with col_c2:
         st.markdown('<div class="metric-card-burn">', unsafe_allow_html=True)
-        with st.container(border=True):
-            # Formato richiesto: Totale stimato / Bruciate finora (es. 1900kcal / 800kcal)
-            burn_display_text = f"{total_estimated_burned} kcal / {total_burned_finora} kcal"
+        with st.container(border=False):  # border=False evita il doppio bordo
+            # Usiamo un formato più compatto per evitare il troncamento
+            burn_display_text = f"{total_estimated_burned} / {total_burned_finora} kcal"
             st.metric(f"🔥 {t['card_kcal_burn']}", burn_display_text)
             st.caption(burn_msg)
         st.markdown('</div>', unsafe_allow_html=True)
