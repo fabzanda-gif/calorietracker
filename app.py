@@ -1023,13 +1023,13 @@ elif selected_page == t["t2"]:
         """, unsafe_allow_html=True)
             
     with col_c2:
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="custom-card-title">🔥 {t['card_kcal_burn']}</div>
-                <div class="custom-card-value">{total_burned_finora} kcal</div>
-                <div class="custom-card-caption">{burn_msg}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="metric-card-burn">', unsafe_allow_html=True)
+        with st.container(border=True):
+            # Formato richiesto: Totale stimato / Bruciate finora (es. 1900kcal / 800kcal)
+            burn_display_text = f"{total_estimated_burned} kcal / {total_burned_finora} kcal"
+            st.metric(f"🔥 {t['card_kcal_burn']}", burn_display_text)
+            st.caption(burn_msg)
+        st.markdown('</div>', unsafe_allow_html=True)
             
     with col_c3:
         st.markdown(f"""
