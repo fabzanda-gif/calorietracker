@@ -1370,23 +1370,38 @@ elif selected_page == t["t5"]:
     try:
         existing_log = supabase.table("daily_logs").select("steps").eq("date", str(act_date)).eq("user_id", user_id).execute().data
         day_steps = existing_log[0].get("steps", 0) if existing_log and existing_log[0].get("steps") else 0
+        
+        # Recuperiamo anche le attività registrate per questa data per la logica intelligente
+        day_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(act_date)).eq("user_id", user_id).execute().data or []
     except Exception:
         day_steps = 0
+        day_activities = []
 
+    # Verifichiamo se ci sono attività strutturate oltre ai passi
+    has_structured_activity = any(a.get("activity_name") not in ["Passi (Stima)"] for a in day_activities)
+
+    # Status Movimento intelligente: se c'è un'attività strutturata, lo status riflette l'allenamento!
     move_bg, move_border = "#FFFFFF", "#FF8B8B"
-    if day_steps >= 10000:
+    if has_structured_activity:
+        move_msg = "🌟 Ottimo! Hai completato un'attività fisica strutturata oggi."
+        status_display_text = "🏋️ Attività registrata"
+    elif day_steps >= 10000:
         move_msg = t["status_very_active"]
+        status_display_text = f"{day_steps} passi"
     elif day_steps >= 5000:
         move_msg = t["status_good"]
+        status_display_text = f"{day_steps} passi"
     else:
         move_msg = t["status_lazy"]
+        status_display_text = f"{day_steps} passi"
 
     st.markdown(f"""<style>div[data-testid="stMetric"]:has(div:contains("Status")) {{ background-color: {move_bg} ; border: 1px solid {move_border} ; padding: 15px; border-radius: 10px; }}</style>""", unsafe_allow_html=True)
     
     with st.container(border=True):
-        st.metric(t["status_move_title"], f"{day_steps} passi")
+        st.metric(t["status_move_title"], status_display_text)
         st.caption(move_msg)
 
+    # 3 Colonne: Passi, Bici (Normale ed Elettrica), Altro
     col_a1, col_a2, col_a3 = st.columns(3)
     
     with col_a1:
@@ -1402,7 +1417,11 @@ elif selected_page == t["t5"]:
                     else:
                         supabase.table("daily_logs").insert({"user_id": user_id, "date": str(act_date), "steps": int(new_steps)}).execute()
                     
-                    estim_cals = int(new_steps * 0.04)
+                    # Se ci sono già altre attività strutturate, i passi non devono generare kcal duplicate (0 kcal dai passi)
+                    # Altrimenti stimiamo le kcal dai passi come prima (0.04 kcal per passo)
+                    has_other_acts = any(a.get("activity_name") not in ["Passi (Stima)"] for a in day_activities)
+                    estim_cals = 0 if has_other_acts else int(new_steps * 0.04)
+                    
                     existing_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
                     
                     if existing_act:
@@ -1412,27 +1431,41 @@ elif selected_page == t["t5"]:
                     
                     refresh_daily_logs(act_date)
                     
-                    st.toast(f"✅ Passi aggiornati con successo! ({estim_cals} kcal stimate)", icon="👣")
-                    st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal totali stimate)")
+                    st.toast(f"✅ Passi aggiornati! ({estim_cals} kcal)", icon="👣")
+                    st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore nel salvataggio dei passi: {e}")
 
     with col_a2:
         with st.container(border=True):
-            st.markdown(f"### {t['bike_title']}")
-            bike_min = st.number_input(t["bike_min"], value=0, min_value=0, step=5)
-            if st.button(t["add_bike"], use_container_width=True):
+            st.markdown("### 🚲 Bici & E-Bike")
+            bike_type = st.radio("Tipo Bici", ["Bici Normale", "E-Bike (Elettrica)"], horizontal=True, key=f"bike_type_{act_date}")
+            bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5, key=f"bike_min_{act_date}")
+            
+            if st.button("💾 Aggiungi Bici", use_container_width=True):
                 if bike_min > 0:
-                    estim_cals = int(bike_min * 8)
-                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Bici", "burned_calories": estim_cals}).execute()
+                    if "Elettrica" in bike_type:
+                        estim_cals = int(bike_min * 4)  # Stima E-bike: ~4 kcal/min
+                        act_label = "Bici Elettrica"
+                    else:
+                        estim_cals = int(bike_min * 8)  # Stima Bici normale: ~8 kcal/min
+                        act_label = "Bici"
+                        
+                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": act_label, "burned_calories": estim_cals}).execute()
+                    
+                    # Se inseriamo una bici, rimuoviamo o azzeriamo l'impatto dei passi per evitare sovrastima
+                    passi_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
+                    if passi_act:
+                        supabase.table("activities").update({"burned_calories": 0}).eq("id", passi_act[0]["id"]).execute()
+
                     refresh_daily_logs(act_date)
                     
-                    st.toast(f"✅ Aggiunti {bike_min} min di bici! ({estim_cals} kcal)", icon="🚲")
-                    st.success(f"✅ Aggiunte {bike_min} min di bici ({estim_cals} kcal)!")
+                    st.toast(f"✅ Aggiunti {bike_min} min di {act_label}! ({estim_cals} kcal)", icon="🚲")
+                    st.success(f"✅ Aggiunti {bike_min} min di {act_label} ({estim_cals} kcal)!")
                     st.rerun()
                 else:
-                    st.warning("Inserisci almeno 1 minuto di bici.")
+                    st.warning("Inserisci almeno 1 minuto.")
 
     with col_a3:
         with st.container(border=True):
@@ -1440,10 +1473,20 @@ elif selected_page == t["t5"]:
             with st.form("activity_form", clear_on_submit=True):
                 extra_act = st.selectbox(t["activity_label"], ["Padel", "Palestra", "Nuoto", "Altro"])
                 extra_cals = st.number_input("Kcal bruciate", value=0, min_value=0, step=50)
-                if st.form_submit_button(t["add_act_btn"], use_container_width=True):
+                
+                submitted_act = st.form_submit_button(t["add_act_btn"], use_container_width=True)
+                if submitted_act:
+                    # Inseriamo l'attività
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
+                    
+                    # Azzeriamo l'impatto dei passi per evitare la sovrastima delle calorie
+                    passi_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
+                    if passi_act:
+                        supabase.table("activities").update({"burned_calories": 0}).eq("id", passi_act[0]["id"]).execute()
+
                     refresh_daily_logs(act_date)
                     
+                    # Usiamo st.success e st.toast per garantire il feedback visivo immediato
                     st.toast(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)", icon="🎯")
                     st.success(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)")
                     st.rerun()
