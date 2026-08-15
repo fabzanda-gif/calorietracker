@@ -7,6 +7,7 @@ import secrets
 import hashlib
 import traceback
 from supabase import create_client
+from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
 import plotly.express as px
 
@@ -84,11 +85,21 @@ st.markdown("""
 # ==============================================================================
 # SUPABASE URL & KEY SETUP
 # ==============================================================================
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+APP_URL = st.secrets.get("APP_URL", "https://diario-alimentare.streamlit.app").rstrip("/")
 
+# Questo client NON deve mantenere una sessione propria in memoria.
+# La sessione persistente viene gestita esplicitamente dal cookie browser.
 if "supabase" not in st.session_state:
-    st.session_state["supabase"] = create_client(SUPABASE_URL, SUPABASE_KEY)
+    st.session_state["supabase"] = create_client(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
+    )
 
 supabase = st.session_state["supabase"]
 controller = CookieController()
@@ -112,7 +123,7 @@ state_defaults = {
     "overview_date": date.today(),
     "last_nav_page": None,
     "selected_recipe": None,
-    "prod_select": ""
+    "prod_select": "",
 }
 
 for key, default in state_defaults.items():
@@ -177,54 +188,160 @@ def search_open_food_facts(query):
         return {}
 
 # ==============================================================================
-# 4. AUTHENTICATION & SESSION MANAGEMENT (PERSISTENTE CON COOKIE PKCE)
+# 4. AUTHENTICATION & SESSION MANAGEMENT
 # ==============================================================================
+# Il cookie viene usato come "remember me". Il refresh token di Supabase è
+# normalmente di lunga durata; il cookie dura 10 anni, ma può comunque essere
+# cancellato dal browser, dal logout o se Supabase invalida il refresh token.
+SESSION_COOKIE = "supabase_session"
+PKCE_COOKIE = "pkce_verifier_cookie"
+SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60
+PKCE_COOKIE_MAX_AGE = 10 * 60
+
+def _cookie_set(name, value, max_age):
+    """Scrive un cookie senza far fallire l'app se il componente non è pronto."""
+    controller.set(name, value, max_age=max_age)
+
+def _cookie_delete(name):
+    try:
+        controller.set(name, None, max_age=0)
+    except Exception:
+        pass
+
 def generate_pkce_pair():
-    code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
-    code_challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(code_verifier.encode('utf-8')).digest()
-    ).decode('utf-8').rstrip('=')
-    
-    controller.set("pkce_verifier_cookie", code_verifier, max_age=300)
-    return code_verifier, code_challenge
+    """Genera una coppia PKCE e salva il verifier nel browser."""
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode("utf-8")).digest()
+    ).decode("utf-8").rstrip("=")
+
+    _cookie_set(PKCE_COOKIE, verifier, PKCE_COOKIE_MAX_AGE)
+    st.session_state["pkce_verifier"] = verifier
+    return verifier, challenge
 
 def save_authenticated_session(response):
+    """Salva user + token correnti e aggiorna SEMPRE il cookie con il refresh token nuovo."""
+    session = getattr(response, "session", None)
+    user = getattr(response, "user", None)
+
+    if session is None:
+        raise RuntimeError("Supabase non ha restituito una sessione valida.")
+
+    if user is None:
+        user = getattr(session, "user", None)
+
+    if user is None:
+        raise RuntimeError("Supabase non ha restituito l'utente autenticato.")
+
+    st.session_state["user"] = user
+
+    # IMPORTANTE: il refresh token può ruotare. Non conserviamo mai quello vecchio.
+    _cookie_set(
+        SESSION_COOKIE,
+        {
+            "access_token": session.access_token,
+            "refresh_token": session.refresh_token,
+        },
+        SESSION_COOKIE_MAX_AGE,
+    )
+
+    return user
+
+def exchange_pkce_code(auth_code, code_verifier):
+    """Scambia manualmente il code PKCE.
+
+    Lo facciamo via endpoint Auth perché il verifier è conservato nel nostro cookie
+    e non nello storage interno del client Python. Questo evita che un nuovo run
+    Streamlit perda il verifier necessario al callback.
+    """
+    token_url = f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce"
+    response = requests.post(
+        token_url,
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "auth_code": auth_code,
+            "code_verifier": code_verifier,
+        },
+        timeout=20,
+    )
+
+    if not response.ok:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise RuntimeError(f"PKCE exchange HTTP {response.status_code}: {detail}")
+
+    payload = response.json()
+    access_token = payload.get("access_token")
+    refresh_token = payload.get("refresh_token")
+
+    if not access_token or not refresh_token:
+        raise RuntimeError("Il callback OAuth non ha restituito access_token/refresh_token.")
+
+    # Stabilisce la sessione nel client Supabase usato da questa run.
+    response_obj = supabase.auth.set_session(access_token, refresh_token)
+    return response_obj
+
+def restore_session_from_cookie():
+    """Ripristina la sessione al refresh e rinnova i token se necessario."""
+    saved = controller.get(SESSION_COOKIE)
+
+    if not isinstance(saved, dict):
+        return False
+
+    access_token = saved.get("access_token")
+    refresh_token = saved.get("refresh_token")
+    if not access_token or not refresh_token:
+        return False
+
     try:
-        user = response.user if hasattr(response, 'user') and response.user else response.session.user
-        st.session_state["user"] = user
-        
-        if response.session:
-            controller.set(
-                "supabase_session", 
-                {
-                    "access_token": response.session.access_token, 
-                    "refresh_token": response.session.refresh_token
-                }, 
-                max_age=30*24*60*60
-            )
+        # set_session() aggiorna automaticamente la sessione se l'access token
+        # è scaduto, usando il refresh token.
+        response = supabase.auth.set_session(access_token, refresh_token)
+        if response and getattr(response, "session", None):
+            save_authenticated_session(response)
+            return True
     except Exception as e:
-        st.error(f"Errore nel salvataggio della sessione: {e}")
-        print(traceback.format_exc())
+        print(f"Cookie restore error: {e}")
+
+    # Token non più valido: eliminiamo il cookie locale e chiediamo un nuovo login.
+    _cookie_delete(SESSION_COOKIE)
+    return False
+
+def build_google_login_url():
+    """Costruisce l'URL OAuth Google con PKCE e redirect esplicito."""
+    from urllib.parse import urlencode
+
+    verifier, challenge = generate_pkce_pair()
+
+    params = {
+        "provider": "google",
+        "redirect_to": APP_URL,
+        "code_challenge": challenge,
+        "code_challenge_method": "s256",
+    }
+
+    return f"{SUPABASE_URL}/auth/v1/authorize?{urlencode(params)}"
 
 def show_login_page():
     st.title("SanoSync")
-    
-    verifier, challenge = generate_pkce_pair()
-    st.session_state.pkce_verifier = verifier
-    
-    try:
-        login_url = supabase.auth.sign_in_with_oauth({
-            "provider": "google",
-            "options": {
-                "redirect_to": "https://diario-alimentare.streamlit.app",
-                "code_challenge": challenge,
-                "code_challenge_method": "s256"
-            }
-        }).url
-    except Exception as e:
-        st.error(f"Errore nell'inizializzazione Google login: {e}")
-        login_url = "#"
-    
+
+    # NON generiamo un nuovo verifier a ogni rerun.
+    # Il link viene creato una sola volta finché non parte un nuovo tentativo.
+    if not st.session_state.get("google_login_url"):
+        try:
+            st.session_state["google_login_url"] = build_google_login_url()
+        except Exception as e:
+            st.error(f"Errore nell'inizializzazione Google login: {e}")
+            st.session_state["google_login_url"] = "#"
+
+    login_url = st.session_state["google_login_url"]
+
     google_button_html = f"""
     <div style="display: flex; justify-content: center; margin: 10px 0 20px 0;">
         <a href="{login_url}" target="_self" style="
@@ -256,19 +373,19 @@ def show_login_page():
     """
     st.markdown(google_button_html, unsafe_allow_html=True)
     st.markdown("---")
-    
+
     auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
-    
+
     with st.form("auth_form"):
         email = st.text_input("Email")
         password = st.text_input("Password (min. 6 caratteri)", type="password")
-        
+
         display_name_input = ""
         target_weight = None
         height = None
         current_weight = None
         gender = None
-        
+
         if auth_mode == "Registrazione":
             st.markdown("#### 📋 Parametri Fisici Iniziali")
             display_name_input = st.text_input("Display Name", value="")
@@ -276,7 +393,7 @@ def show_login_page():
             height = st.number_input("Altezza (cm)", value=175.0, min_value=100.0, max_value=250.0, step=1.0)
             current_weight = st.number_input("Peso Attuale (kg)", value=80.0, min_value=20.0, max_value=300.0, step=0.5)
             target_weight = st.number_input("Peso Obiettivo (kg)", value=75.0, min_value=20.0, max_value=300.0, step=0.5)
-        
+
         submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
         if st.form_submit_button(submit_label):
             try:
@@ -284,6 +401,7 @@ def show_login_page():
                     response = supabase.auth.sign_in_with_password({"email": email, "password": password})
                     if response and response.session:
                         save_authenticated_session(response)
+                        st.session_state["google_login_url"] = None
                         st.success("Login effettuato!")
                         st.rerun()
                     else:
@@ -294,7 +412,7 @@ def show_login_page():
                     else:
                         calculated_bmr = calculate_bmr(current_weight, height, gender)
                         supabase.auth.sign_up({
-                            "email": email, 
+                            "email": email,
                             "password": password,
                             "options": {
                                 "data": {
@@ -312,45 +430,48 @@ def show_login_page():
                 st.error(f"Errore durante l'autenticazione: {str(e)}")
                 print(traceback.format_exc())
 
-# --- ESECUZIONE DEL CONTROLLO SESSIONE ALL'AVVIO ---
-if "user" not in st.session_state or st.session_state["user"] is None:
+# ==============================================================================
+# 5. RESTORE SESSION / OAUTH CALLBACK
+# ==============================================================================
+# 1) Se Google ci ha riportato con ?code=..., completiamo il PKCE.
+# 2) Altrimenti proviamo il cookie persistente.
+# 3) Solo se entrambi falliscono mostriamo la login page.
+
+if st.session_state.get("user") is None:
     query_code = st.query_params.get("code")
+
     if query_code:
-        verifier = st.session_state.get("pkce_verifier")
-        if not verifier:
-            verifier = controller.get("pkce_verifier_cookie")
-            
+        verifier = st.session_state.get("pkce_verifier") or controller.get(PKCE_COOKIE)
+
         if verifier:
             try:
-                response = supabase.auth.exchange_code_for_session({
-                    "auth_code": query_code,
-                    "code_verifier": verifier
-                })
+                response = exchange_pkce_code(query_code, verifier)
                 save_authenticated_session(response)
+
+                # Il code OAuth è monouso: rimuoviamolo immediatamente dall'URL.
                 st.query_params.clear()
-                st.session_state.pkce_verifier = None
-                controller.set("pkce_verifier_cookie", None, max_age=0)
-                st.rerun()
+                st.session_state["pkce_verifier"] = None
+                st.session_state["google_login_url"] = None
+                _cookie_delete(PKCE_COOKIE)
+
+                # NON facciamo st.rerun() qui: continuiamo questa stessa run
+                # con la sessione appena autenticata.
             except Exception as e:
-                st.error(f"Login OAuth fallito: {str(e)}")
+                print(traceback.format_exc())
+                st.error(f"Login Google fallito: {e}")
+                st.query_params.clear()
+                st.session_state["pkce_verifier"] = None
+                st.session_state["google_login_url"] = None
+                _cookie_delete(PKCE_COOKIE)
         else:
+            st.error("Il callback Google è arrivato senza il PKCE verifier. Riprova il login.")
             st.query_params.clear()
+            st.session_state["google_login_url"] = None
 
-    if "user" not in st.session_state or st.session_state["user"] is None:
-        try:
-            saved_cookie = controller.get("supabase_session")
-            if isinstance(saved_cookie, dict) and saved_cookie.get("access_token"):
-                response = supabase.auth.set_session(
-                    saved_cookie["access_token"], 
-                    saved_cookie["refresh_token"]
-                )
-                if response and response.session:
-                    save_authenticated_session(response)
-                    st.rerun()
-        except Exception as e:
-            print(f"Cookie restore error: {e}")
+if st.session_state.get("user") is None:
+    restore_session_from_cookie()
 
-if "user" not in st.session_state or st.session_state["user"] is None:
+if st.session_state.get("user") is None:
     show_login_page()
     st.stop()
 
