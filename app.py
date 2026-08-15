@@ -10,6 +10,7 @@ from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
 import plotly.express as px
+import plotly.graph_objects as go
 
 # ==============================================================================
 # 1. SETUP INIZIALE E CONFIGURAZIONE PAGINA
@@ -1239,6 +1240,7 @@ elif selected_page == t["t3"]:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore: {e}")
+                    print(traceback.format_exc())
         
         with col_w2:
             st.markdown(f"#### {t['update_target']}")
@@ -1262,418 +1264,401 @@ elif selected_page == t["t3"]:
                     st.error(f"Errore: {e}")
                     print(traceback.format_exc())
     
-    # --------------------------------------------------------------------------
-    # FILTRO TEMPORALE DEL GRAFICO
-    # --------------------------------------------------------------------------
-    period_options = {
-        "5 giorni": 5,
-        "15 giorni": 15,
-        "30 giorni": 30,
-        "60 giorni": 60,
-        "90 giorni": 90,
-        "120 giorni": 120,
-        "180 giorni": 180,
-    }
-
-    selected_period_label = st.selectbox(
-        "Periodo del grafico",
-        list(period_options.keys()),
-        index=2,  # Default: 30 giorni
-        key="weight_chart_period",
-    )
-    selected_period_days = period_options[selected_period_label]
-
     with st.container(border=True):
         try:
-            # Recuperiamo tutti i dati necessari per il periodo selezionato.
-            # Per il peso prendiamo anche i dati precedenti al periodo, così
-            # l'interpolazione iniziale non viene "spezzata" artificialmente.
-            chart_end = pd.Timestamp(date.today())
-            chart_start = chart_end - pd.Timedelta(days=selected_period_days - 1)
-
+            # ------------------------------------------------------------------
+            # DATI PESO
+            # ------------------------------------------------------------------
             logs = (
                 supabase.table("daily_logs")
                 .select("date, weight")
                 .eq("user_id", user_id)
                 .not_.is_("weight", "null")
                 .order("date", desc=False)
-                .execute()
-                .data
-                or []
+                .execute().data
             )
-
-            meals_period = (
-                supabase.table("meals")
-                .select("date, calories")
-                .eq("user_id", user_id)
-                .gte("date", chart_start.strftime("%Y-%m-%d"))
-                .lte("date", chart_end.strftime("%Y-%m-%d"))
-                .execute()
-                .data
-                or []
-            )
-
-            activities_period = (
-                supabase.table("activities")
-                .select("date, activity_name, burned_calories")
-                .eq("user_id", user_id)
-                .gte("date", chart_start.strftime("%Y-%m-%d"))
-                .lte("date", chart_end.strftime("%Y-%m-%d"))
-                .execute()
-                .data
-                or []
-            )
-
-            if logs:
-                df = pd.DataFrame(logs)
-                df["date"] = pd.to_datetime(df["date"]).dt.normalize()
-                df["weight"] = pd.to_numeric(df["weight"], errors="coerce")
-                df = df.dropna(subset=["weight"]).sort_values("date")
-
-                # Costruiamo la serie giornaliera completa e interpoliamo
-                # soltanto tra misurazioni realmente disponibili.
-                full_dates = pd.date_range(
-                    min(df["date"].min(), chart_start),
-                    max(df["date"].max(), chart_end),
-                    freq="D",
+            
+            if not logs:
+                st.info("📊 Nessun dato di peso registrato ancora. Inizia registrando il tuo peso!")
+            else:
+                df_weight = pd.DataFrame(logs)
+                df_weight["date"] = pd.to_datetime(df_weight["date"]).dt.normalize()
+                df_weight["weight"] = pd.to_numeric(df_weight["weight"], errors="coerce")
+                df_weight = df_weight.dropna(subset=["date", "weight"]).sort_values("date")
+                
+                # ------------------------------------------------------------------
+                # FILTRO TEMPORALE: il grafico viene realmente zoomato sulla finestra.
+                # La finestra termina sull'ultima data disponibile, non necessariamente
+                # sulla data odierna (utile se non si registra il peso tutti i giorni).
+                # ------------------------------------------------------------------
+                period_options = {
+                    "5 giorni": 5,
+                    "15 giorni": 15,
+                    "30 giorni": 30,
+                    "60 giorni": 60,
+                    "90 giorni": 90,
+                    "120 giorni": 120,
+                    "180 giorni": 180,
+                }
+                selected_period_label = st.selectbox(
+                    "Periodo del grafico",
+                    list(period_options.keys()),
+                    index=2,
+                    key="weight_chart_period"
                 )
-
-                df_full = (
-                    df.drop_duplicates("date", keep="last")
-                    .set_index("date")[["weight"]]
-                    .reindex(full_dates)
-                )
-                df_full["weight"] = df_full["weight"].interpolate(method="linear")
-                df_full = df_full.reset_index().rename(columns={"index": "date"})
-
-                real_dates = set(df["date"])
-                df_full["is_real"] = df_full["date"].isin(real_dates)
-
-                # Mostriamo esclusivamente la finestra scelta.
-                df_chart = df_full[
-                    (df_full["date"] >= chart_start)
-                    & (df_full["date"] <= chart_end)
+                selected_days = period_options[selected_period_label]
+                
+                chart_end = df_weight["date"].max()
+                chart_start = chart_end - pd.Timedelta(days=selected_days - 1)
+                
+                df_visible = df_weight[
+                    (df_weight["date"] >= chart_start) &
+                    (df_weight["date"] <= chart_end)
                 ].copy()
-
-                target_val = float(user_target_weight) if user_target_weight else 75.0
-
+                
                 # ------------------------------------------------------------------
-                # DATI GIORNALIERI: CALORIE, DEFICIT E ATTIVITA'
+                # DATI CALORICI / ATTIVITÀ PER GLI INDICATORI GIORNALIERI
                 # ------------------------------------------------------------------
-                day_df = pd.DataFrame({"date": pd.date_range(chart_start, chart_end, freq="D")})
-
-                if meals_period:
-                    meals_df = pd.DataFrame(meals_period)
-                    meals_df["date"] = pd.to_datetime(meals_df["date"]).dt.normalize()
-                    meals_df["calories"] = pd.to_numeric(
-                        meals_df["calories"], errors="coerce"
-                    ).fillna(0)
-                    meals_daily = (
-                        meals_df.groupby("date", as_index=False)["calories"]
-                        .sum()
-                        .rename(columns={"calories": "calories_in"})
-                    )
-                    day_df = day_df.merge(meals_daily, on="date", how="left")
-                else:
-                    day_df["calories_in"] = 0
-
-                if activities_period:
-                    acts_df = pd.DataFrame(activities_period)
-                    acts_df["date"] = pd.to_datetime(acts_df["date"]).dt.normalize()
-                    acts_df["burned_calories"] = pd.to_numeric(
-                        acts_df["burned_calories"], errors="coerce"
-                    ).fillna(0)
-
-                    acts_daily = (
-                        acts_df.groupby("date", as_index=False)["burned_calories"]
-                        .sum()
-                        .rename(columns={"burned_calories": "extra_burned"})
-                    )
-                    day_df = day_df.merge(acts_daily, on="date", how="left")
-
-                    padel_dates = set(
-                        acts_df.loc[
-                            acts_df["activity_name"].fillna("").str.contains(
-                                "padel", case=False, na=False
-                            ),
-                            "date",
-                        ]
-                    )
-                else:
-                    day_df["extra_burned"] = 0
-                    padel_dates = set()
-
-                day_df["calories_in"] = day_df["calories_in"].fillna(0)
-                day_df["extra_burned"] = day_df["extra_burned"].fillna(0)
-
-                # BMR giornaliero: per i giorni completi usiamo il BMR dell'utente.
-                # Per oggi, se il grafico include oggi, usiamo il BMR maturato
-                # fino all'ora corrente, come nella tab "Riepilogo giornaliero".
-                daily_bmr = float(user_bmr or 0)
-                if daily_bmr > 0 and chart_end.date() == date.today():
-                    now = datetime.now()
-                    minutes_passed = now.hour * 60 + now.minute
-                    bmr_today = int((daily_bmr / (24 * 60)) * minutes_passed)
-                    day_df.loc[day_df["date"] == chart_end, "bmr"] = bmr_today
-                    day_df.loc[day_df["date"] != chart_end, "bmr"] = daily_bmr
-                else:
-                    day_df["bmr"] = daily_bmr
-
-                day_df["total_burned"] = day_df["bmr"] + day_df["extra_burned"]
-                day_df["deficit"] = day_df["total_burned"] - day_df["calories_in"]
-
-                # Target: deficit giornaliero di 500 kcal.
-                # 👍 >= 500 kcal
-                # 😐 da 0 a 499 kcal
-                # 👎 < 0 kcal (surplus calorico)
-                def deficit_symbol(deficit):
-                    if deficit >= 500:
-                        return "👍"
-                    elif deficit >= 0:
-                        return "😐"
-                    return "👎"
-
-                def activity_symbol(row):
-                    activity_date = row["date"]
-                    extra = row["extra_burned"]
-
-                    if activity_date in padel_dates:
-                        return "🎾"
-                    elif extra > 300:
-                        return "🔥"
-                    return "🛏️"
-
-                day_df["deficit_symbol"] = day_df["deficit"].apply(deficit_symbol)
-                day_df["activity_symbol"] = day_df.apply(activity_symbol, axis=1)
-
-                # ------------------------------------------------------------------
-                # FORECAST DEL PESO
-                # ------------------------------------------------------------------
-                latest_real_df = df[df["date"] <= chart_end].sort_values("date")
-                latest_weight = (
-                    float(latest_real_df["weight"].iloc[-1])
-                    if not latest_real_df.empty
-                    else None
+                # Recuperiamo solo le colonne necessarie. In caso di tabella vuota
+                # continuiamo comunque a mostrare la timeline con valori neutri.
+                meals_rows = (
+                    supabase.table("meals")
+                    .select("date, calories")
+                    .eq("user_id", user_id)
+                    .gte("date", str(chart_start.date()))
+                    .lte("date", str(chart_end.date()))
+                    .execute().data or []
                 )
-
+                activities_rows = (
+                    supabase.table("activities")
+                    .select("date, activity_name, burned_calories")
+                    .eq("user_id", user_id)
+                    .gte("date", str(chart_start.date()))
+                    .lte("date", str(chart_end.date()))
+                    .execute().data or []
+                )
+                
+                # Calorie ingerite per giorno
+                meals_df = pd.DataFrame(meals_rows)
+                if not meals_df.empty:
+                    meals_df["date"] = pd.to_datetime(meals_df["date"]).dt.normalize()
+                    meals_df["calories"] = pd.to_numeric(meals_df["calories"], errors="coerce").fillna(0)
+                    kcal_in_by_day = meals_df.groupby("date")["calories"].sum().to_dict()
+                else:
+                    kcal_in_by_day = {}
+                
+                # Attività per giorno
+                activities_df = pd.DataFrame(activities_rows)
+                if not activities_df.empty:
+                    activities_df["date"] = pd.to_datetime(activities_df["date"]).dt.normalize()
+                    activities_df["burned_calories"] = pd.to_numeric(
+                        activities_df["burned_calories"], errors="coerce"
+                    ).fillna(0)
+                
+                # ------------------------------------------------------------------
+                # CALCOLO PROIEZIONE
+                # ------------------------------------------------------------------
+                target_val = float(user_target_weight) if user_target_weight else 75.0
+                latest_weight = float(df_weight["weight"].iloc[-1])
                 forecast_markdown = ""
-                days_to_goal = 0
                 estimated_date = None
-
-                if (
-                    len(latest_real_df) >= 3
-                    and latest_weight is not None
-                    and latest_weight > target_val
-                ):
-                    recent_df = latest_real_df.tail(min(len(latest_real_df), 14))
-                    days_diff = (
-                        recent_df["date"].max() - recent_df["date"].min()
-                    ).days
-                    weight_diff = (
-                        recent_df["weight"].iloc[-1] - recent_df["weight"].iloc[0]
-                    )
-
+                days_to_goal = 0
+                
+                if len(df_weight) >= 3 and latest_weight > target_val:
+                    recent_df = df_weight.tail(min(len(df_weight), 14)).copy()
+                    days_diff = (recent_df["date"].max() - recent_df["date"].min()).days
+                    weight_diff = float(recent_df["weight"].iloc[-1] - recent_df["weight"].iloc[0])
+                    
                     if days_diff > 0 and weight_diff < 0:
                         kg_per_day = abs(weight_diff / days_diff)
                         kg_to_lose = latest_weight - target_val
-                        days_to_goal = int(kg_to_lose / kg_per_day)
-
-                        estimated_date = datetime.now() + pd.Timedelta(days=days_to_goal)
-                        est_date_str = estimated_date.strftime("%d %B %Y")
-
+                        days_to_goal = max(1, int(kg_to_lose / kg_per_day))
+                        estimated_date = df_weight["date"].max() + pd.Timedelta(days=days_to_goal)
+                        est_date_str = estimated_date.strftime('%d %B %Y')
                         forecast_markdown = f"""
-                        <div style="background-color: #FFFFFF; border: 1px solid #FF8B8B; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #1A2942; font-weight: 500;">
+                        <div style="background-color:#FFFFFF;border:1px solid #FF8B8B;padding:12px 16px;border-radius:10px;margin-top:15px;color:#1A2942;font-weight:500;">
                             {t['weight_forecast_title']}<br>
-                            <span style="font-size: 14px; font-weight: 400;">{t['forecast_days'](days_to_goal, est_date_str)}</span>
+                            <span style="font-size:14px;font-weight:400;">{t['forecast_days'](days_to_goal, est_date_str)}</span>
                         </div>
                         """
                     else:
                         forecast_markdown = f"""
-                        <div style="background-color: #FFFFFF; border: 1px solid #FF8B8B; padding: 12px 16px; border-radius: 10px; margin-top: 15px; color: #1A2942; font-weight: 500;">
+                        <div style="background-color:#FFFFFF;border:1px solid #FF8B8B;padding:12px 16px;border-radius:10px;margin-top:15px;color:#1A2942;font-weight:500;">
                             {t['weight_forecast_title']}<br>
-                            <span style="font-size: 14px; font-weight: 400;">{t['forecast_flat_up']}</span>
+                            <span style="font-size:14px;font-weight:400;">{t['forecast_flat_up']}</span>
                         </div>
                         """
-
+                
                 # ------------------------------------------------------------------
-                # GRAFICO
+                # GRAFICO PRINCIPALE
                 # ------------------------------------------------------------------
-                df_chart["date_str"] = df_chart["date"].dt.strftime("%d %b")
-                df_chart["weight_str"] = df_chart["weight"].round(1).astype(str) + " kg"
-
-                df_real = df_chart[df_chart["is_real"]]
-                df_interp = df_chart[~df_chart["is_real"]]
-
-                fig = px.bar()
-
-                fig.add_bar(
-                    x=df_real["date"],
-                    y=df_real["weight"],
-                    marker_color="#FF8B8B",
-                    customdata=df_real[["date_str", "weight_str"]],
-                    hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]}</b><extra></extra>",
-                    name="Reale",
-                )
-
-                fig.add_bar(
-                    x=df_interp["date"],
-                    y=df_interp["weight"],
-                    marker_color="rgba(26, 41, 66, 0.2)",
-                    customdata=df_interp[["date_str", "weight_str"]],
-                    hovertemplate="<b>⚖️ %{customdata[0]}</b><br><b>%{customdata[1]} (Proiezione)</b><extra></extra>",
-                    name="Proiezione",
-                )
-
-                if (
-                    len(latest_real_df) >= 3
-                    and latest_weight is not None
-                    and latest_weight > target_val
-                    and estimated_date
-                    and days_to_goal > 0
-                ):
-                    first_real_date = latest_real_df["date"].iloc[0]
-                    first_real_weight = latest_real_df["weight"].iloc[0]
-
-                    fig.add_scatter(
-                        x=[first_real_date, estimated_date],
-                        y=[first_real_weight, target_val],
+                fig = go.Figure()
+                
+                # Peso reale: unica serie quantitativa sempre visibile.
+                fig.add_trace(go.Scatter(
+                    x=df_visible["date"],
+                    y=df_visible["weight"],
+                    mode="lines+markers",
+                    name="Peso reale",
+                    line=dict(color="#FF8B8B", width=3),
+                    marker=dict(size=8, color="#FF8B8B"),
+                    customdata=df_visible[["date", "weight"]].to_numpy(),
+                    hovertemplate=(
+                        "<b>%{customdata[0]|%d %b %Y}</b><br>"
+                        "Peso: <b>%{customdata[1]:.1f} kg</b><extra></extra>"
+                    ),
+                ))
+                
+                # Proiezione: trace separata, quindi cliccabile nella legenda.
+                if estimated_date is not None and days_to_goal > 0:
+                    recent_df = df_weight.tail(min(len(df_weight), 14)).copy()
+                    first_projection_date = recent_df["date"].iloc[0]
+                    first_projection_weight = float(recent_df["weight"].iloc[0])
+                    fig.add_trace(go.Scatter(
+                        x=[first_projection_date, estimated_date],
+                        y=[first_projection_weight, target_val],
                         mode="lines+markers",
-                        line=dict(color="#FF8B8B", width=3, dash="dash"),
-                        marker=dict(size=6, color="#FF8B8B"),
-                        name="Trend Globale",
-                    )
-
-                # Per finestre lunghe evitiamo di stampare una data sotto ogni
-                # colonna, ma manteniamo tutti i simboli giornalieri.
-                if selected_period_days <= 30:
-                    tickvals = list(df_chart["date"])
-                    ticktext = list(df_chart["date"].dt.strftime("%d %b"))
-                elif selected_period_days <= 60:
-                    tickvals = list(df_chart["date"].iloc[::2])
-                    ticktext = list(df_chart["date"].dt.strftime("%d %b").iloc[::2])
-                else:
-                    step = 7
-                    tickvals = list(df_chart["date"].iloc[::step])
-                    ticktext = list(df_chart["date"].dt.strftime("%d %b").iloc[::step])
-
-                # Simboli allineati alle singole giornate, sotto l'asse X.
-                # Per periodi molto lunghi possono sovrapporsi: in quel caso
-                # l'utente può ridurre il filtro a 30/60 giorni.
-                for _, row in day_df.iterrows():
-                    day = row["date"]
-                    fig.add_annotation(
-                        x=day,
-                        y=-0.16,
-                        xref="x",
-                        yref="paper",
-                        text=row["deficit_symbol"],
-                        showarrow=False,
-                        font=dict(size=16),
-                    )
-                    fig.add_annotation(
-                        x=day,
-                        y=-0.29,
-                        xref="x",
-                        yref="paper",
-                        text=row["activity_symbol"],
-                        showarrow=False,
-                        font=dict(size=15),
-                    )
-
-                min_weight = (
-                    min(75, float(user_target_weight) - 3)
-                    if user_target_weight
-                    else 75
+                        name="Proiezione",
+                        line=dict(color="#FF8B8B", width=2.5, dash="dash"),
+                        marker=dict(size=6),
+                        hovertemplate=(
+                            "<b>Proiezione</b><br>%{x|%d %b %Y}<br>"
+                            "Peso stimato: <b>%{y:.1f} kg</b><extra></extra>"
+                        ),
+                    ))
+                
+                # Obiettivo come trace e NON come hline: in questo modo la legenda
+                # permette di mostrarlo/nasconderlo con un click.
+                goal_x_start = chart_start
+                goal_x_end = max(chart_end, estimated_date) if estimated_date is not None else chart_end
+                fig.add_trace(go.Scatter(
+                    x=[goal_x_start, goal_x_end],
+                    y=[target_val, target_val],
+                    mode="lines",
+                    name="Obiettivo",
+                    line=dict(color="#1A2942", width=2.5),
+                    hovertemplate="Obiettivo: <b>%{y:.1f} kg</b><extra></extra>",
+                ))
+                
+                # Zoom X: la finestra selezionata rimane sempre la finestra visualizzata.
+                fig.update_xaxes(
+                    range=[chart_start - pd.Timedelta(hours=12), chart_end + pd.Timedelta(hours=12)],
+                    type="date",
+                    showgrid=False,
+                    tickformat="%d %b",
+                    nticks=min(selected_days, 10),
+                    fixedrange=False,
                 )
-                max_weight = (
-                    max(90, float(user_target_weight) + 10)
-                    if user_target_weight
-                    else 90
+                
+                # Autoscaling Y intelligente sulla finestra visibile.
+                visible_values = df_visible["weight"].tolist()
+                if target_val >= min(visible_values) - 1.5 and target_val <= max(visible_values) + 1.5:
+                    visible_values.append(target_val)
+                y_min = min(visible_values)
+                y_max = max(visible_values)
+                spread = max(y_max - y_min, 1.0)
+                padding = max(0.8, spread * 0.18)
+                fig.update_yaxes(
+                    range=[y_min - padding, y_max + padding],
+                    title="Peso (kg)",
+                    showgrid=True,
+                    gridcolor="#E8ECF2",
+                    zeroline=False,
+                    fixedrange=False,
                 )
-
-                actual_min = float(df_chart["weight"].min())
-                actual_max = float(df_chart["weight"].max())
-                min_weight = min(min_weight, actual_min - 1)
-                max_weight = max(max_weight, actual_max + 1)
-
-                fig.update_yaxes(range=[min_weight, max_weight])
-
-                fig.add_hline(
-                    y=target_val,
-                    line_dash="solid",
-                    line_color="#1A2942",
-                    line_width=2.5,
-                )
-
-                fig.add_annotation(
-                    xref="paper",
-                    yref="y",
-                    x=0.98,
-                    y=target_val + 2.0,
-                    text=f"<b>🎯 GOAL: {target_val} kg</b>",
-                    showarrow=False,
-                    font=dict(color="#1A2942", size=14, family="sans-serif"),
-                    align="right",
-                    bgcolor="rgba(255, 255, 255, 0.9)",
-                    bordercolor="#FF8B8B",
-                    borderwidth=1,
-                    borderpad=4,
-                )
-
+                
                 fig.update_layout(
-                    showlegend=False,
+                    height=470,
                     plot_bgcolor="#FFFFFF",
                     paper_bgcolor="rgba(0,0,0,0)",
-                    barmode="overlay",
                     hovermode="x unified",
+                    hoverlabel=dict(bgcolor="white"),
                     font=dict(color="#1A2942"),
-                    margin=dict(l=20, r=20, t=20, b=105),
-                    xaxis=dict(
-                        tickmode="array",
-                        tickvals=tickvals,
-                        ticktext=ticktext,
-                        tickangle=-45,
-                        automargin=True,
+                    margin=dict(l=55, r=30, t=45, b=55),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="left",
+                        x=0,
+                        bgcolor="rgba(255,255,255,0.85)",
+                        borderwidth=0,
                     ),
                 )
-
-                st.plotly_chart(fig, use_container_width=True)
-
-                # Legenda esplicativa: resta sempre visibile e chiarisce i simboli.
-                st.markdown(
-                    """
-                    <div style="
-                        display:flex;
-                        flex-wrap:wrap;
-                        gap:18px;
-                        margin-top:-8px;
-                        padding:8px 4px 2px 4px;
-                        font-size:0.85rem;
-                        color:#1A2942;
-                    ">
-                        <span>👍 Deficit ≥ 500 kcal</span>
-                        <span>😐 Deficit 0–499 kcal</span>
-                        <span>👎 Surplus calorico</span>
-                        <span>🎾 Padel</span>
-                        <span>🔥 Extra > 300 kcal</span>
-                        <span>🛏️ Extra &lt; 300 kcal</span>
+                
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                
+                # ------------------------------------------------------------------
+                # TIMELINE GIORNALIERA: FUORI DAL GRAFICO
+                # ------------------------------------------------------------------
+                # Una fascia separata evita che le icone interferiscano con le linee,
+                # le date, il tooltip e l'asse Y. Su mobile diventa scrollabile.
+                timeline_dates = pd.date_range(chart_start, chart_end, freq="D")
+                
+                date_cells = []
+                deficit_cells = []
+                activity_cells = []
+                
+                for day in timeline_dates:
+                    day_key = pd.Timestamp(day).normalize()
+                    kcal_in = float(kcal_in_by_day.get(day_key, 0))
+                    
+                    day_extra = 0.0
+                    day_has_padel = False
+                    if not activities_df.empty:
+                        day_rows = activities_df[activities_df["date"] == day_key]
+                        day_extra = float(day_rows["burned_calories"].sum()) if not day_rows.empty else 0.0
+                        day_has_padel = any(
+                            str(name).strip().lower() == "padel"
+                            for name in day_rows["activity_name"].tolist()
+                        )
+                    
+                    # Deficit reale = calorie bruciate - calorie ingerite.
+                    # Per i giorni storici usiamo il BMR giornaliero + attività extra.
+                    actual_deficit = float(user_bmr) + day_extra - kcal_in
+                    
+                    # Giorni senza dati alimentari: non fingiamo che siano deficitari.
+                    if kcal_in <= 0:
+                        deficit_icon = "·"
+                        deficit_title = "Nessun dato alimentare"
+                    elif actual_deficit >= 500:
+                        deficit_icon = "👍"
+                        deficit_title = f"Deficit {actual_deficit:.0f} kcal"
+                    elif actual_deficit >= 0:
+                        deficit_icon = "😐"
+                        deficit_title = f"Deficit {actual_deficit:.0f} kcal"
+                    else:
+                        deficit_icon = "👎"
+                        deficit_title = f"Surplus {abs(actual_deficit):.0f} kcal"
+                    
+                    if day_has_padel:
+                        activity_icon = "🎾"
+                        activity_title = f"Padel · {day_extra:.0f} kcal extra"
+                    elif day_extra > 300:
+                        activity_icon = "🔥"
+                        activity_title = f"{day_extra:.0f} kcal extra"
+                    elif day_extra > 0:
+                        activity_icon = "🛏️"
+                        activity_title = f"{day_extra:.0f} kcal extra"
+                    else:
+                        activity_icon = "🛏️"
+                        activity_title = "Nessuna attività extra"
+                    
+                    date_cells.append(
+                        f'<div class="weight-timeline-cell"><div class="weight-timeline-date">{day_key.strftime("%d")}</div>'
+                        f'<div class="weight-timeline-month">{day_key.strftime("%b")}</div></div>'
+                    )
+                    deficit_cells.append(
+                        f'<div class="weight-timeline-cell" title="{deficit_title}"><div class="weight-timeline-icon">{deficit_icon}</div></div>'
+                    )
+                    activity_cells.append(
+                        f'<div class="weight-timeline-cell" title="{activity_title}"><div class="weight-timeline-icon">{activity_icon}</div></div>'
+                    )
+                
+                timeline_html = f"""
+                <style>
+                    .weight-timeline-wrap {{
+                        border: 1px solid #E2E6EC;
+                        border-radius: 12px;
+                        background: #FFFFFF;
+                        overflow-x: auto;
+                        padding: 10px 8px 8px 8px;
+                        margin-top: 6px;
+                    }}
+                    .weight-timeline-inner {{
+                        min-width: max(100%, {max(len(timeline_dates) * 42, 420)}px);
+                    }}
+                    .weight-timeline-row {{
+                        display: grid;
+                        grid-template-columns: repeat({len(timeline_dates)}, minmax(38px, 1fr));
+                        align-items: center;
+                    }}
+                    .weight-timeline-label {{
+                        position: sticky;
+                        left: 0;
+                        z-index: 2;
+                        background: #FFFFFF;
+                        width: 78px;
+                        min-width: 78px;
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: #667085;
+                        padding: 6px 8px 6px 2px;
+                    }}
+                    .weight-timeline-content {{
+                        display: grid;
+                        grid-template-columns: 78px repeat({len(timeline_dates)}, minmax(38px, 1fr));
+                        align-items: center;
+                    }}
+                    .weight-timeline-cell {{
+                        text-align: center;
+                        min-width: 38px;
+                        padding: 4px 1px;
+                    }}
+                    .weight-timeline-date {{
+                        font-size: 12px;
+                        line-height: 14px;
+                        font-weight: 700;
+                        color: #1A2942;
+                    }}
+                    .weight-timeline-month {{
+                        font-size: 10px;
+                        color: #98A2B3;
+                        line-height: 12px;
+                    }}
+                    .weight-timeline-icon {{
+                        font-size: 19px;
+                        line-height: 25px;
+                    }}
+                    .weight-timeline-divider {{
+                        border-top: 1px solid #EEF1F5;
+                        margin: 4px 0;
+                    }}
+                    .weight-timeline-legend {{
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 10px 18px;
+                        padding: 10px 2px 2px 2px;
+                        color: #667085;
+                        font-size: 12px;
+                    }}
+                </style>
+                <div class="weight-timeline-wrap">
+                    <div class="weight-timeline-inner">
+                        <div class="weight-timeline-content">
+                            <div class="weight-timeline-label">Giorno</div>
+                            {''.join(date_cells)}
+                        </div>
+                        <div class="weight-timeline-divider"></div>
+                        <div class="weight-timeline-content">
+                            <div class="weight-timeline-label">Deficit</div>
+                            {''.join(deficit_cells)}
+                        </div>
+                        <div class="weight-timeline-content">
+                            <div class="weight-timeline-label">Attività</div>
+                            {''.join(activity_cells)}
+                        </div>
+                        <div class="weight-timeline-legend">
+                            <span>👍 ≥500 kcal</span>
+                            <span>😐 0–499 kcal</span>
+                            <span>👎 surplus</span>
+                            <span>🎾 Padel</span>
+                            <span>🔥 &gt;300 kcal</span>
+                            <span>🛏️ ≤300 kcal</span>
+                            <span>· nessun dato alimentare</span>
+                        </div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
+                </div>
+                """
+                st.markdown(timeline_html, unsafe_allow_html=True)
+                
                 if forecast_markdown:
                     st.markdown(forecast_markdown, unsafe_allow_html=True)
-
-            else:
-                st.info(
-                    "📊 Nessun dato di peso registrato ancora. "
-                    "Inizia registrando il tuo peso!"
-                )
-
         except Exception as e:
             st.error(f"Errore nel caricamento grafico: {e}")
             print(traceback.format_exc())
+
+# ==============================================================================
 # 12. PAGE 4: QUICK ENTRIES (IMMISSIONI RAPIDE)
 # ==============================================================================
 elif selected_page == t["t4"]:
