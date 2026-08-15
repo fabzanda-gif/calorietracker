@@ -1186,15 +1186,91 @@ elif selected_page == t["t2"]:
             })
             st.dataframe(df_display[["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]], use_container_width=True, hide_index=True)
             
-            meal_options_del = {f"{m['meal_type']} - {m['name']} ({m['calories']} kcal)": m['id'] for m in meals_with_id}
-            selected_meal_to_del = st.selectbox(t["del_meal"], [""] + list(meal_options_del.keys()))
-            
-            if selected_meal_to_del:
-                if st.button(t["del_meal_btn"]):
-                    meal_id_to_delete = meal_options_del[selected_meal_to_del]
-                    supabase.table("meals").delete().eq("id", meal_id_to_delete).execute()
-                    st.success(t["meal_del_success"])
-                    st.rerun()
+            # ------------------------------------------------------------------
+            # MODIFICA / ELIMINAZIONE PASTI
+            # ------------------------------------------------------------------
+            # Il valore della selectbox è l'ID del record, così anche due pasti
+            # con lo stesso nome possono essere modificati separatamente.
+            meal_by_id = {m["id"]: m for m in meals_with_id}
+            meal_options = {
+                m["id"]: f"{m.get('meal_type', '')} - {m.get('name', '')} ({m.get('calories', 0)} kcal)"
+                for m in meals_with_id
+            }
+
+            selected_meal_id = st.selectbox(
+                "🍽️ Seleziona il pasto da modificare",
+                options=[""] + list(meal_options.keys()),
+                format_func=lambda meal_id: (
+                    "Seleziona un pasto..."
+                    if meal_id == ""
+                    else meal_options[meal_id]
+                ),
+                key=f"edit_meal_select_{summary_date}"
+            )
+
+            if selected_meal_id:
+                selected_meal = meal_by_id[selected_meal_id]
+                meal_types = ["Colazione", "Pranzo", "Cena", "Snack"]
+
+                current_type = selected_meal.get("meal_type")
+                current_index = meal_types.index(current_type) if current_type in meal_types else 0
+
+                edit_col1, edit_col2 = st.columns([2, 1])
+
+                with edit_col1:
+                    new_meal_type = st.selectbox(
+                        "Tipo di pasto",
+                        meal_types,
+                        index=current_index,
+                        key=f"edit_meal_type_{selected_meal_id}_{summary_date}"
+                    )
+
+                with edit_col2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    save_meal_type = st.button(
+                        "💾 Salva modifica",
+                        use_container_width=True,
+                        key=f"save_meal_type_{selected_meal_id}_{summary_date}"
+                    )
+
+                if save_meal_type:
+                    try:
+                        supabase.table("meals").update(
+                            {"meal_type": new_meal_type}
+                        ).eq("id", selected_meal_id).eq(
+                            "user_id", user_id
+                        ).execute()
+
+                        st.success(
+                            f"✅ Tipo di pasto modificato in **{new_meal_type}**."
+                        )
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Errore nella modifica del pasto: {e}")
+
+                st.markdown("---")
+
+                delete_col1, delete_col2 = st.columns([3, 1])
+                with delete_col1:
+                    st.caption(
+                        f"Elimina definitivamente **{selected_meal.get('name', 'questo pasto')}** "
+                        "se non vuoi più conservarlo."
+                    )
+                with delete_col2:
+                    if st.button(
+                        t["del_meal_btn"],
+                        key=f"delete_meal_{selected_meal_id}_{summary_date}",
+                        use_container_width=True
+                    ):
+                        try:
+                            supabase.table("meals").delete().eq(
+                                "id", selected_meal_id
+                            ).eq("user_id", user_id).execute()
+                            st.success(t["meal_del_success"])
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Errore nell'eliminazione del pasto: {e}")
+
         else:
             st.info(t["no_meals"])
     
