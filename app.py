@@ -175,8 +175,8 @@ def info_badge(note, label="Note"):
     )
 
 
-def closest_logged_meal(meal_type, target_calories):
-    """Trova nello storico meals il pasto del tipo richiesto più vicino al target calorico."""
+def closest_logged_meal(meal_type, target_calories, allow_adyen=False):
+    """Trova nello storico meals il pasto più vicino al target. I pasti Adyen sono ammessi solo quando allow_adyen=True."""
     try:
         rows = (
             supabase.table("meals")
@@ -203,6 +203,8 @@ def closest_logged_meal(meal_type, target_calories):
         if kcal <= 0:
             continue
         label = (row.get("base_name") or _clean_meal_name(row.get("name")) or "Pasto").strip()
+        if not allow_adyen and label.casefold().startswith("adyen"):
+            continue
         dedupe_key = label.casefold()
         if dedupe_key in seen:
             continue
@@ -1439,7 +1441,7 @@ elif selected_page == t["t2"]:
                 fixed_kcal = 1260.0  # colazione + pasto ufficio
                 dinner_target = max(0.0, daily_budget - fixed_kcal)
                 st.markdown(f"**Budget stimato:** {daily_budget:.0f} kcal · **Ufficio già allocato:** 1260 kcal · **Cena:** circa {dinner_target:.0f} kcal")
-                dinner = closest_logged_meal("Cena", dinner_target)
+                dinner = closest_logged_meal("Cena", dinner_target, allow_adyen=True)
                 if dinner:
                     st.markdown(
                         f"🍽️ **Cena suggerita:** {html.escape(dinner['name'])} — circa **{dinner['calories']:.0f} kcal** "
@@ -2104,6 +2106,23 @@ elif selected_page == t["t5"]:
         day_steps = 0
         day_activities = []
 
+    # Riepilogo calorie attività per la giornata selezionata
+    def _activity_kcal(name):
+        return sum(
+            int(a.get("burned_calories") or 0)
+            for a in day_activities
+            if str(a.get("activity_name") or "").strip().casefold() == name.casefold()
+        )
+
+    steps_kcal = _activity_kcal("Passi (Stima)")
+    padel_kcal = _activity_kcal("Padel")
+    bike_kcal = sum(
+        int(a.get("burned_calories") or 0)
+        for a in day_activities
+        if str(a.get("activity_name") or "").strip().casefold() in {"bici", "bici elettrica"}
+    )
+    total_extra_kcal = sum(int(a.get("burned_calories") or 0) for a in day_activities)
+
     # Verifichiamo se ci sono attività strutturate oltre ai passi
     has_structured_activity = any(a.get("activity_name") not in ["Passi (Stima)"] for a in day_activities)
 
@@ -2127,6 +2146,25 @@ elif selected_page == t["t5"]:
     with st.container(border=True):
         st.metric(t["status_move_title"], status_display_text)
         st.caption(move_msg)
+
+    # Tile calorie extra bruciate nella giornata
+    with st.container(border=True):
+        st.metric("🔥 Kcal bruciate extra", f"{total_extra_kcal} kcal")
+        if total_extra_kcal > 0:
+            st.caption("Somma delle calorie registrate nelle attività della giornata selezionata.")
+        else:
+            st.caption("Nessuna caloria extra registrata per questa giornata.")
+
+    # Breakdown per tipologia di attività
+    with st.container(border=True):
+        st.markdown("#### 📊 Calorie per attività")
+        kc1, kc2, kc3 = st.columns(3)
+        kc1.metric("👣 Passi", f"{steps_kcal} kcal")
+        kc2.metric("🎾 Padel", f"{padel_kcal} kcal")
+        kc3.metric("🚲 Bici", f"{bike_kcal} kcal")
+        other_kcal = max(0, total_extra_kcal - steps_kcal - padel_kcal - bike_kcal)
+        if other_kcal > 0:
+            st.caption(f"Altre attività registrate: {other_kcal} kcal")
 
     # 3 Colonne: Passi, Bici (Normale ed Elettrica), Altro
     col_a1, col_a2, col_a3 = st.columns(3)
