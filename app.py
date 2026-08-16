@@ -151,35 +151,27 @@ def search_open_food_facts(query):
         return {}
     
     try:
-       if query.isdigit():
-        # Usiamo l'endpoint specifico per l'Olanda se cerchi per codice a barre
-        url = f"https://nl.openfoodfacts.org/api/v2/product/{query}.json"
-        response = requests.get(url, timeout=10)
-        payload = response.json()
-        if payload.get("status") != 1:
-            # Fallback opzionale sul database mondiale se non lo trova in quello olandese
-            url_world = f"https://world.openfoodfacts.org/api/v2/product/{query}.json"
-            response = requests.get(url_world, timeout=10)
+        if query.isdigit():
+            url = f"https://world.openfoodfacts.org/api/v2/product/{query}.json"
+            response = requests.get(url, timeout=10)
             payload = response.json()
             if payload.get("status") != 1:
                 return {}
-        products = [payload.get("product", {})]
-    else:
-        # Usiamo il motore di ricerca focalizzato sul paese Olanda (cc=nl)
-        url = "https://nl.openfoodfacts.org/cgi/search.pl"
-        response = requests.get(
-            url, 
-            params={
-                "search_terms": query, 
-                "search_simple": 1, 
-                "action": "process", 
-                "json": 1, 
-                "page_size": 20,
-                "cc": "nl"  # Filtro specifico per i prodotti commercializzati in Olanda
-            }, 
-            timeout=10
-        )
-        products = response.json().get("products", [])
+            products = [payload.get("product", {})]
+        else:
+            url = "https://world.openfoodfacts.org/cgi/search.pl"
+            response = requests.get(
+                url, 
+                params={
+                    "search_terms": query, 
+                    "search_simple": 1, 
+                    "action": "process", 
+                    "json": 1, 
+                    "page_size": 20
+                }, 
+                timeout=10
+            )
+            products = response.json().get("products", [])
 
         results = {}
         for i, p in enumerate(products):
