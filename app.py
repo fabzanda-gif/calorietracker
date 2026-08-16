@@ -6,6 +6,8 @@ import base64
 import secrets
 import hashlib
 import traceback
+import re
+import json
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -187,6 +189,44 @@ def search_open_food_facts(query):
     except Exception as e:
         st.error(f"Errore nella ricerca: {e}")
         return {}
+
+def save_meal_as_quick_entry(meal_name, calories, protein, carbs, fat):
+    """Salva/aggiorna automaticamente un cibo registrato come immissione rapida."""
+    try:
+        clean_name = re.sub(r"\s*\((?:[0-9]+(?:\.[0-9]+)?)\s*(?:g|porz\.)\)\s*$", "", str(meal_name)).strip()
+        if not clean_name:
+            clean_name = str(meal_name).strip()
+        existing = (
+            supabase.table("recipes").select("id").eq("user_id", user_id).eq("name", clean_name)
+            .limit(1).execute().data or []
+        )
+        payload = {
+            "name": clean_name,
+            "calories": int(round(float(calories))),
+            "protein": int(round(float(protein))),
+            "carbs": int(round(float(carbs))),
+            "fat": int(round(float(fat))),
+            "is_per_100g": 0,
+            "user_id": user_id,
+        }
+        if existing:
+            supabase.table("recipes").update(payload).eq("id", existing[0]["id"]).eq("user_id", user_id).execute()
+        else:
+            supabase.table("recipes").insert(payload).execute()
+        return True
+    except Exception as e:
+        print(f"Auto-salvataggio quick entry fallito: {e}")
+        return False
+
+def calculate_recipe_totals(ingredients):
+    total_weight = sum(float(i.get("quantity_g", 0)) for i in ingredients)
+    totals = {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+    for i in ingredients:
+        factor = float(i.get("quantity_g", 0)) / 100.0
+        for key in totals:
+            totals[key] += float(i.get(f"{key}_per_100g", 0) or 0) * factor
+    per100 = {k: (v / total_weight * 100 if total_weight > 0 else 0) for k, v in totals.items()}
+    return total_weight, totals, per100
 
 # ==============================================================================
 # 4. AUTHENTICATION & SESSION MANAGEMENT
@@ -1007,6 +1047,7 @@ if selected_page == t["t1"]:
                 "name": meal_display_name, "calories": cals_in, "protein": prot_in, 
                 "carbs": carbs_in, "fat": fat_in
             }).execute()
+            save_meal_as_quick_entry(meal_display_name, cals_in, prot_in, carbs_in, fat_in)
             refresh_daily_logs(log_date)
             reset_or_update()
             st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
@@ -1292,541 +1333,374 @@ elif selected_page == t["t2"]:
 # ==============================================================================
 elif selected_page == t["t3"]:
     st.subheader(t["weight_tracking"])
-    
+
+    # ------------------------------------------------------------------
+    # INSERIMENTO / MODIFICA / CANCELLAZIONE PESO
+    # ------------------------------------------------------------------
     with st.container(border=True):
-        col_w1, col_w2 = st.columns(2)
-        
-        with col_w1:
-            st.markdown(f"#### {t['log_today_weight']}")
-            w = st.number_input(
-                t["insert_weight"], 
-                value=80.0, 
-                min_value=20.0, 
-                max_value=300.0,
-                step=0.1
-            )
-            if st.button(t["save_weight"], use_container_width=True):
+        st.markdown("#### ⚖️ Gestione pesi")
+        logs_all = (
+            supabase.table("daily_logs").select("id, date, weight").eq("user_id", user_id)
+            .not_.is_("weight", "null").order("date", desc=True).execute().data or []
+        )
+        edit_options = {
+            str(r["id"]): f"{r['date']} · {float(r['weight']):.1f} kg" for r in logs_all
+        }
+        c1, c2 = st.columns(2)
+        with c1:
+            w = st.number_input("Nuovo peso (kg)", value=80.0, min_value=20.0, max_value=300.0, step=0.1, key="new_weight_value")
+            w_date = st.date_input("Data del peso", value=date.today(), key="new_weight_date")
+            if st.button("💾 Salva peso", use_container_width=True):
                 try:
                     supabase.table("daily_logs").upsert({
-                        "user_id": user_id,
-                        "date": str(date.today()),
-                        "weight": w
+                        "user_id": user_id, "date": str(w_date), "weight": float(w)
                     }, on_conflict="user_id,date").execute()
                     st.success("✅ Peso salvato!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Errore: {e}")
-                    print(traceback.format_exc())
-        
-        with col_w2:
-            st.markdown(f"#### {t['update_target']}")
-            new_target = st.number_input(
-                "Peso Obiettivo (kg)", 
-                value=float(user_target_weight) if user_target_weight else 75.0,
-                min_value=20.0,
-                max_value=300.0,
-                step=0.5
-            )
-            if st.button(t["save_target"], use_container_width=True):
-                try:
-                    res = supabase.auth.update_user({
-                        "data": {"target_weight": float(new_target)}
-                    })
-                    if res.user:
-                        st.session_state["user"] = res.user
-                    st.success(t["target_updated"])
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Errore: {e}")
-                    print(traceback.format_exc())
-    
+                    st.error(f"Errore nel salvataggio del peso: {e}")
+        with c2:
+            selected_weight_id = st.selectbox("Peso da modificare o eliminare", [""] + list(edit_options.keys()),
+                                              format_func=lambda x: "Seleziona un peso..." if x == "" else edit_options[x],
+                                              key="weight_edit_selector")
+            if selected_weight_id:
+                selected_row = next(r for r in logs_all if str(r["id"]) == selected_weight_id)
+                ew1, ew2 = st.columns(2)
+                with ew1:
+                    edited_date = st.date_input("Data", value=pd.to_datetime(selected_row["date"]).date(), key=f"edit_weight_date_{selected_weight_id}")
+                with ew2:
+                    edited_weight = st.number_input("Peso (kg)", value=float(selected_row["weight"]), min_value=20.0, max_value=300.0, step=0.1, key=f"edit_weight_value_{selected_weight_id}")
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("✏️ Modifica peso", use_container_width=True, key=f"update_weight_{selected_weight_id}"):
+                        try:
+                            # Se cambia data, eliminiamo il vecchio record e lo riscriviamo sulla nuova data.
+                            if str(edited_date) != str(selected_row["date"]):
+                                supabase.table("daily_logs").delete().eq("id", selected_row["id"]).eq("user_id", user_id).execute()
+                                supabase.table("daily_logs").upsert({"user_id": user_id, "date": str(edited_date), "weight": float(edited_weight)}, on_conflict="user_id,date").execute()
+                            else:
+                                supabase.table("daily_logs").update({"weight": float(edited_weight)}).eq("id", selected_row["id"]).eq("user_id", user_id).execute()
+                            st.success("✅ Peso modificato!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Errore nella modifica: {e}")
+                with b2:
+                    if st.button("🗑️ Cancella peso", use_container_width=True, key=f"delete_weight_{selected_weight_id}"):
+                        try:
+                            supabase.table("daily_logs").delete().eq("id", selected_row["id"]).eq("user_id", user_id).execute()
+                            st.success("✅ Peso cancellato.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Errore nella cancellazione: {e}")
+
+    with st.container(border=True):
+        st.markdown(f"#### {t['update_target']}")
+        new_target = st.number_input("Peso Obiettivo (kg)", value=float(user_target_weight) if user_target_weight else 75.0, min_value=20.0, max_value=300.0, step=0.5, key="weight_target_edit")
+        if st.button(t["save_target"], use_container_width=True):
+            try:
+                res = supabase.auth.update_user({"data": {"target_weight": float(new_target)}})
+                if res.user:
+                    st.session_state["user"] = res.user
+                st.success(t["target_updated"])
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore: {e}")
+
     with st.container(border=True):
         try:
-            # ------------------------------------------------------------------
-            # DATI PESO
-            # ------------------------------------------------------------------
-            logs = (
-                supabase.table("daily_logs")
-                .select("date, weight")
-                .eq("user_id", user_id)
-                .not_.is_("weight", "null")
-                .order("date", desc=False)
-                .execute().data
-            )
-            
+            logs = (supabase.table("daily_logs").select("date, weight").eq("user_id", user_id)
+                    .not_.is_("weight", "null").order("date", desc=False).execute().data or [])
             if not logs:
-                st.info("📊 Nessun dato di peso registrato ancora. Inizia registrando il tuo peso!")
+                st.info("📊 Nessun dato di peso registrato ancora.")
             else:
                 df_weight = pd.DataFrame(logs)
                 df_weight["date"] = pd.to_datetime(df_weight["date"]).dt.normalize()
                 df_weight["weight"] = pd.to_numeric(df_weight["weight"], errors="coerce")
-                df_weight = df_weight.dropna(subset=["date", "weight"]).sort_values("date")
-                
-                # ------------------------------------------------------------------
-                # FILTRO TEMPORALE: il grafico viene realmente zoomato sulla finestra.
-                # La finestra termina sull'ultima data disponibile, non necessariamente
-                # sulla data odierna (utile se non si registra il peso tutti i giorni).
-                # ------------------------------------------------------------------
-                period_options = {
-                    "5 giorni": 5,
-                    "15 giorni": 15,
-                    "30 giorni": 30,
-                    "60 giorni": 60,
-                    "90 giorni": 90,
-                    "120 giorni": 120,
-                    "180 giorni": 180,
-                }
-                selected_period_label = st.selectbox(
-                    "Periodo del grafico",
-                    list(period_options.keys()),
-                    index=2,
-                    key="weight_chart_period"
-                )
+                df_weight = df_weight.dropna().sort_values("date")
+
+                period_options = {"5 giorni": 5, "15 giorni": 15, "30 giorni": 30, "60 giorni": 60, "90 giorni": 90, "120 giorni": 120, "180 giorni": 180}
+                selected_period_label = st.selectbox("Periodo del grafico", list(period_options), index=2, key="weight_chart_period")
                 selected_days = period_options[selected_period_label]
-                
                 chart_end = df_weight["date"].max()
                 chart_start = chart_end - pd.Timedelta(days=selected_days - 1)
-                
-                df_visible = df_weight[
-                    (df_weight["date"] >= chart_start) &
-                    (df_weight["date"] <= chart_end)
-                ].copy()
-                
-                # ------------------------------------------------------------------
-                # DATI CALORICI / ATTIVITÀ PER GLI INDICATORI GIORNALIERI
-                # ------------------------------------------------------------------
-                # Recuperiamo solo le colonne necessarie. In caso di tabella vuota
-                # continuiamo comunque a mostrare la timeline con valori neutri.
-                meals_rows = (
-                    supabase.table("meals")
-                    .select("date, calories")
-                    .eq("user_id", user_id)
-                    .gte("date", str(chart_start.date()))
-                    .lte("date", str(chart_end.date()))
-                    .execute().data or []
-                )
-                activities_rows = (
-                    supabase.table("activities")
-                    .select("date, activity_name, burned_calories")
-                    .eq("user_id", user_id)
-                    .gte("date", str(chart_start.date()))
-                    .lte("date", str(chart_end.date()))
-                    .execute().data or []
-                )
-                
-                # Calorie ingerite per giorno
+                timeline_dates = pd.date_range(chart_start, chart_end, freq="D")
+                df_visible = df_weight[(df_weight["date"] >= chart_start) & (df_weight["date"] <= chart_end)].copy()
+
+                # Dati pasti e attività della stessa finestra.
+                meals_rows = (supabase.table("meals").select("date, meal_type, name, calories, protein, carbs, fat")
+                              .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date())).execute().data or [])
+                acts_rows = (supabase.table("activities").select("date, activity_name, burned_calories")
+                             .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date())).execute().data or [])
                 meals_df = pd.DataFrame(meals_rows)
+                acts_df = pd.DataFrame(acts_rows)
                 if not meals_df.empty:
                     meals_df["date"] = pd.to_datetime(meals_df["date"]).dt.normalize()
-                    meals_df["calories"] = pd.to_numeric(meals_df["calories"], errors="coerce").fillna(0)
-                    kcal_in_by_day = meals_df.groupby("date")["calories"].sum().to_dict()
-                else:
-                    kcal_in_by_day = {}
-                
-                # Attività per giorno
-                activities_df = pd.DataFrame(activities_rows)
-                if not activities_df.empty:
-                    activities_df["date"] = pd.to_datetime(activities_df["date"]).dt.normalize()
-                    activities_df["burned_calories"] = pd.to_numeric(
-                        activities_df["burned_calories"], errors="coerce"
-                    ).fillna(0)
-                
-                # ------------------------------------------------------------------
-                # CALCOLO PROIEZIONE
-                # ------------------------------------------------------------------
+                    for col in ["calories", "protein", "carbs", "fat"]:
+                        meals_df[col] = pd.to_numeric(meals_df[col], errors="coerce").fillna(0)
+                if not acts_df.empty:
+                    acts_df["date"] = pd.to_datetime(acts_df["date"]).dt.normalize()
+                    acts_df["burned_calories"] = pd.to_numeric(acts_df["burned_calories"], errors="coerce").fillna(0)
+
                 target_val = float(user_target_weight) if user_target_weight else 75.0
                 latest_weight = float(df_weight["weight"].iloc[-1])
-                forecast_markdown = ""
+                # Proiezione: trend degli ultimi 14 giorni.
                 estimated_date = None
                 days_to_goal = 0
-                
-                if len(df_weight) >= 3 and latest_weight > target_val:
-                    recent_df = df_weight.tail(min(len(df_weight), 14)).copy()
+                recent_df = df_weight.tail(min(len(df_weight), 14))
+                if len(recent_df) >= 3 and latest_weight > target_val:
                     days_diff = (recent_df["date"].max() - recent_df["date"].min()).days
                     weight_diff = float(recent_df["weight"].iloc[-1] - recent_df["weight"].iloc[0])
-                    
                     if days_diff > 0 and weight_diff < 0:
                         kg_per_day = abs(weight_diff / days_diff)
-                        kg_to_lose = latest_weight - target_val
-                        days_to_goal = max(1, int(kg_to_lose / kg_per_day))
+                        days_to_goal = max(1, int((latest_weight - target_val) / kg_per_day))
                         estimated_date = df_weight["date"].max() + pd.Timedelta(days=days_to_goal)
-                        est_date_str = estimated_date.strftime('%d %B %Y')
-                        forecast_markdown = f"""
-                        <div style="background-color:#FFFFFF;border:1px solid #FF8B8B;padding:12px 16px;border-radius:10px;margin-top:15px;color:#1A2942;font-weight:500;">
-                            {t['weight_forecast_title']}<br>
-                            <span style="font-size:14px;font-weight:400;">{t['forecast_days'](days_to_goal, est_date_str)}</span>
-                        </div>
-                        """
-                    else:
-                        forecast_markdown = f"""
-                        <div style="background-color:#FFFFFF;border:1px solid #FF8B8B;padding:12px 16px;border-radius:10px;margin-top:15px;color:#1A2942;font-weight:500;">
-                            {t['weight_forecast_title']}<br>
-                            <span style="font-size:14px;font-weight:400;">{t['forecast_flat_up']}</span>
-                        </div>
-                        """
-                
-                # ------------------------------------------------------------------
-                # GRAFICO PRINCIPALE
-                # ------------------------------------------------------------------
+
                 fig = go.Figure()
-                
-                # Peso reale: unica serie quantitativa sempre visibile.
                 fig.add_trace(go.Scatter(
-                    x=df_visible["date"],
-                    y=df_visible["weight"],
-                    mode="lines+markers",
-                    name="Peso reale",
-                    line=dict(color="#FF8B8B", width=3),
-                    marker=dict(size=8, color="#FF8B8B"),
-                    customdata=df_visible[["date", "weight"]].to_numpy(),
-                    hovertemplate=(
-                        "<b>%{customdata[0]|%d %b %Y}</b><br>"
-                        "Peso: <b>%{customdata[1]:.1f} kg</b><extra></extra>"
-                    ),
+                    x=df_visible["date"], y=df_visible["weight"], mode="lines+markers", name="Peso reale",
+                    line=dict(color="#FF8B8B", width=3), marker=dict(size=8, color="#FF8B8B"),
+                    hovertemplate="<b>%{x|%d %b %Y}</b><br>Peso: <b>%{y:.1f} kg</b><extra></extra>"
                 ))
-                
-                # Proiezione: trace separata, quindi cliccabile nella legenda.
-                if estimated_date is not None and days_to_goal > 0:
-                    recent_df = df_weight.tail(min(len(df_weight), 14)).copy()
-                    first_projection_date = recent_df["date"].iloc[0]
-                    first_projection_weight = float(recent_df["weight"].iloc[0])
+                if estimated_date is not None:
+                    first = df_weight.iloc[0]
                     fig.add_trace(go.Scatter(
-                        x=[first_projection_date, estimated_date],
-                        y=[first_projection_weight, target_val],
-                        mode="lines+markers",
-                        name="Proiezione",
-                        line=dict(color="#FF8B8B", width=2.5, dash="dash"),
-                        marker=dict(size=6),
-                        hovertemplate=(
-                            "<b>Proiezione</b><br>%{x|%d %b %Y}<br>"
-                            "Peso stimato: <b>%{y:.1f} kg</b><extra></extra>"
-                        ),
+                        x=[first["date"], estimated_date], y=[float(first["weight"]), target_val],
+                        mode="lines+markers", name="Proiezione",
+                        line=dict(color="#FF8B8B", width=2.5, dash="dash"), marker=dict(size=6, color="#FF8B8B"),
+                        hovertemplate="<b>Proiezione</b><br>%{x|%d %b %Y}<br>%{y:.1f} kg<extra></extra>"
                     ))
-                
-                # Obiettivo come trace e NON come hline: in questo modo la legenda
-                # permette di mostrarlo/nasconderlo con un click.
-                goal_x_start = chart_start
-                goal_x_end = max(chart_end, estimated_date) if estimated_date is not None else chart_end
                 fig.add_trace(go.Scatter(
-                    x=[goal_x_start, goal_x_end],
-                    y=[target_val, target_val],
-                    mode="lines",
-                    name="Obiettivo",
-                    line=dict(color="#1A2942", width=2.5),
-                    hovertemplate="Obiettivo: <b>%{y:.1f} kg</b><extra></extra>",
+                    x=[chart_start, chart_end], y=[target_val, target_val], mode="lines", name="Obiettivo",
+                    line=dict(color="#1A2942", width=2.5), hovertemplate=f"Obiettivo: {target_val:.1f} kg<extra></extra>"
                 ))
-                
-                # Zoom X: la finestra selezionata rimane sempre la finestra visualizzata.
-                fig.update_xaxes(
-                    range=[chart_start - pd.Timedelta(hours=12), chart_end + pd.Timedelta(hours=12)],
-                    type="date",
-                    showgrid=False,
-                    tickformat="%d %b",
-                    nticks=min(selected_days, 10),
-                    fixedrange=False,
-                )
-                
-                # Autoscaling Y intelligente sulla finestra visibile.
-                visible_values = df_visible["weight"].tolist()
-                if target_val >= min(visible_values) - 1.5 and target_val <= max(visible_values) + 1.5:
-                    visible_values.append(target_val)
-                y_min = min(visible_values)
-                y_max = max(visible_values)
+
+                # Zoom orizzontale + autoscaling verticale.
+                vals = df_visible["weight"].tolist() + [target_val]
+                if estimated_date is not None and chart_start <= estimated_date <= chart_end:
+                    vals.append(target_val)
+                y_min, y_max = min(vals), max(vals)
                 spread = max(y_max - y_min, 1.0)
-                padding = max(0.8, spread * 0.18)
-                fig.update_yaxes(
-                    range=[y_min - padding, y_max + padding],
-                    title="Peso (kg)",
-                    showgrid=True,
-                    gridcolor="#E8ECF2",
-                    zeroline=False,
-                    fixedrange=False,
-                )
-                
-                fig.update_layout(
-                    height=470,
-                    plot_bgcolor="#FFFFFF",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    hovermode="x unified",
-                    hoverlabel=dict(bgcolor="white"),
-                    font=dict(color="#1A2942"),
-                    margin=dict(l=55, r=30, t=45, b=55),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="left",
-                        x=0,
-                        bgcolor="rgba(255,255,255,0.85)",
-                        borderwidth=0,
-                    ),
-                )
-                
+                padding = max(0.6, spread * 0.18)
+                fig.update_xaxes(range=[chart_start, chart_end + pd.Timedelta(hours=23)], showgrid=False, fixedrange=False)
+                fig.update_yaxes(range=[y_min - padding, y_max + padding], title="Peso (kg)", gridcolor="#E8ECF2", zeroline=False, fixedrange=False)
+                fig.update_layout(height=470, plot_bgcolor="#FFFFFF", paper_bgcolor="rgba(0,0,0,0)", hovermode="x unified",
+                                  font=dict(color="#1A2942"), margin=dict(l=55, r=25, t=45, b=55),
+                                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(255,255,255,0.85)"))
                 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                
-                # ------------------------------------------------------------------
-                # TIMELINE GIORNALIERA: FUORI DAL GRAFICO
-                # ------------------------------------------------------------------
-                # Una fascia separata evita che le icone interferiscano con le linee,
-                # le date, il tooltip e l'asse Y. Su mobile diventa scrollabile.
-                timeline_dates = pd.date_range(chart_start, chart_end, freq="D")
-                
-                date_cells = []
-                deficit_cells = []
-                activity_cells = []
-                
-                for day in timeline_dates:
-                    day_key = pd.Timestamp(day).normalize()
-                    kcal_in = float(kcal_in_by_day.get(day_key, 0))
-                    
-                    day_extra = 0.0
-                    day_has_padel = False
-                    if not activities_df.empty:
-                        day_rows = activities_df[activities_df["date"] == day_key]
-                        day_extra = float(day_rows["burned_calories"].sum()) if not day_rows.empty else 0.0
-                        day_has_padel = any(
-                            str(name).strip().lower() == "padel"
-                            for name in day_rows["activity_name"].tolist()
-                        )
-                    
-                    # Deficit reale = calorie bruciate - calorie ingerite.
-                    # Per i giorni storici usiamo il BMR giornaliero + attività extra.
-                    actual_deficit = float(user_bmr) + day_extra - kcal_in
-                    
-                    # Giorni senza dati alimentari: non fingiamo che siano deficitari.
+
+                # --------------------------------------------------------------
+                # SECONDO GRAFICO: DEFICIT / MACROS / PASTI
+                # --------------------------------------------------------------
+                chart_mode = st.selectbox("Analisi giornaliera", ["Deficit", "Macros", "Pasti"], index=0, key="daily_analysis_mode")
+                days_df = pd.DataFrame({"date": timeline_dates})
+                if not meals_df.empty:
+                    daily_meals = meals_df.groupby("date")[["calories", "protein", "carbs", "fat"]].sum().reset_index()
+                    days_df = days_df.merge(daily_meals, on="date", how="left")
+                else:
+                    days_df[["calories", "protein", "carbs", "fat"]] = 0
+                days_df[["calories", "protein", "carbs", "fat"]] = days_df[["calories", "protein", "carbs", "fat"]].fillna(0)
+                if not acts_df.empty:
+                    daily_burn = acts_df.groupby("date")["burned_calories"].sum().reset_index(name="extra")
+                    days_df = days_df.merge(daily_burn, on="date", how="left")
+                else:
+                    days_df["extra"] = 0
+                days_df["extra"] = days_df["extra"].fillna(0)
+                days_df["burned"] = float(user_bmr) + days_df["extra"]
+
+                # Icone per ogni giorno.
+                deficit_icons, activity_icons, deficit_titles, activity_titles = [], [], [], []
+                for _, r in days_df.iterrows():
+                    kcal_in = float(r["calories"])
+                    extra = float(r["extra"])
                     if kcal_in <= 0:
-                        deficit_icon = "·"
-                        deficit_title = "Nessun dato alimentare"
-                    elif actual_deficit >= 500:
-                        deficit_icon = "👍"
-                        deficit_title = f"Deficit {actual_deficit:.0f} kcal"
-                    elif actual_deficit >= 0:
-                        deficit_icon = "😐"
-                        deficit_title = f"Deficit {actual_deficit:.0f} kcal"
+                        deficit_icons.append("·"); deficit_titles.append("Nessun dato alimentare")
                     else:
-                        deficit_icon = "👎"
-                        deficit_title = f"Surplus {abs(actual_deficit):.0f} kcal"
-                    
-                    if day_has_padel:
-                        activity_icon = "🎾"
-                        activity_title = f"Padel · {day_extra:.0f} kcal extra"
-                    elif day_extra > 300:
-                        activity_icon = "🔥"
-                        activity_title = f"{day_extra:.0f} kcal extra"
-                    elif day_extra > 0:
-                        activity_icon = "🛏️"
-                        activity_title = f"{day_extra:.0f} kcal extra"
+                        d = float(user_bmr) + extra - kcal_in
+                        if d >= 500: deficit_icons.append("👍")
+                        elif d >= 0: deficit_icons.append("😐")
+                        else: deficit_icons.append("👎")
+                        deficit_titles.append(f"Deficit: {d:.0f} kcal")
+                    if not acts_df.empty:
+                        day_rows = acts_df[acts_df["date"] == r["date"]]
+                        padel = any(str(n).strip().lower() == "padel" for n in day_rows["activity_name"].tolist())
+                    else: padel = False
+                    if padel: activity_icons.append("🎾")
+                    elif extra > 300: activity_icons.append("🔥")
+                    else: activity_icons.append("🛏️")
+                    activity_titles.append(f"Extra: {extra:.0f} kcal")
+
+                daily_fig = go.Figure()
+                if chart_mode == "Deficit":
+                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["calories"], name="Kcal ingerite", marker_color="#FF8B8B", hovertemplate="%{x|%d %b}<br>Ingerite: %{y:.0f} kcal<extra></extra>"))
+                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["burned"], name="Kcal bruciate", marker_color="#1A2942", hovertemplate="%{x|%d %b}<br>Bruciate: %{y:.0f} kcal<extra></extra>"))
+                    daily_fig.update_layout(barmode="group", yaxis_title="kcal")
+                elif chart_mode == "Macros":
+                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["protein"], name="Proteine", marker_color="#FF8B8B", hovertemplate="%{x|%d %b}<br>Proteine: %{y:.0f} g<extra></extra>"))
+                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["carbs"], name="Carboidrati", marker_color="#1A2942", hovertemplate="%{x|%d %b}<br>Carboidrati: %{y:.0f} g<extra></extra>"))
+                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["fat"], name="Grassi", marker_color="#FFB4B4", hovertemplate="%{x|%d %b}<br>Grassi: %{y:.0f} g<extra></extra>"))
+                    daily_fig.update_layout(barmode="stack", yaxis_title="grammi")
+                else:
+                    meal_order = ["Colazione", "Pranzo", "Snack", "Cena"]
+                    meal_colors = ["#FF8B8B", "#1A2942", "#FFB4B4", "#667085"]
+                    if meals_df.empty:
+                        for meal_type, color in zip(meal_order, meal_colors):
+                            daily_fig.add_trace(go.Bar(x=days_df["date"], y=[0]*len(days_df), name=meal_type, marker_color=color))
                     else:
-                        activity_icon = "🛏️"
-                        activity_title = "Nessuna attività extra"
-                    
-                    date_cells.append(
-                        f'<div class="weight-timeline-cell"><div class="weight-timeline-date">{day_key.strftime("%d")}</div>'
-                        f'<div class="weight-timeline-month">{day_key.strftime("%b")}</div></div>'
-                    )
-                    deficit_cells.append(
-                        f'<div class="weight-timeline-cell" title="{deficit_title}"><div class="weight-timeline-icon">{deficit_icon}</div></div>'
-                    )
-                    activity_cells.append(
-                        f'<div class="weight-timeline-cell" title="{activity_title}"><div class="weight-timeline-icon">{activity_icon}</div></div>'
-                    )
-                
-                timeline_html = f"""
-                <style>
-                    .weight-timeline-wrap {{
-                        border: 1px solid #E2E6EC;
-                        border-radius: 12px;
-                        background: #FFFFFF;
-                        overflow-x: auto;
-                        padding: 10px 8px 8px 8px;
-                        margin-top: 6px;
-                    }}
-                    .weight-timeline-inner {{
-                        min-width: max(100%, {max(len(timeline_dates) * 42, 420)}px);
-                    }}
-                    .weight-timeline-row {{
-                        display: grid;
-                        grid-template-columns: repeat({len(timeline_dates)}, minmax(38px, 1fr));
-                        align-items: center;
-                    }}
-                    .weight-timeline-label {{
-                        position: sticky;
-                        left: 0;
-                        z-index: 2;
-                        background: #FFFFFF;
-                        width: 78px;
-                        min-width: 78px;
-                        font-size: 12px;
-                        font-weight: 600;
-                        color: #667085;
-                        padding: 6px 8px 6px 2px;
-                    }}
-                    .weight-timeline-content {{
-                        display: grid;
-                        grid-template-columns: 78px repeat({len(timeline_dates)}, minmax(38px, 1fr));
-                        align-items: center;
-                    }}
-                    .weight-timeline-cell {{
-                        text-align: center;
-                        min-width: 38px;
-                        padding: 4px 1px;
-                    }}
-                    .weight-timeline-date {{
-                        font-size: 12px;
-                        line-height: 14px;
-                        font-weight: 700;
-                        color: #1A2942;
-                    }}
-                    .weight-timeline-month {{
-                        font-size: 10px;
-                        color: #98A2B3;
-                        line-height: 12px;
-                    }}
-                    .weight-timeline-icon {{
-                        font-size: 19px;
-                        line-height: 25px;
-                    }}
-                    .weight-timeline-divider {{
-                        border-top: 1px solid #EEF1F5;
-                        margin: 4px 0;
-                    }}
-                    .weight-timeline-legend {{
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 10px 18px;
-                        padding: 10px 2px 2px 2px;
-                        color: #667085;
-                        font-size: 12px;
-                    }}
-                </style>
-                <div class="weight-timeline-wrap">
-                    <div class="weight-timeline-inner">
-                        <div class="weight-timeline-content">
-                            <div class="weight-timeline-label">Giorno</div>
-                            {''.join(date_cells)}
-                        </div>
-                        <div class="weight-timeline-divider"></div>
-                        <div class="weight-timeline-content">
-                            <div class="weight-timeline-label">Deficit</div>
-                            {''.join(deficit_cells)}
-                        </div>
-                        <div class="weight-timeline-content">
-                            <div class="weight-timeline-label">Attività</div>
-                            {''.join(activity_cells)}
-                        </div>
-                        <div class="weight-timeline-legend">
-                            <span>👍 ≥500 kcal</span>
-                            <span>😐 0–499 kcal</span>
-                            <span>👎 surplus</span>
-                            <span>🎾 Padel</span>
-                            <span>🔥 &gt;300 kcal</span>
-                            <span>🛏️ ≤300 kcal</span>
-                            <span>· nessun dato alimentare</span>
-                        </div>
-                    </div>
-                </div>
-                """
-                st.markdown(timeline_html, unsafe_allow_html=True)
-                
-                if forecast_markdown:
-                    st.markdown(forecast_markdown, unsafe_allow_html=True)
+                        for meal_type, color in zip(meal_order, meal_colors):
+                            md = meals_df[meals_df["meal_type"] == meal_type].groupby("date")["calories"].sum()
+                            vals = [float(md.get(d, 0)) for d in days_df["date"]]
+                            daily_fig.add_trace(go.Bar(x=days_df["date"], y=vals, name=meal_type, marker_color=color))
+                    daily_fig.update_layout(barmode="stack", yaxis_title="kcal")
+
+                # Le icone sono parte del secondo grafico ma fuori dall'area delle colonne.
+                if len(days_df) <= 45:
+                    for idx, r in days_df.iterrows():
+                        daily_fig.add_annotation(x=r["date"], y=1.02, yref="paper", text=deficit_icons[idx], showarrow=False, font=dict(size=18), hovertext=deficit_titles[idx])
+                        daily_fig.add_annotation(x=r["date"], y=0.94, yref="paper", text=activity_icons[idx], showarrow=False, font=dict(size=17), hovertext=activity_titles[idx])
+                daily_fig.update_xaxes(range=[chart_start, chart_end + pd.Timedelta(hours=23)], tickformat="%d %b", fixedrange=False)
+                daily_fig.update_layout(height=410, plot_bgcolor="#FFFFFF", paper_bgcolor="rgba(0,0,0,0)", hovermode="x unified",
+                                       font=dict(color="#1A2942"), margin=dict(l=55, r=25, t=55, b=55),
+                                       legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(255,255,255,0.85)"))
+                st.plotly_chart(daily_fig, use_container_width=True, config={"displayModeBar": False})
+
+                if len(days_df) > 45:
+                    st.caption("💡 Per periodi lunghi le icone restano disponibili nei tooltip per mantenere il grafico leggibile.")
+
+                # --------------------------------------------------------------
+                # PROIEZIONE TESTUALE
+                # --------------------------------------------------------------
+                if estimated_date is not None:
+                    st.markdown(f"<div style='background:#FFFFFF;border:1px solid #FF8B8B;padding:12px 16px;border-radius:10px;color:#1A2942;'>🔮 <b>Proiezione:</b> al ritmo attuale potresti raggiungere {target_val:.1f} kg intorno al <b>{estimated_date.strftime('%d %b %Y')}</b>.</div>", unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"Errore nel caricamento grafico: {e}")
+            st.error(f"Errore nel caricamento grafici: {e}")
             print(traceback.format_exc())
 
 # ==============================================================================
-# 12. PAGE 4: QUICK ENTRIES (IMMISSIONI RAPIDE)
+# 12. PAGE 4: QUICK ENTRIES / RICETTE
 # ==============================================================================
 elif selected_page == t["t4"]:
     st.subheader(t["quick_entries"])
-
     if "recipe_form_version" not in st.session_state:
         st.session_state["recipe_form_version"] = 0
-    
     v = st.session_state["recipe_form_version"]
+
+    # Importazione di tutti i cibi già registrati come immissioni rapide.
+    with st.container(border=True):
+        st.markdown("### 📥 Importa cibi da meals")
+        st.caption("Ogni cibo registrato nella tabella meals può diventare un'immissione rapida riutilizzabile.")
+        if st.button("🔄 Importa tutti i cibi già registrati", use_container_width=True):
+            try:
+                all_meals = supabase.table("meals").select("name, calories, protein, carbs, fat").eq("user_id", user_id).execute().data or []
+                count = 0
+                for m in all_meals:
+                    if save_meal_as_quick_entry(m.get("name", ""), m.get("calories", 0), m.get("protein", 0), m.get("carbs", 0), m.get("fat", 0)):
+                        count += 1
+                st.success(f"✅ Importati/aggiornati {count} cibi nelle immissioni rapide.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore durante l'importazione: {e}")
 
     with st.container(border=True):
         st.markdown(f"### {t['saved_entries']}")
-        entries = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
+        entries = supabase.table("recipes").select("*").eq("user_id", user_id).order("name").execute().data or []
         if entries:
             df_entries = pd.DataFrame(entries)
-            df_display = df_entries.rename(columns={
-                "name": "Nome", "calories": "Kcal", 
-                "protein": "Pro", "carbs": "Carbs", "fat": "Fat"
-            })
+            df_display = df_entries.rename(columns={"name":"Nome", "calories":"Kcal", "protein":"Pro", "carbs":"Carbs", "fat":"Fat"})
             st.dataframe(df_display[["Nome", "Kcal", "Pro", "Carbs", "Fat"]], use_container_width=True, hide_index=True)
-            
-            st.markdown(f"### {t['del_quick']}")
-            entry_options_del = {e['name']: e['name'] for e in entries}
-            sel_entry_del = st.selectbox(t["select_quick_del"], [""] + list(entry_options_del.keys()), key=f"del_recipe_sel_{v}")
-            if sel_entry_del:
-                if st.button(t["del_quick_btn"], key=f"del_recipe_btn_{v}"):
-                    try:
-                        supabase.table("recipes").delete().eq("user_id", user_id).eq("name", sel_entry_del).execute()
-                        st.success(f"Immissione Rapida '{sel_entry_del}' eliminata!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Errore durante l'eliminazione: {e}")
+            entry_by_id = {str(e.get("id")): e for e in entries}
+            selected_entry_id = st.selectbox("Seleziona ricetta da eliminare", [""] + list(entry_by_id), format_func=lambda x: "Seleziona..." if not x else entry_by_id[x].get("name", ""), key=f"del_recipe_sel_{v}")
+            if selected_entry_id and st.button("🗑️ Elimina ricetta", key=f"del_recipe_btn_{v}"):
+                try:
+                    supabase.table("recipes").delete().eq("id", selected_entry_id).eq("user_id", user_id).execute()
+                    st.success("Ricetta eliminata.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore durante l'eliminazione: {e}")
         else:
             st.info("Nessuna immissione rapida presente.")
 
     with st.container(border=True):
-        with st.form(f"quick_entry_add_{v}"):
-            st.markdown(f"### {t['quick_add_title']}")
-            r_name = st.text_input(t["recipe_name"], placeholder="Es. Pasta al pomodoro o Snack", key=f"r_name_{v}")
-            
-            calc_type = st.radio(
-                t["calc_mode_radio"],
-                ["Per 100g (valori scalabili)", "Per porzione fissa (valori assoluti)"],
-                horizontal=True,
-                key=f"r_calc_type_{v}"
-            )
-            
-            st.caption(t["caption_calc"])
-            
-            c1, c2, c3, c4 = st.columns(4)
-            cals = c1.number_input("Kcal", value=0.0, min_value=0.0, step=1.0, key=f"r_cal_{v}")
-            prot = c2.number_input("Pro (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_prot_{v}")
-            carbs = c3.number_input("Carbs (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_carbs_{v}")
-            fat = c4.number_input("Fat (g)", value=0.0, min_value=0.0, step=0.5, key=f"r_fat_{v}")
-            
-            is_per_100g = 1 if "100g" in calc_type else 0
-            
-            if st.form_submit_button(t["save_recipe"], use_container_width=True):
+        st.markdown("### ➕ Aggiungi nuova Ricetta")
+        r_name = st.text_input("Nome ricetta", placeholder="Es. Pasta al pomodoro", key=f"recipe_builder_name_{v}")
+
+        st.markdown("#### 🥕 Aggiungi ingrediente")
+        source = st.radio("Fonte ingrediente", ["Database / Open Food Facts", "Inserimento manuale"], horizontal=True, key=f"ingredient_source_{v}")
+        ingredient_name = ""
+        base = {"calories":0.0,"protein":0.0,"carbs":0.0,"fat":0.0}
+        if source.startswith("Database"):
+            iq = st.text_input("Cerca ingrediente", key=f"ingredient_search_{v}")
+            if st.button("🔍 Cerca ingrediente", key=f"ingredient_search_btn_{v}"):
+                if len(iq.strip()) >= 2:
+                    st.session_state[f"ingredient_results_{v}"] = search_open_food_facts(iq)
+                    st.rerun()
+            results = st.session_state.get(f"ingredient_results_{v}", {})
+            if results:
+                sel = st.selectbox("Risultati", [""] + list(results), key=f"ingredient_result_select_{v}")
+                if sel:
+                    p = results[sel]
+                    ingredient_name = p.get("name", sel)
+                    base = {k: float(p.get(k,0) or 0) for k in base}
+        else:
+            ingredient_name = st.text_input("Nome ingrediente", key=f"manual_ingredient_name_{v}")
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            base["calories"] = mc1.number_input("Kcal / 100g", min_value=0.0, step=1.0, key=f"manual_kcal_{v}")
+            base["protein"] = mc2.number_input("Pro / 100g", min_value=0.0, step=0.1, key=f"manual_pro_{v}")
+            base["carbs"] = mc3.number_input("Carbs / 100g", min_value=0.0, step=0.1, key=f"manual_carbs_{v}")
+            base["fat"] = mc4.number_input("Fat / 100g", min_value=0.0, step=0.1, key=f"manual_fat_{v}")
+        quantity = st.number_input("Quantità (g)", min_value=0.1, value=100.0, step=1.0, key=f"ingredient_qty_{v}")
+        if st.button("➕ Aggiungi ingrediente alla ricetta", use_container_width=True, key=f"add_ingredient_{v}"):
+            if not ingredient_name.strip():
+                st.warning("Inserisci o seleziona un ingrediente.")
+            else:
+                st.session_state["recipe_builder_ingredients"].append({
+                    "name": ingredient_name.strip(), "quantity_g": float(quantity),
+                    "calories_per_100g": float(base["calories"]), "protein_per_100g": float(base["protein"]),
+                    "carbs_per_100g": float(base["carbs"]), "fat_per_100g": float(base["fat"]),
+                    "source": "database" if source.startswith("Database") else "manual"
+                })
+                st.success(f"✅ {ingredient_name} aggiunto.")
+                st.rerun()
+
+        ingredients = st.session_state.get("recipe_builder_ingredients", [])
+        if ingredients:
+            st.markdown("#### 📋 Ingredienti della ricetta")
+            rows = []
+            for idx, ing in enumerate(ingredients):
+                factor = float(ing["quantity_g"]) / 100
+                rows.append({"#": idx+1, "Ingrediente": ing["name"], "Quantità (g)": ing["quantity_g"], "Kcal": round(ing["calories_per_100g"]*factor), "Pro": round(ing["protein_per_100g"]*factor,1), "Carbs": round(ing["carbs_per_100g"]*factor,1), "Fat": round(ing["fat_per_100g"]*factor,1)})
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            remove_idx = st.selectbox("Rimuovi ingrediente", [""] + [str(i+1) for i in range(len(ingredients))], key=f"remove_ingredient_{v}")
+            if remove_idx and st.button("🗑️ Rimuovi ingrediente", key=f"remove_ingredient_btn_{v}"):
+                del st.session_state["recipe_builder_ingredients"][int(remove_idx)-1]
+                st.rerun()
+
+            total_weight, totals, per100 = calculate_recipe_totals(ingredients)
+            st.markdown(f"**Totale ricetta:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · Pro {totals['protein']:.1f} g · Carbs {totals['carbs']:.1f} g · Fat {totals['fat']:.1f} g")
+            if st.button("💾 Salva nuova Ricetta", use_container_width=True, key=f"save_recipe_builder_{v}"):
                 if not r_name.strip():
-                    st.warning("Inserisci un nome valido.")
+                    st.warning("Inserisci un nome per la ricetta.")
                 else:
                     try:
-                        supabase.table("recipes").insert({
-                            "name": r_name.strip(), 
-                            "calories": int(cals), 
-                            "protein": int(prot), 
-                            "carbs": int(carbs), 
-                            "fat": int(fat),
-                            "is_per_100g": is_per_100g,
-                            "user_id": user_id
-                        }).execute()
-                        
+                        ingredient_json = json.dumps(ingredients, ensure_ascii=False)
+                        existing = supabase.table("recipes").select("id").eq("user_id", user_id).eq("name", r_name.strip()).limit(1).execute().data or []
+                        payload = {
+                            "name": r_name.strip(), "calories": int(round(per100["calories"])),
+                            "protein": int(round(per100["protein"])), "carbs": int(round(per100["carbs"])),
+                            "fat": int(round(per100["fat"])), "is_per_100g": 1, "user_id": user_id,
+                            "ingredients_json": ingredient_json
+                        }
+                        if existing:
+                            supabase.table("recipes").update(payload).eq("id", existing[0]["id"]).eq("user_id", user_id).execute()
+                        else:
+                            supabase.table("recipes").insert(payload).execute()
+                        st.session_state["recipe_builder_ingredients"] = []
                         st.session_state["recipe_form_version"] += 1
-                        st.success(t["recipe_saved"])
+                        st.success("✅ Ricetta salvata nelle immissioni rapide!")
                         st.rerun()
                     except Exception as e:
-                        try:
-                            supabase.table("recipes").insert({
-                                "name": r_name.strip(), 
-                                "calories": int(cals), 
-                                "protein": int(prot), 
-                                "carbs": int(carbs), 
-                                "fat": int(fat),
-                                "user_id": user_id
-                            }).execute()
-                            
-                            st.session_state["recipe_form_version"] += 1
-                            st.success(t["recipe_saved"])
-                            st.rerun()
-                        except Exception as inner_e:
-                            st.error(f"Errore durante il salvataggio: {inner_e}")
-                            print(traceback.format_exc())
+                        st.error("Impossibile salvare la ricetta. Assicurati di aver aggiunto la colonna ingredients_json alla tabella recipes. Errore: " + str(e))
+        else:
+            st.info("Aggiungi almeno un ingrediente per costruire la ricetta.")
 
 # ==============================================================================
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
