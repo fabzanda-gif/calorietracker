@@ -6,6 +6,10 @@ import traceback
 import re
 import json
 import html
+import base64
+import secrets
+import hashlib
+from urllib.parse import urlencode
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -65,14 +69,33 @@ st.markdown("""
             color: #1A2942 !important;
         }
 
-        /* Pulsanti corpo centrale */
-        .main .stButton>button {
-            border-radius: 10px;
-            background-color: #FFFFFF;
-            color: #1A2942;
-            border: 1px solid #FF8B8B;
+        /* Pulsanti fuori dalla sidebar */
+        [data-testid="stAppViewContainer"] .stButton > button {
+            border-radius: 10px !important;
+            background-color: #FFFFFF !important;
+            color: #1A2942 !important;
+            border: 2px solid #FF8B8B !important;
+            font-weight: 600 !important;
+            transition: all .18s ease;
         }
-        .main .stButton>button:hover { background-color: #FFF5F5; border-color: #1A2942; }
+        [data-testid="stAppViewContainer"] .stButton > button * {
+            color: #1A2942 !important;
+            font-weight: 600 !important;
+        }
+        [data-testid="stAppViewContainer"] .stButton > button:hover {
+            background-color: #FFF5F5 !important;
+            border-color: #FF8B8B !important;
+        }
+        [data-testid="stAppViewContainer"] .stButton > button[kind="primary"] {
+            background-color: #FF8B8B !important;
+            border-color: #FF8B8B !important;
+            color: #FFFFFF !important;
+            font-weight: 800 !important;
+        }
+        [data-testid="stAppViewContainer"] .stButton > button[kind="primary"] * {
+            color: #FFFFFF !important;
+            font-weight: 800 !important;
+        }
 
         /* Metric Cards */
         [data-testid="stMetric"] {
@@ -89,6 +112,7 @@ st.markdown("""
 # ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+APP_URL = str(st.secrets.get("APP_URL", "https://diario-alimentare.streamlit.app")).rstrip("/")
 
 # Questo client NON deve mantenere una sessione propria in memoria.
 # La sessione persistente viene gestita esplicitamente dal cookie browser.
@@ -500,6 +524,82 @@ def calculate_recipe_totals(ingredients):
 # preferibile un backend che imposti cookie HttpOnly/Secure/SameSite.
 SESSION_COOKIE = "sanosync_refresh_token"
 SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60
+GOOGLE_PKCE_COOKIE = "sanosync_google_pkce"
+GOOGLE_PKCE_MAX_AGE = 10 * 60
+
+
+def _generate_google_pkce():
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(48)).decode("utf-8").rstrip("=")
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode("utf-8")).digest()
+    ).decode("utf-8").rstrip("=")
+    _cookie_set(GOOGLE_PKCE_COOKIE, verifier, GOOGLE_PKCE_MAX_AGE)
+    return verifier, challenge
+
+
+def _read_cookie(name):
+    try:
+        value = st.context.cookies.get(name)
+        if value:
+            return str(value).strip().strip('"')
+    except Exception:
+        pass
+    try:
+        value = controller.get(name)
+        if value:
+            return str(value).strip().strip('"')
+    except Exception:
+        pass
+    return None
+
+
+def _google_login_url():
+    _, challenge = _generate_google_pkce()
+    params = {
+        "provider": "google",
+        "redirect_to": APP_URL,
+        "code_challenge": challenge,
+        "code_challenge_method": "s256",
+    }
+    return f"{SUPABASE_URL}/auth/v1/authorize?{urlencode(params)}"
+
+
+def handle_google_oauth_callback():
+    auth_code = st.query_params.get("code")
+    if not auth_code:
+        return False
+
+    verifier = _read_cookie(GOOGLE_PKCE_COOKIE)
+    if not verifier:
+        st.query_params.clear()
+        st.error("Il login Google non può essere completato: verifier PKCE mancante o scaduto. Riprova.")
+        return False
+
+    try:
+        token_response = requests.post(
+            f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce",
+            headers={"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+            json={"auth_code": auth_code, "code_verifier": verifier},
+            timeout=15,
+        )
+        token_response.raise_for_status()
+        payload = token_response.json()
+        access_token = payload.get("access_token")
+        refresh_token = payload.get("refresh_token")
+        if not access_token or not refresh_token:
+            raise RuntimeError("Supabase non ha restituito i token OAuth.")
+
+        response = supabase.auth.set_session(access_token, refresh_token)
+        save_authenticated_session(response)
+        _cookie_delete(GOOGLE_PKCE_COOKIE)
+        st.query_params.clear()
+        st.rerun()
+        return True
+    except Exception as e:
+        _cookie_delete(GOOGLE_PKCE_COOKIE)
+        st.query_params.clear()
+        st.error(f"Login Google fallito: {e}")
+        return False
 
 def _cookie_set(name, value, max_age):
     controller.set(name, str(value), max_age=max_age)
@@ -569,8 +669,24 @@ def restore_session_from_cookie():
 
 def show_login_page():
     st.title("SanoSync")
-    st.caption("Accedi con email e password. Il login Google è temporaneamente disattivato.")
+    st.caption("Accedi o crea un account con Google, oppure usa email e password.")
 
+    try:
+        google_url = _google_login_url()
+        google_button_html = f"""
+        <a href="{google_url}" target="_self" style="text-decoration:none;display:block;">
+            <div style="width:100%;box-sizing:border-box;padding:0.72rem 1rem;border-radius:10px;
+                        border:2px solid #FF8B8B;background:#FFFFFF;color:#1A2942;
+                        font-weight:700;text-align:center;cursor:pointer;">
+                Continua con Google
+            </div>
+        </a>
+        """
+        st.markdown(google_button_html, unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Impossibile inizializzare Google Login: {e}")
+
+    st.markdown("---")
     auth_mode = st.radio("Account", ["Login", "Registrazione"], horizontal=True)
 
     with st.form("auth_form"):
@@ -643,8 +759,11 @@ def show_login_page():
                 print(traceback.format_exc())
 
 # ==============================================================================
-# 5. RESTORE SESSION
+# 5. RESTORE SESSION / GOOGLE OAUTH CALLBACK
 # ==============================================================================
+if st.session_state.get("user") is None and st.query_params.get("code"):
+    handle_google_oauth_callback()
+
 if st.session_state.get("user") is None:
     restore_session_from_cookie()
 
@@ -1016,7 +1135,7 @@ with st.sidebar:
     st.markdown("---")
     if st.button(t["logout"], use_container_width=True):
         supabase.auth.sign_out()
-        controller.set("supabase_session", None, max_age=0)
+        _cookie_delete(SESSION_COOKIE)
         st.session_state.clear()
         st.rerun()
 
@@ -1392,6 +1511,9 @@ elif selected_page == t["t2"]:
     if summary_date == date.today():
         with st.container(border=True):
             st.markdown("### 🧭 Piano della giornata")
+
+            plan_day_label = st.selectbox("Giorno da pianificare", ["Oggi", "Domani"], index=0, key="overview_plan_day")
+            plan_date = date.today() if plan_day_label == "Oggi" else (date.today() + pd.Timedelta(days=1)).date()
             if now.hour < 12:
                 st.info("Buongiorno! Imposta il tipo di giornata e il livello di attività previsto per pianificare i pasti.")
             else:
@@ -1399,9 +1521,16 @@ elif selected_page == t["t2"]:
 
             saved_day_type = None
             saved_activity = None
-            if daily_log_res:
-                saved_day_type = daily_log_res[0].get("day_type")
-                saved_activity = daily_log_res[0].get("activity_plan")
+            try:
+                plan_log = (
+                    supabase.table("daily_logs").select("id,day_type,activity_plan")
+                    .eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
+                )
+                if plan_log:
+                    saved_day_type = plan_log[0].get("day_type")
+                    saved_activity = plan_log[0].get("activity_plan")
+            except Exception:
+                plan_log = []
 
             day_types = ["Lavoro da casa", "Ufficio", "Giornata libera"]
             activity_types = ["Riposo", "Moderatamente attiva", "Attiva"]
@@ -1413,22 +1542,22 @@ elif selected_page == t["t2"]:
 
             pc1, pc2 = st.columns(2)
             with pc1:
-                day_type = st.selectbox("Tipo di giornata", day_types, index=day_types.index(default_day), key="overview_day_type")
+                day_type = st.selectbox("Tipo di giornata", day_types, index=day_types.index(default_day), key=f"overview_day_type_{plan_date}")
             with pc2:
-                activity_plan = st.selectbox("Attività prevista", activity_types, index=activity_types.index(default_activity), key="overview_activity_plan")
+                activity_plan = st.selectbox("Attività prevista", activity_types, index=activity_types.index(default_activity), key=f"overview_activity_plan_{plan_date}")
 
             st.session_state["day_plan_type"] = day_type
             st.session_state["day_plan_activity"] = activity_plan
 
             if st.button("💾 Salva piano della giornata", key="save_day_plan", use_container_width=True):
                 try:
-                    existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(date.today())).execute().data or []
+                    existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
                     payload_plan = {"day_type": day_type, "activity_plan": activity_plan}
                     if existing:
                         supabase.table("daily_logs").update(payload_plan).eq("id", existing[0]["id"]).execute()
                     else:
-                        supabase.table("daily_logs").insert({"user_id": user_id, "date": str(date.today()), **payload_plan}).execute()
-                    st.success("✅ Piano salvato.")
+                        supabase.table("daily_logs").insert({"user_id": user_id, "date": str(plan_date), **payload_plan}).execute()
+                    st.success(f"✅ Piano salvato per {plan_date.strftime('%d/%m/%Y')}.")
                 except Exception:
                     st.info("Il piano resta attivo in questa sessione. Esegui la migrazione SQL aggiornata per renderlo persistente.")
 
@@ -1455,9 +1584,16 @@ elif selected_page == t["t2"]:
                     already_allocated = 185.0
                     allocated_label = "colazione da casa"
                 else:
+                    try:
+                        plan_meals = (
+                            supabase.table("meals").select("meal_type,calories")
+                            .eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
+                        )
+                    except Exception:
+                        plan_meals = []
                     breakfast_logged = sum(
                         _safe_float(m.get("calories"))
-                        for m in meals_data
+                        for m in plan_meals
                         if str(m.get("meal_type", "")).lower() == "colazione"
                     )
                     already_allocated = breakfast_logged
