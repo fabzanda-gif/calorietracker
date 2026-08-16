@@ -127,6 +127,7 @@ state_defaults = {
     "last_nav_page": None,
     "selected_recipe": None,
     "prod_select": "",
+    "recipe_builder_ingredients": [],
 }
 
 for key, default in state_defaults.items():
@@ -145,110 +146,264 @@ def calculate_bmr(weight, height, gender):
 def refresh_daily_logs(log_date):
     pass
 
+def _safe_float(value):
+    try:
+        if value in (None, ""):
+            return 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _open_food_facts_headers():
+    """
+    Open Food Facts richiede un User-Agent identificabile.
+    Consigliato nei secrets Streamlit:
+        OFF_USER_AGENT = "SanoSync/1.0 (tuamail@example.com)"
+    """
+    return {
+        "User-Agent": st.secrets.get("OFF_USER_AGENT", "SanoSync/1.0"),
+        "Accept": "application/json",
+    }
+
+
 def search_open_food_facts(query):
-    query = query.strip()
+    """Ricerca Open Food Facts robusta per barcode o testo libero.
+
+    - Barcode: API v2 /product/{barcode}
+    - Testo: endpoint full-text /cgi/search.pl, invocato solo su pulsante
+    - Usa sempre il database globale; i prodotti olandesi vengono favoriti
+      nell'ordinamento quando countries_tags contiene Netherlands.
+    """
+    query = str(query or "").strip()
     if not query:
         return {}
 
+    headers = _open_food_facts_headers()
+    fields = "code,product_name,product_name_nl,brands,nutriments,countries_tags"
+
     try:
         if query.isdigit():
-            # Tentativo sul database olandese per codice a barre
-            url = f"https://nl.openfoodfacts.org/api/v2/product/{query}.json"
-            response = requests.get(url, timeout=10)
-            payload = response.json()
-            if payload.get("status") != 1:
-                # Fallback sul database mondiale
-                url_world = f"https://world.openfoodfacts.org/api/v2/product/{query}.json"
-                response = requests.get(url_world, timeout=10)
-                payload = response.json()
-                if payload.get("status") != 1:
-                    return {}
-            products = [payload.get("product", {})]
-        else:
-            # Ricerca testuale focalizzata sul mercato olandese (cc=nl)
-            url = "https://nl.openfoodfacts.org/cgi/search.pl"
             response = requests.get(
-                url, 
-                params={
-                    "search_terms": query, 
-                    "search_simple": 1, 
-                    "action": "process", 
-                    "json": 1, 
-                    "page_size": 20,
-                    "cc": "nl"
-                }, 
-                timeout=10
+                f"https://world.openfoodfacts.org/api/v2/product/{query}",
+                params={"fields": fields},
+                headers=headers,
+                timeout=15,
             )
-            products = response.json().get("products", [])
+            response.raise_for_status()
+            payload = response.json()
+            if payload.get("status") != 1 or not payload.get("product"):
+                return {}
+            products = [payload["product"]]
+        else:
+            # OFF limita fortemente le search request: questa chiamata deve
+            # rimanere legata al pulsante Cerca, non a ogni battitura.
+            response = requests.get(
+                "https://world.openfoodfacts.org/cgi/search.pl",
+                params={
+                    "search_terms": query,
+                    "search_simple": 1,
+                    "action": "process",
+                    "json": 1,
+                    "page_size": 30,
+                    "fields": fields,
+                },
+                headers=headers,
+                timeout=15,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            products = payload.get("products") or []
+
+        normalized = []
+        for p in products:
+            if not isinstance(p, dict):
+                continue
+
+            product_name = (
+                p.get("product_name_nl")
+                or p.get("product_name")
+                or "Prodotto senza nome"
+            )
+            brands = p.get("brands") or ""
+            code = str(p.get("code") or "")
+            nutriments = p.get("nutriments") or {}
+
+            item = {
+                "name": product_name,
+                "brand": brands,
+                "code": code,
+                "calories": _safe_float(nutriments.get("energy-kcal_100g")),
+                "protein": _safe_float(nutriments.get("proteins_100g")),
+                "carbs": _safe_float(nutriments.get("carbohydrates_100g")),
+                "fat": _safe_float(nutriments.get("fat_100g")),
+                "countries": p.get("countries_tags") or [],
+            }
+
+            # Scarta record senza alcun dato nutrizionale utile.
+            if not any(item[k] for k in ("calories", "protein", "carbs", "fat")):
+                continue
+
+            countries = {str(x).lower() for x in item["countries"]}
+            item["nl_priority"] = 1 if (
+                "en:netherlands" in countries
+                or "nl:nederland" in countries
+                or "nl:netherlands" in countries
+            ) else 0
+            normalized.append(item)
+
+        # Favorisce il mercato NL senza escludere prodotti globali.
+        normalized.sort(key=lambda x: (-x["nl_priority"], x["brand"].lower(), x["name"].lower()))
 
         results = {}
-        for p in products:
-            name = p.get("product_name", "Prodotto sconosciuto")
-            brands = p.get("brands", "")
-            full_name = f"{brands} - {name}" if brands else name
-            
-            nutriscore = p.get("nutriments", {})
-            # Estrazione sicura dei macronutrienti per 100g
-            cals = nutriscore.get("energy-kcal_100g", nutriscore.get("energy-kcal", 0)) or 0
-            prot = nutriscore.get("proteins_100g", 0) or 0
-            carbs = nutriscore.get("carbohydrates_100g", 0) or 0
-            fat = nutriscore.get("fat_100g", 0) or 0
-            
-            results[full_name] = {
-                "name": full_name,
-                "calories": float(cals),
-                "protein": float(prot),
-                "carbs": float(carbs),
-                "fat": float(fat)
-            }
+        for item in normalized:
+            label = f"{item['brand']} - {item['name']}" if item["brand"] else item["name"]
+            if label in results and item["code"]:
+                label = f"{label} [{item['code']}]"
+            item.pop("nl_priority", None)
+            results[label] = item
+
         return results
 
-    except Exception as e:
-        print(f"Errore nella ricerca Open Food Facts: {e}")
+    except requests.exceptions.Timeout:
+        st.warning("Open Food Facts non ha risposto in tempo. Riprova tra qualche secondo.")
         return {}
-        for i, p in enumerate(products):
-            name = p.get("product_name") or "Prodotto senza nome"
-            nutriments = p.get("nutriments") or {}
-            label = f"{name} - {p.get('brands', '')}".strip(" -")
-            results[label] = {
-                "name": name,
-                "calories": nutriments.get("energy-kcal_100g", 0) or 0,
-                "protein": nutriments.get("proteins_100g", 0) or 0,
-                "carbs": nutriments.get("carbohydrates_100g", 0) or 0,
-                "fat": nutriments.get("fat_100g", 0) or 0,
-            }
-        return results
-    except Exception as e:
-        st.error(f"Errore nella ricerca: {e}")
-        return {}
-
-def save_meal_as_quick_entry(meal_name, calories, protein, carbs, fat):
-    """Salva/aggiorna automaticamente un cibo registrato come immissione rapida."""
-    try:
-        clean_name = re.sub(r"\s*\((?:[0-9]+(?:\.[0-9]+)?)\s*(?:g|porz\.)\)\s*$", "", str(meal_name)).strip()
-        if not clean_name:
-            clean_name = str(meal_name).strip()
-        existing = (
-            supabase.table("recipes").select("id").eq("user_id", user_id).eq("name", clean_name)
-            .limit(1).execute().data or []
-        )
-        payload = {
-            "name": clean_name,
-            "calories": int(round(float(calories))),
-            "protein": int(round(float(protein))),
-            "carbs": int(round(float(carbs))),
-            "fat": int(round(float(fat))),
-            "is_per_100g": 0,
-            "user_id": user_id,
-        }
-        if existing:
-            supabase.table("recipes").update(payload).eq("id", existing[0]["id"]).eq("user_id", user_id).execute()
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, "status_code", None)
+        if status in (429, 503):
+            st.warning("Open Food Facts sta limitando temporaneamente le richieste. Attendi qualche secondo e riprova.")
         else:
-            supabase.table("recipes").insert(payload).execute()
-        return True
+            st.warning(f"Errore HTTP Open Food Facts: {status or e}")
+        return {}
+    except requests.exceptions.RequestException as e:
+        st.warning(f"Errore di rete Open Food Facts: {e}")
+        return {}
+    except (ValueError, TypeError) as e:
+        st.warning(f"Risposta Open Food Facts non valida: {e}")
+        return {}
     except Exception as e:
-        print(f"Auto-salvataggio quick entry fallito: {e}")
-        return False
+        st.warning(f"Errore nella ricerca Open Food Facts: {e}")
+        return {}
+
+
+def _clean_meal_name(meal_name):
+    """Rimuove il suffisso quantità generato dall'app, se presente."""
+    clean_name = re.sub(
+        r"\s*\((?:[0-9]+(?:\.[0-9]+)?)\s*(?:g|porz\.)\)\s*$",
+        "",
+        str(meal_name or ""),
+    ).strip()
+    return clean_name or str(meal_name or "").strip()
+
+
+def get_quick_entries_from_meals():
+    """Restituisce le immissioni rapide direttamente da meals.
+
+    Le righe nuove usano i campi base_* per ricostruire valori per 100 g o
+    per porzione. Le righe legacy senza questi campi rimangono utilizzabili
+    come porzioni fisse usando i valori totali salvati nel meal.
+    """
+    try:
+        rows = (
+            supabase.table("meals")
+            .select(
+                "id,date,name,base_name,quantity,is_per_100g,"
+                "base_calories,base_protein,base_carbs,base_fat,"
+                "calories,protein,carbs,fat"
+            )
+            .eq("user_id", user_id)
+            .order("date", desc=True)
+            .execute().data
+            or []
+        )
+        enhanced_schema = True
+    except Exception:
+        # Compatibilità temporanea prima della migrazione SQL.
+        rows = (
+            supabase.table("meals")
+            .select("id,date,name,calories,protein,carbs,fat")
+            .eq("user_id", user_id)
+            .order("date", desc=True)
+            .execute().data
+            or []
+        )
+        enhanced_schema = False
+
+    quick = {}
+    for row in rows:
+        base_name = (row.get("base_name") if enhanced_schema else None) or _clean_meal_name(row.get("name"))
+        if not base_name:
+            continue
+
+        # Il record più recente per nome vince.
+        key = base_name.casefold()
+        if key in quick:
+            continue
+
+        has_base = enhanced_schema and row.get("base_calories") is not None
+        if has_base:
+            is_100g = bool(row.get("is_per_100g"))
+            quick[key] = {
+                "label": base_name,
+                "name": base_name,
+                "calories": _safe_float(row.get("base_calories")),
+                "protein": _safe_float(row.get("base_protein")),
+                "carbs": _safe_float(row.get("base_carbs")),
+                "fat": _safe_float(row.get("base_fat")),
+                "is_per_100g": is_100g,
+                "default_quantity": 100.0 if is_100g else 1.0,
+                "source_date": row.get("date"),
+            }
+        else:
+            # Legacy: valori totali del pasto, quindi porzione fissa.
+            quick[key] = {
+                "label": base_name,
+                "name": base_name,
+                "calories": _safe_float(row.get("calories")),
+                "protein": _safe_float(row.get("protein")),
+                "carbs": _safe_float(row.get("carbs")),
+                "fat": _safe_float(row.get("fat")),
+                "is_per_100g": False,
+                "default_quantity": 1.0,
+                "source_date": row.get("date"),
+            }
+
+    return sorted(quick.values(), key=lambda x: x["label"].lower())
+
+
+def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
+                               quantity, is_per_100g, calories, protein, carbs, fat,
+                               base_calories, base_protein, base_carbs, base_fat):
+    """Inserisce un meal conservando sia il totale sia i dati base riutilizzabili."""
+    payload = {
+        "user_id": user_id,
+        "date": str(log_date),
+        "meal_type": meal_type,
+        "name": display_name,
+        "calories": int(round(calories)),
+        "protein": int(round(protein)),
+        "carbs": int(round(carbs)),
+        "fat": int(round(fat)),
+        "base_name": str(base_name).strip(),
+        "quantity": float(quantity),
+        "is_per_100g": bool(is_per_100g),
+        "base_calories": float(base_calories),
+        "base_protein": float(base_protein),
+        "base_carbs": float(base_carbs),
+        "base_fat": float(base_fat),
+    }
+    try:
+        return supabase.table("meals").insert(payload).execute()
+    except Exception as e:
+        # Fallback per consentire all'app di continuare a funzionare prima
+        # che venga applicata la migrazione dei campi base_*.
+        print(f"Inserimento meals con schema esteso fallito, fallback legacy: {e}")
+        legacy_payload = {
+            k: payload[k]
+            for k in ("user_id", "date", "meal_type", "name", "calories", "protein", "carbs", "fat")
+        }
+        return supabase.table("meals").insert(legacy_payload).execute()
+
 
 def calculate_recipe_totals(ingredients):
     total_weight = sum(float(i.get("quantity_g", 0)) for i in ingredients)
@@ -949,18 +1104,25 @@ st.markdown("""
 # ==============================================================================
 if selected_page == t["t1"]:
     log_date = st.date_input("📅 Data", value=date.today())
-    
     st.subheader(t["tab1_title"])
-    
+
+    recipe_source_label = {
+        "Italiano": "🍲 Ricette",
+        "English": "🍲 Recipes",
+        "Nederlands": "🍲 Recepten",
+    }.get(current_lang, "🍲 Ricette")
+
     input_source = st.radio(
-        t["input_source_lbl"], 
-        [t["opt_off"], t["opt_quick"]], 
-        horizontal=True
+        t["input_source_lbl"],
+        [t["opt_off"], t["opt_quick"], recipe_source_label],
+        horizontal=True,
     )
-    
-    is_recipe = (input_source == t["opt_quick"])
+
+    is_online = input_source == t["opt_off"]
+    is_quick = input_source == t["opt_quick"]
+    is_recipe = input_source == recipe_source_label
     v = st.session_state["form_version"]
-    
+
     if "base_cals" not in st.session_state:
         st.session_state["base_cals"] = 0.0
         st.session_state["base_prot"] = 0.0
@@ -969,7 +1131,7 @@ if selected_page == t["t1"]:
         st.session_state["m_name"] = ""
         st.session_state["grams_val"] = 100.0
         st.session_state["is_per_100g_val"] = True
-    
+
     def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0, is_100g=True):
         st.session_state["m_name"] = name
         st.session_state["base_cals"] = float(cals)
@@ -977,75 +1139,120 @@ if selected_page == t["t1"]:
         st.session_state["base_carbs"] = float(carbs)
         st.session_state["base_fat"] = float(fat)
         st.session_state["grams_val"] = float(grams)
-        st.session_state["is_per_100g_val"] = is_100g
+        st.session_state["is_per_100g_val"] = bool(is_100g)
         st.session_state["last_selected"] = selected
         st.session_state["form_version"] += 1
-    
+
     if st.session_state.get("last_source") != input_source:
         st.session_state["last_source"] = input_source
         reset_or_update()
         st.rerun()
-    
-    if not is_recipe:
+
+    # ------------------------------------------------------------------
+    # A. Open Food Facts
+    # ------------------------------------------------------------------
+    if is_online:
         search_q = st.text_input(t["search_food"])
         if st.button(t["search_btn"]):
-            if len(search_q) >= 2:
-                with st.spinner('Ricerca in corso...'):
+            if len(search_q.strip()) >= 2 or search_q.strip().isdigit():
+                with st.spinner("Ricerca in Open Food Facts..."):
                     st.session_state["api_res"] = search_open_food_facts(search_q)
                 st.session_state["prod_select"] = ""
                 st.session_state["last_selected"] = ""
+                if not st.session_state["api_res"]:
+                    st.info("Nessun prodotto trovato. Prova marca + nome oppure un codice a barre.")
                 st.rerun()
             else:
                 st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
-        
+
         api_res = st.session_state.get("api_res", {})
         if api_res:
             sel_prod = st.selectbox(t["select_db"], [""] + list(api_res.keys()), key=f"prod_select_{v}")
             if sel_prod and sel_prod != st.session_state.get("last_selected"):
                 p_data = api_res[sel_prod]
-                reset_or_update(p_data.get('name',''), p_data.get('calories',0), p_data.get('protein',0), p_data.get('carbs',0), p_data.get('fat',0), sel_prod, 100.0, True)
+                reset_or_update(
+                    p_data.get("name", ""),
+                    p_data.get("calories", 0),
+                    p_data.get("protein", 0),
+                    p_data.get("carbs", 0),
+                    p_data.get("fat", 0),
+                    sel_prod,
+                    100.0,
+                    True,
+                )
                 st.rerun()
-    else:
+
+    # ------------------------------------------------------------------
+    # B. Immissione rapida = storico meals, NON recipes
+    # ------------------------------------------------------------------
+    elif is_quick:
         try:
-            recipes_data = supabase.table("recipes").select("*").eq("user_id", user_id).execute().data
-            recipes_dict = {r["name"]: r for r in recipes_data} if recipes_data else {}
-            if recipes_dict:
-                sel_recipe = st.selectbox(t["select_recipe"], [""] + list(recipes_dict.keys()), key=f"recipe_select_{v}")
-                if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
-                    r = recipes_dict[sel_recipe]
-                    is_100g = bool(r.get('is_per_100g', 1))
-                    reset_or_update(r.get('name',''), r.get('calories',0), r.get('protein',0), r.get('carbs',0), r.get('fat',0), sel_recipe, 100.0 if is_100g else 1.0, is_100g)
+            quick_entries = get_quick_entries_from_meals()
+            if quick_entries:
+                quick_by_label = {q["label"]: q for q in quick_entries}
+                sel_quick = st.selectbox(
+                    "Seleziona un alimento già utilizzato",
+                    [""] + list(quick_by_label.keys()),
+                    key=f"quick_meal_select_{v}",
+                )
+                if sel_quick and sel_quick != st.session_state.get("last_selected"):
+                    q = quick_by_label[sel_quick]
+                    reset_or_update(
+                        q["name"], q["calories"], q["protein"], q["carbs"], q["fat"],
+                        sel_quick, q["default_quantity"], q["is_per_100g"],
+                    )
                     st.rerun()
             else:
-                st.info(t["no_recipes"])
+                st.info("Nessun alimento ancora disponibile. Registra prima un pasto nella Tab 1.")
         except Exception as e:
-            st.error(f"Errore: {e}")
-    
+            st.error(f"Errore nel caricamento delle immissioni rapide: {e}")
+
+    # ------------------------------------------------------------------
+    # C. Ricette = tabella recipes, separata dalle Quick Entry
+    # ------------------------------------------------------------------
+    elif is_recipe:
+        try:
+            recipes_data = supabase.table("recipes").select("*").eq("user_id", user_id).order("name").execute().data or []
+            recipes_dict = {r["name"]: r for r in recipes_data if r.get("name")}
+            if recipes_dict:
+                sel_recipe = st.selectbox(
+                    "Seleziona una ricetta",
+                    [""] + list(recipes_dict.keys()),
+                    key=f"recipe_select_{v}",
+                )
+                if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
+                    r = recipes_dict[sel_recipe]
+                    is_100g = bool(r.get("is_per_100g", 1))
+                    reset_or_update(
+                        r.get("name", ""), r.get("calories", 0), r.get("protein", 0),
+                        r.get("carbs", 0), r.get("fat", 0), sel_recipe,
+                        100.0 if is_100g else 1.0, is_100g,
+                    )
+                    st.rerun()
+            else:
+                st.info("Nessuna ricetta salvata. Creane una nella Tab 4.")
+        except Exception as e:
+            st.error(f"Errore nel caricamento ricette: {e}")
+
     st.markdown("---")
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
-    
-    # Gestione della modalità (Per 100g / Per Porzione)
+
     mode_options = [t["per_100g"], t["per_portion"]]
     default_index = 0 if st.session_state["is_per_100g_val"] else 1
-    
     mode = st.radio(
-        t["calc_mode"], 
-        mode_options, 
-        index=default_index, 
-        horizontal=True,
-        key=f"mode_radio_{v}"
+        t["calc_mode"], mode_options, index=default_index,
+        horizontal=True, key=f"mode_radio_{v}",
     )
-    
-    # Aggiorniamo i valori di sessione se la modalità è cambiata
-    is_now_100g = (mode == t["per_100g"])
+
+    is_now_100g = mode == t["per_100g"]
     if is_now_100g != st.session_state["is_per_100g_val"]:
         st.session_state["is_per_100g_val"] = is_now_100g
         st.session_state["grams_val"] = 100.0 if is_now_100g else 1.0
         st.session_state[f"dyn_qty_{v}"] = st.session_state["grams_val"]
         st.rerun()
-    
+
     def on_qty_change():
         st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
 
@@ -1055,37 +1262,54 @@ if selected_page == t["t1"]:
         min_value=0.25,
         step=0.25,
         key=f"dyn_qty_{v}",
-        on_change=on_qty_change
+        on_change=on_qty_change,
     )
-    
-    factor = (quantity / 100.0) if mode == t["per_100g"] else quantity
+
+    factor = quantity / 100.0 if mode == t["per_100g"] else quantity
     meal_display_name = f"{name} ({quantity}{'g' if mode == t['per_100g'] else ' porz.'})"
-    
+
     final_cals = int(st.session_state["base_cals"] * factor)
     final_prot = int(st.session_state["base_prot"] * factor)
     final_carbs = int(st.session_state["base_carbs"] * factor)
     final_fat = int(st.session_state["base_fat"] * factor)
-    
+
     c1, c2, c3, c4 = st.columns(4)
-    cals_in = c1.number_input(t["kcal"], value=final_cals, step=1)
-    prot_in = c2.number_input(t["pro"], value=final_prot, step=1)
-    carbs_in = c3.number_input(t["carbs"], value=final_carbs, step=1)
-    fat_in = c4.number_input(t["fat"], value=final_fat, step=1)
-    
+    cals_in = c1.number_input(t["kcal"], value=final_cals, step=1, key=f"meal_kcal_{v}")
+    prot_in = c2.number_input(t["pro"], value=final_prot, step=1, key=f"meal_pro_{v}")
+    carbs_in = c3.number_input(t["carbs"], value=final_carbs, step=1, key=f"meal_carbs_{v}")
+    fat_in = c4.number_input(t["fat"], value=final_fat, step=1, key=f"meal_fat_{v}")
+
     if st.button(t["add_meal"], use_container_width=True):
-        try:
-            supabase.table("meals").insert({
-                "user_id": user_id, "date": str(log_date), "meal_type": m_type,
-                "name": meal_display_name, "calories": cals_in, "protein": prot_in, 
-                "carbs": carbs_in, "fat": fat_in
-            }).execute()
-            save_meal_as_quick_entry(meal_display_name, cals_in, prot_in, carbs_in, fat_in)
-            refresh_daily_logs(log_date)
-            reset_or_update()
-            st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Errore: {e}")
+        if not name.strip():
+            st.warning("Inserisci un nome per il pasto.")
+        else:
+            try:
+                # I valori base vengono derivati dai valori finali modificabili,
+                # così eventuali correzioni manuali diventano riutilizzabili.
+                safe_factor = factor if factor > 0 else 1.0
+                insert_meal_with_base_data(
+                    log_date=log_date,
+                    meal_type=m_type,
+                    display_name=meal_display_name,
+                    base_name=name.strip(),
+                    quantity=quantity,
+                    is_per_100g=(mode == t["per_100g"]),
+                    calories=cals_in,
+                    protein=prot_in,
+                    carbs=carbs_in,
+                    fat=fat_in,
+                    base_calories=float(cals_in) / safe_factor,
+                    base_protein=float(prot_in) / safe_factor,
+                    base_carbs=float(carbs_in) / safe_factor,
+                    base_fat=float(fat_in) / safe_factor,
+                )
+                refresh_daily_logs(log_date)
+                reset_or_update()
+                st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore: {e}")
+
 # ==============================================================================
 # 10. PAGE 2: DAILY OVERVIEW
 # ==============================================================================
@@ -1608,39 +1832,35 @@ elif selected_page == t["t3"]:
             print(traceback.format_exc())
 
 # ==============================================================================
-# 12. PAGE 4: QUICK ENTRIES / RICETTE
+# 12. PAGE 4: RICETTE
 # ==============================================================================
 elif selected_page == t["t4"]:
-    st.subheader(t["quick_entries"])
+    st.subheader("🍲 Ricette")
+    st.caption("Le Immissioni Rapide arrivano ora dalla tabella meals. Questa sezione è dedicata esclusivamente alle ricette composte da più ingredienti.")
+
     if "recipe_form_version" not in st.session_state:
         st.session_state["recipe_form_version"] = 0
     v = st.session_state["recipe_form_version"]
 
-    # Importazione di tutti i cibi già registrati come immissioni rapide.
     with st.container(border=True):
-        st.markdown("### 📥 Importa cibi da meals")
-        st.caption("Ogni cibo registrato nella tabella meals può diventare un'immissione rapida riutilizzabile.")
-        if st.button("🔄 Importa tutti i cibi già registrati", use_container_width=True):
-            try:
-                all_meals = supabase.table("meals").select("name, calories, protein, carbs, fat").eq("user_id", user_id).execute().data or []
-                count = 0
-                for m in all_meals:
-                    if save_meal_as_quick_entry(m.get("name", ""), m.get("calories", 0), m.get("protein", 0), m.get("carbs", 0), m.get("fat", 0)):
-                        count += 1
-                st.success(f"✅ Importati/aggiornati {count} cibi nelle immissioni rapide.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Errore durante l'importazione: {e}")
-
-    with st.container(border=True):
-        st.markdown(f"### {t['saved_entries']}")
+        st.markdown("### 📋 Ricette salvate")
         entries = supabase.table("recipes").select("*").eq("user_id", user_id).order("name").execute().data or []
         if entries:
             df_entries = pd.DataFrame(entries)
-            df_display = df_entries.rename(columns={"name":"Nome", "calories":"Kcal", "protein":"Pro", "carbs":"Carbs", "fat":"Fat"})
-            st.dataframe(df_display[["Nome", "Kcal", "Pro", "Carbs", "Fat"]], use_container_width=True, hide_index=True)
+            cols = [c for c in ["name", "calories", "protein", "carbs", "fat"] if c in df_entries.columns]
+            df_display = df_entries[cols].rename(columns={
+                "name": "Nome", "calories": "Kcal/100g", "protein": "Pro/100g",
+                "carbs": "Carbs/100g", "fat": "Fat/100g",
+            })
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+
             entry_by_id = {str(e.get("id")): e for e in entries}
-            selected_entry_id = st.selectbox("Seleziona ricetta da eliminare", [""] + list(entry_by_id), format_func=lambda x: "Seleziona..." if not x else entry_by_id[x].get("name", ""), key=f"del_recipe_sel_{v}")
+            selected_entry_id = st.selectbox(
+                "Seleziona ricetta da eliminare",
+                [""] + list(entry_by_id),
+                format_func=lambda x: "Seleziona..." if not x else entry_by_id[x].get("name", ""),
+                key=f"del_recipe_sel_{v}",
+            )
             if selected_entry_id and st.button("🗑️ Elimina ricetta", key=f"del_recipe_btn_{v}"):
                 try:
                     supabase.table("recipes").delete().eq("id", selected_entry_id).eq("user_id", user_id).execute()
@@ -1649,29 +1869,43 @@ elif selected_page == t["t4"]:
                 except Exception as e:
                     st.error(f"Errore durante l'eliminazione: {e}")
         else:
-            st.info("Nessuna immissione rapida presente.")
+            st.info("Nessuna ricetta salvata.")
 
     with st.container(border=True):
         st.markdown("### ➕ Aggiungi nuova Ricetta")
         r_name = st.text_input("Nome ricetta", placeholder="Es. Pasta al pomodoro", key=f"recipe_builder_name_{v}")
 
         st.markdown("#### 🥕 Aggiungi ingrediente")
-        source = st.radio("Fonte ingrediente", ["Database / Open Food Facts", "Inserimento manuale"], horizontal=True, key=f"ingredient_source_{v}")
+        source = st.radio(
+            "Fonte ingrediente",
+            ["Database / Open Food Facts", "Inserimento manuale"],
+            horizontal=True,
+            key=f"ingredient_source_{v}",
+        )
         ingredient_name = ""
-        base = {"calories":0.0,"protein":0.0,"carbs":0.0,"fat":0.0}
+        base = {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+
         if source.startswith("Database"):
             iq = st.text_input("Cerca ingrediente", key=f"ingredient_search_{v}")
             if st.button("🔍 Cerca ingrediente", key=f"ingredient_search_btn_{v}"):
-                if len(iq.strip()) >= 2:
-                    st.session_state[f"ingredient_results_{v}"] = search_open_food_facts(iq)
+                if len(iq.strip()) >= 2 or iq.strip().isdigit():
+                    with st.spinner("Ricerca ingrediente..."):
+                        st.session_state[f"ingredient_results_{v}"] = search_open_food_facts(iq)
                     st.rerun()
+                else:
+                    st.warning("Inserisci almeno 2 caratteri.")
+
             results = st.session_state.get(f"ingredient_results_{v}", {})
             if results:
                 sel = st.selectbox("Risultati", [""] + list(results), key=f"ingredient_result_select_{v}")
                 if sel:
                     p = results[sel]
                     ingredient_name = p.get("name", sel)
-                    base = {k: float(p.get(k,0) or 0) for k in base}
+                    base = {k: float(p.get(k, 0) or 0) for k in base}
+                    st.caption(
+                        f"Per 100g: {base['calories']:.0f} kcal · Pro {base['protein']:.1f} g · "
+                        f"Carbs {base['carbs']:.1f} g · Fat {base['fat']:.1f} g"
+                    )
         else:
             ingredient_name = st.text_input("Nome ingrediente", key=f"manual_ingredient_name_{v}")
             mc1, mc2, mc3, mc4 = st.columns(4)
@@ -1679,16 +1913,20 @@ elif selected_page == t["t4"]:
             base["protein"] = mc2.number_input("Pro / 100g", min_value=0.0, step=0.1, key=f"manual_pro_{v}")
             base["carbs"] = mc3.number_input("Carbs / 100g", min_value=0.0, step=0.1, key=f"manual_carbs_{v}")
             base["fat"] = mc4.number_input("Fat / 100g", min_value=0.0, step=0.1, key=f"manual_fat_{v}")
+
         quantity = st.number_input("Quantità (g)", min_value=0.1, value=100.0, step=1.0, key=f"ingredient_qty_{v}")
         if st.button("➕ Aggiungi ingrediente alla ricetta", use_container_width=True, key=f"add_ingredient_{v}"):
             if not ingredient_name.strip():
                 st.warning("Inserisci o seleziona un ingrediente.")
             else:
                 st.session_state["recipe_builder_ingredients"].append({
-                    "name": ingredient_name.strip(), "quantity_g": float(quantity),
-                    "calories_per_100g": float(base["calories"]), "protein_per_100g": float(base["protein"]),
-                    "carbs_per_100g": float(base["carbs"]), "fat_per_100g": float(base["fat"]),
-                    "source": "database" if source.startswith("Database") else "manual"
+                    "name": ingredient_name.strip(),
+                    "quantity_g": float(quantity),
+                    "calories_per_100g": float(base["calories"]),
+                    "protein_per_100g": float(base["protein"]),
+                    "carbs_per_100g": float(base["carbs"]),
+                    "fat_per_100g": float(base["fat"]),
+                    "source": "database" if source.startswith("Database") else "manual",
                 })
                 st.success(f"✅ {ingredient_name} aggiunto.")
                 st.rerun()
@@ -1698,39 +1936,72 @@ elif selected_page == t["t4"]:
             st.markdown("#### 📋 Ingredienti della ricetta")
             rows = []
             for idx, ing in enumerate(ingredients):
-                factor = float(ing["quantity_g"]) / 100
-                rows.append({"#": idx+1, "Ingrediente": ing["name"], "Quantità (g)": ing["quantity_g"], "Kcal": round(ing["calories_per_100g"]*factor), "Pro": round(ing["protein_per_100g"]*factor,1), "Carbs": round(ing["carbs_per_100g"]*factor,1), "Fat": round(ing["fat_per_100g"]*factor,1)})
+                ing_factor = float(ing["quantity_g"]) / 100.0
+                rows.append({
+                    "#": idx + 1,
+                    "Ingrediente": ing["name"],
+                    "Quantità (g)": ing["quantity_g"],
+                    "Kcal": round(ing["calories_per_100g"] * ing_factor),
+                    "Pro": round(ing["protein_per_100g"] * ing_factor, 1),
+                    "Carbs": round(ing["carbs_per_100g"] * ing_factor, 1),
+                    "Fat": round(ing["fat_per_100g"] * ing_factor, 1),
+                })
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-            remove_idx = st.selectbox("Rimuovi ingrediente", [""] + [str(i+1) for i in range(len(ingredients))], key=f"remove_ingredient_{v}")
+
+            remove_idx = st.selectbox(
+                "Rimuovi ingrediente",
+                [""] + [str(i + 1) for i in range(len(ingredients))],
+                key=f"remove_ingredient_{v}",
+            )
             if remove_idx and st.button("🗑️ Rimuovi ingrediente", key=f"remove_ingredient_btn_{v}"):
-                del st.session_state["recipe_builder_ingredients"][int(remove_idx)-1]
+                del st.session_state["recipe_builder_ingredients"][int(remove_idx) - 1]
                 st.rerun()
 
             total_weight, totals, per100 = calculate_recipe_totals(ingredients)
-            st.markdown(f"**Totale ricetta:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · Pro {totals['protein']:.1f} g · Carbs {totals['carbs']:.1f} g · Fat {totals['fat']:.1f} g")
+            st.markdown(
+                f"**Totale ricetta:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · "
+                f"Pro {totals['protein']:.1f} g · Carbs {totals['carbs']:.1f} g · Fat {totals['fat']:.1f} g"
+            )
+            st.caption(
+                f"Per 100 g: {per100['calories']:.0f} kcal · Pro {per100['protein']:.1f} g · "
+                f"Carbs {per100['carbs']:.1f} g · Fat {per100['fat']:.1f} g"
+            )
+
             if st.button("💾 Salva nuova Ricetta", use_container_width=True, key=f"save_recipe_builder_{v}"):
                 if not r_name.strip():
                     st.warning("Inserisci un nome per la ricetta.")
                 else:
                     try:
                         ingredient_json = json.dumps(ingredients, ensure_ascii=False)
-                        existing = supabase.table("recipes").select("id").eq("user_id", user_id).eq("name", r_name.strip()).limit(1).execute().data or []
+                        existing = (
+                            supabase.table("recipes").select("id")
+                            .eq("user_id", user_id).eq("name", r_name.strip())
+                            .limit(1).execute().data or []
+                        )
                         payload = {
-                            "name": r_name.strip(), "calories": int(round(per100["calories"])),
-                            "protein": int(round(per100["protein"])), "carbs": int(round(per100["carbs"])),
-                            "fat": int(round(per100["fat"])), "is_per_100g": 1, "user_id": user_id,
-                            "ingredients_json": ingredient_json
+                            "name": r_name.strip(),
+                            "calories": int(round(per100["calories"])),
+                            "protein": int(round(per100["protein"])),
+                            "carbs": int(round(per100["carbs"])),
+                            "fat": int(round(per100["fat"])),
+                            "is_per_100g": 1,
+                            "user_id": user_id,
+                            "ingredients_json": ingredient_json,
                         }
                         if existing:
                             supabase.table("recipes").update(payload).eq("id", existing[0]["id"]).eq("user_id", user_id).execute()
                         else:
                             supabase.table("recipes").insert(payload).execute()
+
                         st.session_state["recipe_builder_ingredients"] = []
                         st.session_state["recipe_form_version"] += 1
-                        st.success("✅ Ricetta salvata nelle immissioni rapide!")
+                        st.success("✅ Ricetta salvata!")
                         st.rerun()
                     except Exception as e:
-                        st.error("Impossibile salvare la ricetta. Assicurati di aver aggiunto la colonna ingredients_json alla tabella recipes. Errore: " + str(e))
+                        st.error(
+                            "Impossibile salvare la ricetta. Assicurati di aver aggiunto "
+                            "ingredients_json alla tabella recipes. Errore: " + str(e)
+                        )
         else:
             st.info("Aggiungi almeno un ingrediente per costruire la ricetta.")
 
