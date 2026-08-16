@@ -1656,6 +1656,131 @@ elif selected_page == t["t3"]:
             except Exception as e:
                 st.error(f"Errore: {e}")
 
+    # ------------------------------------------------------------------
+    # KPI ULTIMI 30 GIORNI
+    # ------------------------------------------------------------------
+    try:
+        month_end = pd.Timestamp(date.today())
+        month_start = month_end - pd.Timedelta(days=29)
+
+        month_weights_rows = (
+            supabase.table("daily_logs").select("date, weight").eq("user_id", user_id)
+            .gte("date", str(month_start.date())).lte("date", str(month_end.date()))
+            .not_.is_("weight", "null").order("date", desc=False).execute().data or []
+        )
+        month_meals_rows = (
+            supabase.table("meals").select("date, calories").eq("user_id", user_id)
+            .gte("date", str(month_start.date())).lte("date", str(month_end.date()))
+            .execute().data or []
+        )
+        month_acts_rows = (
+            supabase.table("activities").select("date, burned_calories").eq("user_id", user_id)
+            .gte("date", str(month_start.date())).lte("date", str(month_end.date()))
+            .execute().data or []
+        )
+
+        mw = pd.DataFrame(month_weights_rows)
+        mm = pd.DataFrame(month_meals_rows)
+        ma = pd.DataFrame(month_acts_rows)
+
+        weight_lost_30 = None
+        latest_weight_30 = None
+        if not mw.empty and len(mw) >= 2:
+            mw["date"] = pd.to_datetime(mw["date"])
+            mw["weight"] = pd.to_numeric(mw["weight"], errors="coerce")
+            mw = mw.dropna().sort_values("date")
+            if len(mw) >= 2:
+                first_w = float(mw.iloc[0]["weight"])
+                latest_weight_30 = float(mw.iloc[-1]["weight"])
+                weight_lost_30 = first_w - latest_weight_30
+        elif not mw.empty:
+            latest_weight_30 = float(pd.to_numeric(mw.iloc[-1]["weight"], errors="coerce"))
+
+        # Deficit calcolato solo sui giorni in cui esiste almeno un pasto registrato,
+        # così un giorno senza logging non viene interpretato come un enorme deficit.
+        total_deficit_30 = 0.0
+        valid_deficit_days = 0
+        avg_daily_deficit_30 = None
+        if not mm.empty:
+            mm["date"] = pd.to_datetime(mm["date"]).dt.normalize()
+            mm["calories"] = pd.to_numeric(mm["calories"], errors="coerce").fillna(0)
+            meal_daily = mm.groupby("date")["calories"].sum()
+
+            if not ma.empty:
+                ma["date"] = pd.to_datetime(ma["date"]).dt.normalize()
+                ma["burned_calories"] = pd.to_numeric(ma["burned_calories"], errors="coerce").fillna(0)
+                act_daily = ma.groupby("date")["burned_calories"].sum()
+            else:
+                act_daily = pd.Series(dtype=float)
+
+            for d, kcal_in in meal_daily.items():
+                extra = float(act_daily.get(d, 0.0))
+                total_deficit_30 += float(user_bmr) + extra - float(kcal_in)
+                valid_deficit_days += 1
+
+            if valid_deficit_days > 0:
+                avg_daily_deficit_30 = total_deficit_30 / valid_deficit_days
+
+        ratio_text = "N/D"
+        ratio_caption = "Servono almeno due pesi e dati alimentari nell'ultimo mese."
+        if weight_lost_30 is not None and weight_lost_30 > 0 and valid_deficit_days > 0:
+            kcal_per_kg = total_deficit_30 / weight_lost_30
+            ratio_text = f"{kcal_per_kg:,.0f} kcal/kg".replace(",", ".")
+            ratio_caption = f"{total_deficit_30:.0f} kcal di deficit / {weight_lost_30:.1f} kg persi."
+        elif weight_lost_30 is not None and weight_lost_30 <= 0:
+            ratio_caption = "Nessuna perdita di peso misurata negli ultimi 30 giorni."
+
+        lost_text = "N/D" if weight_lost_30 is None else f"{weight_lost_30:+.1f} kg"
+        lost_caption = "Differenza tra la prima e l'ultima misurazione degli ultimi 30 giorni."
+
+        goal_date_text = "N/D"
+        goal_caption = "Serve un deficit medio positivo per stimare la data obiettivo."
+        target_30 = float(user_target_weight) if user_target_weight else None
+        current_for_projection = latest_weight_30
+        if current_for_projection is None and logs_all:
+            try:
+                current_for_projection = float(logs_all[0]["weight"])
+            except Exception:
+                current_for_projection = None
+
+        if target_30 is not None and current_for_projection is not None:
+            kg_remaining = current_for_projection - target_30
+            if kg_remaining <= 0:
+                goal_date_text = "Raggiunto 🎯"
+                goal_caption = "Il peso più recente è già pari o inferiore all'obiettivo."
+            elif avg_daily_deficit_30 is not None and avg_daily_deficit_30 > 0:
+                days_needed = int(__import__("math").ceil((kg_remaining * 7700.0) / avg_daily_deficit_30))
+                projected_date = date.today() + pd.Timedelta(days=days_needed)
+                goal_date_text = projected_date.strftime("%d/%m/%Y")
+                goal_caption = f"Stima basata su {avg_daily_deficit_30:.0f} kcal/giorno di deficit medio ({valid_deficit_days} giorni loggati)."
+
+        st.markdown('''
+            <style>
+                .custom-card {
+                    background-color: #FFF5F5;
+                    border: 1.5px solid #FF8B8B;
+                    border-radius: 16px;
+                    padding: 16px;
+                    height: 100%;
+                    box-shadow: 0 2px 6px rgba(255,139,139,.08);
+                }
+                .custom-card-title { font-size:.95rem;font-weight:600;color:#1A2942;margin-bottom:4px; }
+                .custom-card-value { font-size:1.8rem;font-weight:700;color:#1A2942;margin-bottom:8px; }
+                .custom-card-caption { font-size:.82rem;color:#555;line-height:1.35; }
+            </style>
+        ''', unsafe_allow_html=True)
+
+        wk1, wk2, wk3 = st.columns(3)
+        with wk1:
+            st.markdown(f'<div class="custom-card"><div class="custom-card-title">📉 Peso perso · 30 giorni</div><div class="custom-card-value">{lost_text}</div><div class="custom-card-caption">{lost_caption}</div></div>', unsafe_allow_html=True)
+        with wk2:
+            st.markdown(f'<div class="custom-card"><div class="custom-card-title">⚡ Deficit / kg perso</div><div class="custom-card-value">{ratio_text}</div><div class="custom-card-caption">{ratio_caption}</div></div>', unsafe_allow_html=True)
+        with wk3:
+            st.markdown(f'<div class="custom-card"><div class="custom-card-title">🎯 Data obiettivo stimata</div><div class="custom-card-value">{goal_date_text}</div><div class="custom-card-caption">{goal_caption}</div></div>', unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+    except Exception as e:
+        st.warning(f"Impossibile calcolare le statistiche mensili: {e}")
+
     with st.container(border=True):
         try:
             ctrl1, ctrl2 = st.columns(2)
@@ -2141,30 +2266,55 @@ elif selected_page == t["t5"]:
         move_msg = t["status_lazy"]
         status_display_text = f"{day_steps} passi"
 
-    st.markdown(f"""<style>div[data-testid="stMetric"]:has(div:contains("Status")) {{ background-color: {move_bg} ; border: 1px solid {move_border} ; padding: 15px; border-radius: 10px; }}</style>""", unsafe_allow_html=True)
-    
-    with st.container(border=True):
-        st.metric(t["status_move_title"], status_display_text)
-        st.caption(move_msg)
+    # Tile con lo stesso design della Panoramica
+    st.markdown("""
+        <style>
+            .custom-card {
+                background-color: #FFF5F5;
+                border: 1.5px solid #FF8B8B;
+                border-radius: 16px;
+                padding: 16px;
+                height: 100%;
+                box-shadow: 0 2px 6px rgba(255,139,139,.08);
+            }
+            .custom-card-title { font-size:.95rem;font-weight:600;color:#1A2942;margin-bottom:4px; }
+            .custom-card-value { font-size:1.8rem;font-weight:700;color:#1A2942;margin-bottom:8px; }
+            .custom-card-caption { font-size:.82rem;color:#555;line-height:1.35; }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Tile calorie extra bruciate nella giornata
-    with st.container(border=True):
-        st.metric("🔥 Kcal bruciate extra", f"{total_extra_kcal} kcal")
-        if total_extra_kcal > 0:
-            st.caption("Somma delle calorie registrate nelle attività della giornata selezionata.")
-        else:
-            st.caption("Nessuna caloria extra registrata per questa giornata.")
+    ac1, ac2 = st.columns(2)
+    with ac1:
+        st.markdown(
+            f'<div class="custom-card"><div class="custom-card-title">{t["status_move_title"]}</div>'
+            f'<div class="custom-card-value">{status_display_text}</div>'
+            f'<div class="custom-card-caption">{move_msg}</div></div>',
+            unsafe_allow_html=True,
+        )
+    with ac2:
+        extra_caption = (
+            "Somma delle calorie registrate nelle attività della giornata selezionata."
+            if total_extra_kcal > 0 else "Nessuna caloria extra registrata per questa giornata."
+        )
+        st.markdown(
+            f'<div class="custom-card"><div class="custom-card-title">🔥 Kcal bruciate extra</div>'
+            f'<div class="custom-card-value">{total_extra_kcal} kcal</div>'
+            f'<div class="custom-card-caption">{extra_caption}</div></div>',
+            unsafe_allow_html=True,
+        )
 
-    # Breakdown per tipologia di attività
-    with st.container(border=True):
-        st.markdown("#### 📊 Calorie per attività")
-        kc1, kc2, kc3 = st.columns(3)
-        kc1.metric("👣 Passi", f"{steps_kcal} kcal")
-        kc2.metric("🎾 Padel", f"{padel_kcal} kcal")
-        kc3.metric("🚲 Bici", f"{bike_kcal} kcal")
-        other_kcal = max(0, total_extra_kcal - steps_kcal - padel_kcal - bike_kcal)
-        if other_kcal > 0:
-            st.caption(f"Altre attività registrate: {other_kcal} kcal")
+    st.markdown("<br>", unsafe_allow_html=True)
+    other_kcal = max(0, total_extra_kcal - steps_kcal - padel_kcal - bike_kcal)
+    kc1, kc2, kc3 = st.columns(3)
+    with kc1:
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">👣 Passi</div><div class="custom-card-value">{steps_kcal} kcal</div><div class="custom-card-caption">Calorie attribuite ai passi.</div></div>', unsafe_allow_html=True)
+    with kc2:
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🎾 Padel</div><div class="custom-card-value">{padel_kcal} kcal</div><div class="custom-card-caption">Calorie registrate come Padel.</div></div>', unsafe_allow_html=True)
+    with kc3:
+        bike_caption = f"Bici + E-Bike. Altre attività: {other_kcal} kcal." if other_kcal > 0 else "Somma di Bici ed E-Bike."
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🚲 Bici</div><div class="custom-card-value">{bike_kcal} kcal</div><div class="custom-card-caption">{bike_caption}</div></div>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # 3 Colonne: Passi, Bici (Normale ed Elettrica), Altro
     col_a1, col_a2, col_a3 = st.columns(3)
