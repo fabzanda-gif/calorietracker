@@ -2,12 +2,10 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime
 import requests
-import base64
-import secrets
-import hashlib
 import traceback
 import re
 import json
+import html
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -20,6 +18,7 @@ import plotly.graph_objects as go
 st.set_page_config(
     page_title="SanoSync",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 # ==============================================================================
@@ -90,7 +89,6 @@ st.markdown("""
 # ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-APP_URL = st.secrets.get("APP_URL", "https://diario-alimentare.streamlit.app").rstrip("/")
 
 # Questo client NON deve mantenere una sessione propria in memoria.
 # La sessione persistente viene gestita esplicitamente dal cookie browser.
@@ -105,7 +103,12 @@ if "supabase" not in st.session_state:
     )
 
 supabase = st.session_state["supabase"]
-controller = CookieController()
+
+# Manteniamo il componente cookie associato alla sessione Streamlit corrente.
+# Al refresh completo la lettura primaria avviene comunque tramite st.context.cookies.
+if "_cookie_controller" not in st.session_state:
+    st.session_state["_cookie_controller"] = CookieController()
+controller = st.session_state["_cookie_controller"]
 
 # ==============================================================================
 # 2. INITIALIZE SESSION STATE
@@ -128,6 +131,9 @@ state_defaults = {
     "selected_recipe": None,
     "prod_select": "",
     "recipe_builder_ingredients": [],
+    "selected_source_note": "",
+    "day_plan_type": "Lavoro da casa",
+    "day_plan_activity": "Riposo",
 }
 
 for key, default in state_defaults.items():
@@ -153,6 +159,62 @@ def _safe_float(value):
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+
+def info_badge(note, label="Note"):
+    """Icona informativa con tooltip HTML nativo."""
+    note = str(note or "").strip()
+    if not note:
+        return ""
+    safe_note = html.escape(note, quote=True)
+    safe_label = html.escape(label, quote=True)
+    return (
+        f'<span title="{safe_note}" aria-label="{safe_label}" '
+        f'style="cursor:help;font-size:1.05em;margin-left:5px;color:#1A2942;">ⓘ</span>'
+    )
+
+
+def closest_logged_meal(meal_type, target_calories):
+    """Trova nello storico meals il pasto del tipo richiesto più vicino al target calorico."""
+    try:
+        rows = (
+            supabase.table("meals")
+            .select("id,date,meal_type,name,base_name,calories,notes")
+            .eq("user_id", user_id)
+            .eq("meal_type", meal_type)
+            .execute().data
+            or []
+        )
+    except Exception:
+        rows = (
+            supabase.table("meals")
+            .select("id,date,meal_type,name,calories")
+            .eq("user_id", user_id)
+            .eq("meal_type", meal_type)
+            .execute().data
+            or []
+        )
+
+    candidates = []
+    seen = set()
+    for row in sorted(rows, key=lambda r: str(r.get("date", "")), reverse=True):
+        kcal = _safe_float(row.get("calories"))
+        if kcal <= 0:
+            continue
+        label = (row.get("base_name") or _clean_meal_name(row.get("name")) or "Pasto").strip()
+        dedupe_key = label.casefold()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        candidates.append({
+            "name": label,
+            "calories": kcal,
+            "notes": row.get("notes") or "",
+            "difference": abs(kcal - float(target_calories)),
+        })
+
+    return min(candidates, key=lambda r: r["difference"]) if candidates else None
 
 
 def _open_food_facts_headers():
@@ -309,7 +371,7 @@ def get_quick_entries_from_meals():
             .select(
                 "id,date,name,base_name,quantity,is_per_100g,"
                 "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat"
+                "calories,protein,carbs,fat,notes"
             )
             .eq("user_id", user_id)
             .order("date", desc=True)
@@ -353,6 +415,7 @@ def get_quick_entries_from_meals():
                 "is_per_100g": is_100g,
                 "default_quantity": 100.0 if is_100g else 1.0,
                 "source_date": row.get("date"),
+                "notes": row.get("notes") or "",
             }
         else:
             # Legacy: valori totali del pasto, quindi porzione fissa.
@@ -366,6 +429,7 @@ def get_quick_entries_from_meals():
                 "is_per_100g": False,
                 "default_quantity": 1.0,
                 "source_date": row.get("date"),
+                "notes": row.get("notes") or "",
             }
 
     return sorted(quick.values(), key=lambda x: x["label"].lower())
@@ -373,7 +437,8 @@ def get_quick_entries_from_meals():
 
 def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
                                quantity, is_per_100g, calories, protein, carbs, fat,
-                               base_calories, base_protein, base_carbs, base_fat):
+                               base_calories, base_protein, base_carbs, base_fat,
+                               notes=""):
     """Inserisce un meal conservando sia il totale sia i dati base riutilizzabili."""
     payload = {
         "user_id": user_id,
@@ -391,6 +456,7 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
         "base_protein": float(base_protein),
         "base_carbs": float(base_carbs),
         "base_fat": float(base_fat),
+        "notes": str(notes or "").strip(),
     }
     try:
         return supabase.table("meals").insert(payload).execute()
@@ -418,191 +484,92 @@ def calculate_recipe_totals(ingredients):
 # ==============================================================================
 # 4. AUTHENTICATION & SESSION MANAGEMENT
 # ==============================================================================
-# Il cookie viene usato come "remember me". Il refresh token di Supabase è
-# normalmente di lunga durata; il cookie dura 10 anni, ma può comunque essere
-# cancellato dal browser, dal logout o se Supabase invalida il refresh token.
-SESSION_COOKIE = "supabase_session"
-PKCE_COOKIE = "pkce_verifier_cookie"
+# Per ora usiamo SOLO email/password. Il login Google/OAuth è stato rimosso.
+#
+# Persistenza:
+# - nel browser salviamo soltanto il refresh token Supabase;
+# - a ogni refresh completo leggiamo prima st.context.cookies, che contiene i
+#   cookie arrivati con la richiesta iniziale;
+# - usiamo refresh_session(refresh_token) per ottenere una nuova sessione;
+# - se Supabase ruota il refresh token, riscriviamo subito il cookie aggiornato.
+#
+# Nota: streamlit-cookies-controller crea cookie accessibili dal browser e quindi
+# non HttpOnly. Per una futura versione con requisiti di sicurezza più elevati è
+# preferibile un backend che imposti cookie HttpOnly/Secure/SameSite.
+SESSION_COOKIE = "sanosync_refresh_token"
 SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60
-PKCE_COOKIE_MAX_AGE = 10 * 60
 
 def _cookie_set(name, value, max_age):
-    """Scrive un cookie senza far fallire l'app se il componente non è pronto."""
-    controller.set(name, value, max_age=max_age)
+    controller.set(name, str(value), max_age=max_age)
 
 def _cookie_delete(name):
     try:
-        controller.set(name, None, max_age=0)
+        controller.remove(name)
+    except Exception:
+        try:
+            controller.set(name, "", max_age=0)
+        except Exception:
+            pass
+
+def _read_refresh_token_cookie():
+    # Su un vero browser refresh questa è la lettura più affidabile perché
+    # Streamlit espone i cookie ricevuti nella richiesta iniziale.
+    try:
+        value = st.context.cookies.get(SESSION_COOKIE)
+        if value:
+            return str(value).strip().strip('"')
     except Exception:
         pass
 
-def generate_pkce_pair():
-    """Genera una coppia PKCE e salva il verifier nel browser."""
-    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
-    challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(verifier.encode("utf-8")).digest()
-    ).decode("utf-8").rstrip("=")
-
-    _cookie_set(PKCE_COOKIE, verifier, PKCE_COOKIE_MAX_AGE)
-    st.session_state["pkce_verifier"] = verifier
-    return verifier, challenge
+    # Fallback per rerun normali della stessa pagina.
+    try:
+        value = controller.get(SESSION_COOKIE)
+        if value:
+            return str(value).strip().strip('"')
+    except Exception:
+        pass
+    return None
 
 def save_authenticated_session(response):
-    """Salva user + token correnti e aggiorna SEMPRE il cookie con il refresh token nuovo."""
     session = getattr(response, "session", None)
-    user = getattr(response, "user", None)
+    user_obj = getattr(response, "user", None)
 
     if session is None:
         raise RuntimeError("Supabase non ha restituito una sessione valida.")
-
-    if user is None:
-        user = getattr(session, "user", None)
-
-    if user is None:
+    if user_obj is None:
+        user_obj = getattr(session, "user", None)
+    if user_obj is None:
         raise RuntimeError("Supabase non ha restituito l'utente autenticato.")
+    if not getattr(session, "refresh_token", None):
+        raise RuntimeError("Supabase non ha restituito il refresh token.")
 
-    st.session_state["user"] = user
-
-    # IMPORTANTE: il refresh token può ruotare. Non conserviamo mai quello vecchio.
-    _cookie_set(
-        SESSION_COOKIE,
-        {
-            "access_token": session.access_token,
-            "refresh_token": session.refresh_token,
-        },
-        SESSION_COOKIE_MAX_AGE,
-    )
-
-    return user
-
-def exchange_pkce_code(auth_code, code_verifier):
-    """Scambia manualmente il code PKCE.
-
-    Lo facciamo via endpoint Auth perché il verifier è conservato nel nostro cookie
-    e non nello storage interno del client Python. Questo evita che un nuovo run
-    Streamlit perda il verifier necessario al callback.
-    """
-    token_url = f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce"
-    response = requests.post(
-        token_url,
-        headers={
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "auth_code": auth_code,
-            "code_verifier": code_verifier,
-        },
-        timeout=20,
-    )
-
-    if not response.ok:
-        try:
-            detail = response.json()
-        except Exception:
-            detail = response.text
-        raise RuntimeError(f"PKCE exchange HTTP {response.status_code}: {detail}")
-
-    payload = response.json()
-    access_token = payload.get("access_token")
-    refresh_token = payload.get("refresh_token")
-
-    if not access_token or not refresh_token:
-        raise RuntimeError("Il callback OAuth non ha restituito access_token/refresh_token.")
-
-    # Stabilisce la sessione nel client Supabase usato da questa run.
-    response_obj = supabase.auth.set_session(access_token, refresh_token)
-    return response_obj
+    st.session_state["user"] = user_obj
+    _cookie_set(SESSION_COOKIE, session.refresh_token, SESSION_COOKIE_MAX_AGE)
+    return user_obj
 
 def restore_session_from_cookie():
-    """Ripristina la sessione al refresh e rinnova i token se necessario."""
-    saved = controller.get(SESSION_COOKIE)
-
-    if not isinstance(saved, dict):
-        return False
-
-    access_token = saved.get("access_token")
-    refresh_token = saved.get("refresh_token")
-    if not access_token or not refresh_token:
+    refresh_token = _read_refresh_token_cookie()
+    if not refresh_token:
         return False
 
     try:
-        # set_session() aggiorna automaticamente la sessione se l'access token
-        # è scaduto, usando il refresh token.
-        response = supabase.auth.set_session(access_token, refresh_token)
+        # refresh_session è più adatto qui di set_session: ci basta il refresh
+        # token persistente e riceviamo sempre token correnti.
+        response = supabase.auth.refresh_session(refresh_token)
         if response and getattr(response, "session", None):
             save_authenticated_session(response)
             return True
     except Exception as e:
-        print(f"Cookie restore error: {e}")
+        print(f"Session restore error: {e}")
 
-    # Token non più valido: eliminiamo il cookie locale e chiediamo un nuovo login.
     _cookie_delete(SESSION_COOKIE)
     return False
 
-def build_google_login_url():
-    """Costruisce l'URL OAuth Google con PKCE e redirect esplicito."""
-    from urllib.parse import urlencode
-
-    verifier, challenge = generate_pkce_pair()
-
-    params = {
-        "provider": "google",
-        "redirect_to": APP_URL,
-        "code_challenge": challenge,
-        "code_challenge_method": "s256",
-    }
-
-    return f"{SUPABASE_URL}/auth/v1/authorize?{urlencode(params)}"
-
 def show_login_page():
     st.title("SanoSync")
+    st.caption("Accedi con email e password. Il login Google è temporaneamente disattivato.")
 
-    # NON generiamo un nuovo verifier a ogni rerun.
-    # Il link viene creato una sola volta finché non parte un nuovo tentativo.
-    if not st.session_state.get("google_login_url"):
-        try:
-            st.session_state["google_login_url"] = build_google_login_url()
-        except Exception as e:
-            st.error(f"Errore nell'inizializzazione Google login: {e}")
-            st.session_state["google_login_url"] = "#"
-
-    login_url = st.session_state["google_login_url"]
-
-    google_button_html = f"""
-    <div style="display: flex; justify-content: center; margin: 10px 0 20px 0;">
-        <a href="{login_url}" target="_self" style="
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #FFFFFF;
-            color: #1A2942;
-            border: 1px solid #FF8B8B;
-            border-radius: 8px;
-            padding: 12px 24px;
-            font-family: 'Hanken Grotesk', Roboto, Arial, sans-serif;
-            font-size: 16px;
-            font-weight: 500;
-            text-decoration: none;
-            box-shadow: 0 1px 3px rgba(26,41,66,0.08);
-            transition: background-color 0.2s, box-shadow 0.2s;
-            width: 100%;
-        ">
-            <svg style="width: 20px; height: 20px; margin-right: 12px;" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.18v3.15C3.15 21.3 7.22 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.61H1.18C.43 8.13 0 9.87 0 12s.43 3.87 1.18 5.39l4.09-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.15 2.7 1.18 6.61l4.09 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/>
-            </svg>
-            Accedi con Google
-        </a>
-    </div>
-    """
-    st.markdown(google_button_html, unsafe_allow_html=True)
-    st.markdown("---")
-
-    auth_mode = st.radio("Oppure via Email", ["Login", "Registrazione"], horizontal=True)
+    auth_mode = st.radio("Account", ["Login", "Registrazione"], horizontal=True)
 
     with st.form("auth_form"):
         email = st.text_input("Email")
@@ -623,24 +590,33 @@ def show_login_page():
             target_weight = st.number_input("Peso Obiettivo (kg)", value=75.0, min_value=20.0, max_value=300.0, step=0.5)
 
         submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
-        if st.form_submit_button(submit_label):
+        submitted = st.form_submit_button(submit_label, use_container_width=True)
+
+        if submitted:
             try:
                 if auth_mode == "Login":
-                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    if response and response.session:
-                        save_authenticated_session(response)
-                        st.session_state["google_login_url"] = None
-                        st.success("Login effettuato!")
-                        st.rerun()
+                    if not email.strip() or not password:
+                        st.warning("Inserisci email e password.")
                     else:
-                        st.error("Credenziali non valide")
+                        response = supabase.auth.sign_in_with_password({
+                            "email": email.strip(),
+                            "password": password,
+                        })
+                        if response and response.session:
+                            save_authenticated_session(response)
+                            st.success("✅ Login effettuato.")
+                            st.rerun()
+                        else:
+                            st.error("Credenziali non valide.")
                 else:
-                    if not height or not current_weight or not target_weight or not gender:
-                        st.warning("Per favore compila tutti i campi fisici per la registrazione.")
+                    if not email.strip() or len(password) < 6:
+                        st.warning("Inserisci una email valida e una password di almeno 6 caratteri.")
+                    elif not height or not current_weight or not target_weight or not gender:
+                        st.warning("Compila tutti i parametri fisici.")
                     else:
                         calculated_bmr = calculate_bmr(current_weight, height, gender)
-                        supabase.auth.sign_up({
-                            "email": email,
+                        response = supabase.auth.sign_up({
+                            "email": email.strip(),
                             "password": password,
                             "options": {
                                 "data": {
@@ -648,54 +624,25 @@ def show_login_page():
                                     "target_weight": float(target_weight),
                                     "bmr": calculated_bmr,
                                     "height": float(height),
-                                    "gender": gender
+                                    "gender": gender,
                                 }
-                            }
+                            },
                         })
-                        st.success("✅ Account creato con successo! Effettua il login.")
-                        st.rerun()
+                        # Se la conferma email è disabilitata, Supabase può già
+                        # restituire una sessione. In quel caso persistiamola.
+                        if response and getattr(response, "session", None):
+                            save_authenticated_session(response)
+                            st.success("✅ Account creato e accesso effettuato.")
+                            st.rerun()
+                        else:
+                            st.success("✅ Account creato. Controlla l'email se è richiesta la conferma, poi effettua il login.")
             except Exception as e:
                 st.error(f"Errore durante l'autenticazione: {str(e)}")
                 print(traceback.format_exc())
 
 # ==============================================================================
-# 5. RESTORE SESSION / OAUTH CALLBACK
+# 5. RESTORE SESSION
 # ==============================================================================
-# 1) Se Google ci ha riportato con ?code=..., completiamo il PKCE.
-# 2) Altrimenti proviamo il cookie persistente.
-# 3) Solo se entrambi falliscono mostriamo la login page.
-
-if st.session_state.get("user") is None:
-    query_code = st.query_params.get("code")
-
-    if query_code:
-        verifier = st.session_state.get("pkce_verifier") or controller.get(PKCE_COOKIE)
-
-        if verifier:
-            try:
-                response = exchange_pkce_code(query_code, verifier)
-                save_authenticated_session(response)
-
-                # Il code OAuth è monouso: rimuoviamolo immediatamente dall'URL.
-                st.query_params.clear()
-                st.session_state["pkce_verifier"] = None
-                st.session_state["google_login_url"] = None
-                _cookie_delete(PKCE_COOKIE)
-
-                # NON facciamo st.rerun() qui: continuiamo questa stessa run
-                # con la sessione appena autenticata.
-            except Exception as e:
-                print(traceback.format_exc())
-                st.error(f"Login Google fallito: {e}")
-                st.query_params.clear()
-                st.session_state["pkce_verifier"] = None
-                st.session_state["google_login_url"] = None
-                _cookie_delete(PKCE_COOKIE)
-        else:
-            st.error("Il callback Google è arrivato senza il PKCE verifier. Riprova il login.")
-            st.query_params.clear()
-            st.session_state["google_login_url"] = None
-
 if st.session_state.get("user") is None:
     restore_session_from_cookie()
 
@@ -703,7 +650,6 @@ if st.session_state.get("user") is None:
     show_login_page()
     st.stop()
 
-# ==============================================================================
 # 6. USER DATA RETRIEVAL
 # ==============================================================================
 user = st.session_state["user"]
@@ -1072,34 +1018,47 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-# Script JavaScript per chiudere automaticamente la sidebar su mobile dopo un click
+# Su mobile la sidebar parte aperta (initial_sidebar_state="expanded") e viene
+# chiusa dopo la selezione di una tab. I selettori (es. lingua) non la chiudono.
 st.markdown("""
-    <script>
-        function isMobile() {
-            return window.innerWidth <= 768;
-        }
+<script>
+(function () {
+    function isMobile() { return window.innerWidth <= 768; }
 
-        document.addEventListener('click', function(event) {
-            const sidebar = document.querySelector('[data-testid="stSidebar"]');
-            if (sidebar && sidebar.contains(event.target) && isMobile()) {
-                const closeBtn = document.querySelector('[data-testid="stSidebarNav"] button, [data-testid="stSidebar"] button');
-                if (closeBtn) {
-                    setTimeout(() => {
-                        const toggleTrigger = document.querySelector('[data-testid="collapsedControl"]');
-                        if (toggleTrigger) {
-                            const expanded = sidebar.getAttribute("aria-expanded");
-                            if (expanded === "true" || !expanded) {
-                                toggleTrigger.click();
-                            }
-                        }
-                    }, 150);
-                }
-            }
-        });
-    </script>
+    function collapseSidebar() {
+        if (!isMobile()) return;
+        const candidates = [
+            '[data-testid="stSidebarCollapseButton"] button',
+            '[data-testid="stSidebarCollapseButton"]',
+            '[data-testid="collapsedControl"] button',
+            '[data-testid="collapsedControl"]'
+        ];
+        for (const selector of candidates) {
+            const el = document.querySelector(selector);
+            if (el) { el.click(); return; }
+        }
+    }
+
+    document.addEventListener('click', function(event) {
+        if (!isMobile()) return;
+        const sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (!sidebar || !sidebar.contains(event.target)) return;
+
+        const button = event.target.closest('button');
+        if (!button) return;
+
+        // Consideriamo solo i normali st.button della sidebar, escludendo
+        // il pulsante nativo di apertura/chiusura.
+        const buttons = Array.from(sidebar.querySelectorAll('[data-testid="stButton"] button'));
+        const buttonIndex = buttons.indexOf(button);
+        if (buttonIndex >= 0 && buttonIndex < 5) {
+            setTimeout(collapseSidebar, 180);
+        }
+    }, true);
+})();
+</script>
 """, unsafe_allow_html=True)
 
-# ==============================================================================
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
 if selected_page == t["t1"]:
@@ -1132,7 +1091,7 @@ if selected_page == t["t1"]:
         st.session_state["grams_val"] = 100.0
         st.session_state["is_per_100g_val"] = True
 
-    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0, is_100g=True):
+    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0, is_100g=True, note=""):
         st.session_state["m_name"] = name
         st.session_state["base_cals"] = float(cals)
         st.session_state["base_prot"] = float(prot)
@@ -1141,6 +1100,7 @@ if selected_page == t["t1"]:
         st.session_state["grams_val"] = float(grams)
         st.session_state["is_per_100g_val"] = bool(is_100g)
         st.session_state["last_selected"] = selected
+        st.session_state["selected_source_note"] = str(note or "")
         st.session_state["form_version"] += 1
 
     if st.session_state.get("last_source") != input_source:
@@ -1199,7 +1159,7 @@ if selected_page == t["t1"]:
                     q = quick_by_label[sel_quick]
                     reset_or_update(
                         q["name"], q["calories"], q["protein"], q["carbs"], q["fat"],
-                        sel_quick, q["default_quantity"], q["is_per_100g"],
+                        sel_quick, q["default_quantity"], q["is_per_100g"], q.get("notes", ""),
                     )
                     st.rerun()
             else:
@@ -1226,7 +1186,7 @@ if selected_page == t["t1"]:
                     reset_or_update(
                         r.get("name", ""), r.get("calories", 0), r.get("protein", 0),
                         r.get("carbs", 0), r.get("fat", 0), sel_recipe,
-                        100.0 if is_100g else 1.0, is_100g,
+                        100.0 if is_100g else 1.0, is_100g, r.get("notes", ""),
                     )
                     st.rerun()
             else:
@@ -1234,10 +1194,23 @@ if selected_page == t["t1"]:
         except Exception as e:
             st.error(f"Errore nel caricamento ricette: {e}")
 
+    if st.session_state.get("selected_source_note"):
+        st.markdown(
+            f"Note {info_badge(st.session_state.get('selected_source_note'), 'Note alimento o ricetta')}",
+            unsafe_allow_html=True,
+        )
+
     st.markdown("---")
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
+    meal_notes = st.text_area(
+        "Note (opzionali)",
+        value=st.session_state.get("selected_source_note", ""),
+        placeholder="Es. senza lattosio, marca preferita, preparazione, condimenti...",
+        key=f"meal_notes_{v}",
+        height=80,
+    )
 
     mode_options = [t["per_100g"], t["per_portion"]]
     default_index = 0 if st.session_state["is_per_100g_val"] else 1
@@ -1302,6 +1275,7 @@ if selected_page == t["t1"]:
                     base_protein=float(prot_in) / safe_factor,
                     base_carbs=float(carbs_in) / safe_factor,
                     base_fat=float(fat_in) / safe_factor,
+                    notes=meal_notes,
                 )
                 refresh_daily_logs(log_date)
                 reset_or_update()
@@ -1315,74 +1289,58 @@ if selected_page == t["t1"]:
 # ==============================================================================
 elif selected_page == t["t2"]:
     st.subheader(t["daily_summary"])
-    
+
     if "last_nav_page" not in st.session_state or st.session_state.last_nav_page != selected_page:
         st.session_state.overview_date = date.today()
         st.session_state.last_nav_page = selected_page
-    
+
     def update_overview_date():
         st.session_state.overview_date = st.session_state.get("widget_overview_date", date.today())
-    
+
     summary_date = st.date_input(
-        t["summary_date"], 
-        value=st.session_state.overview_date, 
+        t["summary_date"],
+        value=st.session_state.overview_date,
         key="widget_overview_date",
-        on_change=update_overview_date
+        on_change=update_overview_date,
     )
-    
+
     try:
         daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
         meals_data = supabase.table("meals").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
         raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
-        
         all_weight_logs = supabase.table("daily_logs").select("weight, date").eq("user_id", user_id).not_.is_("weight", "null").order("date", desc=False).execute().data or []
     except Exception as e:
         st.error(f"Errore nel caricamento dati: {e}")
-        daily_log_res = []
-        meals_data = []
-        raw_activities = []
-        all_weight_logs = []
-    
+        daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
+
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
-    total_cals_in = sum(m.get('calories', 0) for m in meals_data) if meals_data else 0
-    
-    current_weight = None
-    if daily_log_res and len(daily_log_res) > 0:
-        row = daily_log_res[0]
-        current_weight = row.get('weight')
-    
-    initial_weight = 89.0 
-    if all_weight_logs:
-        initial_weight = all_weight_logs[0]['weight']
+    total_cals_in = sum(_safe_float(m.get("calories")) for m in meals_data)
+
+    current_weight = daily_log_res[0].get("weight") if daily_log_res else None
+    initial_weight = all_weight_logs[0]["weight"] if all_weight_logs else 89.0
     target_weight = float(user_target_weight) if user_target_weight else 78.0
-    
+
     now = datetime.now()
     if summary_date == date.today():
         minutes_passed = max(60, now.hour * 60 + now.minute)
-        bmr_so_far = int((user_bmr / (24 * 60)) * minutes_passed)
+        bmr_so_far = int((float(user_bmr) / (24 * 60)) * minutes_passed)
     else:
-        bmr_so_far = user_bmr
+        bmr_so_far = int(float(user_bmr))
         minutes_passed = 1440
-    
-    extra_burned = sum(a.get('burned_calories', 0) for a in activities_data) if activities_data else 0
+
+    extra_burned = sum(_safe_float(a.get("burned_calories")) for a in activities_data)
     total_burned_finora = bmr_so_far + extra_burned
     deficit = total_cals_in - total_burned_finora
-    
-    # --- CALCOLO TARGET E DEFICIT (BMR + EXTRA - 500) ---
-    total_estimated_burned = user_bmr + extra_burned
+
+    total_estimated_burned = float(user_bmr) + extra_burned
     ideal_target_cals = max(0, total_estimated_burned - 500)
     diff_from_ideal = ideal_target_cals - total_cals_in
 
-    # Sfondo corallo leggerissimo (#FFF5F5) con bordo corallo (#FF8B8B)
     coral_light_bg, coral_border = "#FFF5F5", "#FF8B8B"
-    in_msg = t["in_msg_deficit"](ideal_target_cals, diff_from_ideal)
+    in_msg = t["in_msg_deficit"](int(ideal_target_cals), int(diff_from_ideal))
+    burn_msg = t["burn_msg_yes"](int(extra_burned)) if extra_burned > 0 else t["burn_msg_no"]
 
-    if extra_burned > 0:
-        burn_msg = t["burn_msg_yes"](extra_burned)
-    else:
-        burn_msg = t["burn_msg_no"]
-
-    weight_to_lose = (current_weight if current_weight else initial_weight) - target_weight
+    weight_to_lose = (float(current_weight) if current_weight else float(initial_weight)) - target_weight
     if deficit < 0 and weight_to_lose > 0:
         daily_deficit_abs = abs(deficit)
         total_kcal_needed = weight_to_lose * 7700
@@ -1395,11 +1353,10 @@ elif selected_page == t["t2"]:
 
     weight_msg = t["weight_msg_default"]
     if current_weight:
-        diff_ini = current_weight - initial_weight
-        diff_tgt = current_weight - target_weight
+        diff_ini = float(current_weight) - float(initial_weight)
+        diff_tgt = float(current_weight) - target_weight
         weight_msg = t["weight_msg_val"](initial_weight, diff_ini, target_weight, diff_tgt)
 
-    # CSS per i widget con sfondo corallo soft ed eliminazione bordi doppi
     st.markdown(f"""
         <style>
             .custom-card {{
@@ -1410,215 +1367,240 @@ elif selected_page == t["t2"]:
                 height: 100%;
                 box-shadow: 0 2px 6px rgba(255, 139, 139, 0.08);
             }}
-            .custom-card-title {{
-                font-size: 0.95rem;
-                font-weight: 600;
-                color: #1A2942;
-                margin-bottom: 4px;
-            }}
-            .custom-card-value {{
-                font-size: 1.8rem;
-                font-weight: 700;
-                color: #1A2942;
-                margin-bottom: 8px;
-            }}
-            .custom-card-caption {{
-                font-size: 0.82rem;
-                color: #555555;
-                line-height: 1.35;
-            }}
+            .custom-card-title {{ font-size: .95rem; font-weight: 600; color: #1A2942; margin-bottom: 4px; }}
+            .custom-card-value {{ font-size: 1.8rem; font-weight: 700; color: #1A2942; margin-bottom: 8px; }}
+            .custom-card-caption {{ font-size: .82rem; color: #555; line-height: 1.35; }}
         </style>
     """, unsafe_allow_html=True)
 
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-    
     with col_c1:
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="custom-card-title">🍽️ {t['card_kcal_in']}</div>
-                <div class="custom-card-value">{total_cals_in} kcal</div>
-                <div class="custom-card-caption">{in_msg}</div>
-            </div>
-        """, unsafe_allow_html=True)
-            
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🍽️ {t["card_kcal_in"]}</div><div class="custom-card-value">{int(total_cals_in)} kcal</div><div class="custom-card-caption">{in_msg}</div></div>', unsafe_allow_html=True)
     with col_c2:
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="custom-card-title">🔥 {t['card_kcal_burn']}</div>
-                <div class="custom-card-value">{total_burned_finora} kcal</div>
-                <div class="custom-card-caption">{burn_msg}</div>
-            </div>
-        """, unsafe_allow_html=True)
-            
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🔥 {t["card_kcal_burn"]}</div><div class="custom-card-value">{int(total_burned_finora)} kcal</div><div class="custom-card-caption">{burn_msg}</div></div>', unsafe_allow_html=True)
     with col_c3:
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="custom-card-title">⚖️ {t['card_balance']}</div>
-                <div class="custom-card-value">{deficit:+d} kcal</div>
-                <div class="custom-card-caption">{bilancio_msg}</div>
-            </div>
-        """, unsafe_allow_html=True)
-            
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">⚖️ {t["card_balance"]}</div><div class="custom-card-value">{int(deficit):+d} kcal</div><div class="custom-card-caption">{bilancio_msg}</div></div>', unsafe_allow_html=True)
     with col_c4:
-        weight_str = f"{current_weight} kg" if current_weight else "N/D"
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="custom-card-title">📉 {t['card_weight']}</div>
-                <div class="custom-card-value">{weight_str}</div>
-                <div class="custom-card-caption">{weight_msg}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
+        weight_str = f"{float(current_weight):.1f} kg" if current_weight else "N/D"
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">📉 {t["card_weight"]}</div><div class="custom-card-value">{weight_str}</div><div class="custom-card-caption">{weight_msg}</div></div>', unsafe_allow_html=True)
+
+    # ------------------------------------------------------------------
+    # PIANIFICAZIONE DELLA GIORNATA E SUGGERIMENTI PASTI
+    # ------------------------------------------------------------------
+    if summary_date == date.today():
+        with st.container(border=True):
+            st.markdown("### 🧭 Piano della giornata")
+            if now.hour < 12:
+                st.info("Buongiorno! Imposta il tipo di giornata e il livello di attività previsto per pianificare i pasti.")
+            else:
+                st.caption("Puoi aggiornare il piano della giornata anche dopo la mattina.")
+
+            saved_day_type = None
+            saved_activity = None
+            if daily_log_res:
+                saved_day_type = daily_log_res[0].get("day_type")
+                saved_activity = daily_log_res[0].get("activity_plan")
+
+            day_types = ["Lavoro da casa", "Ufficio", "Giornata libera"]
+            activity_types = ["Riposo", "Moderatamente attiva", "Attiva"]
+
+            default_day = saved_day_type or st.session_state.get("day_plan_type", "Lavoro da casa")
+            default_activity = saved_activity or st.session_state.get("day_plan_activity", "Riposo")
+            if default_day not in day_types: default_day = day_types[0]
+            if default_activity not in activity_types: default_activity = activity_types[0]
+
+            pc1, pc2 = st.columns(2)
+            with pc1:
+                day_type = st.selectbox("Tipo di giornata", day_types, index=day_types.index(default_day), key="overview_day_type")
+            with pc2:
+                activity_plan = st.selectbox("Attività prevista", activity_types, index=activity_types.index(default_activity), key="overview_activity_plan")
+
+            st.session_state["day_plan_type"] = day_type
+            st.session_state["day_plan_activity"] = activity_plan
+
+            if st.button("💾 Salva piano della giornata", key="save_day_plan", use_container_width=True):
+                try:
+                    existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(date.today())).execute().data or []
+                    payload_plan = {"day_type": day_type, "activity_plan": activity_plan}
+                    if existing:
+                        supabase.table("daily_logs").update(payload_plan).eq("id", existing[0]["id"]).execute()
+                    else:
+                        supabase.table("daily_logs").insert({"user_id": user_id, "date": str(date.today()), **payload_plan}).execute()
+                    st.success("✅ Piano salvato.")
+                except Exception:
+                    st.info("Il piano resta attivo in questa sessione. Esegui la migrazione SQL aggiornata per renderlo persistente.")
+
+            # Valori rappresentativi per la pianificazione:
+            # Riposo 0 kcal extra, Moderatamente attiva 500, Attiva 1000.
+            activity_bonus = {"Riposo": 0, "Moderatamente attiva": 500, "Attiva": 1000}[activity_plan]
+            daily_budget = float(user_bmr) + activity_bonus
+
+            if day_type == "Ufficio":
+                fixed_kcal = 1260.0  # colazione + pasto ufficio
+                dinner_target = max(0.0, daily_budget - fixed_kcal)
+                st.markdown(f"**Budget stimato:** {daily_budget:.0f} kcal · **Ufficio già allocato:** 1260 kcal · **Cena:** circa {dinner_target:.0f} kcal")
+                dinner = closest_logged_meal("Cena", dinner_target)
+                if dinner:
+                    st.markdown(
+                        f"🍽️ **Cena suggerita:** {html.escape(dinner['name'])} — circa **{dinner['calories']:.0f} kcal** "
+                        f"{info_badge(dinner.get('notes'), 'Note cena')}",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("Non ho ancora abbastanza cene nello storico meals per suggerirne una.")
+            else:
+                if day_type == "Lavoro da casa":
+                    already_allocated = 185.0
+                    allocated_label = "colazione da casa"
+                else:
+                    breakfast_logged = sum(
+                        _safe_float(m.get("calories"))
+                        for m in meals_data
+                        if str(m.get("meal_type", "")).lower() == "colazione"
+                    )
+                    already_allocated = breakfast_logged
+                    allocated_label = "colazione già registrata" if breakfast_logged else "nessuna quota fissa"
+
+                remaining = max(0.0, daily_budget - already_allocated)
+                per_meal = remaining / 2.0
+                st.markdown(
+                    f"**Budget stimato:** {daily_budget:.0f} kcal · **{allocated_label}:** {already_allocated:.0f} kcal · "
+                    f"**Pranzo:** ~{per_meal:.0f} kcal · **Cena:** ~{per_meal:.0f} kcal"
+                )
+                lunch = closest_logged_meal("Pranzo", per_meal)
+                dinner = closest_logged_meal("Cena", per_meal)
+                sc1, sc2 = st.columns(2)
+                with sc1:
+                    if lunch:
+                        st.markdown(
+                            f"🥗 **Pranzo suggerito**<br>{html.escape(lunch['name'])} · **{lunch['calories']:.0f} kcal** "
+                            f"{info_badge(lunch.get('notes'), 'Note pranzo')}",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.caption("Nessun pranzo storico disponibile.")
+                with sc2:
+                    if dinner:
+                        st.markdown(
+                            f"🍽️ **Cena suggerita**<br>{html.escape(dinner['name'])} · **{dinner['calories']:.0f} kcal** "
+                            f"{info_badge(dinner.get('notes'), 'Note cena')}",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.caption("Nessuna cena storica disponibile.")
+
+            st.caption("Per la pianificazione uso +0 kcal (riposo), +500 kcal (moderatamente attiva), +1000 kcal (attiva). La soglia osservata nel grafico resta: riposo <300 kcal extra, attività intensa ≥800 kcal.")
+
     st.markdown("<br>", unsafe_allow_html=True)
 
     with st.container(border=True):
         st.markdown(f"### {t['logged_foods']}")
         if meals_data:
-            meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data
-            
+            try:
+                meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat, notes").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+            except Exception:
+                meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+
             df_meals = pd.DataFrame(meals_with_id)
             df_display = df_meals.rename(columns={
-                "meal_type": "Pasto", "name": "Nome", "calories": "Kcal", 
-                "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)"
+                "meal_type": "Pasto", "name": "Nome", "calories": "Kcal",
+                "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)",
             })
             st.dataframe(df_display[["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]], use_container_width=True, hide_index=True)
-            
-            # ------------------------------------------------------------------
-            # MODIFICA / ELIMINAZIONE PASTI
-            # ------------------------------------------------------------------
-            # Il valore della selectbox è l'ID del record, così anche due pasti
-            # con lo stesso nome possono essere modificati separatamente.
+
             meal_by_id = {m["id"]: m for m in meals_with_id}
             meal_options = {
                 m["id"]: f"{m.get('meal_type', '')} - {m.get('name', '')} ({m.get('calories', 0)} kcal)"
                 for m in meals_with_id
             }
-
             selected_meal_id = st.selectbox(
                 "🍽️ Seleziona il pasto da modificare",
-                options=[""] + list(meal_options.keys()),
-                format_func=lambda meal_id: (
-                    "Seleziona un pasto..."
-                    if meal_id == ""
-                    else meal_options[meal_id]
-                ),
-                key=f"edit_meal_select_{summary_date}"
+                options=[""] + list(meal_options),
+                format_func=lambda meal_id: "Seleziona un pasto..." if meal_id == "" else meal_options[meal_id],
+                key=f"edit_meal_select_{summary_date}",
             )
 
             if selected_meal_id:
                 selected_meal = meal_by_id[selected_meal_id]
                 meal_types = ["Colazione", "Pranzo", "Cena", "Snack"]
-
                 current_type = selected_meal.get("meal_type")
                 current_index = meal_types.index(current_type) if current_type in meal_types else 0
 
+                if selected_meal.get("notes"):
+                    st.markdown(f"Note {info_badge(selected_meal.get('notes'), 'Note pasto')}", unsafe_allow_html=True)
+
                 edit_col1, edit_col2 = st.columns([2, 1])
-
                 with edit_col1:
-                    new_meal_type = st.selectbox(
-                        "Tipo di pasto",
-                        meal_types,
-                        index=current_index,
-                        key=f"edit_meal_type_{selected_meal_id}_{summary_date}"
-                    )
-
+                    new_meal_type = st.selectbox("Tipo di pasto", meal_types, index=current_index, key=f"edit_meal_type_{selected_meal_id}_{summary_date}")
                 with edit_col2:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    save_meal_type = st.button(
-                        "💾 Salva modifica",
-                        use_container_width=True,
-                        key=f"save_meal_type_{selected_meal_id}_{summary_date}"
-                    )
+                    save_meal_type = st.button("💾 Salva modifica", use_container_width=True, key=f"save_meal_type_{selected_meal_id}_{summary_date}")
 
                 if save_meal_type:
                     try:
-                        supabase.table("meals").update(
-                            {"meal_type": new_meal_type}
-                        ).eq("id", selected_meal_id).eq(
-                            "user_id", user_id
-                        ).execute()
-
-                        st.success(
-                            f"✅ Tipo di pasto modificato in **{new_meal_type}**."
-                        )
+                        supabase.table("meals").update({"meal_type": new_meal_type}).eq("id", selected_meal_id).eq("user_id", user_id).execute()
+                        st.success(f"✅ Tipo di pasto modificato in **{new_meal_type}**.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Errore nella modifica del pasto: {e}")
 
                 st.markdown("---")
-
                 delete_col1, delete_col2 = st.columns([3, 1])
                 with delete_col1:
-                    st.caption(
-                        f"Elimina definitivamente **{selected_meal.get('name', 'questo pasto')}** "
-                        "se non vuoi più conservarlo."
-                    )
+                    st.caption(f"Elimina definitivamente **{selected_meal.get('name', 'questo pasto')}** se non vuoi più conservarlo.")
                 with delete_col2:
-                    if st.button(
-                        t["del_meal_btn"],
-                        key=f"delete_meal_{selected_meal_id}_{summary_date}",
-                        use_container_width=True
-                    ):
+                    if st.button(t["del_meal_btn"], key=f"delete_meal_{selected_meal_id}_{summary_date}", use_container_width=True):
                         try:
-                            supabase.table("meals").delete().eq(
-                                "id", selected_meal_id
-                            ).eq("user_id", user_id).execute()
+                            supabase.table("meals").delete().eq("id", selected_meal_id).eq("user_id", user_id).execute()
                             st.success(t["meal_del_success"])
                             st.rerun()
                         except Exception as e:
                             st.error(f"Errore nell'eliminazione del pasto: {e}")
-
         else:
             st.info(t["no_meals"])
-    
+
     with st.container(border=True):
         st.markdown(t["burned_acts"])
         rows_acts = [{"Attività": "BMR (Base)", "Kcal Bruciate": bmr_so_far}]
-        if activities_data:
-            for act in activities_data:
-                rows_acts.append({
-                    "Attività": act.get("activity_name"),
-                    "Kcal Bruciate": act.get("burned_calories")
-                })
-        
-        df_acts = pd.DataFrame(rows_acts)
-        st.dataframe(df_acts, use_container_width=True, hide_index=True)
+        for act in activities_data:
+            rows_acts.append({"Attività": act.get("activity_name"), "Kcal Bruciate": act.get("burned_calories")})
+        st.dataframe(pd.DataFrame(rows_acts), use_container_width=True, hide_index=True)
 
-# ==============================================================================
-# 11. PAGE 3: WEIGHT TRACKING
+# 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
 # ==============================================================================
 elif selected_page == t["t3"]:
     st.subheader(t["weight_tracking"])
 
-    # ------------------------------------------------------------------
-    # INSERIMENTO / MODIFICA / CANCELLAZIONE PESO
-    # ------------------------------------------------------------------
     with st.container(border=True):
         st.markdown("#### ⚖️ Gestione pesi")
         logs_all = (
             supabase.table("daily_logs").select("id, date, weight").eq("user_id", user_id)
             .not_.is_("weight", "null").order("date", desc=True).execute().data or []
         )
-        edit_options = {
-            str(r["id"]): f"{r['date']} · {float(r['weight']):.1f} kg" for r in logs_all
-        }
+        edit_options = {str(r["id"]): f"{r['date']} · {float(r['weight']):.1f} kg" for r in logs_all}
+
         c1, c2 = st.columns(2)
         with c1:
             w = st.number_input("Nuovo peso (kg)", value=80.0, min_value=20.0, max_value=300.0, step=0.1, key="new_weight_value")
             w_date = st.date_input("Data del peso", value=date.today(), key="new_weight_date")
             if st.button("💾 Salva peso", use_container_width=True):
                 try:
-                    supabase.table("daily_logs").upsert({
-                        "user_id": user_id, "date": str(w_date), "weight": float(w)
-                    }, on_conflict="user_id,date").execute()
+                    supabase.table("daily_logs").upsert(
+                        {"user_id": user_id, "date": str(w_date), "weight": float(w)},
+                        on_conflict="user_id,date",
+                    ).execute()
                     st.success("✅ Peso salvato!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Errore nel salvataggio del peso: {e}")
+
         with c2:
-            selected_weight_id = st.selectbox("Peso da modificare o eliminare", [""] + list(edit_options.keys()),
-                                              format_func=lambda x: "Seleziona un peso..." if x == "" else edit_options[x],
-                                              key="weight_edit_selector")
+            selected_weight_id = st.selectbox(
+                "Peso da modificare o eliminare",
+                [""] + list(edit_options),
+                format_func=lambda x: "Seleziona un peso..." if x == "" else edit_options[x],
+                key="weight_edit_selector",
+            )
             if selected_weight_id:
                 selected_row = next(r for r in logs_all if str(r["id"]) == selected_weight_id)
                 ew1, ew2 = st.columns(2)
@@ -1630,10 +1612,12 @@ elif selected_page == t["t3"]:
                 with b1:
                     if st.button("✏️ Modifica peso", use_container_width=True, key=f"update_weight_{selected_weight_id}"):
                         try:
-                            # Se cambia data, eliminiamo il vecchio record e lo riscriviamo sulla nuova data.
                             if str(edited_date) != str(selected_row["date"]):
                                 supabase.table("daily_logs").delete().eq("id", selected_row["id"]).eq("user_id", user_id).execute()
-                                supabase.table("daily_logs").upsert({"user_id": user_id, "date": str(edited_date), "weight": float(edited_weight)}, on_conflict="user_id,date").execute()
+                                supabase.table("daily_logs").upsert(
+                                    {"user_id": user_id, "date": str(edited_date), "weight": float(edited_weight)},
+                                    on_conflict="user_id,date",
+                                ).execute()
                             else:
                                 supabase.table("daily_logs").update({"weight": float(edited_weight)}).eq("id", selected_row["id"]).eq("user_id", user_id).execute()
                             st.success("✅ Peso modificato!")
@@ -1643,7 +1627,10 @@ elif selected_page == t["t3"]:
                 with b2:
                     if st.button("🗑️ Cancella peso", use_container_width=True, key=f"delete_weight_{selected_weight_id}"):
                         try:
-                            supabase.table("daily_logs").delete().eq("id", selected_row["id"]).eq("user_id", user_id).execute()
+                            # Non cancelliamo l'intera riga se contiene passi o piano giornata:
+                            # azzeriamo solo weight. Se la riga ha solo il peso, Supabase
+                            # conserverà una riga innocua con weight NULL.
+                            supabase.table("daily_logs").update({"weight": None}).eq("id", selected_row["id"]).eq("user_id", user_id).execute()
                             st.success("✅ Peso cancellato.")
                             st.rerun()
                         except Exception as e:
@@ -1651,7 +1638,12 @@ elif selected_page == t["t3"]:
 
     with st.container(border=True):
         st.markdown(f"#### {t['update_target']}")
-        new_target = st.number_input("Peso Obiettivo (kg)", value=float(user_target_weight) if user_target_weight else 75.0, min_value=20.0, max_value=300.0, step=0.5, key="weight_target_edit")
+        new_target = st.number_input(
+            "Peso Obiettivo (kg)",
+            value=float(user_target_weight) if user_target_weight else 75.0,
+            min_value=20.0, max_value=300.0, step=0.5,
+            key="weight_target_edit",
+        )
         if st.button(t["save_target"], use_container_width=True):
             try:
                 res = supabase.auth.update_user({"data": {"target_weight": float(new_target)}})
@@ -1664,174 +1656,249 @@ elif selected_page == t["t3"]:
 
     with st.container(border=True):
         try:
-            logs = (supabase.table("daily_logs").select("date, weight").eq("user_id", user_id)
-                    .not_.is_("weight", "null").order("date", desc=False).execute().data or [])
-            if not logs:
-                st.info("📊 Nessun dato di peso registrato ancora.")
-            else:
-                df_weight = pd.DataFrame(logs)
+            ctrl1, ctrl2 = st.columns(2)
+            with ctrl1:
+                chart_mode = st.selectbox(
+                    "Visualizzazione",
+                    ["Peso", "Kcal", "Macros", "Pasti"],
+                    index=0,
+                    key="main_analytics_mode",
+                )
+            with ctrl2:
+                period_options = {"7 giorni": 7, "14 giorni": 14, "30 giorni": 30, "60 giorni": 60, "90 giorni": 90}
+                selected_period_label = st.selectbox(
+                    "Periodo",
+                    list(period_options),
+                    index=1,  # default 14 giorni
+                    key="weight_chart_period",
+                )
+
+            selected_days = period_options[selected_period_label]
+            chart_end = pd.Timestamp(date.today())
+            chart_start = chart_end - pd.Timedelta(days=selected_days - 1)
+            timeline_dates = pd.date_range(chart_start, chart_end, freq="D")
+
+            logs = (
+                supabase.table("daily_logs").select("date, weight").eq("user_id", user_id)
+                .gte("date", str(chart_start.date())).lte("date", str(chart_end.date()))
+                .not_.is_("weight", "null").order("date", desc=False).execute().data or []
+            )
+            meals_rows = (
+                supabase.table("meals").select("date, meal_type, name, calories, protein, carbs, fat")
+                .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date()))
+                .execute().data or []
+            )
+            acts_rows = (
+                supabase.table("activities").select("date, activity_name, burned_calories")
+                .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date()))
+                .execute().data or []
+            )
+
+            df_weight = pd.DataFrame(logs)
+            meals_df = pd.DataFrame(meals_rows)
+            acts_df = pd.DataFrame(acts_rows)
+
+            if not df_weight.empty:
                 df_weight["date"] = pd.to_datetime(df_weight["date"]).dt.normalize()
                 df_weight["weight"] = pd.to_numeric(df_weight["weight"], errors="coerce")
                 df_weight = df_weight.dropna().sort_values("date")
+            if not meals_df.empty:
+                meals_df["date"] = pd.to_datetime(meals_df["date"]).dt.normalize()
+                for col in ["calories", "protein", "carbs", "fat"]:
+                    meals_df[col] = pd.to_numeric(meals_df[col], errors="coerce").fillna(0)
+            if not acts_df.empty:
+                acts_df["date"] = pd.to_datetime(acts_df["date"]).dt.normalize()
+                acts_df["burned_calories"] = pd.to_numeric(acts_df["burned_calories"], errors="coerce").fillna(0)
 
-                period_options = {"5 giorni": 5, "15 giorni": 15, "30 giorni": 30, "60 giorni": 60, "90 giorni": 90, "120 giorni": 120, "180 giorni": 180}
-                selected_period_label = st.selectbox("Periodo del grafico", list(period_options), index=2, key="weight_chart_period")
-                selected_days = period_options[selected_period_label]
-                chart_end = df_weight["date"].max()
-                chart_start = chart_end - pd.Timedelta(days=selected_days - 1)
-                timeline_dates = pd.date_range(chart_start, chart_end, freq="D")
-                df_visible = df_weight[(df_weight["date"] >= chart_start) & (df_weight["date"] <= chart_end)].copy()
+            days_df = pd.DataFrame({"date": timeline_dates})
+            if not meals_df.empty:
+                meal_totals = meals_df.groupby("date")[["calories", "protein", "carbs", "fat"]].sum().reset_index()
+                days_df = days_df.merge(meal_totals, on="date", how="left")
+            else:
+                for c in ["calories", "protein", "carbs", "fat"]:
+                    days_df[c] = 0.0
 
-                # Dati pasti e attività della stessa finestra.
-                meals_rows = (supabase.table("meals").select("date, meal_type, name, calories, protein, carbs, fat")
-                              .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date())).execute().data or [])
-                acts_rows = (supabase.table("activities").select("date, activity_name, burned_calories")
-                             .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date())).execute().data or [])
-                meals_df = pd.DataFrame(meals_rows)
-                acts_df = pd.DataFrame(acts_rows)
-                if not meals_df.empty:
-                    meals_df["date"] = pd.to_datetime(meals_df["date"]).dt.normalize()
-                    for col in ["calories", "protein", "carbs", "fat"]:
-                        meals_df[col] = pd.to_numeric(meals_df[col], errors="coerce").fillna(0)
-                if not acts_df.empty:
-                    acts_df["date"] = pd.to_datetime(acts_df["date"]).dt.normalize()
-                    acts_df["burned_calories"] = pd.to_numeric(acts_df["burned_calories"], errors="coerce").fillna(0)
+            for c in ["calories", "protein", "carbs", "fat"]:
+                if c not in days_df:
+                    days_df[c] = 0.0
+            days_df[["calories", "protein", "carbs", "fat"]] = days_df[["calories", "protein", "carbs", "fat"]].fillna(0)
 
-                target_val = float(user_target_weight) if user_target_weight else 75.0
-                latest_weight = float(df_weight["weight"].iloc[-1])
-                # Proiezione: trend degli ultimi 14 giorni.
-                estimated_date = None
-                days_to_goal = 0
-                recent_df = df_weight.tail(min(len(df_weight), 14))
-                if len(recent_df) >= 3 and latest_weight > target_val:
-                    days_diff = (recent_df["date"].max() - recent_df["date"].min()).days
-                    weight_diff = float(recent_df["weight"].iloc[-1] - recent_df["weight"].iloc[0])
-                    if days_diff > 0 and weight_diff < 0:
-                        kg_per_day = abs(weight_diff / days_diff)
-                        days_to_goal = max(1, int((latest_weight - target_val) / kg_per_day))
-                        estimated_date = df_weight["date"].max() + pd.Timedelta(days=days_to_goal)
+            if not acts_df.empty:
+                burn_totals = acts_df.groupby("date")["burned_calories"].sum().reset_index(name="extra")
+                days_df = days_df.merge(burn_totals, on="date", how="left")
+            else:
+                days_df["extra"] = 0.0
+            days_df["extra"] = days_df["extra"].fillna(0.0)
+            days_df["burned"] = float(user_bmr) + days_df["extra"]
 
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=df_visible["date"], y=df_visible["weight"], mode="lines+markers", name="Peso reale",
-                    line=dict(color="#FF8B8B", width=3), marker=dict(size=8, color="#FF8B8B"),
-                    hovertemplate="<b>%{x|%d %b %Y}</b><br>Peso: <b>%{y:.1f} kg</b><extra></extra>"
-                ))
-                if estimated_date is not None:
-                    first = df_weight.iloc[0]
+            fig = go.Figure()
+            y_title = ""
+
+            if chart_mode == "Peso":
+                if not df_weight.empty:
                     fig.add_trace(go.Scatter(
-                        x=[first["date"], estimated_date], y=[float(first["weight"]), target_val],
-                        mode="lines+markers", name="Proiezione",
-                        line=dict(color="#FF8B8B", width=2.5, dash="dash"), marker=dict(size=6, color="#FF8B8B"),
-                        hovertemplate="<b>Proiezione</b><br>%{x|%d %b %Y}<br>%{y:.1f} kg<extra></extra>"
+                        x=df_weight["date"], y=df_weight["weight"],
+                        mode="lines+markers", name="Peso reale",
+                        line=dict(color="#FF8B8B", width=3),
+                        marker=dict(size=8, color="#FF8B8B"),
+                        hovertemplate="<b>%{x|%d %b %Y}</b><br>Peso: <b>%{y:.1f} kg</b><extra></extra>",
                     ))
-                fig.add_trace(go.Scatter(
-                    x=[chart_start, chart_end], y=[target_val, target_val], mode="lines", name="Obiettivo",
-                    line=dict(color="#1A2942", width=2.5), hovertemplate=f"Obiettivo: {target_val:.1f} kg<extra></extra>"
+
+                    target_val = float(user_target_weight) if user_target_weight else 75.0
+                    # Trend lineare sui dati disponibili negli ultimi 14 giorni.
+                    trend_source = df_weight[df_weight["date"] >= chart_end - pd.Timedelta(days=13)]
+                    if len(trend_source) >= 3:
+                        x_days = (trend_source["date"] - trend_source["date"].min()).dt.days.astype(float)
+                        slope, intercept = pd.Series(trend_source["weight"].values).pipe(
+                            lambda y: __import__("numpy").polyfit(x_days, y, 1)
+                        )
+                        trend_x = pd.date_range(chart_start, chart_end, freq="D")
+                        trend_days = (trend_x - trend_source["date"].min()).days.astype(float)
+                        trend_y = intercept + slope * trend_days
+                        fig.add_trace(go.Scatter(
+                            x=trend_x, y=trend_y, mode="lines",
+                            name="Proiezione",
+                            line=dict(color="#FF8B8B", width=2.5, dash="dash"),
+                            hovertemplate="<b>Trend</b><br>%{x|%d %b}<br>%{y:.1f} kg<extra></extra>",
+                        ))
+
+                    fig.add_trace(go.Scatter(
+                        x=[chart_start, chart_end], y=[target_val, target_val],
+                        mode="lines", name="Obiettivo",
+                        line=dict(color="#1A2942", width=2.5),
+                        hovertemplate=f"Obiettivo: {target_val:.1f} kg<extra></extra>",
+                    ))
+
+                    visible_values = df_weight["weight"].tolist() + [target_val]
+                    y_min, y_max = min(visible_values), max(visible_values)
+                    spread = max(y_max - y_min, 1.0)
+                    pad = max(.5, spread * .18)
+                    fig.update_yaxes(range=[y_min - pad, y_max + pad])
+                else:
+                    st.info(f"Nessun peso registrato negli ultimi {selected_days} giorni.")
+                y_title = "Peso (kg)"
+
+            elif chart_mode == "Kcal":
+                fig.add_trace(go.Bar(
+                    x=days_df["date"], y=days_df["calories"],
+                    name="Kcal ingerite", marker_color="#FF8B8B",
+                    hovertemplate="%{x|%d %b}<br>Ingerite: %{y:.0f} kcal<extra></extra>",
                 ))
+                fig.add_trace(go.Bar(
+                    x=days_df["date"], y=days_df["burned"],
+                    name="Kcal bruciate", marker_color="#1A2942",
+                    hovertemplate="%{x|%d %b}<br>Bruciate: %{y:.0f} kcal<extra></extra>",
+                ))
+                fig.update_layout(barmode="group")
+                y_title = "kcal"
 
-                # Zoom orizzontale + autoscaling verticale.
-                vals = df_visible["weight"].tolist() + [target_val]
-                if estimated_date is not None and chart_start <= estimated_date <= chart_end:
-                    vals.append(target_val)
-                y_min, y_max = min(vals), max(vals)
-                spread = max(y_max - y_min, 1.0)
-                padding = max(0.6, spread * 0.18)
-                fig.update_xaxes(range=[chart_start, chart_end + pd.Timedelta(hours=23)], showgrid=False, fixedrange=False)
-                fig.update_yaxes(range=[y_min - padding, y_max + padding], title="Peso (kg)", gridcolor="#E8ECF2", zeroline=False, fixedrange=False)
-                fig.update_layout(height=470, plot_bgcolor="#FFFFFF", paper_bgcolor="rgba(0,0,0,0)", hovermode="x unified",
-                                  font=dict(color="#1A2942"), margin=dict(l=55, r=25, t=45, b=55),
-                                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(255,255,255,0.85)"))
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            elif chart_mode == "Macros":
+                macro_specs = [
+                    ("protein", "Proteine", "#FF8B8B"),
+                    ("carbs", "Carboidrati", "#1A2942"),
+                    ("fat", "Grassi", "#FFB4B4"),
+                ]
+                for col, label, color in macro_specs:
+                    fig.add_trace(go.Bar(
+                        x=days_df["date"], y=days_df[col], name=label, marker_color=color,
+                        hovertemplate=f"%{{x|%d %b}}<br>{label}: %{{y:.1f}} g<extra></extra>",
+                    ))
+                fig.update_layout(barmode="stack")
+                y_title = "grammi"
 
-                # --------------------------------------------------------------
-                # SECONDO GRAFICO: DEFICIT / MACROS / PASTI
-                # --------------------------------------------------------------
-                chart_mode = st.selectbox("Analisi giornaliera", ["Deficit", "Macros", "Pasti"], index=0, key="daily_analysis_mode")
-                days_df = pd.DataFrame({"date": timeline_dates})
-                if not meals_df.empty:
-                    daily_meals = meals_df.groupby("date")[["calories", "protein", "carbs", "fat"]].sum().reset_index()
-                    days_df = days_df.merge(daily_meals, on="date", how="left")
-                else:
-                    days_df[["calories", "protein", "carbs", "fat"]] = 0
-                days_df[["calories", "protein", "carbs", "fat"]] = days_df[["calories", "protein", "carbs", "fat"]].fillna(0)
-                if not acts_df.empty:
-                    daily_burn = acts_df.groupby("date")["burned_calories"].sum().reset_index(name="extra")
-                    days_df = days_df.merge(daily_burn, on="date", how="left")
-                else:
-                    days_df["extra"] = 0
-                days_df["extra"] = days_df["extra"].fillna(0)
-                days_df["burned"] = float(user_bmr) + days_df["extra"]
-
-                # Icone per ogni giorno.
-                deficit_icons, activity_icons, deficit_titles, activity_titles = [], [], [], []
-                for _, r in days_df.iterrows():
-                    kcal_in = float(r["calories"])
-                    extra = float(r["extra"])
-                    if kcal_in <= 0:
-                        deficit_icons.append("·"); deficit_titles.append("Nessun dato alimentare")
-                    else:
-                        d = float(user_bmr) + extra - kcal_in
-                        if d >= 500: deficit_icons.append("👍")
-                        elif d >= 0: deficit_icons.append("😐")
-                        else: deficit_icons.append("👎")
-                        deficit_titles.append(f"Deficit: {d:.0f} kcal")
-                    if not acts_df.empty:
-                        day_rows = acts_df[acts_df["date"] == r["date"]]
-                        padel = any(str(n).strip().lower() == "padel" for n in day_rows["activity_name"].tolist())
-                    else: padel = False
-                    if padel: activity_icons.append("🎾")
-                    elif extra > 300: activity_icons.append("🔥")
-                    else: activity_icons.append("🛏️")
-                    activity_titles.append(f"Extra: {extra:.0f} kcal")
-
-                daily_fig = go.Figure()
-                if chart_mode == "Deficit":
-                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["calories"], name="Kcal ingerite", marker_color="#FF8B8B", hovertemplate="%{x|%d %b}<br>Ingerite: %{y:.0f} kcal<extra></extra>"))
-                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["burned"], name="Kcal bruciate", marker_color="#1A2942", hovertemplate="%{x|%d %b}<br>Bruciate: %{y:.0f} kcal<extra></extra>"))
-                    daily_fig.update_layout(barmode="group", yaxis_title="kcal")
-                elif chart_mode == "Macros":
-                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["protein"], name="Proteine", marker_color="#FF8B8B", hovertemplate="%{x|%d %b}<br>Proteine: %{y:.0f} g<extra></extra>"))
-                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["carbs"], name="Carboidrati", marker_color="#1A2942", hovertemplate="%{x|%d %b}<br>Carboidrati: %{y:.0f} g<extra></extra>"))
-                    daily_fig.add_trace(go.Bar(x=days_df["date"], y=days_df["fat"], name="Grassi", marker_color="#FFB4B4", hovertemplate="%{x|%d %b}<br>Grassi: %{y:.0f} g<extra></extra>"))
-                    daily_fig.update_layout(barmode="stack", yaxis_title="grammi")
-                else:
-                    meal_order = ["Colazione", "Pranzo", "Snack", "Cena"]
-                    meal_colors = ["#FF8B8B", "#1A2942", "#FFB4B4", "#667085"]
+            else:  # Pasti
+                meal_order = ["Colazione", "Pranzo", "Snack", "Cena"]
+                meal_colors = ["#FF8B8B", "#1A2942", "#FFB4B4", "#667085"]
+                for meal_type, color in zip(meal_order, meal_colors):
                     if meals_df.empty:
-                        for meal_type, color in zip(meal_order, meal_colors):
-                            daily_fig.add_trace(go.Bar(x=days_df["date"], y=[0]*len(days_df), name=meal_type, marker_color=color))
+                        vals = [0.0] * len(days_df)
                     else:
-                        for meal_type, color in zip(meal_order, meal_colors):
-                            md = meals_df[meals_df["meal_type"] == meal_type].groupby("date")["calories"].sum()
-                            vals = [float(md.get(d, 0)) for d in days_df["date"]]
-                            daily_fig.add_trace(go.Bar(x=days_df["date"], y=vals, name=meal_type, marker_color=color))
-                    daily_fig.update_layout(barmode="stack", yaxis_title="kcal")
+                        series = meals_df[meals_df["meal_type"] == meal_type].groupby("date")["calories"].sum()
+                        vals = [float(series.get(d, 0)) for d in days_df["date"]]
+                    fig.add_trace(go.Bar(
+                        x=days_df["date"], y=vals, name=meal_type, marker_color=color,
+                        hovertemplate=f"%{{x|%d %b}}<br>{meal_type}: %{{y:.0f}} kcal<extra></extra>",
+                    ))
+                fig.update_layout(barmode="stack")
+                y_title = "kcal"
 
-                # Le icone sono parte del secondo grafico ma fuori dall'area delle colonne.
-                if len(days_df) <= 45:
-                    for idx, r in days_df.iterrows():
-                        daily_fig.add_annotation(x=r["date"], y=1.02, yref="paper", text=deficit_icons[idx], showarrow=False, font=dict(size=18), hovertext=deficit_titles[idx])
-                        daily_fig.add_annotation(x=r["date"], y=0.94, yref="paper", text=activity_icons[idx], showarrow=False, font=dict(size=17), hovertext=activity_titles[idx])
-                daily_fig.update_xaxes(range=[chart_start, chart_end + pd.Timedelta(hours=23)], tickformat="%d %b", fixedrange=False)
-                daily_fig.update_layout(height=410, plot_bgcolor="#FFFFFF", paper_bgcolor="rgba(0,0,0,0)", hovermode="x unified",
-                                       font=dict(color="#1A2942"), margin=dict(l=55, r=25, t=55, b=55),
-                                       legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(255,255,255,0.85)"))
-                st.plotly_chart(daily_fig, use_container_width=True, config={"displayModeBar": False})
+            fig.update_xaxes(
+                range=[chart_start, chart_end + pd.Timedelta(hours=23)],
+                tickformat="%d %b",
+                showgrid=False,
+                fixedrange=False,
+            )
+            fig.update_yaxes(title=y_title, gridcolor="#E8ECF2", zeroline=False, fixedrange=False)
+            fig.update_layout(
+                height=500,
+                plot_bgcolor="#FFFFFF",
+                paper_bgcolor="rgba(0,0,0,0)",
+                hovermode="x unified",
+                font=dict(color="#1A2942"),
+                margin=dict(l=55, r=25, t=45, b=55),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(255,255,255,.85)"),
+            )
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-                if len(days_df) > 45:
-                    st.caption("💡 Per periodi lunghi le icone restano disponibili nei tooltip per mantenere il grafico leggibile.")
+            # --------------------------------------------------------------
+            # DETTAGLI GIORNALIERI SOTTO IL GRAFICO
+            # --------------------------------------------------------------
+            detail_cells = []
+            for _, row in days_df.iterrows():
+                day = row["date"]
+                kcal_in = float(row["calories"])
+                extra = float(row["extra"])
+                if kcal_in <= 0:
+                    deficit_icon, deficit_tip = "·", "Nessun dato alimentare"
+                else:
+                    daily_def = float(user_bmr) + extra - kcal_in
+                    if daily_def >= 500:
+                        deficit_icon = "👍"
+                    elif daily_def >= 0:
+                        deficit_icon = "😐"
+                    else:
+                        deficit_icon = "👎"
+                    deficit_tip = f"Deficit: {daily_def:.0f} kcal"
 
-                # --------------------------------------------------------------
-                # PROIEZIONE TESTUALE
-                # --------------------------------------------------------------
-                if estimated_date is not None:
-                    st.markdown(f"<div style='background:#FFFFFF;border:1px solid #FF8B8B;padding:12px 16px;border-radius:10px;color:#1A2942;'>🔮 <b>Proiezione:</b> al ritmo attuale potresti raggiungere {target_val:.1f} kg intorno al <b>{estimated_date.strftime('%d %b %Y')}</b>.</div>", unsafe_allow_html=True)
+                if not acts_df.empty:
+                    day_acts = acts_df[acts_df["date"] == day]
+                    has_padel = any(str(v).strip().lower() == "padel" for v in day_acts["activity_name"].tolist())
+                else:
+                    has_padel = False
+
+                if has_padel:
+                    activity_icon = "🎾"
+                    activity_tip = f"Padel · {extra:.0f} kcal extra"
+                elif extra > 300:
+                    activity_icon = "🔥"
+                    activity_tip = f"{extra:.0f} kcal extra"
+                else:
+                    activity_icon = "🛏️"
+                    activity_tip = f"{extra:.0f} kcal extra"
+
+                detail_cells.append(
+                    f'<div style="min-width:48px;text-align:center;padding:5px 3px;">'
+                    f'<div style="font-size:11px;color:#667085;">{day.strftime("%d")}<br>{day.strftime("%b")}</div>'
+                    f'<div title="{html.escape(deficit_tip, quote=True)}" style="font-size:20px;cursor:help;">{deficit_icon}</div>'
+                    f'<div title="{html.escape(activity_tip, quote=True)}" style="font-size:18px;cursor:help;">{activity_icon}</div>'
+                    f'</div>'
+                )
+
+            timeline_html = (
+                '<div style="border:1px solid #E8ECF2;border-radius:12px;padding:8px 10px;overflow-x:auto;">'
+                '<div style="font-size:12px;color:#667085;margin-bottom:4px;">'
+                'Dettagli: 👍 deficit ≥500 · 😐 deficit 0–499 · 👎 surplus &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
+                '</div>'
+                f'<div style="display:flex;gap:2px;min-width:{max(100, len(detail_cells)*50)}px;">'
+                + "".join(detail_cells) +
+                '</div></div>'
+            )
+            st.markdown(timeline_html, unsafe_allow_html=True)
+
         except Exception as e:
-            st.error(f"Errore nel caricamento grafici: {e}")
+            st.error(f"Errore nel caricamento del grafico: {e}")
             print(traceback.format_exc())
 
-# ==============================================================================
 # 12. PAGE 4: RICETTE
 # ==============================================================================
 elif selected_page == t["t4"]:
@@ -1854,6 +1921,14 @@ elif selected_page == t["t4"]:
             })
             st.dataframe(df_display, use_container_width=True, hide_index=True)
 
+            # Le note vengono mostrate come icona informativa con tooltip.
+            for e in entries:
+                if e.get("notes"):
+                    st.markdown(
+                        f"**{html.escape(str(e.get('name', 'Ricetta')))}** {info_badge(e.get('notes'), 'Note ricetta')}",
+                        unsafe_allow_html=True,
+                    )
+
             entry_by_id = {str(e.get("id")): e for e in entries}
             selected_entry_id = st.selectbox(
                 "Seleziona ricetta da eliminare",
@@ -1874,6 +1949,12 @@ elif selected_page == t["t4"]:
     with st.container(border=True):
         st.markdown("### ➕ Aggiungi nuova Ricetta")
         r_name = st.text_input("Nome ricetta", placeholder="Es. Pasta al pomodoro", key=f"recipe_builder_name_{v}")
+        r_notes = st.text_area(
+            "Note ricetta (opzionali)",
+            placeholder="Es. preparazione, sostituzioni, condimenti, quando la mangio...",
+            key=f"recipe_builder_notes_{v}",
+            height=90,
+        )
 
         st.markdown("#### 🥕 Aggiungi ingrediente")
         source = st.radio(
@@ -1987,6 +2068,7 @@ elif selected_page == t["t4"]:
                             "is_per_100g": 1,
                             "user_id": user_id,
                             "ingredients_json": ingredient_json,
+                            "notes": r_notes.strip(),
                         }
                         if existing:
                             supabase.table("recipes").update(payload).eq("id", existing[0]["id"]).eq("user_id", user_id).execute()
