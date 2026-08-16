@@ -149,17 +149,24 @@ def search_open_food_facts(query):
     query = query.strip()
     if not query:
         return {}
-    
+
     try:
         if query.isdigit():
-            url = f"https://world.openfoodfacts.org/api/v2/product/{query}.json"
+            # Tentativo sul database olandese per codice a barre
+            url = f"https://nl.openfoodfacts.org/api/v2/product/{query}.json"
             response = requests.get(url, timeout=10)
             payload = response.json()
             if payload.get("status") != 1:
-                return {}
+                # Fallback sul database mondiale
+                url_world = f"https://world.openfoodfacts.org/api/v2/product/{query}.json"
+                response = requests.get(url_world, timeout=10)
+                payload = response.json()
+                if payload.get("status") != 1:
+                    return {}
             products = [payload.get("product", {})]
         else:
-            url = "https://world.openfoodfacts.org/cgi/search.pl"
+            # Ricerca testuale focalizzata sul mercato olandese (cc=nl)
+            url = "https://nl.openfoodfacts.org/cgi/search.pl"
             response = requests.get(
                 url, 
                 params={
@@ -167,13 +174,38 @@ def search_open_food_facts(query):
                     "search_simple": 1, 
                     "action": "process", 
                     "json": 1, 
-                    "page_size": 20
+                    "page_size": 20,
+                    "cc": "nl"
                 }, 
                 timeout=10
             )
             products = response.json().get("products", [])
 
         results = {}
+        for p in products:
+            name = p.get("product_name", "Prodotto sconosciuto")
+            brands = p.get("brands", "")
+            full_name = f"{brands} - {name}" if brands else name
+            
+            nutriscore = p.get("nutriments", {})
+            # Estrazione sicura dei macronutrienti per 100g
+            cals = nutriscore.get("energy-kcal_100g", nutriscore.get("energy-kcal", 0)) or 0
+            prot = nutriscore.get("proteins_100g", 0) or 0
+            carbs = nutriscore.get("carbohydrates_100g", 0) or 0
+            fat = nutriscore.get("fat_100g", 0) or 0
+            
+            results[full_name] = {
+                "name": full_name,
+                "calories": float(cals),
+                "protein": float(prot),
+                "carbs": float(carbs),
+                "fat": float(fat)
+            }
+        return results
+
+    except Exception as e:
+        print(f"Errore nella ricerca Open Food Facts: {e}")
+        return {}
         for i, p in enumerate(products):
             name = p.get("product_name") or "Prodotto senza nome"
             nutriments = p.get("nutriments") or {}
