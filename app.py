@@ -156,6 +156,7 @@ state_defaults = {
     "prod_select": "",
     "recipe_builder_ingredients": [],
     "selected_source_note": "",
+    "selected_source_category": "Casa",
     "day_plan_type": "Lavoro da casa",
     "day_plan_activity": "Riposo",
 }
@@ -199,12 +200,30 @@ def info_badge(note, label="Note"):
     )
 
 
-def closest_logged_meal(meal_type, target_calories, allow_adyen=False):
-    """Trova nello storico meals il pasto più vicino al target. I pasti Adyen sono ammessi solo quando allow_adyen=True."""
+MEAL_CATEGORIES = ["Casa", "Lavoro", "Ristorante", "Una-tantum"]
+
+
+def infer_meal_category(row):
+    category = str(row.get("category") or "").strip()
+    if category in MEAL_CATEGORIES:
+        return category
+
+    label = (
+        row.get("base_name")
+        or _clean_meal_name(row.get("name"))
+        or ""
+    ).strip()
+    if label.casefold().startswith("adyen"):
+        return "Lavoro"
+    return "Casa"
+
+
+def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
+    """Trova il meal replicabile più vicino al target rispettando contesto e categoria."""
     try:
         rows = (
             supabase.table("meals")
-            .select("id,date,meal_type,name,base_name,calories,notes")
+            .select("id,date,meal_type,name,base_name,calories,notes,category")
             .eq("user_id", user_id)
             .eq("meal_type", meal_type)
             .execute().data
@@ -213,30 +232,45 @@ def closest_logged_meal(meal_type, target_calories, allow_adyen=False):
     except Exception:
         rows = (
             supabase.table("meals")
-            .select("id,date,meal_type,name,calories")
+            .select("id,date,meal_type,name,base_name,calories,notes")
             .eq("user_id", user_id)
             .eq("meal_type", meal_type)
             .execute().data
             or []
         )
 
+    allowed = set(allowed_categories or MEAL_CATEGORIES)
     candidates = []
     seen = set()
+
     for row in sorted(rows, key=lambda r: str(r.get("date", "")), reverse=True):
         kcal = _safe_float(row.get("calories"))
         if kcal <= 0:
             continue
-        label = (row.get("base_name") or _clean_meal_name(row.get("name")) or "Pasto").strip()
-        if not allow_adyen and label.casefold().startswith("adyen"):
+
+        category = infer_meal_category(row)
+        if category == "Una-tantum":
             continue
-        dedupe_key = label.casefold()
+        if meal_type == "Pranzo" and category == "Ristorante":
+            continue
+        if category not in allowed:
+            continue
+
+        label = (
+            row.get("base_name")
+            or _clean_meal_name(row.get("name"))
+            or "Pasto"
+        ).strip()
+        dedupe_key = (label.casefold(), category.casefold())
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
+
         candidates.append({
             "name": label,
             "calories": kcal,
             "notes": row.get("notes") or "",
+            "category": category,
             "difference": abs(kcal - float(target_calories)),
         })
 
@@ -397,7 +431,7 @@ def get_quick_entries_from_meals():
             .select(
                 "id,date,name,base_name,quantity,is_per_100g,"
                 "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat,notes"
+                "calories,protein,carbs,fat,notes,category,ingredients_json"
             )
             .eq("user_id", user_id)
             .order("date", desc=True)
@@ -442,6 +476,8 @@ def get_quick_entries_from_meals():
                 "default_quantity": 100.0 if is_100g else 1.0,
                 "source_date": row.get("date"),
                 "notes": row.get("notes") or "",
+                "category": infer_meal_category(row),
+                "ingredients_json": row.get("ingredients_json"),
             }
         else:
             # Legacy: valori totali del pasto, quindi porzione fissa.
@@ -456,6 +492,8 @@ def get_quick_entries_from_meals():
                 "default_quantity": 1.0,
                 "source_date": row.get("date"),
                 "notes": row.get("notes") or "",
+                "category": infer_meal_category(row),
+                "ingredients_json": row.get("ingredients_json") if enhanced_schema else None,
             }
 
     return sorted(quick.values(), key=lambda x: x["label"].lower())
@@ -464,7 +502,7 @@ def get_quick_entries_from_meals():
 def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
                                quantity, is_per_100g, calories, protein, carbs, fat,
                                base_calories, base_protein, base_carbs, base_fat,
-                               notes=""):
+                               notes="", category="Casa", ingredients_json=None):
     """Inserisce un meal conservando sia il totale sia i dati base riutilizzabili."""
     payload = {
         "user_id": user_id,
@@ -483,6 +521,8 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
         "base_carbs": float(base_carbs),
         "base_fat": float(base_fat),
         "notes": str(notes or "").strip(),
+        "category": category if category in MEAL_CATEGORIES else "Casa",
+        "ingredients_json": ingredients_json,
     }
     try:
         return supabase.table("meals").insert(payload).execute()
@@ -1289,7 +1329,8 @@ if selected_page == t["t1"]:
         st.session_state["grams_val"] = 100.0
         st.session_state["is_per_100g_val"] = True
 
-    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0, is_100g=True, note=""):
+    def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0,
+                        is_100g=True, note="", category="Casa"):
         st.session_state["m_name"] = name
         st.session_state["base_cals"] = float(cals)
         st.session_state["base_prot"] = float(prot)
@@ -1299,6 +1340,7 @@ if selected_page == t["t1"]:
         st.session_state["is_per_100g_val"] = bool(is_100g)
         st.session_state["last_selected"] = selected
         st.session_state["selected_source_note"] = str(note or "")
+        st.session_state["selected_source_category"] = category if category in MEAL_CATEGORIES else "Casa"
         st.session_state["form_version"] += 1
 
     if st.session_state.get("last_source") != input_source:
@@ -1357,7 +1399,7 @@ if selected_page == t["t1"]:
                     q = quick_by_label[sel_quick]
                     reset_or_update(
                         q["name"], q["calories"], q["protein"], q["carbs"], q["fat"],
-                        sel_quick, q["default_quantity"], q["is_per_100g"], q.get("notes", ""),
+                        sel_quick, q["default_quantity"], q["is_per_100g"], q.get("notes", ""), q.get("category", "Casa"),
                     )
                     st.rerun()
             else:
@@ -1366,29 +1408,56 @@ if selected_page == t["t1"]:
             st.error(f"Errore nel caricamento delle immissioni rapide: {e}")
 
     # ------------------------------------------------------------------
-    # C. Ricette = tabella recipes, separata dalle Quick Entry
+    # C. Ricette = meals composti da ingredienti (un solo database)
     # ------------------------------------------------------------------
     elif is_recipe:
         try:
-            recipes_data = supabase.table("recipes").select("*").eq("user_id", user_id).order("name").execute().data or []
-            recipes_dict = {r["name"]: r for r in recipes_data if r.get("name")}
+            recipe_rows = (
+                supabase.table("meals")
+                .select(
+                    "id,date,name,base_name,quantity,is_per_100g,"
+                    "base_calories,base_protein,base_carbs,base_fat,"
+                    "calories,protein,carbs,fat,notes,category,ingredients_json"
+                )
+                .eq("user_id", user_id)
+                .order("date", desc=True)
+                .execute().data
+                or []
+            )
+
+            recipes_dict = {}
+            for r in recipe_rows:
+                if not r.get("ingredients_json"):
+                    continue
+                label = (r.get("base_name") or _clean_meal_name(r.get("name")) or "").strip()
+                if not label or label in recipes_dict:
+                    continue
+                recipes_dict[label] = r
+
             if recipes_dict:
                 sel_recipe = st.selectbox(
                     "Seleziona una ricetta",
-                    [""] + list(recipes_dict.keys()),
+                    [""] + sorted(recipes_dict.keys(), key=str.casefold),
                     key=f"recipe_select_{v}",
                 )
                 if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
                     r = recipes_dict[sel_recipe]
-                    is_100g = bool(r.get("is_per_100g", 1))
+                    is_100g = bool(r.get("is_per_100g", True))
                     reset_or_update(
-                        r.get("name", ""), r.get("calories", 0), r.get("protein", 0),
-                        r.get("carbs", 0), r.get("fat", 0), sel_recipe,
-                        100.0 if is_100g else 1.0, is_100g, r.get("notes", ""),
+                        sel_recipe,
+                        _safe_float(r.get("base_calories") if r.get("base_calories") is not None else r.get("calories")),
+                        _safe_float(r.get("base_protein") if r.get("base_protein") is not None else r.get("protein")),
+                        _safe_float(r.get("base_carbs") if r.get("base_carbs") is not None else r.get("carbs")),
+                        _safe_float(r.get("base_fat") if r.get("base_fat") is not None else r.get("fat")),
+                        sel_recipe,
+                        100.0 if is_100g else 1.0,
+                        is_100g,
+                        r.get("notes", ""),
+                        infer_meal_category(r),
                     )
                     st.rerun()
             else:
-                st.info("Nessuna ricetta salvata. Creane una nella Tab 4.")
+                st.info("Nessuna ricetta composta disponibile. Creane una nella Tab Ricette.")
         except Exception as e:
             st.error(f"Errore nel caricamento ricette: {e}")
 
@@ -1402,6 +1471,18 @@ if selected_page == t["t1"]:
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
     m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
+
+    default_category = st.session_state.get("selected_source_category", "Casa")
+    if default_category not in MEAL_CATEGORIES:
+        default_category = "Casa"
+    meal_category = st.selectbox(
+        "Categoria",
+        MEAL_CATEGORIES,
+        index=MEAL_CATEGORIES.index(default_category),
+        key=f"meal_category_{v}",
+        help="Casa = replicabile a casa · Lavoro = pasto aziendale · Ristorante = fuori casa · Una-tantum = evento/non replicabile",
+    )
+
     meal_notes = st.text_area(
         "Note (opzionali)",
         value=st.session_state.get("selected_source_note", ""),
@@ -1474,6 +1555,8 @@ if selected_page == t["t1"]:
                     base_carbs=float(carbs_in) / safe_factor,
                     base_fat=float(fat_in) / safe_factor,
                     notes=meal_notes,
+                    category=meal_category,
+                    ingredients_json=None,
                 )
                 refresh_daily_logs(log_date)
                 reset_or_update()
@@ -1643,66 +1726,140 @@ elif selected_page == t["t2"]:
             activity_bonus = {"Riposo": 0, "Moderatamente attiva": 500, "Attiva": 1000}[activity_plan]
             daily_budget = float(user_bmr) + activity_bonus
 
-            if day_type == "Ufficio":
-                fixed_kcal = 1260.0  # colazione + pasto ufficio
-                dinner_target = max(0.0, daily_budget - fixed_kcal)
-                st.markdown(f"**Budget stimato:** {daily_budget:.0f} kcal · **Ufficio già allocato:** 1260 kcal · **Cena:** circa {dinner_target:.0f} kcal")
-                dinner = closest_logged_meal("Cena", dinner_target, allow_adyen=True)
+            try:
+                plan_meals = (
+                    supabase.table("meals")
+                    .select("meal_type,calories,category,name,base_name")
+                    .eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
+                )
+            except Exception:
+                plan_meals = []
+
+            is_today_plan = plan_date == date.today()
+            lunch_logged = any(
+                str(m.get("meal_type", "")).casefold() == "pranzo"
+                for m in plan_meals
+            )
+            calories_already_logged = sum(_safe_float(m.get("calories")) for m in plan_meals)
+
+            # Se oggi il pranzo è già loggato, suggeriamo esclusivamente la cena.
+            if is_today_plan and lunch_logged:
+                dinner_target = max(0.0, daily_budget - calories_already_logged)
+                st.markdown(
+                    f"**Budget stimato:** {daily_budget:.0f} kcal · "
+                    f"**Già registrato oggi:** {calories_already_logged:.0f} kcal · "
+                    f"**Cena disponibile:** circa {dinner_target:.0f} kcal"
+                )
+                dinner = closest_logged_meal(
+                    "Cena",
+                    dinner_target,
+                    allowed_categories={"Casa", "Ristorante"},
+                )
                 if dinner:
                     st.markdown(
-                        f"🍽️ **Cena suggerita:** {html.escape(dinner['name'])} — circa **{dinner['calories']:.0f} kcal** "
+                        f"🍽️ **Cena suggerita:** {html.escape(dinner['name'])} — "
+                        f"**{dinner['calories']:.0f} kcal** · {dinner['category']} "
                         f"{info_badge(dinner.get('notes'), 'Note cena')}",
                         unsafe_allow_html=True,
                     )
                 else:
-                    st.caption("Non ho ancora abbastanza cene nello storico meals per suggerirne una.")
+                    st.caption("Nessuna cena replicabile nello storico abbastanza vicina al target.")
+
+            elif day_type == "Ufficio":
+                fixed_kcal = 1260.0
+                dinner_target = max(0.0, daily_budget - fixed_kcal)
+                st.markdown(
+                    f"**Budget stimato:** {daily_budget:.0f} kcal · "
+                    f"**Ufficio già allocato:** 1260 kcal · "
+                    f"**Cena:** circa {dinner_target:.0f} kcal"
+                )
+
+                # Se serve consultare un pranzo da ufficio, l'unica categoria ammessa è Lavoro.
+                office_lunch = closest_logged_meal(
+                    "Pranzo",
+                    1260.0,
+                    allowed_categories={"Lavoro"},
+                )
+                if office_lunch:
+                    st.caption(
+                        f"Pranzo ufficio nello storico: {office_lunch['name']} "
+                        f"({office_lunch['calories']:.0f} kcal)."
+                    )
+
+                dinner = closest_logged_meal(
+                    "Cena",
+                    dinner_target,
+                    allowed_categories={"Casa", "Ristorante"},
+                )
+                if dinner:
+                    st.markdown(
+                        f"🍽️ **Cena suggerita:** {html.escape(dinner['name'])} — "
+                        f"circa **{dinner['calories']:.0f} kcal** · {dinner['category']} "
+                        f"{info_badge(dinner.get('notes'), 'Note cena')}",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("Non ho ancora abbastanza cene replicabili nello storico.")
+
             else:
                 if day_type == "Lavoro da casa":
                     already_allocated = 185.0
                     allocated_label = "colazione da casa"
                 else:
-                    try:
-                        plan_meals = (
-                            supabase.table("meals").select("meal_type,calories")
-                            .eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
-                        )
-                    except Exception:
-                        plan_meals = []
                     breakfast_logged = sum(
                         _safe_float(m.get("calories"))
                         for m in plan_meals
-                        if str(m.get("meal_type", "")).lower() == "colazione"
+                        if str(m.get("meal_type", "")).casefold() == "colazione"
                     )
                     already_allocated = breakfast_logged
-                    allocated_label = "colazione già registrata" if breakfast_logged else "nessuna quota fissa"
+                    allocated_label = (
+                        "colazione già registrata"
+                        if breakfast_logged
+                        else "nessuna quota fissa"
+                    )
 
                 remaining = max(0.0, daily_budget - already_allocated)
                 per_meal = remaining / 2.0
                 st.markdown(
-                    f"**Budget stimato:** {daily_budget:.0f} kcal · **{allocated_label}:** {already_allocated:.0f} kcal · "
+                    f"**Budget stimato:** {daily_budget:.0f} kcal · "
+                    f"**{allocated_label}:** {already_allocated:.0f} kcal · "
                     f"**Pranzo:** ~{per_meal:.0f} kcal · **Cena:** ~{per_meal:.0f} kcal"
                 )
-                lunch = closest_logged_meal("Pranzo", per_meal)
-                dinner = closest_logged_meal("Cena", per_meal)
+
+                # A casa/libero: pranzo solo Casa. Ristorante mai a pranzo.
+                lunch = closest_logged_meal(
+                    "Pranzo",
+                    per_meal,
+                    allowed_categories={"Casa"},
+                )
+                # Cena replicabile: Casa o Ristorante.
+                dinner = closest_logged_meal(
+                    "Cena",
+                    per_meal,
+                    allowed_categories={"Casa", "Ristorante"},
+                )
+
                 sc1, sc2 = st.columns(2)
                 with sc1:
                     if lunch:
                         st.markdown(
-                            f"🥗 **Pranzo suggerito**<br>{html.escape(lunch['name'])} · **{lunch['calories']:.0f} kcal** "
+                            f"🥗 **Pranzo suggerito**<br>{html.escape(lunch['name'])} · "
+                            f"**{lunch['calories']:.0f} kcal** · {lunch['category']} "
                             f"{info_badge(lunch.get('notes'), 'Note pranzo')}",
                             unsafe_allow_html=True,
                         )
                     else:
-                        st.caption("Nessun pranzo storico disponibile.")
+                        st.caption("Nessun pranzo Casa replicabile disponibile nello storico.")
                 with sc2:
                     if dinner:
                         st.markdown(
-                            f"🍽️ **Cena suggerita**<br>{html.escape(dinner['name'])} · **{dinner['calories']:.0f} kcal** "
+                            f"🍽️ **Cena suggerita**<br>{html.escape(dinner['name'])} · "
+                            f"**{dinner['calories']:.0f} kcal** · {dinner['category']} "
                             f"{info_badge(dinner.get('notes'), 'Note cena')}",
                             unsafe_allow_html=True,
                         )
                     else:
-                        st.caption("Nessuna cena storica disponibile.")
+                        st.caption("Nessuna cena replicabile disponibile nello storico.")
 
             st.caption("Per la pianificazione uso +0 kcal (riposo), +500 kcal (moderatamente attiva), +1000 kcal (attiva). La soglia osservata nel grafico resta: riposo <300 kcal extra, attività intensa ≥800 kcal.")
 
@@ -1712,16 +1869,21 @@ elif selected_page == t["t2"]:
         st.markdown(f"### {t['logged_foods']}")
         if meals_data:
             try:
-                meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat, notes").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+                meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat, notes, category").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
             except Exception:
                 meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
 
             df_meals = pd.DataFrame(meals_with_id)
             df_display = df_meals.rename(columns={
                 "meal_type": "Pasto", "name": "Nome", "calories": "Kcal",
-                "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)",
+                "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)", "category": "Categoria",
             })
-            st.dataframe(df_display[["Pasto", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]], use_container_width=True, hide_index=True)
+            df_display["Categoria"] = [infer_meal_category(m) for m in meals_with_id]
+            st.dataframe(
+                df_display[["Pasto", "Categoria", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]],
+                use_container_width=True,
+                hide_index=True,
+            )
 
             meal_by_id = {m["id"]: m for m in meals_with_id}
             meal_options = {
@@ -1744,17 +1906,40 @@ elif selected_page == t["t2"]:
                 if selected_meal.get("notes"):
                     st.markdown(f"Note {info_badge(selected_meal.get('notes'), 'Note pasto')}", unsafe_allow_html=True)
 
-                edit_col1, edit_col2 = st.columns([2, 1])
+                current_category = infer_meal_category(selected_meal)
+
+                edit_col1, edit_col2, edit_col3 = st.columns([2, 2, 1])
                 with edit_col1:
-                    new_meal_type = st.selectbox("Tipo di pasto", meal_types, index=current_index, key=f"edit_meal_type_{selected_meal_id}_{summary_date}")
+                    new_meal_type = st.selectbox(
+                        "Tipo di pasto",
+                        meal_types,
+                        index=current_index,
+                        key=f"edit_meal_type_{selected_meal_id}_{summary_date}",
+                    )
                 with edit_col2:
+                    new_meal_category = st.selectbox(
+                        "Categoria",
+                        MEAL_CATEGORIES,
+                        index=MEAL_CATEGORIES.index(current_category),
+                        key=f"edit_meal_category_{selected_meal_id}_{summary_date}",
+                    )
+                with edit_col3:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    save_meal_type = st.button("💾 Salva modifica", use_container_width=True, key=f"save_meal_type_{selected_meal_id}_{summary_date}")
+                    save_meal_type = st.button(
+                        "💾 Salva",
+                        use_container_width=True,
+                        key=f"save_meal_type_{selected_meal_id}_{summary_date}",
+                    )
 
                 if save_meal_type:
                     try:
-                        supabase.table("meals").update({"meal_type": new_meal_type}).eq("id", selected_meal_id).eq("user_id", user_id).execute()
-                        st.success(f"✅ Tipo di pasto modificato in **{new_meal_type}**.")
+                        supabase.table("meals").update({
+                            "meal_type": new_meal_type,
+                            "category": new_meal_category,
+                        }).eq("id", selected_meal_id).eq("user_id", user_id).execute()
+                        st.success(
+                            f"✅ Pasto aggiornato: **{new_meal_type} · {new_meal_category}**."
+                        )
                         st.rerun()
                     except Exception as e:
                         st.error(f"Errore nella modifica del pasto: {e}")
@@ -2239,59 +2424,104 @@ elif selected_page == t["t3"]:
             st.error(f"Errore nel caricamento del grafico: {e}")
             print(traceback.format_exc())
 
-# 12. PAGE 4: RICETTE
+# 12. PAGE 4: RICETTE / MEAL COMPOSTI
 # ==============================================================================
 elif selected_page == t["t4"]:
     st.subheader("🍲 Ricette")
-    st.caption("Le Immissioni Rapide arrivano ora dalla tabella meals. Questa sezione è dedicata esclusivamente alle ricette composte da più ingredienti.")
+    st.caption(
+        "Le ricette non usano più una tabella separata: sono normali record di `meals` "
+        "con gli ingredienti salvati in `ingredients_json`. Quick Entry, Ricette e suggerimenti "
+        "usano quindi lo stesso database."
+    )
 
     if "recipe_form_version" not in st.session_state:
         st.session_state["recipe_form_version"] = 0
     v = st.session_state["recipe_form_version"]
 
     with st.container(border=True):
-        st.markdown("### 📋 Ricette salvate")
-        entries = supabase.table("recipes").select("*").eq("user_id", user_id).order("name").execute().data or []
-        if entries:
-            df_entries = pd.DataFrame(entries)
-            cols = [c for c in ["name", "calories", "protein", "carbs", "fat"] if c in df_entries.columns]
-            df_display = df_entries[cols].rename(columns={
-                "name": "Nome", "calories": "Kcal/100g", "protein": "Pro/100g",
-                "carbs": "Carbs/100g", "fat": "Fat/100g",
-            })
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+        st.markdown("### 📋 Ricette disponibili")
+        try:
+            recipe_meals = (
+                supabase.table("meals")
+                .select(
+                    "id,date,meal_type,category,name,base_name,calories,protein,carbs,fat,"
+                    "base_calories,base_protein,base_carbs,base_fat,notes,ingredients_json"
+                )
+                .eq("user_id", user_id)
+                .order("date", desc=True)
+                .execute().data
+                or []
+            )
+        except Exception:
+            recipe_meals = []
 
-            # Le note vengono mostrate come icona informativa con tooltip.
-            for e in entries:
-                if e.get("notes"):
+        recipe_meals = [r for r in recipe_meals if r.get("ingredients_json")]
+
+        if recipe_meals:
+            display_rows = []
+            seen_names = set()
+            for r in recipe_meals:
+                label = (r.get("base_name") or _clean_meal_name(r.get("name")) or "Ricetta").strip()
+                key = label.casefold()
+                if key in seen_names:
+                    continue
+                seen_names.add(key)
+                display_rows.append({
+                    "Nome": label,
+                    "Pasto": r.get("meal_type"),
+                    "Categoria": infer_meal_category(r),
+                    "Kcal": r.get("calories"),
+                    "Pro (g)": r.get("protein"),
+                    "Carbs (g)": r.get("carbs"),
+                    "Fat (g)": r.get("fat"),
+                    "Data": r.get("date"),
+                })
+            st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
+
+            for r in recipe_meals:
+                if r.get("notes"):
+                    label = r.get("base_name") or _clean_meal_name(r.get("name"))
                     st.markdown(
-                        f"**{html.escape(str(e.get('name', 'Ricetta')))}** {info_badge(e.get('notes'), 'Note ricetta')}",
+                        f"**{html.escape(str(label or 'Ricetta'))}** "
+                        f"{info_badge(r.get('notes'), 'Note ricetta')}",
                         unsafe_allow_html=True,
                     )
-
-            entry_by_id = {str(e.get("id")): e for e in entries}
-            selected_entry_id = st.selectbox(
-                "Seleziona ricetta da eliminare",
-                [""] + list(entry_by_id),
-                format_func=lambda x: "Seleziona..." if not x else entry_by_id[x].get("name", ""),
-                key=f"del_recipe_sel_{v}",
-            )
-            if selected_entry_id and st.button("🗑️ Elimina ricetta", key=f"del_recipe_btn_{v}"):
-                try:
-                    supabase.table("recipes").delete().eq("id", selected_entry_id).eq("user_id", user_id).execute()
-                    st.success("Ricetta eliminata.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Errore durante l'eliminazione: {e}")
         else:
-            st.info("Nessuna ricetta salvata.")
+            st.info("Nessuna ricetta composta presente in meals.")
 
     with st.container(border=True):
-        st.markdown("### ➕ Aggiungi nuova Ricetta")
-        r_name = st.text_input("Nome ricetta", placeholder="Es. Pasta al pomodoro", key=f"recipe_builder_name_{v}")
+        st.markdown("### ➕ Crea un meal da ingredienti")
+
+        rc1, rc2, rc3 = st.columns(3)
+        with rc1:
+            recipe_log_date = st.date_input(
+                "Data",
+                value=date.today(),
+                key=f"recipe_meal_date_{v}",
+            )
+        with rc2:
+            recipe_meal_type = st.selectbox(
+                "Tipo di pasto",
+                ["Colazione", "Pranzo", "Cena", "Snack"],
+                key=f"recipe_meal_type_{v}",
+            )
+        with rc3:
+            recipe_category = st.selectbox(
+                "Categoria",
+                MEAL_CATEGORIES,
+                index=0,
+                key=f"recipe_category_{v}",
+                help="Una-tantum non entra nei suggerimenti. Ristorante non viene mai suggerito a pranzo.",
+            )
+
+        r_name = st.text_input(
+            "Nome",
+            placeholder="Es. Pasta al pomodoro",
+            key=f"recipe_builder_name_{v}",
+        )
         r_notes = st.text_area(
-            "Note ricetta (opzionali)",
-            placeholder="Es. preparazione, sostituzioni, condimenti, quando la mangio...",
+            "Note (opzionali)",
+            placeholder="Es. preparazione, sostituzioni, condimenti...",
             key=f"recipe_builder_notes_{v}",
             height=90,
         )
@@ -2303,6 +2533,7 @@ elif selected_page == t["t4"]:
             horizontal=True,
             key=f"ingredient_source_{v}",
         )
+
         ingredient_name = ""
         base = {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
 
@@ -2318,25 +2549,51 @@ elif selected_page == t["t4"]:
 
             results = st.session_state.get(f"ingredient_results_{v}", {})
             if results:
-                sel = st.selectbox("Risultati", [""] + list(results), key=f"ingredient_result_select_{v}")
+                sel = st.selectbox(
+                    "Risultati",
+                    [""] + list(results),
+                    key=f"ingredient_result_select_{v}",
+                )
                 if sel:
-                    p = results[sel]
-                    ingredient_name = p.get("name", sel)
-                    base = {k: float(p.get(k, 0) or 0) for k in base}
+                    p_data = results[sel]
+                    ingredient_name = p_data.get("name", sel)
+                    base = {k: float(p_data.get(k, 0) or 0) for k in base}
                     st.caption(
-                        f"Per 100g: {base['calories']:.0f} kcal · Pro {base['protein']:.1f} g · "
-                        f"Carbs {base['carbs']:.1f} g · Fat {base['fat']:.1f} g"
+                        f"Per 100g: {base['calories']:.0f} kcal · "
+                        f"Pro {base['protein']:.1f} g · Carbs {base['carbs']:.1f} g · Fat {base['fat']:.1f} g"
                     )
         else:
-            ingredient_name = st.text_input("Nome ingrediente", key=f"manual_ingredient_name_{v}")
+            ingredient_name = st.text_input(
+                "Nome ingrediente",
+                key=f"manual_ingredient_name_{v}",
+            )
             mc1, mc2, mc3, mc4 = st.columns(4)
-            base["calories"] = mc1.number_input("Kcal / 100g", min_value=0.0, step=1.0, key=f"manual_kcal_{v}")
-            base["protein"] = mc2.number_input("Pro / 100g", min_value=0.0, step=0.1, key=f"manual_pro_{v}")
-            base["carbs"] = mc3.number_input("Carbs / 100g", min_value=0.0, step=0.1, key=f"manual_carbs_{v}")
-            base["fat"] = mc4.number_input("Fat / 100g", min_value=0.0, step=0.1, key=f"manual_fat_{v}")
+            base["calories"] = mc1.number_input(
+                "Kcal / 100g", min_value=0.0, step=1.0, key=f"manual_kcal_{v}"
+            )
+            base["protein"] = mc2.number_input(
+                "Pro / 100g", min_value=0.0, step=0.1, key=f"manual_pro_{v}"
+            )
+            base["carbs"] = mc3.number_input(
+                "Carbs / 100g", min_value=0.0, step=0.1, key=f"manual_carbs_{v}"
+            )
+            base["fat"] = mc4.number_input(
+                "Fat / 100g", min_value=0.0, step=0.1, key=f"manual_fat_{v}"
+            )
 
-        quantity = st.number_input("Quantità (g)", min_value=0.1, value=100.0, step=1.0, key=f"ingredient_qty_{v}")
-        if st.button("➕ Aggiungi ingrediente alla ricetta", use_container_width=True, key=f"add_ingredient_{v}"):
+        quantity = st.number_input(
+            "Quantità ingrediente (g)",
+            min_value=0.1,
+            value=100.0,
+            step=1.0,
+            key=f"ingredient_qty_{v}",
+        )
+
+        if st.button(
+            "➕ Aggiungi ingrediente",
+            use_container_width=True,
+            key=f"add_ingredient_{v}",
+        ):
             if not ingredient_name.strip():
                 st.warning("Inserisci o seleziona un ingrediente.")
             else:
@@ -2353,8 +2610,9 @@ elif selected_page == t["t4"]:
                 st.rerun()
 
         ingredients = st.session_state.get("recipe_builder_ingredients", [])
+
         if ingredients:
-            st.markdown("#### 📋 Ingredienti della ricetta")
+            st.markdown("#### 📋 Ingredienti")
             rows = []
             for idx, ing in enumerate(ingredients):
                 ing_factor = float(ing["quantity_g"]) / 100.0
@@ -2374,58 +2632,65 @@ elif selected_page == t["t4"]:
                 [""] + [str(i + 1) for i in range(len(ingredients))],
                 key=f"remove_ingredient_{v}",
             )
-            if remove_idx and st.button("🗑️ Rimuovi ingrediente", key=f"remove_ingredient_btn_{v}"):
+            if remove_idx and st.button(
+                "🗑️ Rimuovi ingrediente",
+                key=f"remove_ingredient_btn_{v}",
+            ):
                 del st.session_state["recipe_builder_ingredients"][int(remove_idx) - 1]
                 st.rerun()
 
             total_weight, totals, per100 = calculate_recipe_totals(ingredients)
+
             st.markdown(
-                f"**Totale ricetta:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · "
+                f"**Totale meal:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · "
                 f"Pro {totals['protein']:.1f} g · Carbs {totals['carbs']:.1f} g · Fat {totals['fat']:.1f} g"
             )
             st.caption(
-                f"Per 100 g: {per100['calories']:.0f} kcal · Pro {per100['protein']:.1f} g · "
-                f"Carbs {per100['carbs']:.1f} g · Fat {per100['fat']:.1f} g"
+                f"Per 100 g: {per100['calories']:.0f} kcal · "
+                f"Pro {per100['protein']:.1f} g · Carbs {per100['carbs']:.1f} g · Fat {per100['fat']:.1f} g"
             )
 
-            if st.button("💾 Salva nuova Ricetta", use_container_width=True, key=f"save_recipe_builder_{v}"):
+            if st.button(
+                "💾 Salva come meal",
+                use_container_width=True,
+                key=f"save_recipe_builder_{v}",
+            ):
                 if not r_name.strip():
-                    st.warning("Inserisci un nome per la ricetta.")
+                    st.warning("Inserisci un nome.")
                 else:
                     try:
-                        ingredient_json = json.dumps(ingredients, ensure_ascii=False)
-                        existing = (
-                            supabase.table("recipes").select("id")
-                            .eq("user_id", user_id).eq("name", r_name.strip())
-                            .limit(1).execute().data or []
+                        display_name = f"{r_name.strip()} ({total_weight:.0f}g)"
+                        insert_meal_with_base_data(
+                            log_date=recipe_log_date,
+                            meal_type=recipe_meal_type,
+                            display_name=display_name,
+                            base_name=r_name.strip(),
+                            quantity=total_weight,
+                            is_per_100g=True,
+                            calories=totals["calories"],
+                            protein=totals["protein"],
+                            carbs=totals["carbs"],
+                            fat=totals["fat"],
+                            base_calories=per100["calories"],
+                            base_protein=per100["protein"],
+                            base_carbs=per100["carbs"],
+                            base_fat=per100["fat"],
+                            notes=r_notes,
+                            category=recipe_category,
+                            ingredients_json=ingredients,
                         )
-                        payload = {
-                            "name": r_name.strip(),
-                            "calories": int(round(per100["calories"])),
-                            "protein": int(round(per100["protein"])),
-                            "carbs": int(round(per100["carbs"])),
-                            "fat": int(round(per100["fat"])),
-                            "is_per_100g": 1,
-                            "user_id": user_id,
-                            "ingredients_json": ingredient_json,
-                            "notes": r_notes.strip(),
-                        }
-                        if existing:
-                            supabase.table("recipes").update(payload).eq("id", existing[0]["id"]).eq("user_id", user_id).execute()
-                        else:
-                            supabase.table("recipes").insert(payload).execute()
-
+                        refresh_daily_logs(recipe_log_date)
                         st.session_state["recipe_builder_ingredients"] = []
                         st.session_state["recipe_form_version"] += 1
-                        st.success("✅ Ricetta salvata!")
+                        st.success("✅ Meal composto salvato in meals!")
                         st.rerun()
                     except Exception as e:
                         st.error(
-                            "Impossibile salvare la ricetta. Assicurati di aver aggiunto "
-                            "ingredients_json alla tabella recipes. Errore: " + str(e)
+                            "Impossibile salvare il meal composto. Applica la nuova migrazione SQL "
+                            "per aggiungere category e ingredients_json a meals. Errore: " + str(e)
                         )
         else:
-            st.info("Aggiungi almeno un ingrediente per costruire la ricetta.")
+            st.info("Aggiungi almeno un ingrediente per costruire il meal.")
 
 # ==============================================================================
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
