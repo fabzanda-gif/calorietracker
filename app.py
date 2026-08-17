@@ -510,7 +510,7 @@ def calculate_recipe_totals(ingredients):
 # ==============================================================================
 # 4. AUTHENTICATION & SESSION MANAGEMENT
 # ==============================================================================
-# Per ora usiamo SOLO email/password. Il login Google/OAuth è stato rimosso.
+# Autenticazione email/password + Google OAuth (PKCE).
 #
 # Persistenza:
 # - nel browser salviamo soltanto il refresh token Supabase;
@@ -528,13 +528,42 @@ GOOGLE_PKCE_COOKIE = "sanosync_google_pkce"
 GOOGLE_PKCE_MAX_AGE = 10 * 60
 
 
-def _generate_google_pkce():
-    verifier = base64.urlsafe_b64encode(secrets.token_bytes(48)).decode("utf-8").rstrip("=")
-    challenge = base64.urlsafe_b64encode(
+def _pkce_challenge(verifier):
+    return base64.urlsafe_b64encode(
         hashlib.sha256(verifier.encode("utf-8")).digest()
     ).decode("utf-8").rstrip("=")
-    _cookie_set(GOOGLE_PKCE_COOKIE, verifier, GOOGLE_PKCE_MAX_AGE)
-    return verifier, challenge
+
+
+def _get_or_create_google_pkce():
+    """
+    Restituisce sempre lo stesso verifier per il tentativo OAuth corrente.
+
+    È importante in Streamlit perché la pagina può fare diversi rerun prima che
+    l'utente prema il pulsante Google. Rigenerare il verifier a ogni rerun rende
+    il `code` restituito da Google incompatibile con il verifier letto al ritorno.
+    """
+    verifier = st.session_state.get("google_pkce_verifier")
+
+    if not verifier:
+        verifier = _read_cookie(GOOGLE_PKCE_COOKIE)
+
+    if not verifier:
+        verifier = base64.urlsafe_b64encode(
+            secrets.token_bytes(48)
+        ).decode("utf-8").rstrip("=")
+
+        st.session_state["google_pkce_verifier"] = verifier
+        _cookie_set(GOOGLE_PKCE_COOKIE, verifier, GOOGLE_PKCE_MAX_AGE)
+    else:
+        # Manteniamo anche session_state sincronizzato durante i normali rerun.
+        st.session_state["google_pkce_verifier"] = verifier
+
+    return verifier, _pkce_challenge(verifier)
+
+
+def _clear_google_pkce():
+    st.session_state.pop("google_pkce_verifier", None)
+    _cookie_delete(GOOGLE_PKCE_COOKIE)
 
 
 def _read_cookie(name):
@@ -554,7 +583,7 @@ def _read_cookie(name):
 
 
 def _google_login_url():
-    _, challenge = _generate_google_pkce()
+    _, challenge = _get_or_create_google_pkce()
     params = {
         "provider": "google",
         "redirect_to": APP_URL,
@@ -566,37 +595,79 @@ def _google_login_url():
 
 def handle_google_oauth_callback():
     auth_code = st.query_params.get("code")
+    oauth_error = st.query_params.get("error")
+    oauth_error_description = st.query_params.get("error_description")
+
+    if oauth_error:
+        _clear_google_pkce()
+        st.query_params.clear()
+        st.error(
+            f"Google/Supabase ha annullato il login: {oauth_error_description or oauth_error}"
+        )
+        return False
+
     if not auth_code:
         return False
 
-    verifier = _read_cookie(GOOGLE_PKCE_COOKIE)
+    verifier = (
+        st.session_state.get("google_pkce_verifier")
+        or _read_cookie(GOOGLE_PKCE_COOKIE)
+    )
+
     if not verifier:
         st.query_params.clear()
-        st.error("Il login Google non può essere completato: verifier PKCE mancante o scaduto. Riprova.")
+        st.error(
+            "Il login Google non può essere completato perché il verifier PKCE "
+            "non è più disponibile nel browser. Cancella i cookie del sito e riprova."
+        )
         return False
 
     try:
         token_response = requests.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce",
-            headers={"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
-            json={"auth_code": auth_code, "code_verifier": verifier},
-            timeout=15,
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "auth_code": str(auth_code),
+                "code_verifier": verifier,
+            },
+            timeout=20,
         )
-        token_response.raise_for_status()
+
+        if not token_response.ok:
+            try:
+                detail = token_response.json()
+            except Exception:
+                detail = token_response.text[:500]
+            raise RuntimeError(
+                f"Token exchange HTTP {token_response.status_code}: {detail}"
+            )
+
         payload = token_response.json()
         access_token = payload.get("access_token")
         refresh_token = payload.get("refresh_token")
+
         if not access_token or not refresh_token:
-            raise RuntimeError("Supabase non ha restituito i token OAuth.")
+            raise RuntimeError(
+                "Supabase ha risposto al callback ma non ha restituito access_token "
+                "e refresh_token."
+            )
 
         response = supabase.auth.set_session(access_token, refresh_token)
         save_authenticated_session(response)
-        _cookie_delete(GOOGLE_PKCE_COOKIE)
+
+        _clear_google_pkce()
         st.query_params.clear()
         st.rerun()
         return True
+
     except Exception as e:
-        _cookie_delete(GOOGLE_PKCE_COOKIE)
+        # Il code OAuth normalmente è monouso: per un nuovo tentativo è più sicuro
+        # eliminare il vecchio verifier e ricominciare il flusso da zero.
+        _clear_google_pkce()
         st.query_params.clear()
         st.error(f"Login Google fallito: {e}")
         return False
@@ -686,6 +757,9 @@ def show_login_page():
     except Exception as e:
         st.error(f"Impossibile inizializzare Google Login: {e}")
 
+    st.caption(
+        f"Redirect OAuth configurato: {APP_URL}"
+    )
     st.markdown("---")
     auth_mode = st.radio("Account", ["Login", "Registrazione"], horizontal=True)
 
@@ -722,6 +796,7 @@ def show_login_page():
                         })
                         if response and response.session:
                             save_authenticated_session(response)
+                            _clear_google_pkce()
                             st.success("✅ Login effettuato.")
                             st.rerun()
                         else:
@@ -761,7 +836,9 @@ def show_login_page():
 # ==============================================================================
 # 5. RESTORE SESSION / GOOGLE OAUTH CALLBACK
 # ==============================================================================
-if st.session_state.get("user") is None and st.query_params.get("code"):
+if st.session_state.get("user") is None and (
+    st.query_params.get("code") or st.query_params.get("error")
+):
     handle_google_oauth_callback()
 
 if st.session_state.get("user") is None:
