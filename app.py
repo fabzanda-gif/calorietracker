@@ -1500,8 +1500,35 @@ elif selected_page == t["t2"]:
     diff_from_ideal = ideal_target_cals - total_cals_in
 
     coral_light_bg, coral_border = "#FFF5F5", "#FF8B8B"
-    in_msg = t["in_msg_deficit"](int(ideal_target_cals), int(diff_from_ideal))
-    burn_msg = t["burn_msg_yes"](int(extra_burned)) if extra_burned > 0 else t["burn_msg_no"]
+
+    # Messaggi cards più immediati.
+    if diff_from_ideal > 0:
+        in_msg = (
+            f"🎯 Puoi mangiare ancora <b>{int(round(diff_from_ideal))} kcal</b> "
+            f"per chiudere la giornata con circa 500 kcal di deficit."
+        )
+    elif diff_from_ideal < 0:
+        in_msg = (
+            f"⚠️ Sei oltre il target da deficit di circa "
+            f"<b>{abs(int(round(diff_from_ideal)))} kcal</b>."
+        )
+    else:
+        in_msg = "🎯 Sei esattamente sul target per un deficit di circa 500 kcal."
+
+    # Proiezione semplice e conservativa:
+    # BMR completo della giornata + attività già registrate.
+    # Non inventiamo attività future.
+    projected_burn_end_day = int(round(float(user_bmr) + extra_burned))
+
+    if summary_date == date.today():
+        burn_msg = (
+            f"🔮 Fine giornata: <b>~{projected_burn_end_day} kcal</b> "
+            f"se non registri altra attività."
+        )
+    else:
+        burn_msg = (
+            f"🔥 Totale giornata: <b>{int(round(total_burned_finora))} kcal</b>."
+        )
 
     weight_to_lose = (float(current_weight) if current_weight else float(initial_weight)) - target_weight
     if deficit < 0 and weight_to_lose > 0:
@@ -1532,7 +1559,7 @@ elif selected_page == t["t2"]:
             }}
             .custom-card-title {{ font-size: .95rem; font-weight: 600; color: #1A2942; margin-bottom: 4px; }}
             .custom-card-value {{ font-size: 1.8rem; font-weight: 700; color: #1A2942; margin-bottom: 8px; }}
-            .custom-card-caption {{ font-size: .82rem; color: #555; line-height: 1.35; }}
+            .custom-card-caption {{ font-size: .86rem; color: #4A4A4A; line-height: 1.42; }}
         </style>
     """, unsafe_allow_html=True)
 
