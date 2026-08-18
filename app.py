@@ -998,7 +998,7 @@ def show_login_page():
     Login SanoSync multilingua:
     - dropdown lingua disponibile prima del login;
     - hero + card in palette SanoSync;
-    - Google OAuth con lo stesso flusso funzionante dell'altra app.
+    - Google e Facebook OAuth con lo stesso flusso funzionante dell'altra app.
     """
     LOGIN_I18N = {
         "Italiano": {
@@ -1008,9 +1008,10 @@ def show_login_page():
             "subtitle": "Alimentazione, attività, peso e progressi in un unico posto.",
             "continue": "Accedi per continuare",
             "google": "Continua con Google",
+            "facebook": "Continua con Facebook",
             "google_note": (
-                "L’autenticazione Google viene gestita da Supabase Auth. "
-                "La password del tuo account Google non viene mai gestita da SanoSync."
+                "L’autenticazione Google e Facebook viene gestita da Supabase Auth. "
+                "Le password dei tuoi account social non vengono mai gestite da SanoSync."
             ),
             "divider": "oppure accedi con email e password",
             "login": "Login",
@@ -1041,7 +1042,7 @@ def show_login_page():
                 "✅ Account creato. Controlla l'email se è richiesta la conferma, "
                 "poi effettua il login."
             ),
-            "google_error": "Non riesco a generare il link Google. Controlla la configurazione Auth di Supabase.",
+            "google_error": "Non riesco a generare i link social. Controlla la configurazione Auth di Supabase.",
             "google_callback_error": "Login Google non completato: {error}",
         },
         "English": {
@@ -1051,9 +1052,10 @@ def show_login_page():
             "subtitle": "Food, activity, weight and progress in one place.",
             "continue": "Sign in to continue",
             "google": "Continue with Google",
+            "facebook": "Continue with Facebook",
             "google_note": (
-                "Google authentication is handled by Supabase Auth. "
-                "SanoSync never handles your Google account password."
+                "Google and Facebook authentication is handled by Supabase Auth. "
+                "SanoSync never handles your social account passwords."
             ),
             "divider": "or sign in with email and password",
             "login": "Login",
@@ -1084,7 +1086,7 @@ def show_login_page():
                 "✅ Account created. Check your email if confirmation is required, "
                 "then come back and sign in."
             ),
-            "google_error": "I can't generate the Google login link. Check your Supabase Auth configuration.",
+            "google_error": "I can't generate the social login links. Check your Supabase Auth configuration.",
             "google_callback_error": "Google login not completed: {error}",
         },
         "Nederlands": {
@@ -1094,9 +1096,10 @@ def show_login_page():
             "subtitle": "Voeding, activiteit, gewicht en voortgang op één plek.",
             "continue": "Log in om door te gaan",
             "google": "Doorgaan met Google",
+            "facebook": "Doorgaan met Facebook",
             "google_note": (
-                "Google-authenticatie wordt beheerd door Supabase Auth. "
-                "SanoSync verwerkt nooit het wachtwoord van je Google-account."
+                "Google- en Facebook-authenticatie wordt beheerd door Supabase Auth. "
+                "SanoSync verwerkt nooit de wachtwoorden van je socialaccounts."
             ),
             "divider": "of log in met e-mail en wachtwoord",
             "login": "Inloggen",
@@ -1127,7 +1130,7 @@ def show_login_page():
                 "✅ Account aangemaakt. Controleer je e-mail als bevestiging nodig is "
                 "en log daarna in."
             ),
-            "google_error": "Ik kan de Google-loginlink niet genereren. Controleer de Supabase Auth-configuratie.",
+            "google_error": "Ik kan de social-loginlinks niet genereren. Controleer de Supabase Auth-configuratie.",
             "google_callback_error": "Google-login niet voltooid: {error}",
         },
         "Français": {
@@ -1137,9 +1140,10 @@ def show_login_page():
             "subtitle": "Alimentation, activité, poids et progrès au même endroit.",
             "continue": "Connectez-vous pour continuer",
             "google": "Continuer avec Google",
+            "facebook": "Continuer avec Facebook",
             "google_note": (
-                "L’authentification Google est gérée par Supabase Auth. "
-                "SanoSync ne gère jamais le mot de passe de votre compte Google."
+                "L’authentification Google et Facebook est gérée par Supabase Auth. "
+                "SanoSync ne gère jamais les mots de passe de vos comptes sociaux."
             ),
             "divider": "ou connectez-vous avec e-mail et mot de passe",
             "login": "Connexion",
@@ -1170,7 +1174,7 @@ def show_login_page():
                 "✅ Compte créé. Vérifiez votre e-mail si une confirmation est requise, "
                 "puis revenez vous connecter."
             ),
-            "google_error": "Impossible de générer le lien Google. Vérifiez la configuration Supabase Auth.",
+            "google_error": "Impossible de générer les liens de connexion sociale. Vérifiez la configuration Supabase Auth.",
             "google_callback_error": "Connexion Google non terminée : {error}",
         },
     }
@@ -1283,6 +1287,22 @@ def show_login_page():
 
         .sano-social-login.google span { color: #172A46 !important; }
 
+        .sano-social-login.facebook {
+            color: #FFFFFF !important;
+            background: #1877F2;
+            border: 2px solid #1468D4;
+            box-shadow: 0 5px 14px rgba(24,119,242,.18);
+        }
+
+        .sano-social-login.facebook span {
+            color: #FFFFFF !important;
+        }
+
+        .sano-social-login.facebook:hover {
+            background: #166FE5;
+            border-color: #125FC2;
+        }
+
         .sano-social-logo {
             width: 23px;
             height: 23px;
@@ -1391,8 +1411,14 @@ def show_login_page():
     callback_error = st.session_state.pop("auth_callback_error", None)
 
     try:
+        # Stesso identico flusso PKCE per entrambi i provider:
+        # client dedicato -> sign_in_with_oauth -> auth_flow -> callback.
         google_url = escape(
             build_provider_login_url("google"),
+            quote=True,
+        )
+        facebook_url = escape(
+            build_provider_login_url("facebook"),
             quote=True,
         )
     except Exception as exc:
@@ -1418,6 +1444,14 @@ def show_login_page():
         '<path fill="#EA4335" d="M12 6.01c1.47 0 2.79.51 3.83 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01z"/>'
         '</svg>'
         f'<span>{escape(lt["google"])}</span>'
+        '</a>'
+        f'<a class="sano-social-login facebook" href="{facebook_url}" '
+        'target="_blank" rel="noopener">'
+        '<svg class="sano-social-logo" viewBox="0 0 24 24" aria-hidden="true">'
+        '<circle cx="12" cy="12" r="12" fill="#ffffff"/>'
+        '<path fill="#1877F2" d="M13.52 20v-7h2.35l.35-2.73h-2.7V8.53c0-.79.22-1.33 1.35-1.33h1.44V4.76c-.25-.03-1.1-.1-2.1-.1-2.08 0-3.5 1.27-3.5 3.6v2.01H8.36V13h2.35v7h2.81z"/>'
+        '</svg>'
+        f'<span>{escape(lt["facebook"])}</span>'
         '</a>'
         f'<div class="sano-login-note">{escape(lt["google_note"])}</div>'
         '</div>'
