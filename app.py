@@ -139,6 +139,67 @@ st.markdown("""
             font-weight: 800 !important;
         }
 
+        /* Sfondo principale SanoSync:
+           centro chiaro + sfumature corallo laterali, come nel login. */
+        [data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(circle at 0% 42%, rgba(255,139,139,.22), transparent 30%),
+                radial-gradient(circle at 100% 42%, rgba(255,139,139,.22), transparent 30%),
+                linear-gradient(90deg, #FFF4F4 0%, #FFFFFF 22%, #FFFFFF 78%, #FFF4F4 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-testid="stMain"] {
+            background: transparent !important;
+        }
+
+        /* Card-titolo usata in tutte le pagine principali.
+           Riprende esattamente il linguaggio visivo della hero del login. */
+        .sano-page-hero {
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 24px;
+            padding: 25px 30px;
+            margin: .20rem 0 1.25rem 0;
+            background:
+                radial-gradient(circle at 92% 4%, rgba(255,255,255,.23), transparent 32%),
+                linear-gradient(135deg, #172A46 0%, #243B5A 54%, #FF8B8B 155%);
+            border: 1px solid rgba(255,139,139,.38);
+            box-shadow: 0 16px 40px rgba(35,48,72,.14);
+        }
+
+        .sano-page-hero,
+        .sano-page-hero * {
+            color: #FFFFFF !important;
+        }
+
+        .sano-page-kicker {
+            font-size: .72rem;
+            font-weight: 900;
+            letter-spacing: .16em;
+            color: #FFD1D1 !important;
+            margin-bottom: 6px;
+        }
+
+        .sano-page-title {
+            font-size: clamp(1.65rem, 3.4vw, 2.35rem);
+            line-height: 1.05;
+            font-weight: 950;
+            letter-spacing: -.035em;
+            margin: 0;
+        }
+
+        @media (max-width: 700px) {
+            .sano-page-hero {
+                border-radius: 20px;
+                padding: 21px 20px;
+                margin-bottom: 1rem;
+            }
+            .sano-page-title {
+                font-size: 1.65rem;
+            }
+        }
+
         /* Metric Cards */
         [data-testid="stMetric"] {
             background-color: #FFFFFF;
@@ -388,6 +449,20 @@ def _safe_float(value):
     except (TypeError, ValueError):
         return 0.0
 
+
+
+def render_page_title_card(title):
+    """Titolo pagina nella stessa card navy/corallo usata nel login."""
+    safe_title = html.escape(str(title or ""))
+    st.markdown(
+        (
+            '<div class="sano-page-hero">'
+            '<div class="sano-page-kicker">SANOSYNC</div>'
+            f'<div class="sano-page-title">{safe_title}</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
 
 
 def info_badge(note, label="Note"):
@@ -2602,7 +2677,7 @@ st.markdown("""
 # ==============================================================================
 if selected_page == t["t1"]:
     log_date = st.date_input("📅 Data", value=date.today())
-    st.subheader(t["tab1_title"])
+    render_page_title_card(t["tab1_title"])
 
     recipe_source_label = {
         "Italiano": "🍲 Ricette",
@@ -2951,7 +3026,7 @@ if selected_page == t["t1"]:
 # 10. PAGE 2: DAILY OVERVIEW
 # ==============================================================================
 elif selected_page == t["t2"]:
-    st.subheader(t["daily_summary"])
+    render_page_title_card(t["daily_summary"])
 
     if "last_nav_page" not in st.session_state or st.session_state.last_nav_page != selected_page:
         st.session_state.overview_date = date.today()
@@ -3505,7 +3580,7 @@ elif selected_page == t["t2"]:
 # 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
 # ==============================================================================
 elif selected_page == t["t3"]:
-    st.subheader(t["weight_tracking"])
+    render_page_title_card(t["weight_tracking"])
 
     # Se un peso è appena stato salvato, riproduci il relativo feedback sonoro.
     render_pending_weight_sound()
@@ -4012,7 +4087,7 @@ elif selected_page == t["t3"]:
 # 12. PAGE 4: RICETTE / MEAL COMPOSTI
 # ==============================================================================
 elif selected_page == t["t4"]:
-    st.subheader(t["recipes_title"])
+    render_page_title_card(t["recipes_title"])
     st.caption(
         "Le ricette non usano più una tabella separata: sono normali record di `meals` "
         "con gli ingredienti salvati in `ingredients_json`. Quick Entry, Ricette e suggerimenti "
@@ -4281,7 +4356,7 @@ elif selected_page == t["t4"]:
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
 # ==============================================================================
 elif selected_page == t["t5"]:
-    st.subheader(t["register_activity"])
+    render_page_title_card(t["register_activity"])
     act_date = st.date_input(t["act_date"], value=date.today())
     
     try:
