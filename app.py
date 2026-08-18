@@ -800,21 +800,36 @@ def _read_refresh_token_cookie():
         pass
     return None
 
-def save_authenticated_session(response):
+def save_authenticated_session(response, fallback_user=None):
+    """
+    Salva la sessione Supabase e mantiene il refresh-token persistente.
+    fallback_user serve nel callback OAuth: alcune versioni di set_session()
+    possono restituire la sessione senza popolare response.user.
+    """
     session = getattr(response, "session", None)
-    user_obj = getattr(response, "user", None)
+    user_obj = getattr(response, "user", None) or fallback_user
+
+    if session is None and getattr(response, "access_token", None):
+        session = response
 
     if session is None:
         raise RuntimeError("Supabase non ha restituito una sessione valida.")
+
     if user_obj is None:
         user_obj = getattr(session, "user", None)
+
     if user_obj is None:
         raise RuntimeError("Supabase non ha restituito l'utente autenticato.")
+
     if not getattr(session, "refresh_token", None):
         raise RuntimeError("Supabase non ha restituito il refresh token.")
 
     st.session_state["user"] = user_obj
-    _cookie_set(SESSION_COOKIE, session.refresh_token, SESSION_COOKIE_MAX_AGE)
+    _cookie_set(
+        SESSION_COOKIE,
+        session.refresh_token,
+        SESSION_COOKIE_MAX_AGE,
+    )
     return user_obj
 
 def restore_session_from_cookie():
@@ -879,23 +894,22 @@ def get_public_app_url():
     return "http://localhost:8501"
 
 
-def build_google_login_url():
+def build_provider_login_url(provider):
     """
-    Genera il flusso PKCE usando direttamente supabase-py.
-
-    Ogni tentativo ha un flow_id dedicato. Il client associato viene recuperato
-    nel callback tramite lo stesso flow_id presente nella redirect URL.
+    Genera l'URL OAuth esattamente con il pattern che funziona nell'altra app:
+    un client Supabase dedicato per ogni flow_id, conservato da cache_resource.
     """
     flow_id = uuid.uuid4().hex
     auth_client = get_auth_flow_client(flow_id)
 
+    app_url = get_public_app_url().rstrip("/")
     redirect_to = (
-        f"{get_public_app_url()}"
-        f"/?auth_callback=1&auth_flow={flow_id}"
+        f"{app_url}/"
+        f"?auth_callback=1&auth_flow={flow_id}"
     )
 
     response = auth_client.auth.sign_in_with_oauth({
-        "provider": "google",
+        "provider": provider,
         "options": {
             "redirect_to": redirect_to,
         },
@@ -903,12 +917,14 @@ def build_google_login_url():
 
     oauth_url = _oauth_response_url(response)
     if not oauth_url:
-        raise RuntimeError("Supabase non ha restituito la URL OAuth Google.")
+        raise RuntimeError(
+            f"Supabase non ha restituito la URL OAuth per {provider}."
+        )
 
     return oauth_url
 
 
-def handle_google_oauth_callback():
+def handle_oauth_callback():
     """
     Scambia il code PKCE restituito da Supabase con una sessione.
 
@@ -959,7 +975,10 @@ def handle_google_oauth_callback():
 
         # Riutilizziamo la persistenza già presente nell'app:
         # salva utente e refresh token nel cookie persistente.
-        save_authenticated_session(main_response)
+        save_authenticated_session(
+            main_response,
+            fallback_user=user_obj,
+        )
 
         st.session_state[AUTH_FLOW_STATE_KEY] = str(flow_id)
 
@@ -975,73 +994,299 @@ def handle_google_oauth_callback():
 
 
 def show_login_page():
-    st.title("SanoSync")
-    st.caption("Accedi con Google oppure usa email e password.")
+    """
+    Login SanoSync:
+    - hero + card centrata, ispirata alla pagina fornita;
+    - palette SanoSync corallo / navy;
+    - Google OAuth con lo stesso identico meccanismo dell'app funzionante.
+    """
+    st.markdown(
+        """
+        <style>
+        /* Login: niente sidebar, contenuto compatto e centrato. */
+        [data-testid="stSidebar"] { display: none !important; }
+
+        [data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(circle at 92% 4%, rgba(255,139,139,.22), transparent 28%),
+                radial-gradient(circle at 5% 50%, rgba(255,193,193,.16), transparent 25%),
+                linear-gradient(180deg, #FFF9F9 0%, #FFF3F3 55%, #FFF9F9 100%);
+        }
+
+        .block-container {
+            max-width: 760px !important;
+            padding-top: 2.1rem !important;
+            padding-bottom: 3rem !important;
+        }
+
+        .sano-login-shell {
+            max-width: 610px;
+            margin: 0 auto;
+        }
+
+        .sano-login-hero {
+            border-radius: 28px;
+            padding: 34px 34px 31px;
+            text-align: center;
+            margin: 4px auto 20px auto;
+            background:
+                radial-gradient(circle at 92% 4%, rgba(255,255,255,.23), transparent 32%),
+                linear-gradient(135deg, #172A46 0%, #243B5A 54%, #FF8B8B 155%);
+            border: 1px solid rgba(255,139,139,.35);
+            box-shadow: 0 20px 50px rgba(35,48,72,.16);
+        }
+
+        .sano-login-hero,
+        .sano-login-hero * {
+            color: #FFFFFF !important;
+        }
+
+        .sano-login-eyebrow {
+            font-size: .78rem;
+            font-weight: 900;
+            letter-spacing: .16em;
+            color: #FFD1D1 !important;
+            margin-bottom: 8px;
+        }
+
+        .sano-login-title {
+            font-size: clamp(2rem, 5vw, 3rem);
+            line-height: 1.02;
+            font-weight: 950;
+            letter-spacing: -.04em;
+            margin: 3px 0 10px;
+        }
+
+        .sano-login-subtitle {
+            font-size: 1rem;
+            line-height: 1.45;
+            color: #FCECEC !important;
+        }
+
+        .sano-login-card {
+            max-width: 610px;
+            box-sizing: border-box;
+            margin: 0 auto;
+            padding: 27px 28px 24px;
+            border-radius: 24px;
+            background: rgba(255,255,255,.97);
+            border: 1.5px solid #FFD0D0;
+            box-shadow: 0 13px 38px rgba(35,48,72,.09);
+        }
+
+        .sano-login-card-title {
+            text-align: center;
+            font-size: 1.22rem;
+            font-weight: 900;
+            color: #172A46 !important;
+            margin-bottom: 17px;
+        }
+
+        .sano-social-login {
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 13px;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 14px;
+            text-decoration: none !important;
+            font-size: 1rem;
+            font-weight: 850;
+            margin: 10px 0;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+
+        .sano-social-login:hover {
+            transform: translateY(-1px);
+            text-decoration: none !important;
+        }
+
+        .sano-social-login.google {
+            color: #172A46 !important;
+            background: #FFFFFF;
+            border: 2px solid #FF8B8B;
+            box-shadow: 0 5px 14px rgba(35,48,72,.06);
+        }
+
+        .sano-social-login.google span {
+            color: #172A46 !important;
+        }
+
+        .sano-social-logo {
+            width: 23px;
+            height: 23px;
+            flex: 0 0 23px;
+        }
+
+        .sano-login-note {
+            text-align: center;
+            color: #64748B !important;
+            font-size: .80rem;
+            line-height: 1.5;
+            margin-top: 16px;
+        }
+
+        .sano-email-divider {
+            max-width: 610px;
+            margin: 18px auto 10px auto;
+            text-align: center;
+            color: #64748B !important;
+            font-size: .88rem;
+            font-weight: 750;
+        }
+
+        /* I controlli email/password seguono la stessa larghezza della card. */
+        div[data-testid="stRadio"],
+        div[data-testid="stForm"],
+        .st-key-signup_email,
+        .st-key-signup_password,
+        .st-key-signup_display_name,
+        .st-key-signup_gender,
+        .st-key-signup_birth_date,
+        .st-key-signup_height,
+        .st-key-signup_current_weight,
+        .st-key-signup_target_weight,
+        .st-key-signup_deficit_plan,
+        .st-key-signup_deficit_kcal,
+        .st-key-signup_submit {
+            max-width: 610px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        div[data-testid="stForm"] {
+            border: 1.5px solid #FFD0D0;
+            border-radius: 20px;
+            background: rgba(255,255,255,.96);
+            padding: 18px 20px 20px;
+            box-shadow: 0 9px 26px rgba(35,48,72,.06);
+        }
+
+        /* Bottoni Streamlit fuori sidebar = corallo coerente con il resto dell'app. */
+        .stButton > button,
+        div[data-testid="stFormSubmitButton"] > button {
+            border: 2px solid #FF8B8B !important;
+            border-radius: 11px !important;
+            font-weight: 800 !important;
+        }
+
+        .stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button {
+            background: #FF8B8B !important;
+            color: #FFFFFF !important;
+        }
+
+        .stButton > button[kind="primary"] *,
+        div[data-testid="stFormSubmitButton"] > button * {
+            color: #FFFFFF !important;
+        }
+
+        @media (max-width: 700px) {
+            .block-container {
+                padding-left: .85rem !important;
+                padding-right: .85rem !important;
+                padding-top: 1rem !important;
+            }
+
+            .sano-login-hero {
+                padding: 27px 19px 25px;
+                border-radius: 23px;
+            }
+
+            .sano-login-card {
+                padding: 23px 18px 21px;
+                border-radius: 20px;
+            }
+
+            .sano-social-login {
+                height: 55px;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     callback_error = st.session_state.pop("auth_callback_error", None)
 
     try:
-        google_url = escape(build_google_login_url(), quote=True)
-
-        # Stringa HTML continua + target="_top":
-        # su mobile forziamo la navigazione dell'intero contesto browser verso
-        # Supabase/Google, evitando eventuali contenitori/frame intermedi.
-        google_html = (
-            '<a href="' + google_url + '" '
-            'target="_top" rel="external noopener" '
-            'style="display:flex;align-items:center;justify-content:center;gap:10px;'
-            'width:100%;box-sizing:border-box;padding:0.72rem 1rem;'
-            'border-radius:10px;border:2px solid #FF8B8B;'
-            'background:#FFFFFF;color:#1A2942;text-decoration:none;'
-            'font-weight:800;margin:6px 0 10px 0;'
-            'touch-action:manipulation;-webkit-tap-highlight-color:transparent;">'
-            '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">'
-            '<path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41z"/>'
-            '<path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22z"/>'
-            '<path fill="#FBBC05" d="M6.39 13.86A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.86V7.52H3.04A10 10 0 0 0 2 12c0 1.61.38 3.13 1.04 4.48l3.35-2.62z"/>'
-            '<path fill="#EA4335" d="M12 6.01c1.47 0 2.79.51 3.83 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01z"/>'
-            '</svg>'
-            '<span>Continua con Google</span>'
-            '</a>'
+        # STESSO flusso dell'app di riferimento:
+        # build_provider_login_url -> client dedicato -> PKCE Supabase.
+        google_url = escape(
+            build_provider_login_url("google"),
+            quote=True,
         )
-
-        st.markdown(google_html, unsafe_allow_html=True)
-
-        with st.expander("Problemi con Google su mobile?", expanded=False):
-            st.caption(
-                "Apri il link qui sotto direttamente nel browser. "
-                "Usa lo stesso flusso OAuth, senza modificare Supabase."
-            )
-            st.link_button(
-                "Apri Google in una nuova scheda",
-                google_url,
-                use_container_width=True,
-            )
-
     except Exception as exc:
         st.error(
             "Non riesco a generare il link Google. "
             "Controlla la configurazione Auth di Supabase."
         )
         st.caption(str(exc))
+        st.stop()
+
+    # IMPORTANTE:
+    # blocco HTML continuo e anchor target="_blank" rel="noopener",
+    # identico al pattern che funziona nell'app inviata.
+    login_html = (
+        '<div class="sano-login-shell">'
+        '<div class="sano-login-hero">'
+        '<div class="sano-login-eyebrow">SANOSYNC</div>'
+        '<div class="sano-login-title">🍑 Il tuo equilibrio, ogni giorno</div>'
+        '<div class="sano-login-subtitle">'
+        'Alimentazione, attività, peso e progressi in un unico posto.'
+        '</div>'
+        '</div>'
+        '<div class="sano-login-card">'
+        '<div class="sano-login-card-title">Accedi per continuare</div>'
+        f'<a class="sano-social-login google" href="{google_url}" '
+        'target="_blank" rel="noopener">'
+        '<svg class="sano-social-logo" viewBox="0 0 24 24" aria-hidden="true">'
+        '<path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41z"/>'
+        '<path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22z"/>'
+        '<path fill="#FBBC05" d="M6.39 13.86A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.86V7.52H3.04A10 10 0 0 0 2 12c0 1.61.38 3.13 1.04 4.48l3.35-2.62z"/>'
+        '<path fill="#EA4335" d="M12 6.01c1.47 0 2.79.51 3.83 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01z"/>'
+        '</svg>'
+        '<span>Continua con Google</span>'
+        '</a>'
+        '<div class="sano-login-note">'
+        'L’autenticazione Google viene gestita da Supabase Auth. '
+        'La password del tuo account Google non viene mai gestita da SanoSync.'
+        '</div>'
+        '</div>'
+        '</div>'
+    )
+
+    st.markdown(login_html, unsafe_allow_html=True)
 
     if callback_error:
         st.error(f"Login Google non completato: {callback_error}")
 
-    st.markdown("---")
+    st.markdown(
+        '<div class="sano-email-divider">'
+        'oppure accedi con email e password'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     auth_mode = st.radio(
         "Account",
         ["Login", "Registrazione"],
         horizontal=True,
+        label_visibility="collapsed",
     )
 
     if auth_mode == "Login":
-        with st.form("auth_login_form"):
-            email = st.text_input("Email")
+        with st.form("auth_login_form", clear_on_submit=False):
+            email = st.text_input(
+                "Email",
+                placeholder="nome@email.com",
+            )
             password = st.text_input(
-                "Password (min. 6 caratteri)",
+                "Password",
                 type="password",
+                placeholder="••••••••",
             )
             submitted = st.form_submit_button(
                 "Accedi",
@@ -1072,18 +1317,23 @@ def show_login_page():
                     print(traceback.format_exc())
 
     else:
-        # Non usiamo st.form qui: il preset del deficit deve aggiornare
-        # immediatamente il campo kcal quando l'utente lo seleziona.
-        email = st.text_input("Email", key="signup_email")
+        # Registrazione fuori da st.form:
+        # il preset deficit deve aggiornare immediatamente il campo kcal.
+        email = st.text_input(
+            "Email",
+            key="signup_email",
+            placeholder="nome@email.com",
+        )
         password = st.text_input(
             "Password (min. 6 caratteri)",
             type="password",
             key="signup_password",
+            placeholder="••••••••",
         )
 
-        st.markdown("#### 📋 Parametri Fisici Iniziali")
+        st.markdown("#### 📋 Parametri fisici iniziali")
         display_name_input = st.text_input(
-            "Display Name",
+            "Nome",
             value="",
             key="signup_display_name",
         )
@@ -1110,7 +1360,7 @@ def show_login_page():
             key="signup_height",
         )
         current_weight = st.number_input(
-            "Peso Attuale (kg)",
+            "Peso attuale (kg)",
             value=80.0,
             min_value=20.0,
             max_value=300.0,
@@ -1118,7 +1368,7 @@ def show_login_page():
             key="signup_current_weight",
         )
         target_weight = st.number_input(
-            "Peso Obiettivo (kg)",
+            "Peso obiettivo (kg)",
             value=75.0,
             min_value=20.0,
             max_value=300.0,
@@ -1126,9 +1376,7 @@ def show_login_page():
             key="signup_target_weight",
         )
 
-        # ----------------------------------------------------------
-        # DEFICIT: volutamente ALLA FINE dei dati di registrazione.
-        # ----------------------------------------------------------
+        # Deficit ALLA FINE della registrazione.
         deficit_ui = DEFICIT_PRESET_LABELS[_ui_language()]
 
         if "signup_deficit_plan" not in st.session_state:
@@ -1143,7 +1391,10 @@ def show_login_page():
 
         def _sync_signup_deficit_preset():
             selected_key = normalize_deficit_plan(
-                st.session_state.get("signup_deficit_plan", "custom")
+                st.session_state.get(
+                    "signup_deficit_plan",
+                    "custom",
+                )
             )
             st.session_state["signup_deficit_kcal"] = int(
                 DEFICIT_PRESETS.get(selected_key, 0)
@@ -1170,6 +1421,7 @@ def show_login_page():
         if st.button(
             "Registrati",
             use_container_width=True,
+            type="primary",
             key="signup_submit",
         ):
             try:
@@ -1245,7 +1497,6 @@ def show_login_page():
                 print(traceback.format_exc())
 
 
-
 # ==============================================================================
 # 5. RESTORE SESSION / GOOGLE CALLBACK
 # ==============================================================================
@@ -1255,7 +1506,7 @@ if (
     and st.query_params.get("code")
     and st.query_params.get("auth_flow")
 ):
-    handle_google_oauth_callback()
+    handle_oauth_callback()
 
 # Poi proviamo il restore persistente dal refresh-token cookie.
 if st.session_state.get("user") is None:
