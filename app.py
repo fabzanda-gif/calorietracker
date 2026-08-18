@@ -1981,7 +1981,7 @@ if profile_incomplete:
         )
 
         t_val = st.number_input(
-            "Peso Obiettivo (kg)",
+            t["target_weight_label"],
             value=float(user_target_weight) if user_target_weight else 75.0,
             min_value=20.0,
             max_value=300.0,
@@ -2038,7 +2038,7 @@ if profile_incomplete:
                 st.rerun()
 
             except Exception as e:
-                st.error(f"Errore: {e}")
+                st.error(t["generic_error"].format(error=e))
                 print(traceback.format_exc())
     st.stop()
 
@@ -2598,12 +2598,198 @@ translations["Français"].update({
     "greeting_evening": "Bonsoir {name}!",
 })
 
+# ------------------------------------------------------------------------------
+# Traduzioni UI aggiuntive (Tab 2/3/4 + valori canonici salvati nel database)
+# I valori nel DB restano in italiano/canonici; traduciamo solo ciò che si vede.
+# ------------------------------------------------------------------------------
+translations["Italiano"].update({
+    "slogan": "Tutto sotto controllo",
+    "meal_breakfast": "Colazione", "meal_lunch": "Pranzo", "meal_dinner": "Cena", "meal_snack": "Snack",
+    "cat_home": "Casa", "cat_work": "Lavoro", "cat_restaurant": "Ristorante", "cat_once": "Una-tantum",
+    "col_meal": "Pasto", "col_category": "Categoria", "col_name": "Nome", "col_date": "Data",
+    "select_meal_edit": t["select_meal_edit"], "select_meal_placeholder": "Seleziona un pasto...",
+    "meal_type_label": "Tipo di pasto", "category_label": "Categoria", "quantity_g": "Quantità (g)", "portions": "Porzioni",
+    "edit_meal_help": "Puoi modificare grammi o porzioni. Kcal e macronutrienti vengono ricalcolati automaticamente.",
+    "save_changes": t["save_changes"], "delete_this_meal": "Elimina definitivamente **{name}** se non vuoi più conservarlo.",
+    "meal_updated": "✅ Pasto aggiornato: **{meal} · {category} · {qty} {unit}**.",
+    "load_data_error": "Errore nel caricamento dati: {error}", "edit_meal_error": "Errore nella modifica del pasto: {error}",
+    "delete_meal_error": "Errore nell'eliminazione del pasto: {error}",
+    "day_plan_title": "### 🧭 Piano della giornata", "plan_update_later": "Puoi aggiornare il piano della giornata anche dopo la mattina.",
+    "day_home": "Lavoro da casa", "day_office": "Ufficio", "day_free": "Giornata libera",
+    "act_rest": "Riposo", "act_moderate": "Moderatamente attiva", "act_active": "Attiva",
+    "weight_manage": "#### ⚖️ Gestione pesi", "new_weight": "Nuovo peso (kg)", "weight_date": "Data del peso",
+    "weight_edit_select": t["weight_edit_select"], "weight_select_placeholder": "Seleziona un peso...",
+    "date_label": "Data", "weight_saved": "✅ Peso salvato!", "weight_edited": "✅ Peso modificato!", "weight_deleted": "✅ Peso cancellato.",
+    "target_weight_label": "Peso Obiettivo (kg)", "weight_lost_30": "📉 Peso perso · 30 giorni", "deficit_per_kg": "⚡ Deficit / kg perso",
+    "estimated_target_date": "🎯 Data obiettivo stimata", "need_two_weights": t["need_two_weights"],
+    "first_last_diff": t["first_last_diff"],
+    "need_positive_deficit": t["need_positive_deficit"], "target_reached": t["target_reached"],
+    "target_reached_caption": t["target_reached_caption"], "estimate_based": "Stima basata su {deficit} kcal/giorno di deficit medio ({days} giorni loggati).",
+    "view_label": "Visualizzazione", "view_weight": "Peso", "view_kcal": "Kcal", "view_macros": "Macros", "view_meals": "Pasti", "period_label": "Periodo",
+    "no_weight_period": "Nessun peso registrato negli ultimi {days} giorni.", "ingested_kcal": "Kcal ingerite", "burned_kcal": "Kcal bruciate",
+    "protein_full": "Proteine", "carbs_full": "Carboidrati", "fats_full": "Grassi", "grams": "grammi", "goal": "Obiettivo",
+    "no_food_data": "Nessun dato alimentare", "chart_error": "Errore nel caricamento del grafico: {error}",
+    "recipes_caption": "Le ricette sono normali record di meals con gli ingredienti salvati. Immissioni rapide, ricette e suggerimenti usano lo stesso database.",
+    "available_recipes": "### 📋 Ricette disponibili", "no_composed_recipes": "Nessuna ricetta composta presente nei pasti.",
+    "create_meal_ingredients": "### ➕ Crea un pasto da ingredienti", "recipe_name_placeholder": "Es. Pasta al pomodoro",
+    "notes_optional": "Note (opzionali)", "notes_placeholder": "Es. preparazione, sostituzioni, condimenti...",
+    "add_ingredient_title": "#### 🥕 Aggiungi ingrediente", "ingredient_source": "Fonte ingrediente",
+    "db_off": "Database / Open Food Facts", "manual_entry": "Inserimento manuale", "ingredient_search": "Cerca ingrediente",
+    "searching_ingredient": "Ricerca ingrediente...", "min_2_chars": "Inserisci almeno 2 caratteri.", "results": "Risultati",
+    "ingredient_name": "Nome ingrediente", "ingredient_qty": t["ingredient_qty"], "add_ingredient": t["add_ingredient"],
+    "select_or_enter_ingredient": "Inserisci o seleziona un ingrediente.", "ingredient_added": "✅ {name} aggiunto.",
+    "ingredients_title": "#### 📋 Ingredienti", "ingredient_col": "Ingrediente", "remove_ingredient": "Rimuovi ingrediente",
+    "remove_ingredient_btn": t["remove_ingredient_btn"], "total_meal": "Totale pasto", "per_100g_label": "Per 100 g",
+    "save_as_meal": "💾 Salva come pasto", "enter_name": "Inserisci un nome.", "composed_saved": "✅ Pasto composto salvato!",
+    "add_one_ingredient": "Aggiungi almeno un ingrediente per costruire il pasto.",
+    "recipe_category_help": "Una-tantum non entra nei suggerimenti. Ristorante non viene mai suggerito a pranzo.",
+})
+translations["English"].update({
+    "slogan": "Under control",
+    "meal_breakfast": "Breakfast", "meal_lunch": "Lunch", "meal_dinner": "Dinner", "meal_snack": "Snack",
+    "cat_home": "Home", "cat_work": "Work", "cat_restaurant": "Restaurant", "cat_once": "One-off",
+    "col_meal": "Meal", "col_category": "Category", "col_name": "Name", "col_date": "Date",
+    "select_meal_edit": "🍽️ Select the meal to edit", "select_meal_placeholder": "Select a meal...",
+    "meal_type_label": "Meal type", "category_label": "Category", "quantity_g": "Quantity (g)", "portions": "Portions",
+    "edit_meal_help": "You can edit grams or portions. Calories and macros are recalculated automatically.",
+    "save_changes": "💾 Save changes", "delete_this_meal": "Permanently delete **{name}** if you no longer want to keep it.",
+    "meal_updated": "✅ Meal updated: **{meal} · {category} · {qty} {unit}**.",
+    "load_data_error": "Error loading data: {error}", "edit_meal_error": "Error editing meal: {error}", "delete_meal_error": "Error deleting meal: {error}",
+    "day_plan_title": "### 🧭 Day plan", "plan_update_later": "You can update today's plan later as well.",
+    "day_home": "Work from home", "day_office": "Office", "day_free": "Day off", "act_rest": "Rest", "act_moderate": "Moderately active", "act_active": "Active",
+    "weight_manage": "#### ⚖️ Weight management", "new_weight": "New weight (kg)", "weight_date": "Weight date",
+    "weight_edit_select": "Weight to edit or delete", "weight_select_placeholder": "Select a weight...", "date_label": "Date",
+    "weight_saved": "✅ Weight saved!", "weight_edited": "✅ Weight updated!", "weight_deleted": "✅ Weight deleted.",
+    "target_weight_label": "Target weight (kg)", "weight_lost_30": "📉 Weight lost · 30 days", "deficit_per_kg": "⚡ Deficit / kg lost",
+    "estimated_target_date": "🎯 Estimated target date", "need_two_weights": "At least two weights and food data are needed for the last month.",
+    "first_last_diff": "Difference between the first and last measurement in the last 30 days.", "need_positive_deficit": "A positive average deficit is needed to estimate the target date.",
+    "target_reached": "Reached 🎯", "target_reached_caption": "Your latest weight is already at or below the target.",
+    "estimate_based": "Estimate based on an average deficit of {deficit} kcal/day ({days} logged days).",
+    "view_label": "View", "view_weight": "Weight", "view_kcal": "Calories", "view_macros": "Macros", "view_meals": "Meals", "period_label": "Period",
+    "no_weight_period": "No weight logged in the last {days} days.", "ingested_kcal": "Calories eaten", "burned_kcal": "Calories burned",
+    "protein_full": "Protein", "carbs_full": "Carbohydrates", "fats_full": "Fat", "grams": "grams", "goal": "Goal", "no_food_data": "No food data",
+    "chart_error": "Error loading chart: {error}", "recipes_caption": "Recipes are normal meal records with saved ingredients. Quick entries, recipes and suggestions use the same database.",
+    "available_recipes": "### 📋 Available recipes", "no_composed_recipes": "No composed recipes found in meals.", "create_meal_ingredients": "### ➕ Create a meal from ingredients",
+    "recipe_name_placeholder": "E.g. Pasta with tomato sauce", "notes_optional": "Notes (optional)", "notes_placeholder": "E.g. preparation, substitutions, seasoning...",
+    "add_ingredient_title": "#### 🥕 Add ingredient", "ingredient_source": "Ingredient source", "db_off": "Database / Open Food Facts", "manual_entry": "Manual entry",
+    "ingredient_search": "Search ingredient", "searching_ingredient": "Searching ingredient...", "min_2_chars": "Enter at least 2 characters.", "results": "Results",
+    "ingredient_name": "Ingredient name", "ingredient_qty": "Ingredient quantity (g)", "add_ingredient": "➕ Add ingredient",
+    "select_or_enter_ingredient": "Enter or select an ingredient.", "ingredient_added": "✅ {name} added.", "ingredients_title": "#### 📋 Ingredients",
+    "ingredient_col": "Ingredient", "remove_ingredient": "Remove ingredient", "remove_ingredient_btn": "🗑️ Remove ingredient", "total_meal": "Total meal",
+    "per_100g_label": "Per 100 g", "save_as_meal": "💾 Save as meal", "enter_name": "Enter a name.", "composed_saved": "✅ Composed meal saved!",
+    "add_one_ingredient": "Add at least one ingredient to build the meal.", "recipe_category_help": "One-off meals are excluded from suggestions. Restaurants are never suggested for lunch.",
+})
+translations["Nederlands"].update({
+    "slogan": "Komt goed",
+    "meal_breakfast": "Ontbijt", "meal_lunch": "Lunch", "meal_dinner": "Avondeten", "meal_snack": "Snack",
+    "cat_home": "Thuis", "cat_work": "Werk", "cat_restaurant": "Restaurant", "cat_once": "Eenmalig",
+    "col_meal": "Maaltijd", "col_category": "Categorie", "col_name": "Naam", "col_date": "Datum",
+    "select_meal_edit": "🍽️ Selecteer de maaltijd om te wijzigen", "select_meal_placeholder": "Selecteer een maaltijd...",
+    "meal_type_label": "Maaltijdtype", "category_label": "Categorie", "quantity_g": "Hoeveelheid (g)", "portions": "Porties",
+    "edit_meal_help": "Je kunt grammen of porties wijzigen. Calorieën en macro's worden automatisch herberekend.",
+    "save_changes": "💾 Wijzigingen opslaan", "delete_this_meal": "Verwijder **{name}** definitief als je deze niet meer wilt bewaren.",
+    "meal_updated": "✅ Maaltijd bijgewerkt: **{meal} · {category} · {qty} {unit}**.",
+    "load_data_error": "Fout bij laden van gegevens: {error}", "edit_meal_error": "Fout bij wijzigen van maaltijd: {error}", "delete_meal_error": "Fout bij verwijderen van maaltijd: {error}",
+    "day_plan_title": "### 🧭 Dagplanning", "plan_update_later": "Je kunt de dagplanning later ook nog aanpassen.",
+    "day_home": "Thuiswerken", "day_office": "Kantoor", "day_free": "Vrije dag", "act_rest": "Rust", "act_moderate": "Matig actief", "act_active": "Actief",
+    "weight_manage": "#### ⚖️ Gewicht beheren", "new_weight": "Nieuw gewicht (kg)", "weight_date": "Datum van gewicht",
+    "weight_edit_select": "Gewicht wijzigen of verwijderen", "weight_select_placeholder": "Selecteer een gewicht...", "date_label": "Datum",
+    "weight_saved": "✅ Gewicht opgeslagen!", "weight_edited": "✅ Gewicht gewijzigd!", "weight_deleted": "✅ Gewicht verwijderd.",
+    "target_weight_label": "Streefgewicht (kg)", "weight_lost_30": "📉 Gewichtsverlies · 30 dagen", "deficit_per_kg": "⚡ Tekort / kg verloren",
+    "estimated_target_date": "🎯 Geschatte streefdatum", "need_two_weights": "Minstens twee gewichten en voedingsgegevens van de afgelopen maand zijn nodig.",
+    "first_last_diff": "Verschil tussen de eerste en laatste meting van de afgelopen 30 dagen.", "need_positive_deficit": "Een positief gemiddeld tekort is nodig om de streefdatum te schatten.",
+    "target_reached": "Bereikt 🎯", "target_reached_caption": "Je laatste gewicht is al gelijk aan of lager dan je doel.",
+    "estimate_based": "Schatting gebaseerd op gemiddeld {deficit} kcal/dag tekort ({days} gelogde dagen).",
+    "view_label": "Weergave", "view_weight": "Gewicht", "view_kcal": "Kcal", "view_macros": "Macro's", "view_meals": "Maaltijden", "period_label": "Periode",
+    "no_weight_period": "Geen gewicht geregistreerd in de afgelopen {days} dagen.", "ingested_kcal": "Kcal gegeten", "burned_kcal": "Kcal verbrand",
+    "protein_full": "Eiwitten", "carbs_full": "Koolhydraten", "fats_full": "Vetten", "grams": "gram", "goal": "Doel", "no_food_data": "Geen voedingsgegevens",
+    "chart_error": "Fout bij laden van grafiek: {error}", "recipes_caption": "Recepten zijn gewone maaltijdrecords met opgeslagen ingrediënten. Snelle invoer, recepten en suggesties gebruiken dezelfde database.",
+    "available_recipes": "### 📋 Beschikbare recepten", "no_composed_recipes": "Geen samengestelde recepten gevonden in maaltijden.", "create_meal_ingredients": "### ➕ Maak een maaltijd van ingrediënten",
+    "recipe_name_placeholder": "Bijv. pasta met tomatensaus", "notes_optional": "Notities (optioneel)", "notes_placeholder": "Bijv. bereiding, vervangingen, kruiden...",
+    "add_ingredient_title": "#### 🥕 Ingrediënt toevoegen", "ingredient_source": "Bron ingrediënt", "db_off": "Database / Open Food Facts", "manual_entry": "Handmatige invoer",
+    "ingredient_search": "Ingrediënt zoeken", "searching_ingredient": "Ingrediënt zoeken...", "min_2_chars": "Voer minstens 2 tekens in.", "results": "Resultaten",
+    "ingredient_name": "Naam ingrediënt", "ingredient_qty": "Hoeveelheid ingrediënt (g)", "add_ingredient": "➕ Ingrediënt toevoegen",
+    "select_or_enter_ingredient": "Voer een ingrediënt in of selecteer er één.", "ingredient_added": "✅ {name} toegevoegd.", "ingredients_title": "#### 📋 Ingrediënten",
+    "ingredient_col": "Ingrediënt", "remove_ingredient": "Ingrediënt verwijderen", "remove_ingredient_btn": "🗑️ Ingrediënt verwijderen", "total_meal": "Totale maaltijd",
+    "per_100g_label": "Per 100 g", "save_as_meal": "💾 Opslaan als maaltijd", "enter_name": "Voer een naam in.", "composed_saved": "✅ Samengestelde maaltijd opgeslagen!",
+    "add_one_ingredient": "Voeg minstens één ingrediënt toe om de maaltijd te maken.", "recipe_category_help": "Eenmalige maaltijden worden niet voorgesteld. Restaurants worden nooit voor lunch voorgesteld.",
+})
+translations["Français"].update({
+    "slogan": "C'est géré",
+    "meal_breakfast": "Petit-déjeuner", "meal_lunch": "Déjeuner", "meal_dinner": "Dîner", "meal_snack": "Snack",
+    "cat_home": "Maison", "cat_work": "Travail", "cat_restaurant": "Restaurant", "cat_once": "Ponctuel",
+    "col_meal": "Repas", "col_category": "Catégorie", "col_name": "Nom", "col_date": "Date",
+    "select_meal_edit": "🍽️ Sélectionnez le repas à modifier", "select_meal_placeholder": "Sélectionnez un repas...",
+    "meal_type_label": "Type de repas", "category_label": "Catégorie", "quantity_g": "Quantité (g)", "portions": "Portions",
+    "edit_meal_help": "Vous pouvez modifier les grammes ou les portions. Les calories et macros sont recalculées automatiquement.",
+    "save_changes": "💾 Enregistrer les modifications", "delete_this_meal": "Supprimez définitivement **{name}** si vous ne souhaitez plus le conserver.",
+    "meal_updated": "✅ Repas mis à jour : **{meal} · {category} · {qty} {unit}**.",
+    "load_data_error": "Erreur de chargement : {error}", "edit_meal_error": "Erreur de modification du repas : {error}", "delete_meal_error": "Erreur de suppression du repas : {error}",
+    "day_plan_title": "### 🧭 Plan de la journée", "plan_update_later": "Vous pouvez modifier le plan de la journée plus tard.",
+    "day_home": "Télétravail", "day_office": "Bureau", "day_free": "Jour libre", "act_rest": "Repos", "act_moderate": "Modérément actif", "act_active": "Actif",
+    "weight_manage": "#### ⚖️ Gestion du poids", "new_weight": "Nouveau poids (kg)", "weight_date": "Date du poids",
+    "weight_edit_select": "Poids à modifier ou supprimer", "weight_select_placeholder": "Sélectionnez un poids...", "date_label": "Date",
+    "weight_saved": "✅ Poids enregistré !", "weight_edited": "✅ Poids modifié !", "weight_deleted": "✅ Poids supprimé.",
+    "target_weight_label": "Poids cible (kg)", "weight_lost_30": "📉 Poids perdu · 30 jours", "deficit_per_kg": "⚡ Déficit / kg perdu",
+    "estimated_target_date": "🎯 Date cible estimée", "need_two_weights": "Il faut au moins deux poids et des données alimentaires sur le dernier mois.",
+    "first_last_diff": "Différence entre la première et la dernière mesure des 30 derniers jours.", "need_positive_deficit": "Un déficit moyen positif est nécessaire pour estimer la date cible.",
+    "target_reached": "Atteint 🎯", "target_reached_caption": "Votre poids le plus récent est déjà égal ou inférieur à l'objectif.",
+    "estimate_based": "Estimation basée sur un déficit moyen de {deficit} kcal/jour ({days} jours enregistrés).",
+    "view_label": "Affichage", "view_weight": "Poids", "view_kcal": "Kcal", "view_macros": "Macros", "view_meals": "Repas", "period_label": "Période",
+    "no_weight_period": "Aucun poids enregistré au cours des {days} derniers jours.", "ingested_kcal": "Kcal consommées", "burned_kcal": "Kcal brûlées",
+    "protein_full": "Protéines", "carbs_full": "Glucides", "fats_full": "Lipides", "grams": "grammes", "goal": "Objectif", "no_food_data": "Aucune donnée alimentaire",
+    "chart_error": "Erreur de chargement du graphique : {error}", "recipes_caption": "Les recettes sont des repas normaux avec leurs ingrédients enregistrés. Saisie rapide, recettes et suggestions utilisent la même base.",
+    "available_recipes": "### 📋 Recettes disponibles", "no_composed_recipes": "Aucune recette composée dans les repas.", "create_meal_ingredients": "### ➕ Créer un repas à partir d'ingrédients",
+    "recipe_name_placeholder": "Ex. pâtes à la sauce tomate", "notes_optional": "Notes (facultatives)", "notes_placeholder": "Ex. préparation, substitutions, assaisonnement...",
+    "add_ingredient_title": "#### 🥕 Ajouter un ingrédient", "ingredient_source": "Source de l'ingrédient", "db_off": "Base / Open Food Facts", "manual_entry": "Saisie manuelle",
+    "ingredient_search": "Rechercher un ingrédient", "searching_ingredient": "Recherche d'ingrédient...", "min_2_chars": "Saisissez au moins 2 caractères.", "results": "Résultats",
+    "ingredient_name": "Nom de l'ingrédient", "ingredient_qty": "Quantité d'ingrédient (g)", "add_ingredient": "➕ Ajouter l'ingrédient",
+    "select_or_enter_ingredient": "Saisissez ou sélectionnez un ingrédient.", "ingredient_added": "✅ {name} ajouté.", "ingredients_title": "#### 📋 Ingrédients",
+    "ingredient_col": "Ingrédient", "remove_ingredient": "Retirer l'ingrédient", "remove_ingredient_btn": "🗑️ Retirer l'ingrédient", "total_meal": "Repas total",
+    "per_100g_label": "Pour 100 g", "save_as_meal": "💾 Enregistrer comme repas", "enter_name": "Saisissez un nom.", "composed_saved": "✅ Repas composé enregistré !",
+    "add_one_ingredient": "Ajoutez au moins un ingrédient pour construire le repas.", "recipe_category_help": "Les repas ponctuels sont exclus des suggestions. Les restaurants ne sont jamais suggérés au déjeuner.",
+})
+
+translations["Italiano"].update({"period_days":"giorni","monthly_stats_error":"Impossibile calcolare le statistiche mensili: {error}","weight_edit_error":"Errore nella modifica: {error}","weight_delete_error":"Errore nella cancellazione: {error}","generic_error":"Errore: {error}","no_weight_loss":"Nessuna perdita di peso misurata negli ultimi 30 giorni.","ratio_caption":"{deficit} kcal di deficit / {kg} kg persi.","trend":"Proiezione","real_weight":"Peso reale"})
+translations["English"].update({"period_days":"days","monthly_stats_error":"Unable to calculate monthly statistics: {error}","weight_edit_error":"Error updating weight: {error}","weight_delete_error":"Error deleting weight: {error}","generic_error":"Error: {error}","no_weight_loss":"No measured weight loss in the last 30 days.","ratio_caption":"{deficit} kcal deficit / {kg} kg lost.","trend":"Projection","real_weight":"Actual weight"})
+translations["Nederlands"].update({"period_days":"dagen","monthly_stats_error":"Maandstatistieken konden niet worden berekend: {error}","weight_edit_error":"Fout bij wijzigen van gewicht: {error}","weight_delete_error":"Fout bij verwijderen van gewicht: {error}","generic_error":"Fout: {error}","no_weight_loss":"Geen gemeten gewichtsverlies in de afgelopen 30 dagen.","ratio_caption":"{deficit} kcal tekort / {kg} kg verloren.","trend":"Projectie","real_weight":"Werkelijk gewicht"})
+translations["Français"].update({"period_days":"jours","monthly_stats_error":"Impossible de calculer les statistiques mensuelles : {error}","weight_edit_error":"Erreur lors de la modification du poids : {error}","weight_delete_error":"Erreur lors de la suppression du poids : {error}","generic_error":"Erreur : {error}","no_weight_loss":"Aucune perte de poids mesurée au cours des 30 derniers jours.","ratio_caption":"{deficit} kcal de déficit / {kg} kg perdus.","trend":"Projection","real_weight":"Poids réel"})
+
+translations["Italiano"].update({"category_help":"Casa = replicabile a casa · Lavoro = pasto aziendale · Ristorante = fuori casa · Una-tantum = evento/non replicabile","col_activity":"Attività","col_burned":"Kcal Bruciate","save_weight_ui":"💾 Salva peso","plan_persistence_note":"Il piano resta attivo in questa sessione. Esegui la migrazione SQL aggiornata per renderlo persistente."})
+translations["English"].update({"category_help":"Home = repeatable at home · Work = company meal · Restaurant = eating out · One-off = event/non-repeatable","col_activity":"Activity","col_burned":"Calories Burned","save_weight_ui":"💾 Save weight","plan_persistence_note":"The plan remains active for this session. Run the updated SQL migration to make it persistent."})
+translations["Nederlands"].update({"category_help":"Thuis = thuis herhaalbaar · Werk = bedrijfsmaaltijd · Restaurant = buitenshuis · Eenmalig = evenement/niet herhaalbaar","col_activity":"Activiteit","col_burned":"Kcal Verbrand","save_weight_ui":"💾 Gewicht opslaan","plan_persistence_note":"Het plan blijft actief in deze sessie. Voer de bijgewerkte SQL-migratie uit om het permanent op te slaan."})
+translations["Français"].update({"category_help":"Maison = reproductible à la maison · Travail = repas d'entreprise · Restaurant = à l'extérieur · Ponctuel = événement/non reproductible","col_activity":"Activité","col_burned":"Kcal Brûlées","save_weight_ui":"💾 Enregistrer le poids","plan_persistence_note":"Le plan reste actif pendant cette session. Exécutez la migration SQL mise à jour pour le rendre persistant."})
+
+translations["Italiano"].update({"plan_saved":"✅ Piano salvato per {date}.","budget_estimated":"Budget stimato","already_logged":"già registrate","dinner_available":"Cena disponibile","office_allocated":"Ufficio già allocato","dinner_label":"Cena","lunch_label":"Pranzo","office_lunch_history":"Pranzo ufficio nello storico","suggested_dinner":"Cena suggerita","suggested_lunch":"Pranzo suggerito","no_dinner_near":"Nessuna cena replicabile nello storico abbastanza vicina al target.","no_dinner_history":"Non ho ancora abbastanza cene replicabili nello storico.","no_home_lunch":"Nessun pranzo Casa replicabile disponibile nello storico.","no_dinner":"Nessuna cena replicabile disponibile nello storico.","planning_formula":"Per la pianificazione uso +0 kcal (riposo), +500 kcal (moderatamente attiva), +1000 kcal (attiva). La soglia osservata nel grafico resta: riposo <300 kcal extra, attività intensa ≥800 kcal."})
+translations["English"].update({"plan_saved":"✅ Plan saved for {date}.","budget_estimated":"Estimated budget","already_logged":"already logged","dinner_available":"Dinner available","office_allocated":"Office already allocated","dinner_label":"Dinner","lunch_label":"Lunch","office_lunch_history":"Office lunch in history","suggested_dinner":"Suggested dinner","suggested_lunch":"Suggested lunch","no_dinner_near":"No repeatable dinner in your history is close enough to the target.","no_dinner_history":"There are not enough repeatable dinners in your history yet.","no_home_lunch":"No repeatable Home lunch is available in your history.","no_dinner":"No repeatable dinner is available in your history.","planning_formula":"Planning uses +0 kcal (rest), +500 kcal (moderately active), +1000 kcal (active). The chart threshold remains: rest <300 extra kcal, intense activity ≥800 kcal."})
+translations["Nederlands"].update({"plan_saved":"✅ Plan opgeslagen voor {date}.","budget_estimated":"Geschat budget","already_logged":"al gelogd","dinner_available":"Beschikbaar voor avondeten","office_allocated":"Kantoor al toegewezen","dinner_label":"Avondeten","lunch_label":"Lunch","office_lunch_history":"Kantoorlunch in geschiedenis","suggested_dinner":"Aanbevolen avondeten","suggested_lunch":"Aanbevolen lunch","no_dinner_near":"Geen herhaalbaar avondeten in je geschiedenis ligt dicht genoeg bij het doel.","no_dinner_history":"Er zijn nog niet genoeg herhaalbare avondmaaltijden in je geschiedenis.","no_home_lunch":"Geen herhaalbare Thuis-lunch beschikbaar in je geschiedenis.","no_dinner":"Geen herhaalbaar avondeten beschikbaar in je geschiedenis.","planning_formula":"De planning gebruikt +0 kcal (rust), +500 kcal (matig actief), +1000 kcal (actief). De grafiekdrempel blijft: rust <300 extra kcal, intensief ≥800 kcal."})
+translations["Français"].update({"plan_saved":"✅ Plan enregistré pour le {date}.","budget_estimated":"Budget estimé","already_logged":"déjà enregistrées","dinner_available":"Disponible pour le dîner","office_allocated":"Bureau déjà alloué","dinner_label":"Dîner","lunch_label":"Déjeuner","office_lunch_history":"Déjeuner bureau dans l'historique","suggested_dinner":"Dîner suggéré","suggested_lunch":"Déjeuner suggéré","no_dinner_near":"Aucun dîner reproductible de l'historique n'est assez proche de la cible.","no_dinner_history":"Pas encore assez de dîners reproductibles dans l'historique.","no_home_lunch":"Aucun déjeuner Maison reproductible disponible dans l'historique.","no_dinner":"Aucun dîner reproductible disponible dans l'historique.","planning_formula":"La planification utilise +0 kcal (repos), +500 kcal (modérément actif), +1000 kcal (actif). Le seuil du graphique reste : repos <300 kcal supplémentaires, activité intense ≥800 kcal."})
+
+MEAL_TYPE_KEYS = {"Colazione": "meal_breakfast", "Pranzo": "meal_lunch", "Cena": "meal_dinner", "Snack": "meal_snack"}
+CATEGORY_KEYS = {"Casa": "cat_home", "Lavoro": "cat_work", "Ristorante": "cat_restaurant", "Una-tantum": "cat_once"}
+DAY_TYPE_KEYS = {"Lavoro da casa": "day_home", "Ufficio": "day_office", "Giornata libera": "day_free"}
+ACTIVITY_PLAN_KEYS = {"Riposo": "act_rest", "Moderatamente attiva": "act_moderate", "Attiva": "act_active"}
+
+def _tr_value(mapping, value):
+    lang = st.session_state.get("lang_selector", "Italiano")
+    lang_t = translations.get(lang, translations["Italiano"])
+    return lang_t.get(mapping.get(value, ""), value)
+
+def tr_meal_type(value): return _tr_value(MEAL_TYPE_KEYS, value)
+def tr_category(value): return _tr_value(CATEGORY_KEYS, value)
+def tr_day_type(value): return _tr_value(DAY_TYPE_KEYS, value)
+def tr_activity_plan(value): return _tr_value(ACTIVITY_PLAN_KEYS, value)
+
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
     st.sidebar.image("logo2.png", use_container_width=True)
-    st.markdown("---") # Linea di separazione dopo il logo
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands", "Français"], key="lang_selector")
     t = translations[current_lang]
+    st.markdown(
+        f'<div style="text-align:center;color:#FFB4B4;font-weight:900;font-size:1rem;letter-spacing:.01em;margin:-.15rem 0 .55rem 0;">{html.escape(t["slogan"])}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("---")
     
     pages_map = {
         t["t1"]: "t1",
@@ -2845,22 +3031,23 @@ if selected_page == t["t1"]:
 
     st.markdown("---")
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
-    m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}")
+    m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}", format_func=tr_meal_type)
     name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
 
     default_category = st.session_state.get("selected_source_category", "Casa")
     if default_category not in MEAL_CATEGORIES:
         default_category = "Casa"
     meal_category = st.selectbox(
-        "Categoria",
+        t["category_label"],
         MEAL_CATEGORIES,
         index=MEAL_CATEGORIES.index(default_category),
         key=f"meal_category_{v}",
-        help="Casa = replicabile a casa · Lavoro = pasto aziendale · Ristorante = fuori casa · Una-tantum = evento/non replicabile",
+        help=t["category_help"],
+        format_func=tr_category,
     )
 
     meal_notes = st.text_area(
-        "Note (opzionali)",
+        t["notes_optional"],
         value=st.session_state.get("selected_source_note", ""),
         placeholder="Es. senza lattosio, marca preferita, preparazione, condimenti...",
         key=f"meal_notes_{v}",
@@ -3020,7 +3207,7 @@ if selected_page == t["t1"]:
                 st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
                 st.rerun()
             except Exception as e:
-                st.error(f"Errore: {e}")
+                st.error(t["generic_error"].format(error=e))
 
 # ==============================================================================
 # 10. PAGE 2: DAILY OVERVIEW
@@ -3048,7 +3235,7 @@ elif selected_page == t["t2"]:
         raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
         all_weight_logs = supabase.table("daily_logs").select("weight, date").eq("user_id", user_id).not_.is_("weight", "null").order("date", desc=False).execute().data or []
     except Exception as e:
-        st.error(f"Errore nel caricamento dati: {e}")
+        st.error(t["load_data_error"].format(error=e))
         daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
 
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
@@ -3158,7 +3345,7 @@ elif selected_page == t["t2"]:
     # ------------------------------------------------------------------
     if summary_date == date.today():
         with st.container(border=True):
-            st.markdown("### 🧭 Piano della giornata")
+            st.markdown(t["day_plan_title"])
 
             plan_day_label = st.selectbox(t["plan_day"], [t["today"], t["tomorrow"]], index=0, key="overview_plan_day")
             # Non confrontare mai l'etichetta localizzata con "Oggi":
@@ -3173,7 +3360,7 @@ elif selected_page == t["t2"]:
             if now.hour < 12:
                 st.info(t["morning_plan"])
             else:
-                st.caption("Puoi aggiornare il piano della giornata anche dopo la mattina.")
+                st.caption(t["plan_update_later"])
 
             saved_day_type = None
             saved_activity = None
@@ -3198,9 +3385,9 @@ elif selected_page == t["t2"]:
 
             pc1, pc2 = st.columns(2)
             with pc1:
-                day_type = st.selectbox(t["day_type"], day_types, index=day_types.index(default_day), key=f"overview_day_type_{plan_date}")
+                day_type = st.selectbox(t["day_type"], day_types, index=day_types.index(default_day), key=f"overview_day_type_{plan_date}", format_func=tr_day_type)
             with pc2:
-                activity_plan = st.selectbox(t["activity_expected"], activity_types, index=activity_types.index(default_activity), key=f"overview_activity_plan_{plan_date}")
+                activity_plan = st.selectbox(t["activity_expected"], activity_types, index=activity_types.index(default_activity), key=f"overview_activity_plan_{plan_date}", format_func=tr_activity_plan)
 
             st.session_state["day_plan_type"] = day_type
             st.session_state["day_plan_activity"] = activity_plan
@@ -3213,9 +3400,9 @@ elif selected_page == t["t2"]:
                         supabase.table("daily_logs").update(payload_plan).eq("id", existing[0]["id"]).execute()
                     else:
                         supabase.table("daily_logs").insert({"user_id": user_id, "date": str(plan_date), **payload_plan}).execute()
-                    st.success(f"✅ Piano salvato per {plan_date.strftime('%d/%m/%Y')}.")
+                    st.success(t["plan_saved"].format(date=plan_date.strftime("%d/%m/%Y")))
                 except Exception:
-                    st.info("Il piano resta attivo in questa sessione. Esegui la migrazione SQL aggiornata per renderlo persistente.")
+                    st.info(t["plan_persistence_note"])
 
             # Valori rappresentativi per la pianificazione:
             # Riposo 0 kcal extra, Moderatamente attiva 500, Attiva 1000.
@@ -3242,7 +3429,7 @@ elif selected_page == t["t2"]:
             if is_today_plan and lunch_logged:
                 dinner_target = max(0.0, daily_budget - calories_already_logged)
                 st.markdown(
-                    f"**Budget stimato:** {daily_budget:.0f} kcal · "
+                    f"**{t['budget_estimated']}:** {daily_budget:.0f} kcal · "
                     f"**Già registrato oggi:** {calories_already_logged:.0f} kcal · "
                     f"**Cena disponibile:** circa {dinner_target:.0f} kcal"
                 )
@@ -3253,19 +3440,19 @@ elif selected_page == t["t2"]:
                 )
                 if dinner:
                     st.markdown(
-                        f"🍽️ **Cena suggerita:** {html.escape(dinner['name'])} — "
+                        f"🍽️ **{t['suggested_dinner']}:** {html.escape(dinner['name'])} — "
                         f"**{dinner['calories']:.0f} kcal** · {dinner['category']} "
                         f"{info_badge(dinner.get('notes'), 'Note cena')}",
                         unsafe_allow_html=True,
                     )
                 else:
-                    st.caption("Nessuna cena replicabile nello storico abbastanza vicina al target.")
+                    st.caption(t["no_dinner_near"])
 
             elif day_type == "Ufficio":
                 fixed_kcal = 1260.0
                 dinner_target = max(0.0, daily_budget - fixed_kcal)
                 st.markdown(
-                    f"**Budget stimato:** {daily_budget:.0f} kcal · "
+                    f"**{t['budget_estimated']}:** {daily_budget:.0f} kcal · "
                     f"**Ufficio già allocato:** 1260 kcal · "
                     f"**Cena:** circa {dinner_target:.0f} kcal"
                 )
@@ -3278,7 +3465,7 @@ elif selected_page == t["t2"]:
                 )
                 if office_lunch:
                     st.caption(
-                        f"Pranzo ufficio nello storico: {office_lunch['name']} "
+                        f"{t['office_lunch_history']}: {office_lunch['name']} "
                         f"({office_lunch['calories']:.0f} kcal)."
                     )
 
@@ -3289,13 +3476,13 @@ elif selected_page == t["t2"]:
                 )
                 if dinner:
                     st.markdown(
-                        f"🍽️ **Cena suggerita:** {html.escape(dinner['name'])} — "
+                        f"🍽️ **{t['suggested_dinner']}:** {html.escape(dinner['name'])} — "
                         f"circa **{dinner['calories']:.0f} kcal** · {dinner['category']} "
                         f"{info_badge(dinner.get('notes'), 'Note cena')}",
                         unsafe_allow_html=True,
                     )
                 else:
-                    st.caption("Non ho ancora abbastanza cene replicabili nello storico.")
+                    st.caption(t["no_dinner_history"])
 
             else:
                 if day_type == "Lavoro da casa":
@@ -3317,7 +3504,7 @@ elif selected_page == t["t2"]:
                 remaining = max(0.0, daily_budget - already_allocated)
                 per_meal = remaining / 2.0
                 st.markdown(
-                    f"**Budget stimato:** {daily_budget:.0f} kcal · "
+                    f"**{t['budget_estimated']}:** {daily_budget:.0f} kcal · "
                     f"**{allocated_label}:** {already_allocated:.0f} kcal · "
                     f"**Pranzo:** ~{per_meal:.0f} kcal · **Cena:** ~{per_meal:.0f} kcal"
                 )
@@ -3339,25 +3526,25 @@ elif selected_page == t["t2"]:
                 with sc1:
                     if lunch:
                         st.markdown(
-                            f"🥗 **Pranzo suggerito**<br>{html.escape(lunch['name'])} · "
+                            f"🥗 **{t['suggested_lunch']}**<br>{html.escape(lunch['name'])} · "
                             f"**{lunch['calories']:.0f} kcal** · {lunch['category']} "
                             f"{info_badge(lunch.get('notes'), 'Note pranzo')}",
                             unsafe_allow_html=True,
                         )
                     else:
-                        st.caption("Nessun pranzo Casa replicabile disponibile nello storico.")
+                        st.caption(t["no_home_lunch"])
                 with sc2:
                     if dinner:
                         st.markdown(
-                            f"🍽️ **Cena suggerita**<br>{html.escape(dinner['name'])} · "
+                            f"🍽️ **{t['suggested_dinner']}**<br>{html.escape(dinner['name'])} · "
                             f"**{dinner['calories']:.0f} kcal** · {dinner['category']} "
                             f"{info_badge(dinner.get('notes'), 'Note cena')}",
                             unsafe_allow_html=True,
                         )
                     else:
-                        st.caption("Nessuna cena replicabile disponibile nello storico.")
+                        st.caption(t["no_dinner"])
 
-            st.caption("Per la pianificazione uso +0 kcal (riposo), +500 kcal (moderatamente attiva), +1000 kcal (attiva). La soglia osservata nel grafico resta: riposo <300 kcal extra, attività intensa ≥800 kcal.")
+            st.caption(t["planning_formula"])
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -3392,25 +3579,26 @@ elif selected_page == t["t2"]:
 
             df_meals = pd.DataFrame(meals_with_id)
             df_display = df_meals.rename(columns={
-                "meal_type": "Pasto", "name": "Nome", "calories": "Kcal",
-                "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)", "category": "Categoria",
+                "meal_type": t["col_meal"], "name": t["col_name"], "calories": "Kcal",
+                "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)", "category": t["col_category"],
             })
-            df_display["Categoria"] = [infer_meal_category(m) for m in meals_with_id]
+            df_display[t["col_meal"]] = df_display[t["col_meal"]].map(tr_meal_type)
+            df_display[t["col_category"]] = [tr_category(infer_meal_category(m)) for m in meals_with_id]
             st.dataframe(
-                df_display[["Pasto", "Categoria", "Nome", "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]],
+                df_display[[t["col_meal"], t["col_category"], t["col_name"], "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]],
                 use_container_width=True,
                 hide_index=True,
             )
 
             meal_by_id = {m["id"]: m for m in meals_with_id}
             meal_options = {
-                m["id"]: f"{m.get('meal_type', '')} - {m.get('name', '')} ({m.get('calories', 0)} kcal)"
+                m["id"]: f"{tr_meal_type(m.get('meal_type', ''))} - {m.get('name', '')} ({m.get('calories', 0)} kcal)"
                 for m in meals_with_id
             }
             selected_meal_id = st.selectbox(
-                "🍽️ Seleziona il pasto da modificare",
+                t["select_meal_edit"],
                 options=[""] + list(meal_options),
-                format_func=lambda meal_id: "Seleziona un pasto..." if meal_id == "" else meal_options[meal_id],
+                format_func=lambda meal_id: t["select_meal_placeholder"] if meal_id == "" else meal_options[meal_id],
                 key=f"edit_meal_select_{summary_date}",
             )
 
@@ -3436,28 +3624,30 @@ elif selected_page == t["t2"]:
                 # Se il meal è per 100 g, la quantità è espressa in grammi.
                 # Se è per porzione, la quantità rappresenta il numero di porzioni.
                 if is_per_100g:
-                    quantity_label = "Quantità (g)"
+                    quantity_label = t["quantity_g"]
                     quantity_step = 1.0
                     quantity_unit = "g"
                 else:
-                    quantity_label = "Porzioni"
+                    quantity_label = t["portions"]
                     quantity_step = 0.1
                     quantity_unit = "porz."
 
                 edit_col1, edit_col2, edit_col3 = st.columns([2, 2, 2])
                 with edit_col1:
                     new_meal_type = st.selectbox(
-                        "Tipo di pasto",
+                        t["meal_type_label"],
                         meal_types,
                         index=current_index,
                         key=f"edit_meal_type_{selected_meal_id}_{summary_date}",
+                        format_func=tr_meal_type,
                     )
                 with edit_col2:
                     new_meal_category = st.selectbox(
-                        "Categoria",
+                        t["category_label"],
                         MEAL_CATEGORIES,
                         index=MEAL_CATEGORIES.index(current_category),
                         key=f"edit_meal_category_{selected_meal_id}_{summary_date}",
+                        format_func=tr_category,
                     )
                 with edit_col3:
                     new_quantity = st.number_input(
@@ -3468,14 +3658,10 @@ elif selected_page == t["t2"]:
                         key=f"edit_meal_quantity_{selected_meal_id}_{summary_date}",
                     )
 
-                st.caption(
-                    "Puoi modificare sia i grammi sia il numero di porzioni, "
-                    "a seconda di come il pasto è stato salvato. "
-                    "Kcal e macronutrienti vengono ricalcolati automaticamente."
-                )
+                st.caption(t["edit_meal_help"])
 
                 if st.button(
-                    "💾 Salva modifiche",
+                    t["save_changes"],
                     use_container_width=True,
                     key=f"save_meal_edit_{selected_meal_id}_{summary_date}",
                 ):
@@ -3545,20 +3731,16 @@ elif selected_page == t["t2"]:
 
                         refresh_daily_logs(summary_date)
 
-                        st.success(
-                            f"✅ Pasto aggiornato: **{new_meal_type} · "
-                            f"{new_meal_category} · {new_quantity:g} "
-                            f"{quantity_unit}**."
-                        )
+                        st.success(t["meal_updated"].format(meal=tr_meal_type(new_meal_type), category=tr_category(new_meal_category), qty=f"{new_quantity:g}", unit=quantity_unit))
                         st.rerun()
 
                     except Exception as e:
-                        st.error(f"Errore nella modifica del pasto: {e}")
+                        st.error(t["edit_meal_error"].format(error=e))
 
                 st.markdown("---")
                 delete_col1, delete_col2 = st.columns([3, 1])
                 with delete_col1:
-                    st.caption(f"Elimina definitivamente **{selected_meal.get('name', 'questo pasto')}** se non vuoi più conservarlo.")
+                    st.caption(t["delete_this_meal"].format(name=selected_meal.get("name", t["col_meal"])))
                 with delete_col2:
                     if st.button(t["del_meal_btn"], key=f"delete_meal_{selected_meal_id}_{summary_date}", use_container_width=True):
                         try:
@@ -3566,15 +3748,15 @@ elif selected_page == t["t2"]:
                             st.success(t["meal_del_success"])
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Errore nell'eliminazione del pasto: {e}")
+                            st.error(t["delete_meal_error"].format(error=e))
         else:
             st.info(t["no_meals"])
 
     with st.container(border=True):
         st.markdown(t["burned_acts"])
-        rows_acts = [{"Attività": "BMR (Base)", "Kcal Bruciate": bmr_so_far}]
+        rows_acts = [{t["col_activity"]: "BMR (Base)", t["col_burned"]: bmr_so_far}]
         for act in activities_data:
-            rows_acts.append({"Attività": act.get("activity_name"), "Kcal Bruciate": act.get("burned_calories")})
+            rows_acts.append({t["col_activity"]: act.get("activity_name"), t["col_burned"]: act.get("burned_calories")})
         st.dataframe(pd.DataFrame(rows_acts), use_container_width=True, hide_index=True)
 
 # 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
@@ -3586,7 +3768,7 @@ elif selected_page == t["t3"]:
     render_pending_weight_sound()
 
     with st.container(border=True):
-        st.markdown("#### ⚖️ Gestione pesi")
+        st.markdown(t["weight_manage"])
         logs_all = (
             supabase.table("daily_logs").select("id, date, weight").eq("user_id", user_id)
             .not_.is_("weight", "null").order("date", desc=True).execute().data or []
@@ -3595,9 +3777,9 @@ elif selected_page == t["t3"]:
 
         c1, c2 = st.columns(2)
         with c1:
-            w = st.number_input("Nuovo peso (kg)", value=80.0, min_value=20.0, max_value=300.0, step=0.1, key="new_weight_value")
-            w_date = st.date_input("Data del peso", value=date.today(), key="new_weight_date")
-            if st.button("💾 Salva peso", use_container_width=True):
+            w = st.number_input(t["new_weight"], value=80.0, min_value=20.0, max_value=300.0, step=0.1, key="new_weight_value")
+            w_date = st.date_input(t["weight_date"], value=date.today(), key="new_weight_date")
+            if st.button(t["save_weight_ui"], use_container_width=True):
                 try:
                     # Cerchiamo il peso cronologicamente precedente alla data
                     # che stiamo registrando. Un eventuale peso già presente
@@ -3646,7 +3828,7 @@ elif selected_page == t["t3"]:
                     if sound_to_play is not None:
                         st.session_state["pending_weight_sound"] = str(sound_to_play)
 
-                    st.success("✅ Peso salvato!")
+                    st.success(t["weight_saved"])
                     st.rerun()
 
                 except Exception as e:
@@ -3654,16 +3836,16 @@ elif selected_page == t["t3"]:
 
         with c2:
             selected_weight_id = st.selectbox(
-                "Peso da modificare o eliminare",
+                t["weight_edit_select"],
                 [""] + list(edit_options),
-                format_func=lambda x: "Seleziona un peso..." if x == "" else edit_options[x],
+                format_func=lambda x: t["weight_select_placeholder"] if x == "" else edit_options[x],
                 key="weight_edit_selector",
             )
             if selected_weight_id:
                 selected_row = next(r for r in logs_all if str(r["id"]) == selected_weight_id)
                 ew1, ew2 = st.columns(2)
                 with ew1:
-                    edited_date = st.date_input("Data", value=pd.to_datetime(selected_row["date"]).date(), key=f"edit_weight_date_{selected_weight_id}")
+                    edited_date = st.date_input(t["date_label"], value=pd.to_datetime(selected_row["date"]).date(), key=f"edit_weight_date_{selected_weight_id}")
                 with ew2:
                     edited_weight = st.number_input(t["weight_value"], value=float(selected_row["weight"]), min_value=20.0, max_value=300.0, step=0.1, key=f"edit_weight_value_{selected_weight_id}")
                 b1, b2 = st.columns(2)
@@ -3678,10 +3860,10 @@ elif selected_page == t["t3"]:
                                 ).execute()
                             else:
                                 supabase.table("daily_logs").update({"weight": float(edited_weight)}).eq("id", selected_row["id"]).eq("user_id", user_id).execute()
-                            st.success("✅ Peso modificato!")
+                            st.success(t["weight_edited"])
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Errore nella modifica: {e}")
+                            st.error(t["weight_edit_error"].format(error=e))
                 with b2:
                     if st.button(t["delete_weight"], use_container_width=True, key=f"delete_weight_{selected_weight_id}"):
                         try:
@@ -3689,15 +3871,15 @@ elif selected_page == t["t3"]:
                             # azzeriamo solo weight. Se la riga ha solo il peso, Supabase
                             # conserverà una riga innocua con weight NULL.
                             supabase.table("daily_logs").update({"weight": None}).eq("id", selected_row["id"]).eq("user_id", user_id).execute()
-                            st.success("✅ Peso cancellato.")
+                            st.success(t["weight_deleted"])
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Errore nella cancellazione: {e}")
+                            st.error(t["weight_delete_error"].format(error=e))
 
     with st.container(border=True):
         st.markdown(f"#### {t['update_target']}")
         new_target = st.number_input(
-            "Peso Obiettivo (kg)",
+            t["target_weight_label"],
             value=float(user_target_weight) if user_target_weight else 75.0,
             min_value=20.0, max_value=300.0, step=0.5,
             key="weight_target_edit",
@@ -3778,19 +3960,19 @@ elif selected_page == t["t3"]:
                 avg_daily_deficit_30 = total_deficit_30 / valid_deficit_days
 
         ratio_text = "N/D"
-        ratio_caption = "Servono almeno due pesi e dati alimentari nell'ultimo mese."
+        ratio_caption = t["need_two_weights"]
         if weight_lost_30 is not None and weight_lost_30 > 0 and valid_deficit_days > 0:
             kcal_per_kg = total_deficit_30 / weight_lost_30
             ratio_text = f"{kcal_per_kg:,.0f} kcal/kg".replace(",", ".")
-            ratio_caption = f"{total_deficit_30:.0f} kcal di deficit / {weight_lost_30:.1f} kg persi."
+            ratio_caption = t["ratio_caption"].format(deficit=f"{total_deficit_30:.0f}", kg=f"{weight_lost_30:.1f}")
         elif weight_lost_30 is not None and weight_lost_30 <= 0:
-            ratio_caption = "Nessuna perdita di peso misurata negli ultimi 30 giorni."
+            ratio_caption = t["no_weight_loss"]
 
         lost_text = "N/D" if weight_lost_30 is None else f"{weight_lost_30:+.1f} kg"
-        lost_caption = "Differenza tra la prima e l'ultima misurazione degli ultimi 30 giorni."
+        lost_caption = t["first_last_diff"]
 
         goal_date_text = "N/D"
-        goal_caption = "Serve un deficit medio positivo per stimare la data obiettivo."
+        goal_caption = t["need_positive_deficit"]
         target_30 = float(user_target_weight) if user_target_weight else None
         current_for_projection = latest_weight_30
         if current_for_projection is None and logs_all:
@@ -3802,13 +3984,13 @@ elif selected_page == t["t3"]:
         if target_30 is not None and current_for_projection is not None:
             kg_remaining = current_for_projection - target_30
             if kg_remaining <= 0:
-                goal_date_text = "Raggiunto 🎯"
-                goal_caption = "Il peso più recente è già pari o inferiore all'obiettivo."
+                goal_date_text = t["target_reached"]
+                goal_caption = t["target_reached_caption"]
             elif avg_daily_deficit_30 is not None and avg_daily_deficit_30 > 0:
                 days_needed = int(__import__("math").ceil((kg_remaining * 7700.0) / avg_daily_deficit_30))
                 projected_date = date.today() + pd.Timedelta(days=days_needed)
                 goal_date_text = projected_date.strftime("%d/%m/%Y")
-                goal_caption = f"Stima basata su {avg_daily_deficit_30:.0f} kcal/giorno di deficit medio ({valid_deficit_days} giorni loggati)."
+                goal_caption = t["estimate_based"].format(deficit=f"{avg_daily_deficit_30:.0f}", days=valid_deficit_days)
 
         st.markdown('''
             <style>
@@ -3828,29 +4010,30 @@ elif selected_page == t["t3"]:
 
         wk1, wk2, wk3 = st.columns(3)
         with wk1:
-            st.markdown(f'<div class="custom-card"><div class="custom-card-title">📉 Peso perso · 30 giorni</div><div class="custom-card-value">{lost_text}</div><div class="custom-card-caption">{lost_caption}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="custom-card-title">{t["weight_lost_30"]}</div><div class="custom-card-value">{lost_text}</div><div class="custom-card-caption">{lost_caption}</div></div>', unsafe_allow_html=True)
         with wk2:
-            st.markdown(f'<div class="custom-card"><div class="custom-card-title">⚡ Deficit / kg perso</div><div class="custom-card-value">{ratio_text}</div><div class="custom-card-caption">{ratio_caption}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="custom-card-title">{t["deficit_per_kg"]}</div><div class="custom-card-value">{ratio_text}</div><div class="custom-card-caption">{ratio_caption}</div></div>', unsafe_allow_html=True)
         with wk3:
-            st.markdown(f'<div class="custom-card"><div class="custom-card-title">🎯 Data obiettivo stimata</div><div class="custom-card-value">{goal_date_text}</div><div class="custom-card-caption">{goal_caption}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="custom-card-title">{t["estimated_target_date"]}</div><div class="custom-card-value">{goal_date_text}</div><div class="custom-card-caption">{goal_caption}</div></div>', unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
     except Exception as e:
-        st.warning(f"Impossibile calcolare le statistiche mensili: {e}")
+        st.warning(t["monthly_stats_error"].format(error=e))
 
     with st.container(border=True):
         try:
             ctrl1, ctrl2 = st.columns(2)
             with ctrl1:
                 chart_mode = st.selectbox(
-                    "Visualizzazione",
-                    ["Peso", "Kcal", "Macros", "Pasti"],
+                    t["view_label"],
+                    ["weight", "kcal", "macros", "meals"],
                     index=0,
                     key="main_analytics_mode",
+                    format_func=lambda x: {"weight": t["view_weight"], "kcal": t["view_kcal"], "macros": t["view_macros"], "meals": t["view_meals"]}[x],
                 )
             with ctrl2:
-                period_options = {"7 giorni": 7, "14 giorni": 14, "30 giorni": 30, "60 giorni": 60, "90 giorni": 90}
+                period_options = {f"{d} {t['period_days']}": d for d in (7, 14, 30, 60, 90)}
                 selected_period_label = st.selectbox(
-                    "Periodo",
+                    t["period_label"],
                     list(period_options),
                     index=1,  # default 14 giorni
                     key="weight_chart_period",
@@ -3917,14 +4100,14 @@ elif selected_page == t["t3"]:
             fig = go.Figure()
             y_title = ""
 
-            if chart_mode == "Peso":
+            if chart_mode == "weight":
                 if not df_weight.empty:
                     fig.add_trace(go.Scatter(
                         x=df_weight["date"], y=df_weight["weight"],
-                        mode="lines+markers", name="Peso reale",
+                        mode="lines+markers", name=t["view_weight"],
                         line=dict(color="#FF8B8B", width=3),
                         marker=dict(size=8, color="#FF8B8B"),
-                        hovertemplate="<b>%{x|%d %b %Y}</b><br>Peso: <b>%{y:.1f} kg</b><extra></extra>",
+                        hovertemplate=f"<b>%{{x|%d %b %Y}}</b><br>{t['view_weight']}: <b>%{{y:.1f}} kg</b><extra></extra>",
                     ))
 
                     target_val = float(user_target_weight) if user_target_weight else 75.0
@@ -3940,16 +4123,16 @@ elif selected_page == t["t3"]:
                         trend_y = intercept + slope * trend_days
                         fig.add_trace(go.Scatter(
                             x=trend_x, y=trend_y, mode="lines",
-                            name="Proiezione",
+                            name=t["trend"],
                             line=dict(color="#FF8B8B", width=2.5, dash="dash"),
-                            hovertemplate="<b>Trend</b><br>%{x|%d %b}<br>%{y:.1f} kg<extra></extra>",
+                            hovertemplate=f"<b>{t['trend']}</b><br>%{{x|%d %b}}<br>%{{y:.1f}} kg<extra></extra>",
                         ))
 
                     fig.add_trace(go.Scatter(
                         x=[chart_start, chart_end], y=[target_val, target_val],
-                        mode="lines", name="Obiettivo",
+                        mode="lines", name=t["goal"],
                         line=dict(color="#1A2942", width=2.5),
-                        hovertemplate=f"Obiettivo: {target_val:.1f} kg<extra></extra>",
+                        hovertemplate=f"{t['goal']}: {target_val:.1f} kg<extra></extra>",
                     ))
 
                     visible_values = df_weight["weight"].tolist() + [target_val]
@@ -3958,28 +4141,28 @@ elif selected_page == t["t3"]:
                     pad = max(.5, spread * .18)
                     fig.update_yaxes(range=[y_min - pad, y_max + pad])
                 else:
-                    st.info(f"Nessun peso registrato negli ultimi {selected_days} giorni.")
-                y_title = "Peso (kg)"
+                    st.info(t["no_weight_period"].format(days=selected_days))
+                y_title = f"{t['view_weight']} (kg)"
 
-            elif chart_mode == "Kcal":
+            elif chart_mode == "kcal":
                 fig.add_trace(go.Bar(
                     x=days_df["date"], y=days_df["calories"],
-                    name="Kcal ingerite", marker_color="#FF8B8B",
-                    hovertemplate="%{x|%d %b}<br>Ingerite: %{y:.0f} kcal<extra></extra>",
+                    name=t["ingested_kcal"], marker_color="#FF8B8B",
+                    hovertemplate=f"%{{x|%d %b}}<br>{t['ingested_kcal']}: %{{y:.0f}} kcal<extra></extra>",
                 ))
                 fig.add_trace(go.Bar(
                     x=days_df["date"], y=days_df["burned"],
-                    name="Kcal bruciate", marker_color="#1A2942",
-                    hovertemplate="%{x|%d %b}<br>Bruciate: %{y:.0f} kcal<extra></extra>",
+                    name=t["burned_kcal"], marker_color="#1A2942",
+                    hovertemplate=f"%{{x|%d %b}}<br>{t['burned_kcal']}: %{{y:.0f}} kcal<extra></extra>",
                 ))
                 fig.update_layout(barmode="group")
                 y_title = "kcal"
 
-            elif chart_mode == "Macros":
+            elif chart_mode == "macros":
                 macro_specs = [
-                    ("protein", "Proteine", "#FF8B8B"),
-                    ("carbs", "Carboidrati", "#1A2942"),
-                    ("fat", "Grassi", "#FFB4B4"),
+                    ("protein", t["protein_full"], "#FF8B8B"),
+                    ("carbs", t["carbs_full"], "#1A2942"),
+                    ("fat", t["fats_full"], "#FFB4B4"),
                 ]
                 for col, label, color in macro_specs:
                     fig.add_trace(go.Bar(
@@ -3987,9 +4170,9 @@ elif selected_page == t["t3"]:
                         hovertemplate=f"%{{x|%d %b}}<br>{label}: %{{y:.1f}} g<extra></extra>",
                     ))
                 fig.update_layout(barmode="stack")
-                y_title = "grammi"
+                y_title = t["grams"]
 
-            else:  # Pasti
+            else:  # meals
                 meal_order = ["Colazione", "Pranzo", "Snack", "Cena"]
                 meal_colors = ["#FF8B8B", "#1A2942", "#FFB4B4", "#667085"]
                 for meal_type, color in zip(meal_order, meal_colors):
@@ -3999,8 +4182,8 @@ elif selected_page == t["t3"]:
                         series = meals_df[meals_df["meal_type"] == meal_type].groupby("date")["calories"].sum()
                         vals = [float(series.get(d, 0)) for d in days_df["date"]]
                     fig.add_trace(go.Bar(
-                        x=days_df["date"], y=vals, name=meal_type, marker_color=color,
-                        hovertemplate=f"%{{x|%d %b}}<br>{meal_type}: %{{y:.0f}} kcal<extra></extra>",
+                        x=days_df["date"], y=vals, name=tr_meal_type(meal_type), marker_color=color,
+                        hovertemplate=f"%{{x|%d %b}}<br>{tr_meal_type(meal_type)}: %{{y:.0f}} kcal<extra></extra>",
                     ))
                 fig.update_layout(barmode="stack")
                 y_title = "kcal"
@@ -4032,7 +4215,7 @@ elif selected_page == t["t3"]:
                 kcal_in = float(row["calories"])
                 extra = float(row["extra"])
                 if kcal_in <= 0:
-                    deficit_icon, deficit_tip = "·", "Nessun dato alimentare"
+                    deficit_icon, deficit_tip = "·", t["no_food_data"]
                 else:
                     daily_def = float(user_bmr) + extra - kcal_in
                     if daily_def >= float(user_deficit_target_kcal):
@@ -4081,25 +4264,21 @@ elif selected_page == t["t3"]:
             st.markdown(timeline_html, unsafe_allow_html=True)
 
         except Exception as e:
-            st.error(f"Errore nel caricamento del grafico: {e}")
+            st.error(t["chart_error"].format(error=e))
             print(traceback.format_exc())
 
 # 12. PAGE 4: RICETTE / MEAL COMPOSTI
 # ==============================================================================
 elif selected_page == t["t4"]:
     render_page_title_card(t["recipes_title"])
-    st.caption(
-        "Le ricette non usano più una tabella separata: sono normali record di `meals` "
-        "con gli ingredienti salvati in `ingredients_json`. Quick Entry, Ricette e suggerimenti "
-        "usano quindi lo stesso database."
-    )
+    st.caption(t["recipes_caption"])
 
     if "recipe_form_version" not in st.session_state:
         st.session_state["recipe_form_version"] = 0
     v = st.session_state["recipe_form_version"]
 
     with st.container(border=True):
-        st.markdown("### 📋 Ricette disponibili")
+        st.markdown(t["available_recipes"])
         try:
             recipe_meals = (
                 supabase.table("meals")
@@ -4127,14 +4306,14 @@ elif selected_page == t["t4"]:
                     continue
                 seen_names.add(key)
                 display_rows.append({
-                    "Nome": label,
-                    "Pasto": r.get("meal_type"),
-                    "Categoria": infer_meal_category(r),
+                    t["col_name"]: label,
+                    t["col_meal"]: tr_meal_type(r.get("meal_type")),
+                    t["col_category"]: tr_category(infer_meal_category(r)),
                     "Kcal": r.get("calories"),
                     "Pro (g)": r.get("protein"),
                     "Carbs (g)": r.get("carbs"),
                     "Fat (g)": r.get("fat"),
-                    "Data": r.get("date"),
+                    t["col_date"]: r.get("date"),
                 })
             st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
 
@@ -4147,70 +4326,73 @@ elif selected_page == t["t4"]:
                         unsafe_allow_html=True,
                     )
         else:
-            st.info("Nessuna ricetta composta presente in meals.")
+            st.info(t["no_composed_recipes"])
 
     with st.container(border=True):
-        st.markdown("### ➕ Crea un meal da ingredienti")
+        st.markdown(t["create_meal_ingredients"])
 
         rc1, rc2, rc3 = st.columns(3)
         with rc1:
             recipe_log_date = st.date_input(
-                "Data",
+                t["date_label"],
                 value=date.today(),
                 key=f"recipe_meal_date_{v}",
             )
         with rc2:
             recipe_meal_type = st.selectbox(
-                "Tipo di pasto",
+                t["meal_type_label"],
                 ["Colazione", "Pranzo", "Cena", "Snack"],
                 key=f"recipe_meal_type_{v}",
+                format_func=tr_meal_type,
             )
         with rc3:
             recipe_category = st.selectbox(
-                "Categoria",
+                t["category_label"],
                 MEAL_CATEGORIES,
                 index=0,
                 key=f"recipe_category_{v}",
-                help="Una-tantum non entra nei suggerimenti. Ristorante non viene mai suggerito a pranzo.",
+                help=t["recipe_category_help"],
+                format_func=tr_category,
             )
 
         r_name = st.text_input(
-            "Nome",
-            placeholder="Es. Pasta al pomodoro",
+            t["col_name"],
+            placeholder=t["recipe_name_placeholder"],
             key=f"recipe_builder_name_{v}",
         )
         r_notes = st.text_area(
-            "Note (opzionali)",
-            placeholder="Es. preparazione, sostituzioni, condimenti...",
+            t["notes_optional"],
+            placeholder=t["notes_placeholder"],
             key=f"recipe_builder_notes_{v}",
             height=90,
         )
 
-        st.markdown("#### 🥕 Aggiungi ingrediente")
+        st.markdown(t["add_ingredient_title"])
         source = st.radio(
-            "Fonte ingrediente",
-            ["Database / Open Food Facts", "Inserimento manuale"],
+            t["ingredient_source"],
+            ["database", "manual"],
             horizontal=True,
             key=f"ingredient_source_{v}",
+            format_func=lambda x: t["db_off"] if x == "database" else t["manual_entry"],
         )
 
         ingredient_name = ""
         base = {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
 
-        if source.startswith("Database"):
-            iq = st.text_input("Cerca ingrediente", key=f"ingredient_search_{v}")
+        if source == "database":
+            iq = st.text_input(t["ingredient_search"], key=f"ingredient_search_{v}")
             if st.button(t["search_ingredient"], key=f"ingredient_search_btn_{v}"):
                 if len(iq.strip()) >= 2 or iq.strip().isdigit():
-                    with st.spinner("Ricerca ingrediente..."):
+                    with st.spinner(t["searching_ingredient"]):
                         st.session_state[f"ingredient_results_{v}"] = search_open_food_facts(iq)
                     st.rerun()
                 else:
-                    st.warning("Inserisci almeno 2 caratteri.")
+                    st.warning(t["min_2_chars"])
 
             results = st.session_state.get(f"ingredient_results_{v}", {})
             if results:
                 sel = st.selectbox(
-                    "Risultati",
+                    t["results"],
                     [""] + list(results),
                     key=f"ingredient_result_select_{v}",
                 )
@@ -4219,12 +4401,12 @@ elif selected_page == t["t4"]:
                     ingredient_name = p_data.get("name", sel)
                     base = {k: float(p_data.get(k, 0) or 0) for k in base}
                     st.caption(
-                        f"Per 100g: {base['calories']:.0f} kcal · "
+                        f"{t['per_100g_label']}: {base['calories']:.0f} kcal · "
                         f"Pro {base['protein']:.1f} g · Carbs {base['carbs']:.1f} g · Fat {base['fat']:.1f} g"
                     )
         else:
             ingredient_name = st.text_input(
-                "Nome ingrediente",
+                t["ingredient_name"],
                 key=f"manual_ingredient_name_{v}",
             )
             mc1, mc2, mc3, mc4 = st.columns(4)
@@ -4242,7 +4424,7 @@ elif selected_page == t["t4"]:
             )
 
         quantity = st.number_input(
-            "Quantità ingrediente (g)",
+            t["ingredient_qty"],
             min_value=0.1,
             value=100.0,
             step=1.0,
@@ -4250,12 +4432,12 @@ elif selected_page == t["t4"]:
         )
 
         if st.button(
-            "➕ Aggiungi ingrediente",
+            t["add_ingredient"],
             use_container_width=True,
             key=f"add_ingredient_{v}",
         ):
             if not ingredient_name.strip():
-                st.warning("Inserisci o seleziona un ingrediente.")
+                st.warning(t["select_or_enter_ingredient"])
             else:
                 st.session_state["recipe_builder_ingredients"].append({
                     "name": ingredient_name.strip(),
@@ -4264,22 +4446,22 @@ elif selected_page == t["t4"]:
                     "protein_per_100g": float(base["protein"]),
                     "carbs_per_100g": float(base["carbs"]),
                     "fat_per_100g": float(base["fat"]),
-                    "source": "database" if source.startswith("Database") else "manual",
+                    "source": source,
                 })
-                st.success(f"✅ {ingredient_name} aggiunto.")
+                st.success(t["ingredient_added"].format(name=ingredient_name))
                 st.rerun()
 
         ingredients = st.session_state.get("recipe_builder_ingredients", [])
 
         if ingredients:
-            st.markdown("#### 📋 Ingredienti")
+            st.markdown(t["ingredients_title"])
             rows = []
             for idx, ing in enumerate(ingredients):
                 ing_factor = float(ing["quantity_g"]) / 100.0
                 rows.append({
                     "#": idx + 1,
-                    "Ingrediente": ing["name"],
-                    "Quantità (g)": ing["quantity_g"],
+                    t["ingredient_col"]: ing["name"],
+                    t["quantity_g"]: ing["quantity_g"],
                     "Kcal": round(ing["calories_per_100g"] * ing_factor),
                     "Pro": round(ing["protein_per_100g"] * ing_factor, 1),
                     "Carbs": round(ing["carbs_per_100g"] * ing_factor, 1),
@@ -4288,12 +4470,12 @@ elif selected_page == t["t4"]:
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
             remove_idx = st.selectbox(
-                "Rimuovi ingrediente",
+                t["remove_ingredient"],
                 [""] + [str(i + 1) for i in range(len(ingredients))],
                 key=f"remove_ingredient_{v}",
             )
             if remove_idx and st.button(
-                "🗑️ Rimuovi ingrediente",
+                t["remove_ingredient_btn"],
                 key=f"remove_ingredient_btn_{v}",
             ):
                 del st.session_state["recipe_builder_ingredients"][int(remove_idx) - 1]
@@ -4302,21 +4484,21 @@ elif selected_page == t["t4"]:
             total_weight, totals, per100 = calculate_recipe_totals(ingredients)
 
             st.markdown(
-                f"**Totale meal:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · "
+                f"**{t['total_meal']}:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · "
                 f"Pro {totals['protein']:.1f} g · Carbs {totals['carbs']:.1f} g · Fat {totals['fat']:.1f} g"
             )
             st.caption(
-                f"Per 100 g: {per100['calories']:.0f} kcal · "
+                f"{t['per_100g_label']}: {per100['calories']:.0f} kcal · "
                 f"Pro {per100['protein']:.1f} g · Carbs {per100['carbs']:.1f} g · Fat {per100['fat']:.1f} g"
             )
 
             if st.button(
-                "💾 Salva come meal",
+                t["save_as_meal"],
                 use_container_width=True,
                 key=f"save_recipe_builder_{v}",
             ):
                 if not r_name.strip():
-                    st.warning("Inserisci un nome.")
+                    st.warning(t["enter_name"])
                 else:
                     try:
                         display_name = f"{r_name.strip()} ({total_weight:.0f}g)"
@@ -4342,7 +4524,7 @@ elif selected_page == t["t4"]:
                         refresh_daily_logs(recipe_log_date)
                         st.session_state["recipe_builder_ingredients"] = []
                         st.session_state["recipe_form_version"] += 1
-                        st.success("✅ Meal composto salvato in meals!")
+                        st.success(t["composed_saved"])
                         st.rerun()
                     except Exception as e:
                         st.error(
@@ -4350,7 +4532,7 @@ elif selected_page == t["t4"]:
                             "per aggiungere category e ingredients_json a meals. Errore: " + str(e)
                         )
         else:
-            st.info("Aggiungi almeno un ingrediente per costruire il meal.")
+            st.info(t["add_one_ingredient"])
 
 # ==============================================================================
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
