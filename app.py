@@ -6,6 +6,10 @@ import traceback
 import re
 import json
 import html
+import base64
+import secrets
+import hashlib
+from urllib.parse import urlencode
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -108,6 +112,7 @@ st.markdown("""
 # ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+APP_URL = str(st.secrets.get("APP_URL", "https://sanosync.streamlit.app")).rstrip("/")
 
 # Questo client NON deve mantenere una sessione propria in memoria.
 # La sessione persistente viene gestita esplicitamente dal cookie browser.
@@ -544,7 +549,7 @@ def calculate_recipe_totals(ingredients):
 # ==============================================================================
 # 4. AUTHENTICATION & SESSION MANAGEMENT
 # ==============================================================================
-# Autenticazione email/password con sessione persistente.
+# Autenticazione email/password + Google OAuth con sessione persistente.
 #
 # Persistenza:
 # - nel browser salviamo soltanto il refresh token Supabase;
@@ -558,6 +563,171 @@ def calculate_recipe_totals(ingredients):
 # preferibile un backend che imposti cookie HttpOnly/Secure/SameSite.
 SESSION_COOKIE = "sanosync_refresh_token"
 SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60
+
+# PKCE temporaneo per il login Google.
+GOOGLE_PKCE_COOKIE = "sanosync_google_pkce"
+GOOGLE_PKCE_MAX_AGE = 10 * 60
+
+
+def _read_cookie(name):
+    """Legge un cookie sia dopo un vero refresh sia durante un normale rerun."""
+    try:
+        value = st.context.cookies.get(name)
+        if value:
+            return str(value).strip().strip('"')
+    except Exception:
+        pass
+
+    try:
+        value = controller.get(name)
+        if value:
+            return str(value).strip().strip('"')
+    except Exception:
+        pass
+
+    return None
+
+
+def _pkce_challenge(verifier):
+    return base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode("utf-8")).digest()
+    ).decode("utf-8").rstrip("=")
+
+
+def _get_or_create_google_pkce():
+    """
+    Mantiene stabile il verifier per tutto il tentativo OAuth.
+
+    Streamlit può eseguire più rerun mentre la pagina di login è aperta:
+    rigenerare il verifier a ogni rerun romperebbe il callback PKCE.
+    """
+    verifier = st.session_state.get("google_pkce_verifier")
+
+    if not verifier:
+        verifier = _read_cookie(GOOGLE_PKCE_COOKIE)
+
+    if not verifier:
+        verifier = base64.urlsafe_b64encode(
+            secrets.token_bytes(48)
+        ).decode("utf-8").rstrip("=")
+
+        st.session_state["google_pkce_verifier"] = verifier
+        _cookie_set(
+            GOOGLE_PKCE_COOKIE,
+            verifier,
+            GOOGLE_PKCE_MAX_AGE,
+        )
+    else:
+        st.session_state["google_pkce_verifier"] = verifier
+
+    return verifier, _pkce_challenge(verifier)
+
+
+def _clear_google_pkce():
+    st.session_state.pop("google_pkce_verifier", None)
+    _cookie_delete(GOOGLE_PKCE_COOKIE)
+
+
+def get_google_oauth_url():
+    """
+    URL Supabase Auth per Google.
+
+    Il pulsante viene mostrato con st.link_button: Streamlit apre un vero link
+    esterno in una nuova scheda, evitando di renderizzare Google dentro il
+    contesto della pagina dell'app.
+    """
+    _, challenge = _get_or_create_google_pkce()
+
+    params = {
+        "provider": "google",
+        "redirect_to": APP_URL,
+        "code_challenge": challenge,
+        "code_challenge_method": "s256",
+    }
+
+    return f"{SUPABASE_URL}/auth/v1/authorize?{urlencode(params)}"
+
+
+def handle_google_oauth_callback():
+    """Scambia il code PKCE restituito da Supabase per una sessione."""
+    auth_code = st.query_params.get("code")
+    oauth_error = st.query_params.get("error")
+    oauth_error_description = st.query_params.get("error_description")
+
+    if oauth_error:
+        _clear_google_pkce()
+        st.query_params.clear()
+        st.error(
+            f"Google/Supabase ha annullato il login: "
+            f"{oauth_error_description or oauth_error}"
+        )
+        return False
+
+    if not auth_code:
+        return False
+
+    verifier = (
+        st.session_state.get("google_pkce_verifier")
+        or _read_cookie(GOOGLE_PKCE_COOKIE)
+    )
+
+    if not verifier:
+        st.query_params.clear()
+        st.error(
+            "Il callback Google è arrivato, ma il verifier PKCE non è più "
+            "disponibile. Riprova il login."
+        )
+        return False
+
+    try:
+        response = requests.post(
+            f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Content-Type": "application/json",
+            },
+            json={
+                "auth_code": str(auth_code),
+                "code_verifier": verifier,
+            },
+            timeout=20,
+        )
+
+        if not response.ok:
+            try:
+                detail = response.json()
+            except Exception:
+                detail = response.text[:500]
+
+            raise RuntimeError(
+                f"Token exchange HTTP {response.status_code}: {detail}"
+            )
+
+        payload = response.json()
+        access_token = payload.get("access_token")
+        refresh_token = payload.get("refresh_token")
+
+        if not access_token or not refresh_token:
+            raise RuntimeError(
+                "Supabase non ha restituito access_token e refresh_token."
+            )
+
+        auth_response = supabase.auth.set_session(
+            access_token,
+            refresh_token,
+        )
+
+        save_authenticated_session(auth_response)
+        _clear_google_pkce()
+        st.query_params.clear()
+        st.rerun()
+        return True
+
+    except Exception as e:
+        _clear_google_pkce()
+        st.query_params.clear()
+        st.error(f"Login Google fallito: {e}")
+        return False
 
 
 def _cookie_set(name, value, max_age):
@@ -628,7 +798,23 @@ def restore_session_from_cookie():
 
 def show_login_page():
     st.title("SanoSync")
-    st.caption("Accedi con email e password oppure crea un nuovo account.")
+    st.caption("Accedi con Google oppure usa email e password.")
+
+    try:
+        google_url = get_google_oauth_url()
+        st.link_button(
+            "Continua con Google",
+            google_url,
+            use_container_width=True,
+            type="primary",
+        )
+        st.caption(
+            "Google si apre in una nuova scheda. Dopo il login verrai riportato a SanoSync."
+        )
+    except Exception as e:
+        st.error(f"Impossibile inizializzare Google Login: {e}")
+
+    st.markdown("---")
 
     auth_mode = st.radio(
         "Account",
@@ -699,6 +885,7 @@ def show_login_page():
 
                         if response and response.session:
                             save_authenticated_session(response)
+                            _clear_google_pkce()
                             st.success("✅ Login effettuato.")
                             st.rerun()
                         else:
@@ -758,8 +945,14 @@ def show_login_page():
 
 
 # ==============================================================================
-# 5. RESTORE SESSION
+# 5. RESTORE SESSION / GOOGLE CALLBACK
 # ==============================================================================
+# Il callback OAuth viene gestito prima del restore normale della sessione.
+if st.session_state.get("user") is None and (
+    st.query_params.get("code") or st.query_params.get("error")
+):
+    handle_google_oauth_callback()
+
 # A ogni refresh del browser Streamlit ricrea session_state. Prima di mostrare
 # il login proviamo quindi a ricostruire la sessione dal refresh token salvato
 # nel cookie persistente.
