@@ -451,6 +451,16 @@ def _safe_float(value):
 
 
 
+def translate_activity_display(value, lang):
+    maps = {
+        "Italiano": {"Bici": "Bici", "Passi (Stima)": "Passi (Stima)", "BMR (Base)": "BMR (Base)"},
+        "English": {"Bici": "Bike", "Passi (Stima)": "Steps (Estimate)", "BMR (Base)": "BMR (Base)"},
+        "Nederlands": {"Bici": "Fiets", "Passi (Stima)": "Stappen (Schatting)", "BMR (Base)": "BMR (Basis)"},
+        "Français": {"Bici": "Vélo", "Passi (Stima)": "Pas (Estimation)", "BMR (Base)": "BMR (Base)"},
+    }
+    return maps.get(lang, maps["Italiano"]).get(str(value), str(value))
+
+
 def render_page_title_card(title):
     """Titolo pagina nella stessa card navy/corallo usata nel login."""
     safe_title = html.escape(str(title or ""))
@@ -2207,7 +2217,7 @@ translations = {
         "steps_updated": "Passi aggiornati!",
         "bike_title": "🚲 Bici (Sessione)",
         "bike_min": "Minuti Bici",
-        "add_bike": "💾 Aggiungi Bici",
+        "add_bike": ux["add_bike"],
         "other_act": "🏋️ Altro",
         "activity_label": "Attività",
         "add_act_btn": "💾 Aggiungi",
@@ -2607,7 +2617,7 @@ translations["Italiano"].update({
     "meal_breakfast": "Colazione", "meal_lunch": "Pranzo", "meal_dinner": "Cena", "meal_snack": "Snack",
     "cat_home": "Casa", "cat_work": "Lavoro", "cat_restaurant": "Ristorante", "cat_once": "Una-tantum",
     "col_meal": "Pasto", "col_category": "Categoria", "col_name": "Nome", "col_date": "Data",
-    "select_meal_edit": translations["Italiano"].get("select_meal_edit", "🍽️ Seleziona il pasto da modificare"), "select_meal_placeholder": "Seleziona un pasto...",
+    "select_meal_edit": translations["Italiano"].get("select_meal_edit", "🍽️ Seleziona il pasto da modificare"), "select_meal_placeholder": ux["meal_placeholder"],
     "meal_type_label": "Tipo di pasto", "category_label": "Categoria", "quantity_g": "Quantità (g)", "portions": "Porzioni",
     "edit_meal_help": "Puoi modificare grammi o porzioni. Kcal e macronutrienti vengono ricalcolati automaticamente.",
     "save_changes": translations["Italiano"].get("save_changes", "💾 Salva modifiche"), "delete_this_meal": "Elimina definitivamente **{name}** se non vuoi più conservarlo.",
@@ -2785,6 +2795,111 @@ with st.sidebar:
     st.sidebar.image("logo2.png", use_container_width=True)
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands", "Français"], key="lang_selector")
     t = translations[current_lang]
+
+    _ui_extra = {
+        "Italiano": {
+            "meal_placeholder": ux["meal_placeholder"],
+            "activity": "Attività",
+            "bmr_base": "BMR (Base)",
+            "bike": "Bici",
+            "steps_est": "Passi (Stima)",
+            "over_target": "⚠️ Sei oltre il target da deficit di circa {kcal} kcal.",
+            "end_day": "🔮 Fine giornata: ~{kcal} kcal se non registri altra attività.",
+            "details": "Dettagli:",
+            "deficit": "deficit",
+            "surplus": "surplus",
+            "extra": "extra",
+            "movement_status": "👣 Status Movimento",
+            "activity_logged": "🏋️ Attività registrata",
+            "activity_logged_note": "🌟 Ottimo! Hai completato un'attività fisica strutturata oggi.",
+            "extra_burned": "🔥 Kcal bruciate extra",
+            "extra_burned_note": "Somma delle calorie registrate nelle attività della giornata selezionata.",
+            "steps": "👣 Passi",
+            "steps_note": "Calorie attribuite ai passi.",
+            "padel_note": "Calorie registrate come Padel.",
+            "bike_note": "Somma di Bici ed E-Bike.",
+            "total_steps": "Totale passi",
+            "add_bike": ux["add_bike"],
+            "notes_ph": ux["notes_ph"]
+        },
+        "English": {
+            "meal_placeholder": "Select a meal...",
+            "activity": "Activity",
+            "bmr_base": "BMR (Base)",
+            "bike": "Bike",
+            "steps_est": "Steps (Estimate)",
+            "over_target": "⚠️ You are about {kcal} kcal over your deficit target.",
+            "end_day": "🔮 End of day: ~{kcal} kcal if you log no more activity.",
+            "details": "Details:",
+            "deficit": "deficit",
+            "surplus": "surplus",
+            "extra": "extra",
+            "movement_status": "👣 Movement Status",
+            "activity_logged": "🏋️ Activity logged",
+            "activity_logged_note": "🌟 Great! You completed a structured physical activity today.",
+            "extra_burned": "🔥 Extra kcal burned",
+            "extra_burned_note": "Total calories logged from activities on the selected day.",
+            "steps": "👣 Steps",
+            "steps_note": "Calories attributed to steps.",
+            "padel_note": "Calories logged as Padel.",
+            "bike_note": "Total from Bike and E-Bike.",
+            "total_steps": "Total steps",
+            "add_bike": "💾 Add Bike",
+            "notes_ph": "E.g. lactose-free, preferred brand, preparation, seasonings..."
+        },
+        "Nederlands": {
+            "meal_placeholder": "Selecteer een maaltijd...",
+            "activity": "Activiteit",
+            "bmr_base": "BMR (Basis)",
+            "bike": "Fiets",
+            "steps_est": "Stappen (Schatting)",
+            "over_target": "⚠️ Je zit ongeveer {kcal} kcal boven je tekortdoel.",
+            "end_day": "🔮 Einde van de dag: ~{kcal} kcal als je geen extra activiteit registreert.",
+            "details": "Details:",
+            "deficit": "tekort",
+            "surplus": "overschot",
+            "extra": "extra",
+            "movement_status": "👣 Bewegingsstatus",
+            "activity_logged": "🏋️ Activiteit geregistreerd",
+            "activity_logged_note": "🌟 Goed gedaan! Je hebt vandaag een gestructureerde fysieke activiteit voltooid.",
+            "extra_burned": "🔥 Extra kcal verbrand",
+            "extra_burned_note": "Totaal van de calorieën uit activiteiten op de geselecteerde dag.",
+            "steps": "👣 Stappen",
+            "steps_note": "Calorieën toegeschreven aan stappen.",
+            "padel_note": "Calorieën geregistreerd als padel.",
+            "bike_note": "Totaal van fiets en e-bike.",
+            "total_steps": "Totaal stappen",
+            "add_bike": "💾 Fiets toevoegen",
+            "notes_ph": "Bijv. lactosevrij, voorkeursmerk, bereiding, kruiden..."
+        },
+        "Français": {
+            "meal_placeholder": "Sélectionnez un repas...",
+            "activity": "Activité",
+            "bmr_base": "BMR (Base)",
+            "bike": "Vélo",
+            "steps_est": "Pas (Estimation)",
+            "over_target": "⚠️ Vous dépassez votre objectif de déficit d’environ {kcal} kcal.",
+            "end_day": "🔮 Fin de journée : ~{kcal} kcal si vous n’enregistrez aucune autre activité.",
+            "details": "Détails :",
+            "deficit": "déficit",
+            "surplus": "surplus",
+            "extra": "extra",
+            "movement_status": "👣 État des mouvements",
+            "activity_logged": "🏋️ Activité enregistrée",
+            "activity_logged_note": "🌟 Bravo ! Vous avez effectué une activité physique structurée aujourd’hui.",
+            "extra_burned": "🔥 Kcal supplémentaires brûlées",
+            "extra_burned_note": "Total des calories enregistrées dans les activités du jour sélectionné.",
+            "steps": "👣 Pas",
+            "steps_note": "Calories attribuées aux pas.",
+            "padel_note": "Calories enregistrées comme padel.",
+            "bike_note": "Total Vélo et Vélo électrique.",
+            "total_steps": "Total des pas",
+            "add_bike": "💾 Ajouter le vélo",
+            "notes_ph": "Ex. sans lactose, marque préférée, préparation, assaisonnements..."
+        },
+    }
+    ux = _ui_extra.get(current_lang, _ui_extra["Italiano"])
+
     st.markdown(
         f'<div style="text-align:center;color:#FFB4B4;font-weight:900;font-size:1rem;letter-spacing:.01em;margin:-.15rem 0 .55rem 0;">{html.escape(t["slogan"])}</div>',
         unsafe_allow_html=True,
@@ -3049,7 +3164,7 @@ if selected_page == t["t1"]:
     meal_notes = st.text_area(
         t["notes_optional"],
         value=st.session_state.get("selected_source_note", ""),
-        placeholder="Es. senza lattosio, marca preferita, preparazione, condimenti...",
+        placeholder=ux["notes_ph"],
         key=f"meal_notes_{v}",
         height=80,
     )
@@ -4692,7 +4807,7 @@ elif selected_page == t["t5"]:
             bike_type = st.radio(t["bike_type"], [t["normal_bike"], t["ebike"]], horizontal=True, key=f"bike_type_{act_date}")
             bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5, key=f"bike_min_{act_date}")
             
-            if st.button("💾 Aggiungi Bici", use_container_width=True):
+            if st.button(ux["add_bike"], use_container_width=True):
                 if bike_min > 0:
                     if "Elettrica" in bike_type:
                         estim_cals = int(bike_min * 4)  # Stima E-bike: ~4 kcal/min
