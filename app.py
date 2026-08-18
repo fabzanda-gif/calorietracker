@@ -241,35 +241,119 @@ def calculate_age(birth_date_value, on_date=None):
 
 
 DEFICIT_PRESETS = {
-    "Custom": 0,
-    "Low · 250 kcal": 250,
-    "Medium · 500 kcal": 500,
-    "High · 750 kcal": 750,
+    "custom": 0,
+    "slow": 250,
+    "medium": 500,
+    "fast": 750,
+}
+
+DEFICIT_PRESET_LABELS = {
+    "Italiano": {
+        "custom": "Custom",
+        "slow": "Lento · 250 kcal",
+        "medium": "Medio · 500 kcal",
+        "fast": "Veloce · 750 kcal",
+        "title": "🎯 Obiettivo calorico",
+        "speed": "Velocità di dimagrimento",
+        "field": "Deficit kcal di base",
+        "help": (
+            "Il preset imposta automaticamente il deficit. "
+            "Il valore sotto resta sempre modificabile manualmente."
+        ),
+    },
+    "English": {
+        "custom": "Custom",
+        "slow": "Slow · 250 kcal",
+        "medium": "Medium · 500 kcal",
+        "fast": "Fast · 750 kcal",
+        "title": "🎯 Calorie target",
+        "speed": "Weight-loss speed",
+        "field": "Base calorie deficit",
+        "help": (
+            "The preset automatically sets the deficit. "
+            "You can always edit the value below manually."
+        ),
+    },
+    "Nederlands": {
+        "custom": "Aangepast",
+        "slow": "Langzaam · 250 kcal",
+        "medium": "Gemiddeld · 500 kcal",
+        "fast": "Snel · 750 kcal",
+        "title": "🎯 Caloriedoel",
+        "speed": "Snelheid van gewichtsverlies",
+        "field": "Basis calorietekort",
+        "help": (
+            "De voorinstelling vult het tekort automatisch in. "
+            "Je kunt de waarde hieronder altijd handmatig wijzigen."
+        ),
+    },
+    "Français": {
+        "custom": "Personnalisé",
+        "slow": "Lent · 250 kcal",
+        "medium": "Moyen · 500 kcal",
+        "fast": "Rapide · 750 kcal",
+        "title": "🎯 Objectif calorique",
+        "speed": "Vitesse de perte de poids",
+        "field": "Déficit calorique de base",
+        "help": (
+            "Le préréglage renseigne automatiquement le déficit. "
+            "Vous pouvez toujours modifier la valeur ci-dessous."
+        ),
+    },
 }
 
 
+def _ui_language():
+    """Lingua corrente; prima del login usa Italiano come fallback."""
+    lang = st.session_state.get("lang_selector", "Italiano")
+    return lang if lang in DEFICIT_PRESET_LABELS else "Italiano"
+
+
+def deficit_preset_label(preset_key):
+    lang = _ui_language()
+    return DEFICIT_PRESET_LABELS[lang].get(
+        preset_key,
+        DEFICIT_PRESET_LABELS[lang]["custom"],
+    )
+
+
+def normalize_deficit_plan(value):
+    """Compatibilità con valori salvati dalle versioni precedenti."""
+    raw = str(value or "").strip().casefold()
+
+    if raw in {"custom", "aangepast", "personnalisé", "personalizzato"}:
+        return "custom"
+    if raw in {"slow", "lento", "langzaam", "lent"} or "250" in raw:
+        return "slow"
+    if raw in {"medium", "medio", "gemiddeld", "moyen"} or "500" in raw:
+        return "medium"
+    if raw in {"fast", "veloce", "snel", "rapide"} or "750" in raw:
+        return "fast"
+    return "custom"
+
+
 def deficit_preset_from_value(value):
-    """Restituisce l'etichetta preset corrispondente a un target salvato."""
     try:
         value = int(round(float(value)))
     except (TypeError, ValueError):
-        return "Media · 500 kcal"
+        return "custom"
 
-    for label, kcal in DEFICIT_PRESETS.items():
+    for key, kcal in DEFICIT_PRESETS.items():
         if kcal == value:
-            return label
-    return "Custom"
+            return key
+    return "custom"
 
 
-def resolve_deficit_target(preset_label, entered_value=None):
+def resolve_deficit_target(preset_key, entered_value=None):
     """
     Il campo kcal è sempre la fonte di verità.
-    Il preset serve soltanto a precompilarlo.
+    Il preset serve solo a precompilarlo.
     """
     try:
         return max(0, int(round(float(entered_value))))
     except (TypeError, ValueError):
-        return int(DEFICIT_PRESETS.get(preset_label, 0))
+        return int(DEFICIT_PRESETS.get(preset_key, 0))
+
 
 
 def calculate_bmr(weight, height, birth_date_value, gender):
@@ -952,111 +1036,20 @@ def show_login_page():
         horizontal=True,
     )
 
-    # --------------------------------------------------------------
-    # Deficit target - fuori dal form per aggiornarsi in tempo reale.
-    # Dentro uno st.form i widget non causano rerun fino al submit:
-    # era questo il motivo per cui il campo Custom non compariva.
-    # --------------------------------------------------------------
-    deficit_plan_input = "Custom"
-    custom_deficit_input = 0
-
-    if auth_mode == "Registrazione":
-        if "signup_deficit_plan" not in st.session_state:
-            st.session_state["signup_deficit_plan"] = "Custom"
-        if "signup_deficit_kcal" not in st.session_state:
-            st.session_state["signup_deficit_kcal"] = 0
-
-        def _sync_signup_deficit_preset():
-            selected = st.session_state.get("signup_deficit_plan", "Custom")
-            st.session_state["signup_deficit_kcal"] = int(
-                DEFICIT_PRESETS.get(selected, 0)
+    if auth_mode == "Login":
+        with st.form("auth_login_form"):
+            email = st.text_input("Email")
+            password = st.text_input(
+                "Password (min. 6 caratteri)",
+                type="password",
+            )
+            submitted = st.form_submit_button(
+                "Accedi",
+                use_container_width=True,
             )
 
-        st.markdown("#### 🎯 Obiettivo calorico")
-        deficit_plan_input = st.selectbox(
-            "Velocità di dimagrimento",
-            list(DEFICIT_PRESETS.keys()),
-            key="signup_deficit_plan",
-            on_change=_sync_signup_deficit_preset,
-            help=(
-                "Il preset precompila il deficit giornaliero. "
-                "Puoi comunque modificare manualmente il valore sotto."
-            ),
-        )
-
-        custom_deficit_input = st.number_input(
-            "Deficit kcal di base",
-            min_value=0,
-            max_value=2000,
-            step=50,
-            key="signup_deficit_kcal",
-            help=(
-                "Custom parte da 0. Low imposta 250, Medium 500, "
-                "High 750. Il valore resta sempre modificabile."
-            ),
-        )
-
-    with st.form("auth_form"):
-        email = st.text_input("Email")
-        password = st.text_input(
-            "Password (min. 6 caratteri)",
-            type="password",
-        )
-
-        display_name_input = ""
-        target_weight = None
-        height = None
-        current_weight = None
-        gender = None
-        birth_date_input = None
-
-        if auth_mode == "Registrazione":
-            st.markdown("#### 📋 Parametri Fisici Iniziali")
-            display_name_input = st.text_input("Display Name", value="")
-            gender = st.selectbox(
-                "Genere",
-                ["Uomo", "Donna"],
-                index=None,
-                placeholder="Seleziona genere...",
-            )
-            birth_date_input = st.date_input(
-                "Data di nascita",
-                value=date(1990, 1, 1),
-                min_value=date(1900, 1, 1),
-                max_value=date.today(),
-            )
-            height = st.number_input(
-                "Altezza (cm)",
-                value=175.0,
-                min_value=100.0,
-                max_value=250.0,
-                step=1.0,
-            )
-            current_weight = st.number_input(
-                "Peso Attuale (kg)",
-                value=80.0,
-                min_value=20.0,
-                max_value=300.0,
-                step=0.5,
-            )
-            target_weight = st.number_input(
-                "Peso Obiettivo (kg)",
-                value=75.0,
-                min_value=20.0,
-                max_value=300.0,
-                step=0.5,
-            )
-
-
-        submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
-        submitted = st.form_submit_button(
-            submit_label,
-            use_container_width=True,
-        )
-
-        if submitted:
-            try:
-                if auth_mode == "Login":
+            if submitted:
+                try:
                     if not email.strip() or not password:
                         st.warning("Inserisci email e password.")
                     else:
@@ -1072,62 +1065,185 @@ def show_login_page():
                         else:
                             st.error("Credenziali non valide.")
 
-                else:
-                    if not email.strip() or len(password) < 6:
-                        st.warning(
-                            "Inserisci una email valida e una password "
-                            "di almeno 6 caratteri."
-                        )
-                    elif not height or not current_weight or not target_weight or not gender or not birth_date_input:
-                        st.warning("Compila tutti i parametri fisici.")
-                    else:
-                        response = supabase.auth.sign_up({
-                            "email": email.strip(),
-                            "password": password,
-                            "options": {
-                                "data": {
-                                    "display_name": (
-                                        display_name_input
-                                        or email.split("@")[0]
-                                    ),
-                                    "target_weight": float(target_weight),
-                                    "current_weight": float(current_weight),
-                                    "birth_date": str(birth_date_input),
-                                    "height": float(height),
-                                    "gender": gender,
-                                    "deficit_target_kcal": resolve_deficit_target(
-                                        deficit_plan_input,
-                                        custom_deficit_input,
-                                    ),
-                                    "deficit_plan": (
-                                        deficit_plan_input
-                                        if int(custom_deficit_input)
-                                        == int(DEFICIT_PRESETS.get(deficit_plan_input, 0))
-                                        else "Custom"
-                                    ),
-                                }
-                            },
-                        })
+                except Exception as e:
+                    st.error(
+                        f"Errore durante l'autenticazione: {str(e)}"
+                    )
+                    print(traceback.format_exc())
 
-                        # Se la conferma email è disabilitata, Supabase può già
-                        # restituire una sessione.
-                        if response and getattr(response, "session", None):
-                            save_authenticated_session(response)
-                            st.success(
-                                "✅ Account creato e accesso effettuato."
-                            )
-                            st.rerun()
-                        else:
-                            st.success(
-                                "✅ Account creato. Controlla l'email se è "
-                                "richiesta la conferma, poi effettua il login."
-                            )
+    else:
+        # Non usiamo st.form qui: il preset del deficit deve aggiornare
+        # immediatamente il campo kcal quando l'utente lo seleziona.
+        email = st.text_input("Email", key="signup_email")
+        password = st.text_input(
+            "Password (min. 6 caratteri)",
+            type="password",
+            key="signup_password",
+        )
+
+        st.markdown("#### 📋 Parametri Fisici Iniziali")
+        display_name_input = st.text_input(
+            "Display Name",
+            value="",
+            key="signup_display_name",
+        )
+        gender = st.selectbox(
+            "Genere",
+            ["Uomo", "Donna"],
+            index=None,
+            placeholder="Seleziona genere...",
+            key="signup_gender",
+        )
+        birth_date_input = st.date_input(
+            "Data di nascita",
+            value=date(1990, 1, 1),
+            min_value=date(1900, 1, 1),
+            max_value=date.today(),
+            key="signup_birth_date",
+        )
+        height = st.number_input(
+            "Altezza (cm)",
+            value=175.0,
+            min_value=100.0,
+            max_value=250.0,
+            step=1.0,
+            key="signup_height",
+        )
+        current_weight = st.number_input(
+            "Peso Attuale (kg)",
+            value=80.0,
+            min_value=20.0,
+            max_value=300.0,
+            step=0.5,
+            key="signup_current_weight",
+        )
+        target_weight = st.number_input(
+            "Peso Obiettivo (kg)",
+            value=75.0,
+            min_value=20.0,
+            max_value=300.0,
+            step=0.5,
+            key="signup_target_weight",
+        )
+
+        # ----------------------------------------------------------
+        # DEFICIT: volutamente ALLA FINE dei dati di registrazione.
+        # ----------------------------------------------------------
+        deficit_ui = DEFICIT_PRESET_LABELS[_ui_language()]
+
+        if "signup_deficit_plan" not in st.session_state:
+            st.session_state["signup_deficit_plan"] = "custom"
+        else:
+            st.session_state["signup_deficit_plan"] = normalize_deficit_plan(
+                st.session_state["signup_deficit_plan"]
+            )
+
+        if "signup_deficit_kcal" not in st.session_state:
+            st.session_state["signup_deficit_kcal"] = 0
+
+        def _sync_signup_deficit_preset():
+            selected_key = normalize_deficit_plan(
+                st.session_state.get("signup_deficit_plan", "custom")
+            )
+            st.session_state["signup_deficit_kcal"] = int(
+                DEFICIT_PRESETS.get(selected_key, 0)
+            )
+
+        st.markdown(f"#### {deficit_ui['title']}")
+        deficit_plan_input = st.selectbox(
+            deficit_ui["speed"],
+            list(DEFICIT_PRESETS.keys()),
+            key="signup_deficit_plan",
+            format_func=deficit_preset_label,
+            on_change=_sync_signup_deficit_preset,
+            help=deficit_ui["help"],
+        )
+
+        custom_deficit_input = st.number_input(
+            deficit_ui["field"],
+            min_value=0,
+            max_value=2000,
+            step=50,
+            key="signup_deficit_kcal",
+        )
+
+        if st.button(
+            "Registrati",
+            use_container_width=True,
+            key="signup_submit",
+        ):
+            try:
+                if not email.strip() or len(password) < 6:
+                    st.warning(
+                        "Inserisci una email valida e una password "
+                        "di almeno 6 caratteri."
+                    )
+                elif (
+                    not height
+                    or not current_weight
+                    or not target_weight
+                    or not gender
+                    or not birth_date_input
+                ):
+                    st.warning("Compila tutti i parametri fisici.")
+                else:
+                    selected_plan = normalize_deficit_plan(
+                        deficit_plan_input
+                    )
+                    selected_deficit = resolve_deficit_target(
+                        selected_plan,
+                        custom_deficit_input,
+                    )
+
+                    preset_value = int(
+                        DEFICIT_PRESETS.get(selected_plan, 0)
+                    )
+                    plan_to_save = (
+                        selected_plan
+                        if int(selected_deficit) == preset_value
+                        else "custom"
+                    )
+
+                    response = supabase.auth.sign_up({
+                        "email": email.strip(),
+                        "password": password,
+                        "options": {
+                            "data": {
+                                "display_name": (
+                                    display_name_input
+                                    or email.split("@")[0]
+                                ),
+                                "target_weight": float(target_weight),
+                                "current_weight": float(current_weight),
+                                "birth_date": str(birth_date_input),
+                                "height": float(height),
+                                "gender": gender,
+                                "deficit_target_kcal": int(
+                                    selected_deficit
+                                ),
+                                "deficit_plan": plan_to_save,
+                            }
+                        },
+                    })
+
+                    if response and getattr(response, "session", None):
+                        save_authenticated_session(response)
+                        st.success(
+                            "✅ Account creato e accesso effettuato."
+                        )
+                        st.rerun()
+                    else:
+                        st.success(
+                            "✅ Account creato. Controlla l'email se è "
+                            "richiesta la conferma, poi effettua il login."
+                        )
 
             except Exception as e:
                 st.error(
                     f"Errore durante l'autenticazione: {str(e)}"
                 )
                 print(traceback.format_exc())
+
 
 
 # ==============================================================================
@@ -1254,8 +1370,8 @@ if profile_incomplete:
         else 0
     )
     existing_deficit_label = (
-        user_deficit_plan
-        if user_deficit_plan in DEFICIT_PRESETS
+        normalize_deficit_plan(user_deficit_plan)
+        if user_deficit_plan
         else deficit_preset_from_value(existing_deficit_value)
     )
 
@@ -1265,25 +1381,26 @@ if profile_incomplete:
         st.session_state["profile_deficit_kcal"] = existing_deficit_value
 
     def _sync_profile_deficit_preset():
-        selected = st.session_state.get("profile_deficit_plan", "Custom")
+        selected = normalize_deficit_plan(
+            st.session_state.get("profile_deficit_plan", "custom")
+        )
         st.session_state["profile_deficit_kcal"] = int(
             DEFICIT_PRESETS.get(selected, 0)
         )
 
-    st.markdown("#### 🎯 Obiettivo calorico")
+    deficit_ui = DEFICIT_PRESET_LABELS[_ui_language()]
+    st.markdown(f"#### {deficit_ui['title']}")
     deficit_plan_val = st.selectbox(
-        "Velocità di dimagrimento",
+        deficit_ui["speed"],
         list(DEFICIT_PRESETS.keys()),
         key="profile_deficit_plan",
+        format_func=deficit_preset_label,
         on_change=_sync_profile_deficit_preset,
-        help=(
-            "Custom = 0 · Low = 250 · Medium = 500 · High = 750. "
-            "Il valore kcal può sempre essere modificato manualmente."
-        ),
+        help=deficit_ui["help"],
     )
 
     custom_deficit_val = st.number_input(
-        "Deficit kcal di base",
+        deficit_ui["field"],
         min_value=0,
         max_value=2000,
         step=50,
@@ -1301,7 +1418,7 @@ if profile_incomplete:
     deficit_plan_to_save = (
         deficit_plan_val
         if int(selected_deficit_target) == preset_default
-        else "Custom"
+        else "custom"
     )
 
     with st.form("missing_data_form"):
