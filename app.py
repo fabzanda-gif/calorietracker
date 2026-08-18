@@ -1243,19 +1243,46 @@ with st.sidebar:
 
     with account_right:
         _lang = st.session_state.get("lang_selector", "Italiano")
-        _gender = str(u_meta.get("gender") or "").strip().lower()
-        # Saluto dinamico in base all'ora del giorno.
-        # 05:00–11:59 = mattina, 12:00–17:59 = pomeriggio, 18:00–04:59 = sera/notte.
+
+        # Saluto dinamico indipendente da `t`, perché questa card viene
+        # renderizzata PRIMA della tabella translations.
         _hour = datetime.now().hour
 
         if 5 <= _hour < 12:
-            _greeting_key = "greeting_morning"
+            _period = "morning"
         elif 12 <= _hour < 18:
-            _greeting_key = "greeting_afternoon"
+            _period = "afternoon"
         else:
-            _greeting_key = "greeting_evening"
+            _period = "evening"
 
-        _welcome = t[_greeting_key].format(name=first_name)
+        _greetings = {
+            "Italiano": {
+                "morning": "Buongiorno {name}!",
+                "afternoon": "Buon pomeriggio {name}!",
+                "evening": "Buonasera {name}!",
+            },
+            "English": {
+                "morning": "Good morning {name}!",
+                "afternoon": "Good afternoon {name}!",
+                "evening": "Good evening {name}!",
+            },
+            "Nederlands": {
+                "morning": "Goedemorgen {name}!",
+                "afternoon": "Goedemiddag {name}!",
+                "evening": "Goedenavond {name}!",
+            },
+            "Français": {
+                "morning": "Bonjour {name}!",
+                "afternoon": "Bon après-midi {name}!",
+                "evening": "Bonsoir {name}!",
+            },
+        }
+
+        _welcome = _greetings.get(
+            _lang,
+            _greetings["Italiano"],
+        )[_period].format(name=first_name)
+
         st.markdown(
             f'<div class="sanosync-welcome">{html.escape(_welcome)}</div>',
             unsafe_allow_html=True,
