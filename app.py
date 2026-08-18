@@ -1235,7 +1235,7 @@ def show_login_page():
         '<div class="sano-login-eyebrow">SANOSYNC</div>'
         '<div class="sano-login-title">🍑 Il tuo equilibrio, ogni giorno</div>'
         '<div class="sano-login-subtitle">'
-        'Alimentazione, attività, peso e progressi in un unico posto.'
+        'I tuoi progressi sotto controllo.'
         '</div>'
         '</div>'
         '<div class="sano-login-card">'
