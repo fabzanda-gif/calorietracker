@@ -2217,7 +2217,7 @@ translations = {
         "steps_updated": "Passi aggiornati!",
         "bike_title": "🚲 Bici (Sessione)",
         "bike_min": "Minuti Bici",
-        "add_bike": ux["add_bike"],
+        "add_bike": "💾 Aggiungi Bici",
         "other_act": "🏋️ Altro",
         "activity_label": "Attività",
         "add_act_btn": "💾 Aggiungi",
@@ -2617,7 +2617,7 @@ translations["Italiano"].update({
     "meal_breakfast": "Colazione", "meal_lunch": "Pranzo", "meal_dinner": "Cena", "meal_snack": "Snack",
     "cat_home": "Casa", "cat_work": "Lavoro", "cat_restaurant": "Ristorante", "cat_once": "Una-tantum",
     "col_meal": "Pasto", "col_category": "Categoria", "col_name": "Nome", "col_date": "Data",
-    "select_meal_edit": translations["Italiano"].get("select_meal_edit", "🍽️ Seleziona il pasto da modificare"), "select_meal_placeholder": ux["meal_placeholder"],
+    "select_meal_edit": translations["Italiano"].get("select_meal_edit", "🍽️ Seleziona il pasto da modificare"), "select_meal_placeholder": "Seleziona un pasto...",
     "meal_type_label": "Tipo di pasto", "category_label": "Categoria", "quantity_g": "Quantità (g)", "portions": "Porzioni",
     "edit_meal_help": "Puoi modificare grammi o porzioni. Kcal e macronutrienti vengono ricalcolati automaticamente.",
     "save_changes": translations["Italiano"].get("save_changes", "💾 Salva modifiche"), "delete_this_meal": "Elimina definitivamente **{name}** se non vuoi più conservarlo.",
@@ -2798,7 +2798,7 @@ with st.sidebar:
 
     _ui_extra = {
         "Italiano": {
-            "meal_placeholder": ux["meal_placeholder"],
+            "meal_placeholder": "Seleziona un pasto...",
             "activity": "Attività",
             "bmr_base": "BMR (Base)",
             "bike": "Bici",
@@ -2819,8 +2819,8 @@ with st.sidebar:
             "padel_note": "Calorie registrate come Padel.",
             "bike_note": "Somma di Bici ed E-Bike.",
             "total_steps": "Totale passi",
-            "add_bike": ux["add_bike"],
-            "notes_ph": ux["notes_ph"]
+            "add_bike": "💾 Aggiungi Bici",
+            "notes_ph": "Es. senza lattosio, marca preferita, preparazione, condimenti..."
         },
         "English": {
             "meal_placeholder": "Select a meal...",
