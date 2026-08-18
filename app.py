@@ -628,24 +628,31 @@ def get_google_oauth_url(challenge):
 
 def google_login_button():
     """
-    Scrive il verifier PKCE nel cookie *sincronicamente nel browser* e poi
-    naviga la finestra principale verso Supabase OAuth.
-
-    Questo evita la race condition di streamlit-cookies-controller: il cookie
-    esiste già prima che il browser lasci SanoSync.
+    Genera il pulsante di login Google con PKCE sicuro.
+    Il verifier viene salvato nel cookie prima del redirect OAuth.
     """
     verifier, challenge = _new_google_pkce_pair()
     oauth_url = get_google_oauth_url(challenge)
 
+    # Escaping per JavaScript
     safe_verifier = verifier.replace("\\", "\\\\").replace("'", "\\'")
     safe_url = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
 
     button_html = f"""
     <div style="width:100%;">
       <button
+        id="google-login-btn"
         onclick="
-          document.cookie = '{GOOGLE_PKCE_COOKIE}={safe_verifier}; Path=/; Max-Age={GOOGLE_PKCE_MAX_AGE}; SameSite=Lax; Secure';
-          window.top.location.href = '{safe_url}';
+          try {{
+            document.cookie = '{GOOGLE_PKCE_COOKIE}={safe_verifier}; Path=/; Max-Age={GOOGLE_PKCE_MAX_AGE}; SameSite=Lax; Secure';
+            console.log('PKCE verifier salvato nel cookie');
+            setTimeout(function() {{
+              window.top.location.href = '{safe_url}';
+            }}, 100);
+          }} catch(e) {{
+            console.error('Errore Google login:', e);
+            alert('Errore nella configurazione di Google Login');
+          }}
         "
         style="
           width:100%;
