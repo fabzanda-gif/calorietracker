@@ -10,6 +10,7 @@ import html
 import base64
 import secrets
 import hashlib
+import hmac
 from urllib.parse import urlencode
 from supabase import create_client
 from supabase.client import ClientOptions
@@ -114,6 +115,7 @@ st.markdown("""
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 APP_URL = str(st.secrets.get("APP_URL", "https://sanosync.streamlit.app")).rstrip("/")
+OAUTH_STATE_SECRET = str(st.secrets.get("OAUTH_STATE_SECRET", ""))
 
 # Questo client NON deve mantenere una sessione propria in memoria.
 # La sessione persistente viene gestita esplicitamente dal cookie browser.
@@ -565,131 +567,88 @@ def calculate_recipe_totals(ingredients):
 SESSION_COOKIE = "sanosync_refresh_token"
 SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60
 
-# PKCE temporaneo per il login Google.
-GOOGLE_PKCE_COOKIE = "sanosync_google_pkce"
-GOOGLE_PKCE_MAX_AGE = 10 * 60
+# PKCE Google senza cookie/session_state:
+# il verifier viene derivato deterministicamente da un nonce presente nella
+# redirect URL e da un segreto server-side conservato nei Secrets Streamlit.
+# In questo modo il callback può ricostruire il verifier anche dopo un redirect
+# completo del browser, senza dipendere da iframe o cookie.
+GOOGLE_OAUTH_NONCE_PARAM = "oauth_nonce"
 
 
-def _read_cookie(name):
-    """Legge un cookie sia dopo un vero refresh sia durante un normale rerun."""
-    try:
-        value = st.context.cookies.get(name)
-        if value:
-            return str(value).strip().strip('"')
-    except Exception:
-        pass
+def _base64url(data):
+    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
 
-    try:
-        value = controller.get(name)
-        if value:
-            return str(value).strip().strip('"')
-    except Exception:
-        pass
 
-    return None
+def _google_verifier_from_nonce(nonce):
+    if not OAUTH_STATE_SECRET:
+        raise RuntimeError(
+            "Manca OAUTH_STATE_SECRET nei Secrets Streamlit."
+        )
+
+    digest = hmac.new(
+        OAUTH_STATE_SECRET.encode("utf-8"),
+        str(nonce).encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+
+    # 43 caratteri URL-safe: valido come PKCE code_verifier.
+    return _base64url(digest)
 
 
 def _pkce_challenge(verifier):
-    return base64.urlsafe_b64encode(
+    return _base64url(
         hashlib.sha256(verifier.encode("utf-8")).digest()
-    ).decode("utf-8").rstrip("=")
+    )
 
 
-def _new_google_pkce_pair():
+def get_google_oauth_url():
     """
-    Genera una nuova coppia PKCE.
+    Genera un URL OAuth completamente stateless per Streamlit.
 
-    Il verifier NON viene scritto qui con CookieController perché quel write è
-    asincrono rispetto alla navigazione OAuth. Verrà scritto dal browser in modo
-    sincrono nell'onclick del pulsante Google.
+    Il nonce torna nel redirect URL. Al callback ricostruiamo il verifier con
+    HMAC(secret, nonce), quindi non serve più conservarlo nel browser.
     """
-    verifier = base64.urlsafe_b64encode(
-        secrets.token_bytes(48)
-    ).decode("utf-8").rstrip("=")
-
+    nonce = _base64url(secrets.token_bytes(24))
+    verifier = _google_verifier_from_nonce(nonce)
     challenge = _pkce_challenge(verifier)
-    return verifier, challenge
 
+    callback_url = (
+        f"{APP_URL}/?"
+        + urlencode({GOOGLE_OAUTH_NONCE_PARAM: nonce})
+    )
 
-def _clear_google_pkce():
-    st.session_state.pop("google_pkce_verifier", None)
-    _cookie_delete(GOOGLE_PKCE_COOKIE)
-
-
-def get_google_oauth_url(challenge):
     params = {
         "provider": "google",
-        "redirect_to": APP_URL,
+        "redirect_to": callback_url,
         "code_challenge": challenge,
         "code_challenge_method": "s256",
     }
+
     return f"{SUPABASE_URL}/auth/v1/authorize?{urlencode(params)}"
 
 
 def google_login_button():
     """
-    Genera il pulsante di login Google con PKCE.
-
-    Il verifier viene scritto nel cookie al click e il link usa target="_top"
-    così la navigazione OAuth esce dall'iframe Streamlit.
+    Usa un vero widget Streamlit, quindi niente iframe HTML e niente bottone
+    opaco/non cliccabile.
     """
-    verifier, challenge = _new_google_pkce_pair()
-    oauth_url = get_google_oauth_url(challenge)
-
-    # Escaping per JavaScript e per l'attributo href
-    safe_verifier = verifier.replace("\\", "\\\\").replace("'", "\\'")
-    safe_url = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
-
-    button_html = f"""
-    <div style="width:100%;">
-      <a
-        href="{safe_url}"
-        target="_top"
-        onclick="
-          try {{
-            document.cookie = '{GOOGLE_PKCE_COOKIE}={safe_verifier}; Path=/; Max-Age={GOOGLE_PKCE_MAX_AGE}; SameSite=Lax; Secure';
-            console.log('PKCE verifier salvato nel cookie via link click');
-            // Lasciamo che il browser segua l'anchor; non forziamo window.top dalla sandbox.
-          }} catch(e) {{
-            console.error('Errore Google login:', e);
-            alert('Errore nella configurazione di Google Login');
-            return false;
-          }}
-        "
-        style="display:block;text-decoration:none;"
-      >
-        <button
-          id="google-login-btn"
-          style="
-            width:100%;
-            padding:0.72rem 1rem;
-            border-radius:10px;
-            border:2px solid #FF8B8B;
-            background:#FF8B8B;
-            color:white;
-            font-weight:800;
-            cursor:pointer;
-            font-size:1rem;
-          "
-          type="button"
-        >
-          Continua con Google
-        </button>
-      </a>
-    </div>
-    """
-    components.html(button_html, height=72)
-
+    google_url = get_google_oauth_url()
+    st.link_button(
+        "Continua con Google",
+        google_url,
+        use_container_width=True,
+        type="primary",
+    )
 
 
 def handle_google_oauth_callback():
-    """Scambia il code PKCE restituito da Supabase per una sessione."""
+    """Completa Google OAuth ricostruendo il verifier dal nonce del callback."""
     auth_code = st.query_params.get("code")
     oauth_error = st.query_params.get("error")
     oauth_error_description = st.query_params.get("error_description")
+    nonce = st.query_params.get(GOOGLE_OAUTH_NONCE_PARAM)
 
     if oauth_error:
-        _clear_google_pkce()
         st.query_params.clear()
         st.error(
             f"Google/Supabase ha annullato il login: "
@@ -700,17 +659,17 @@ def handle_google_oauth_callback():
     if not auth_code:
         return False
 
-    verifier = _read_cookie(GOOGLE_PKCE_COOKIE)
-
-    if not verifier:
+    if not nonce:
         st.query_params.clear()
         st.error(
-            "Il callback Google è arrivato, ma il verifier PKCE non è più "
-            "disponibile. Riprova il login."
+            "Il callback Google è arrivato senza oauth_nonce. "
+            "Controlla la Redirect URL di Supabase."
         )
         return False
 
     try:
+        verifier = _google_verifier_from_nonce(str(nonce))
+
         response = requests.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce",
             headers={
@@ -749,13 +708,11 @@ def handle_google_oauth_callback():
         )
 
         save_authenticated_session(auth_response)
-        _clear_google_pkce()
         st.query_params.clear()
         st.rerun()
         return True
 
     except Exception as e:
-        _clear_google_pkce()
         st.query_params.clear()
         st.error(f"Login Google fallito: {e}")
         return False
@@ -834,8 +791,7 @@ def show_login_page():
     try:
         google_login_button()
         st.caption(
-            "Il login Google viene aperto nella stessa scheda; il verifier PKCE "
-            "viene salvato nel browser prima del redirect."
+            "Google OAuth usa un callback PKCE stateless, senza cookie temporanei."
         )
     except Exception as e:
         st.error(f"Impossibile inizializzare Google Login: {e}")
@@ -911,7 +867,6 @@ def show_login_page():
 
                         if response and response.session:
                             save_authenticated_session(response)
-                            _clear_google_pkce()
                             st.success("✅ Login effettuato.")
                             st.rerun()
                         else:
