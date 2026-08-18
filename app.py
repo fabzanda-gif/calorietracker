@@ -1004,7 +1004,7 @@ def show_login_page():
         "Italiano": {
             "language": "🌐 Lingua",
             "eyebrow": "SANOSYNC",
-            "title": "🍑 Il tuo equilibrio, ogni giorno",
+            "title": "🍑 Tutto sotto controllo",
             "subtitle": "Alimentazione, attività, peso e progressi in un unico posto.",
             "continue": "Accedi per continuare",
             "google": "Continua con Google",
@@ -1047,7 +1047,7 @@ def show_login_page():
         "English": {
             "language": "🌐 Language",
             "eyebrow": "SANOSYNC",
-            "title": "🍑 Your balance, every day",
+            "title": "🍑 Get it under control",
             "subtitle": "Food, activity, weight and progress in one place.",
             "continue": "Sign in to continue",
             "google": "Continue with Google",
@@ -1090,7 +1090,7 @@ def show_login_page():
         "Nederlands": {
             "language": "🌐 Taal",
             "eyebrow": "SANOSYNC",
-            "title": "🍑 Jouw balans, elke dag",
+            "title": "🍑 Komt goed",
             "subtitle": "Voeding, activiteit, gewicht en voortgang op één plek.",
             "continue": "Log in om door te gaan",
             "google": "Doorgaan met Google",
@@ -1133,7 +1133,7 @@ def show_login_page():
         "Français": {
             "language": "🌐 Langue",
             "eyebrow": "SANOSYNC",
-            "title": "🍑 Votre équilibre, chaque jour",
+            "title": "🍑 C'est géré",
             "subtitle": "Alimentation, activité, poids et progrès au même endroit.",
             "continue": "Connectez-vous pour continuer",
             "google": "Continuer avec Google",
