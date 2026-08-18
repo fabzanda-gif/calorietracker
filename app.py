@@ -628,9 +628,10 @@ def get_google_oauth_url(challenge):
 
 def google_login_button():
     """
-    Genera il pulsante di login Google con PKCE sicuro.
-    Il verifier viene salvato nel cookie prima del redirect OAuth.
-    Usa un <a target=\"_top\"> per garantire la navigazione fuori dall'iframe.
+    Genera il pulsante di login Google con PKCE.
+
+    Il verifier viene scritto nel cookie al click e il link usa target="_top"
+    così la navigazione OAuth esce dall'iframe Streamlit.
     """
     verifier, challenge = _new_google_pkce_pair()
     oauth_url = get_google_oauth_url(challenge)
@@ -677,8 +678,8 @@ def google_login_button():
       </a>
     </div>
     """
-    # Aumenta un poco l'altezza per evitare ritagli visivi e garantire clickability
     components.html(button_html, height=72)
+
 
 
 def handle_google_oauth_callback():
