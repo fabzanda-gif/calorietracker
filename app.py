@@ -1222,12 +1222,14 @@ with st.sidebar:
             _welcome = f"Welcome {first_name}"
         elif _lang == "Nederlands":
             _welcome = f"Welkom {first_name}"
+        elif _lang == "Français":
+            _welcome = f"Bienvenue {first_name}"
         elif _gender in {"female", "f", "donna", "vrouw"}:
             _welcome = f"Benvenuta {first_name}"
         else:
             _welcome = f"Benvenuto {first_name}"
         st.markdown(
-            f"<div style='font-size:1.15rem;font-weight:800;'>"
+            f"<div style='font-size:1.15rem;font-weight:800;color:#FFFFFF !important;'>"
             f"{html.escape(_welcome)}</div>",
             unsafe_allow_html=True,
         )
@@ -1553,11 +1555,126 @@ translations["Nederlands"].update({
     "bike_type":"Type fiets","normal_bike":"Normale fiets","ebike":"E-bike (elektrisch)",
 })
 
+
+# Français
+translations["Français"] = {
+    "t1": "🚀 Saisie",
+    "t2": "📊 Vue d’ensemble",
+    "t3": "📈 Poids",
+    "t4": "⚡ Saisie rapide",
+    "t5": "🏃 Activité",
+    "meal": "Type de repas",
+    "meal_name": "Nom du repas",
+    "add_meal": "Ajouter le repas",
+    "extra_act": "Activité supplémentaire",
+    "extra_cals": "Calories supplémentaires brûlées",
+    "insert_weight": "Saisir le poids (kg)",
+    "save_weight": "Enregistrer le poids",
+    "recipe_name": "Nom de la recette",
+    "save_recipe": "Enregistrer la recette",
+    "recipe_saved": "✅ Recette enregistrée !",
+    "lang_label": "🌐 Langue",
+    "logout": "🚪 Déconnexion",
+    "search_food": "🔍 Rechercher par nom ou code-barres",
+    "search_btn": "🚀 Rechercher",
+    "select_db": "Sélectionner dans la base de données",
+    "select_recipe": "Sélectionner une recette",
+    "no_recipes": "Aucune recette enregistrée.",
+    "calc_mode": "Saisie basée sur :",
+    "per_100g": "Pour 100 g",
+    "per_portion": "Par portion",
+    "qty_label": "Quantité (g ou portions)",
+    "num_portions": "Nombre de portions",
+    "kcal": "Kcal",
+    "pro": "Protéines (g)",
+    "carbs": "Glucides (g)",
+    "fat": "Lipides (g)",
+    "inserted": "✅ Ajouté",
+    "daily_summary": "📊 Résumé journalier",
+    "summary_date": "📅 Date du résumé",
+    "logged_foods": "🍽️ Aliments enregistrés",
+    "del_meal": "Sélectionner un repas à supprimer",
+    "del_meal_btn": "🗑️ Supprimer le repas sélectionné",
+    "meal_del_success": "Repas supprimé avec succès !",
+    "no_meals": "Aucun repas enregistré pour cette date.",
+    "burned_acts": "#### 🏃 Calories brûlées & activités",
+    "weight_tracking": "⚖️ Suivi du poids",
+    "log_today_weight": "📥 Enregistrer le poids d’aujourd’hui",
+    "update_target": "🎯 Mettre à jour l’objectif",
+    "save_target": "Enregistrer l’objectif",
+    "target_updated": "✅ Objectif mis à jour !",
+    "quick_entries": "⚡ Saisies rapides",
+    "saved_entries": "📋 Éléments enregistrés",
+    "del_quick": "🗑️ Supprimer une saisie rapide",
+    "select_quick_del": "Sélectionner la saisie rapide à supprimer",
+    "del_quick_btn": "Supprimer la saisie rapide",
+    "quick_add_title": "➕ Ajouter une nouvelle saisie rapide",
+    "calc_mode_radio": "Mode de calcul",
+    "caption_calc": "ℹ️ *Si vous choisissez « Pour 100 g », saisissez les valeurs pour 100 g. Si vous choisissez « Portion », saisissez les valeurs totales d’une portion.*",
+    "register_activity": "🏃 Enregistrer activité & mouvement",
+    "act_date": "📅 Date",
+    "steps_title": "👣 Pas (Total)",
+    "update_steps": "💾 Mettre à jour les pas",
+    "steps_updated": "Pas mis à jour !",
+    "bike_title": "🚲 Vélo (Session)",
+    "bike_min": "Minutes de vélo",
+    "add_bike": "💾 Ajouter le vélo",
+    "other_act": "🏋️ Autre",
+    "activity_label": "Activité",
+    "add_act_btn": "💾 Ajouter",
+    "tab1_title": "🍽️ Saisie des aliments & repas",
+    "input_source_lbl": "Source de saisie",
+    "opt_off": "🔍 Rechercher en ligne (Open Food Facts)",
+    "opt_quick": "🍳 Saisie rapide",
+    "card_kcal_in": "Kcal consommées",
+    "card_kcal_burn": "Kcal brûlées",
+    "card_balance": "Bilan",
+    "card_weight": "Poids",
+    "in_msg_low": lambda p: f"⚠️ Projection basse ({p} kcal prévues). Mangez davantage !",
+    "in_msg_high": lambda p: f"✅ Bonne projection ({p} kcal estimées en fin de journée).",
+    "burn_msg_yes": lambda e: f"🌟 Bravo ! Vous avez fait une activité supplémentaire (+{e} kcal).",
+    "burn_msg_no": "💡 Aucune activité supplémentaire enregistrée. Pourquoi ne pas bouger un peu ?",
+    "bilancio_ok": "🎯 Parfait, vous êtes dans un bon déficit calorique.",
+    "bilancio_bad": "⚠️ Attention : vous êtes en surplus calorique.",
+    "weight_msg_default": "📈 Continuez ainsi pour atteindre votre objectif.",
+    "weight_msg_val": lambda i, d_ini, t, d_tgt: f"Initial : {i} kg ({d_ini:+.1f}) | Objectif : {t} kg ({d_tgt:+.1f})",
+    "status_move_title": "👣 Statut mouvement",
+    "status_very_active": "🌟 Excellent ! Journée très active.",
+    "status_good": "🚶 Bonne activité, continuez comme ça.",
+    "status_lazy": "🛋️ Journée calme, essayez de bouger davantage.",
+    "in_msg_deficit": lambda target_in, diff: f"🎯 Pour un déficit idéal de 500 kcal (objectif {target_in} kcal), {'il reste' if diff >= 0 else 'vous avez dépassé de'} {abs(diff)} kcal.",
+    "balance_days": lambda d: f"⏳ À ce rythme, environ {d} jours estimés pour atteindre l’objectif.",
+    "balance_surplus": "⚠️ En surplus : impossible d’estimer le nombre de jours jusqu’à l’objectif.",
+    "weight_forecast_title": "🔮 Prévision d’atteinte de l’objectif",
+    "forecast_days": lambda d, date_str: f"🎯 À votre rythme actuel ({d} jours estimés), vous pourriez atteindre votre objectif vers le **{date_str}** !",
+    "forecast_steady": "📉 En maintenant cette tendance, l’objectif se rapproche.",
+    "forecast_flat_up": "💡 La tendance actuelle est stable ou en hausse : la projection temporelle s’active uniquement avec une perte de poids active.",
+
+    # Traductions supplémentaires
+    "no_products": "Aucun produit trouvé. Essayez marque + nom ou un code-barres.",
+    "search_min_chars": "Saisissez au moins 2 caractères ou un code-barres valide.",
+    "plan_day": "Jour à planifier",
+    "today": "Aujourd’hui",
+    "tomorrow": "Demain",
+    "morning_plan": "Bonjour ! Définissez le type de journée et le niveau d’activité prévu pour planifier vos repas.",
+    "day_type": "Type de journée",
+    "activity_expected": "Activité prévue",
+    "save_day_plan": "💾 Enregistrer le plan de la journée",
+    "weight_value": "Poids (kg)",
+    "edit_weight": "✏️ Modifier le poids",
+    "delete_weight": "🗑️ Supprimer le poids",
+    "recipes_title": "🍲 Recettes",
+    "search_ingredient": "🔍 Rechercher un ingrédient",
+    "bike_type": "Type de vélo",
+    "normal_bike": "Vélo classique",
+    "ebike": "Vélo électrique",
+}
+
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
     st.sidebar.image("https://inhmvbdujpxrqrlcgmqw.supabase.co/storage/v1/object/sign/public-assets/logo2.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jZTZjYWVhZi00MTYxLTQyYzctODliZS05ODY1ZGZiMzFlN2EiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwdWJsaWMtYXNzZXRzL2xvZ28yLnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODY1NjA3MjAsImV4cCI6MTgxODA5NjcyMH0.jrnw8BnoiAmsuywkaLe5Uk1ruiHpEjF4nxNnrJyF3s4", use_container_width=True)
     st.markdown("---") # Linea di separazione dopo il logo
-    current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands"], key="lang_selector")
+    current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands", "Français"], key="lang_selector")
     t = translations[current_lang]
     
     pages_map = {
