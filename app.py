@@ -1047,7 +1047,7 @@ def show_login_page():
         "English": {
             "language": "🌐 Language",
             "eyebrow": "SANOSYNC",
-            "title": "🍑 Get it under control",
+            "title": "🍑 Under control",
             "subtitle": "Food, activity, weight and progress in one place.",
             "continue": "Sign in to continue",
             "google": "Continue with Google",
