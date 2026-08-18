@@ -1010,18 +1010,21 @@ def show_login_page():
                 "Velocità di dimagrimento",
                 list(DEFICIT_PRESETS.keys()),
                 index=1,
+                key="signup_deficit_plan",
                 help=(
                     "Definisce il deficit calorico giornaliero che SanoSync "
                     "userà come obiettivo nella panoramica."
                 ),
             )
-            if deficit_plan_input == "Custom":
+
+            if st.session_state.get("signup_deficit_plan") == "Custom":
                 custom_deficit_input = st.number_input(
                     "Deficit personalizzato (kcal/giorno)",
                     min_value=50,
                     max_value=2000,
-                    value=500,
+                    value=int(st.session_state.get("signup_custom_deficit", 500)),
                     step=50,
+                    key="signup_custom_deficit",
                 )
 
         submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
@@ -1269,6 +1272,7 @@ if profile_incomplete:
             "Velocità di dimagrimento",
             deficit_labels,
             index=deficit_labels.index(existing_deficit_label),
+            key="profile_deficit_plan",
             help=(
                 "Lenta = 250 kcal/giorno · Media = 500 · "
                 "Veloce = 750 · Custom = valore scelto da te."
@@ -1281,13 +1285,20 @@ if profile_incomplete:
             else 500
         )
         custom_deficit_val = existing_custom_deficit
-        if deficit_plan_val == "Custom":
+
+        if st.session_state.get("profile_deficit_plan") == "Custom":
             custom_deficit_val = st.number_input(
                 "Deficit personalizzato (kcal/giorno)",
                 min_value=50,
                 max_value=2000,
-                value=existing_custom_deficit,
+                value=int(
+                    st.session_state.get(
+                        "profile_custom_deficit",
+                        existing_custom_deficit,
+                    )
+                ),
                 step=50,
+                key="profile_custom_deficit",
             )
 
         selected_deficit_target = resolve_deficit_target(
