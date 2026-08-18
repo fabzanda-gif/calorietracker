@@ -824,15 +824,18 @@ def show_login_page():
     try:
         google_url = escape(build_google_login_url(), quote=True)
 
-        # Costruito come stringa HTML continua per evitare che Markdown
-        # spezzi l'anchor OAuth in frammenti non cliccabili.
+        # Stringa HTML continua + target="_top":
+        # su mobile forziamo la navigazione dell'intero contesto browser verso
+        # Supabase/Google, evitando eventuali contenitori/frame intermedi.
         google_html = (
-            '<a href="' + google_url + '" target="_self" '
+            '<a href="' + google_url + '" '
+            'target="_top" rel="external noopener" '
             'style="display:flex;align-items:center;justify-content:center;gap:10px;'
             'width:100%;box-sizing:border-box;padding:0.72rem 1rem;'
             'border-radius:10px;border:2px solid #FF8B8B;'
             'background:#FFFFFF;color:#1A2942;text-decoration:none;'
-            'font-weight:800;margin:6px 0 10px 0;">'
+            'font-weight:800;margin:6px 0 10px 0;'
+            'touch-action:manipulation;-webkit-tap-highlight-color:transparent;">'
             '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">'
             '<path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41z"/>'
             '<path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22z"/>'
@@ -844,6 +847,17 @@ def show_login_page():
         )
 
         st.markdown(google_html, unsafe_allow_html=True)
+
+        with st.expander("Problemi con Google su mobile?", expanded=False):
+            st.caption(
+                "Apri il link qui sotto direttamente nel browser. "
+                "Usa lo stesso flusso OAuth, senza modificare Supabase."
+            )
+            st.link_button(
+                "Apri Google in una nuova scheda",
+                google_url,
+                use_container_width=True,
+            )
 
     except Exception as exc:
         st.error(
