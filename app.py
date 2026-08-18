@@ -1807,7 +1807,7 @@ translations["Français"].update({
 
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
-    st.sidebar.image(str(APP_LOGO_FILE), use_container_width=True)
+    st.sidebar.image("logo2.png", use_container_width=True)
     st.markdown("---") # Linea di separazione dopo il logo
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands", "Français"], key="lang_selector")
     t = translations[current_lang]
@@ -2088,31 +2088,112 @@ if selected_page == t["t1"]:
         st.session_state[f"dyn_qty_{v}"] = st.session_state["grams_val"]
         st.rerun()
 
+    # ------------------------------------------------------------------
+    # Quantità + kcal/macros sincronizzati in tempo reale
+    # ------------------------------------------------------------------
+    qty_key = f"dyn_qty_{v}"
+    kcal_key = f"meal_kcal_{v}"
+    pro_key = f"meal_pro_{v}"
+    carbs_key = f"meal_carbs_{v}"
+    fat_key = f"meal_fat_{v}"
+
+    def _current_factor(qty=None):
+        if qty is None:
+            qty = float(st.session_state.get(qty_key, st.session_state["grams_val"]))
+        return qty / 100.0 if mode == t["per_100g"] else qty
+
+    def _sync_final_nutrients_from_base():
+        """
+        Quando cambiano grammi/porzioni aggiorna SUBITO i quattro widget.
+        Impostare soltanto value=... non basta in Streamlit, perché un widget
+        con key conserva il proprio valore in session_state.
+        """
+        qty = float(st.session_state.get(qty_key, st.session_state["grams_val"]))
+        st.session_state["grams_val"] = qty
+        factor_now = _current_factor(qty)
+
+        st.session_state[kcal_key] = int(round(st.session_state["base_cals"] * factor_now))
+        st.session_state[pro_key] = int(round(st.session_state["base_prot"] * factor_now))
+        st.session_state[carbs_key] = int(round(st.session_state["base_carbs"] * factor_now))
+        st.session_state[fat_key] = int(round(st.session_state["base_fat"] * factor_now))
+
+    def _sync_base_from_manual_nutrient(final_key, base_key):
+        """
+        Se l'utente corregge manualmente kcal o un macro, aggiorna anche il
+        valore base (per 100 g / per porzione). Così il successivo cambio di
+        quantità continua a scalare partendo dalla correzione manuale.
+        """
+        factor_now = _current_factor()
+        if factor_now <= 0:
+            return
+        st.session_state[base_key] = (
+            float(st.session_state.get(final_key, 0.0)) / factor_now
+        )
+
     def on_qty_change():
-        st.session_state["grams_val"] = st.session_state.get(f"dyn_qty_{v}", 100.0)
+        _sync_final_nutrients_from_base()
+
+    def on_kcal_change():
+        _sync_base_from_manual_nutrient(kcal_key, "base_cals")
+
+    def on_pro_change():
+        _sync_base_from_manual_nutrient(pro_key, "base_prot")
+
+    def on_carbs_change():
+        _sync_base_from_manual_nutrient(carbs_key, "base_carbs")
+
+    def on_fat_change():
+        _sync_base_from_manual_nutrient(fat_key, "base_fat")
+
+    # Inizializza i widget nutrienti una sola volta per questa versione del form.
+    # Dopo di che saranno i callback a mantenerli sincronizzati.
+    initial_factor = _current_factor(float(st.session_state["grams_val"]))
+    if kcal_key not in st.session_state:
+        st.session_state[kcal_key] = int(round(st.session_state["base_cals"] * initial_factor))
+    if pro_key not in st.session_state:
+        st.session_state[pro_key] = int(round(st.session_state["base_prot"] * initial_factor))
+    if carbs_key not in st.session_state:
+        st.session_state[carbs_key] = int(round(st.session_state["base_carbs"] * initial_factor))
+    if fat_key not in st.session_state:
+        st.session_state[fat_key] = int(round(st.session_state["base_fat"] * initial_factor))
 
     quantity = st.number_input(
         t["qty_label"] if mode == t["per_100g"] else t["num_portions"],
         value=float(st.session_state["grams_val"]),
         min_value=0.25,
         step=0.25,
-        key=f"dyn_qty_{v}",
+        key=qty_key,
         on_change=on_qty_change,
     )
 
     factor = quantity / 100.0 if mode == t["per_100g"] else quantity
     meal_display_name = f"{name} ({quantity}{'g' if mode == t['per_100g'] else ' porz.'})"
 
-    final_cals = int(st.session_state["base_cals"] * factor)
-    final_prot = int(st.session_state["base_prot"] * factor)
-    final_carbs = int(st.session_state["base_carbs"] * factor)
-    final_fat = int(st.session_state["base_fat"] * factor)
-
     c1, c2, c3, c4 = st.columns(4)
-    cals_in = c1.number_input(t["kcal"], value=final_cals, step=1, key=f"meal_kcal_{v}")
-    prot_in = c2.number_input(t["pro"], value=final_prot, step=1, key=f"meal_pro_{v}")
-    carbs_in = c3.number_input(t["carbs"], value=final_carbs, step=1, key=f"meal_carbs_{v}")
-    fat_in = c4.number_input(t["fat"], value=final_fat, step=1, key=f"meal_fat_{v}")
+    cals_in = c1.number_input(
+        t["kcal"],
+        step=1,
+        key=kcal_key,
+        on_change=on_kcal_change,
+    )
+    prot_in = c2.number_input(
+        t["pro"],
+        step=1,
+        key=pro_key,
+        on_change=on_pro_change,
+    )
+    carbs_in = c3.number_input(
+        t["carbs"],
+        step=1,
+        key=carbs_key,
+        on_change=on_carbs_change,
+    )
+    fat_in = c4.number_input(
+        t["fat"],
+        step=1,
+        key=fat_key,
+        on_change=on_fat_change,
+    )
 
     if st.button(t["add_meal"], use_container_width=True):
         if not name.strip():
