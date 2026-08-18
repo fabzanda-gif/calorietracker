@@ -162,11 +162,57 @@ for key, default in state_defaults.items():
 # ==============================================================================
 # 3. UTILITY FUNCTIONS
 # ==============================================================================
-def calculate_bmr(weight, height, gender):
+def parse_birth_date(value):
+    """Converte birth_date dai metadata Supabase in datetime.date."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def calculate_age(birth_date_value, on_date=None):
+    """Età anagrafica completa alla data indicata (default: oggi)."""
+    birth_date = parse_birth_date(birth_date_value)
+    if birth_date is None:
+        return None
+
+    today = on_date or date.today()
+    return (
+        today.year
+        - birth_date.year
+        - (
+            (today.month, today.day)
+            < (birth_date.month, birth_date.day)
+        )
+    )
+
+
+def calculate_bmr(weight, height, birth_date_value, gender):
+    """
+    BMR secondo Mifflin-St Jeor.
+
+    Uomo:  10W + 6.25H - 5A + 5
+    Donna: 10W + 6.25H - 5A - 161
+
+    W = peso in kg, H = altezza in cm, A = età in anni.
+    """
+    age = calculate_age(birth_date_value)
+    if age is None:
+        return None
+
+    weight = float(weight)
+    height = float(height)
+
     if gender in ["Uomo", "Male", "Man"]:
-        return int((10 * weight) + (6.25 * height) - (5 * 30) + 5)
-    else:
-        return int((10 * weight) + (6.25 * height) - (5 * 30) - 161)
+        return int(round((10 * weight) + (6.25 * height) - (5 * age) + 5))
+
+    return int(round((10 * weight) + (6.25 * height) - (5 * age) - 161))
 
 def refresh_daily_logs(log_date):
     pass
@@ -648,6 +694,7 @@ def show_login_page():
         height = None
         current_weight = None
         gender = None
+        birth_date_input = None
 
         if auth_mode == "Registrazione":
             st.markdown("#### 📋 Parametri Fisici Iniziali")
@@ -657,6 +704,12 @@ def show_login_page():
                 ["Uomo", "Donna"],
                 index=None,
                 placeholder="Seleziona genere...",
+            )
+            birth_date_input = st.date_input(
+                "Data di nascita",
+                value=date(1990, 1, 1),
+                min_value=date(1900, 1, 1),
+                max_value=date.today(),
             )
             height = st.number_input(
                 "Altezza (cm)",
@@ -710,15 +763,9 @@ def show_login_page():
                             "Inserisci una email valida e una password "
                             "di almeno 6 caratteri."
                         )
-                    elif not height or not current_weight or not target_weight or not gender:
+                    elif not height or not current_weight or not target_weight or not gender or not birth_date_input:
                         st.warning("Compila tutti i parametri fisici.")
                     else:
-                        calculated_bmr = calculate_bmr(
-                            current_weight,
-                            height,
-                            gender,
-                        )
-
                         response = supabase.auth.sign_up({
                             "email": email.strip(),
                             "password": password,
@@ -729,7 +776,8 @@ def show_login_page():
                                         or email.split("@")[0]
                                     ),
                                     "target_weight": float(target_weight),
-                                    "bmr": calculated_bmr,
+                                    "current_weight": float(current_weight),
+                                    "birth_date": str(birth_date_input),
                                     "height": float(height),
                                     "gender": gender,
                                 }
@@ -778,42 +826,155 @@ u_meta = user.user_metadata or {}
 
 display_name = u_meta.get("display_name") or user.email.split("@")[0] or "User"
 user_target_weight = u_meta.get("target_weight")
-user_bmr = u_meta.get("bmr")
 user_height = u_meta.get("height")
 user_gender = u_meta.get("gender")
+user_birth_date = u_meta.get("birth_date")
+
+# Il BMR viene calcolato dinamicamente usando l'ultimo peso registrato.
+latest_weight_row = None
+try:
+    latest_weight_data = (
+        supabase.table("daily_logs")
+        .select("weight,date")
+        .eq("user_id", user_id)
+        .not_.is_("weight", "null")
+        .order("date", desc=True)
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+    if latest_weight_data:
+        latest_weight_row = latest_weight_data[0]
+except Exception as e:
+    print(f"Latest weight lookup error: {e}")
+
+if latest_weight_row and latest_weight_row.get("weight") is not None:
+    user_current_weight = float(latest_weight_row["weight"])
+else:
+    metadata_weight = u_meta.get("current_weight")
+    user_current_weight = (
+        float(metadata_weight)
+        if metadata_weight not in (None, "")
+        else None
+    )
+
+user_bmr = None
+if (
+    user_current_weight is not None
+    and user_height is not None
+    and user_gender is not None
+    and user_birth_date
+):
+    user_bmr = calculate_bmr(
+        user_current_weight,
+        float(user_height),
+        user_birth_date,
+        user_gender,
+    )
 
 # ==============================================================================
 # 7. PROFILE COMPLETION CHECK
 # ==============================================================================
 profile_incomplete = (
-    user_target_weight is None or 
-    user_bmr is None or 
-    user_height is None or 
-    user_gender is None
+    user_target_weight is None
+    or user_height is None
+    or user_gender is None
+    or not user_birth_date
+    or user_current_weight is None
+    or user_bmr is None
 )
 
 if profile_incomplete:
     st.warning("⚠️ Per iniziare, configura i tuoi dati.")
     with st.form("missing_data_form"):
         st.subheader("📋 Configurazione Profilo")
-        gen = st.selectbox("Genere", ["Uomo", "Donna"], index=0 if user_gender is None else (0 if user_gender == "Uomo" else 1))
-        h_val = st.number_input("Altezza (cm)", value=float(user_height) if user_height else 175.0, min_value=100.0, max_value=250.0, step=1.0)
-        w_val = st.number_input("Peso Attuale (kg)", value=float(user_target_weight) if user_target_weight else 80.0, min_value=20.0, max_value=300.0, step=0.5)
-        t_val = st.number_input("Peso Obiettivo (kg)", value=float(user_target_weight) if user_target_weight else 75.0, min_value=20.0, max_value=300.0, step=0.5)
-        
+
+        gen_index = 0 if user_gender is None else (0 if user_gender == "Uomo" else 1)
+        gen = st.selectbox(
+            "Genere",
+            ["Uomo", "Donna"],
+            index=gen_index,
+        )
+
+        existing_birth_date = parse_birth_date(user_birth_date)
+        birth_val = st.date_input(
+            "Data di nascita",
+            value=existing_birth_date or date(1990, 1, 1),
+            min_value=date(1900, 1, 1),
+            max_value=date.today(),
+        )
+
+        h_val = st.number_input(
+            "Altezza (cm)",
+            value=float(user_height) if user_height else 175.0,
+            min_value=100.0,
+            max_value=250.0,
+            step=1.0,
+        )
+
+        w_val = st.number_input(
+            "Peso Attuale (kg)",
+            value=float(user_current_weight) if user_current_weight is not None else 80.0,
+            min_value=20.0,
+            max_value=300.0,
+            step=0.5,
+        )
+
+        t_val = st.number_input(
+            "Peso Obiettivo (kg)",
+            value=float(user_target_weight) if user_target_weight else 75.0,
+            min_value=20.0,
+            max_value=300.0,
+            step=0.5,
+        )
+
+        calculated_preview_bmr = calculate_bmr(
+            w_val,
+            h_val,
+            birth_val,
+            gen,
+        )
+        calculated_age = calculate_age(birth_val)
+
+        if calculated_preview_bmr is not None:
+            st.caption(
+                f"Età: {calculated_age} anni · "
+                f"BMR stimato: {calculated_preview_bmr} kcal/giorno"
+            )
+
         if st.form_submit_button("Salva e Inizia"):
-            calculated_bmr = calculate_bmr(w_val, h_val, gen)
             try:
-                res = supabase.auth.update_user({"data": {
-                    "target_weight": float(t_val),
-                    "bmr": calculated_bmr,
-                    "height": float(h_val),
-                    "gender": gen
-                }})
-                if hasattr(res, 'user') and res.user:
+                res = supabase.auth.update_user({
+                    "data": {
+                        "target_weight": float(t_val),
+                        "current_weight": float(w_val),
+                        "birth_date": str(birth_val),
+                        "height": float(h_val),
+                        "gender": gen,
+                    }
+                })
+
+                # Salviamo anche il peso nello storico: da questo momento il BMR
+                # seguirà automaticamente l'ultimo peso registrato.
+                supabase.table("daily_logs").upsert(
+                    {
+                        "user_id": user_id,
+                        "date": str(date.today()),
+                        "weight": float(w_val),
+                    },
+                    on_conflict="user_id,date",
+                ).execute()
+
+                if hasattr(res, "user") and res.user:
                     st.session_state["user"] = res.user
-                st.success("✅ Profilo aggiornato!")
+
+                st.success(
+                    f"✅ Profilo aggiornato! BMR attuale: "
+                    f"{calculated_preview_bmr} kcal/giorno."
+                )
                 st.rerun()
+
             except Exception as e:
                 st.error(f"Errore: {e}")
                 print(traceback.format_exc())
