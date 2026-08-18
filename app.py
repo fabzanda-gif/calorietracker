@@ -2421,9 +2421,30 @@ elif selected_page == t["t2"]:
         st.markdown(f"### {t['logged_foods']}")
         if meals_data:
             try:
-                meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat, notes, category").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+                meals_with_id = (
+                    supabase.table("meals")
+                    .select(
+                        "id,meal_type,name,base_name,quantity,is_per_100g,"
+                        "base_calories,base_protein,base_carbs,base_fat,"
+                        "calories,protein,carbs,fat,notes,category"
+                    )
+                    .eq("date", str(summary_date))
+                    .eq("user_id", user_id)
+                    .execute()
+                    .data
+                    or []
+                )
             except Exception:
-                meals_with_id = supabase.table("meals").select("id, meal_type, name, calories, protein, carbs, fat").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
+                # Compatibilità con eventuali righe/schema legacy.
+                meals_with_id = (
+                    supabase.table("meals")
+                    .select("id,meal_type,name,calories,protein,carbs,fat")
+                    .eq("date", str(summary_date))
+                    .eq("user_id", user_id)
+                    .execute()
+                    .data
+                    or []
+                )
 
             df_meals = pd.DataFrame(meals_with_id)
             df_display = df_meals.rename(columns={
@@ -2460,7 +2481,26 @@ elif selected_page == t["t2"]:
 
                 current_category = infer_meal_category(selected_meal)
 
-                edit_col1, edit_col2, edit_col3 = st.columns([2, 2, 1])
+                # Quantità corrente. Le righe nuove hanno quantity/is_per_100g;
+                # quelle legacy vengono trattate come una porzione singola.
+                current_quantity = _safe_float(selected_meal.get("quantity"))
+                if current_quantity <= 0:
+                    current_quantity = 1.0
+
+                is_per_100g = bool(selected_meal.get("is_per_100g"))
+
+                # Se il meal è per 100 g, la quantità è espressa in grammi.
+                # Se è per porzione, la quantità rappresenta il numero di porzioni.
+                if is_per_100g:
+                    quantity_label = "Quantità (g)"
+                    quantity_step = 1.0
+                    quantity_unit = "g"
+                else:
+                    quantity_label = "Porzioni"
+                    quantity_step = 0.1
+                    quantity_unit = "porz."
+
+                edit_col1, edit_col2, edit_col3 = st.columns([2, 2, 2])
                 with edit_col1:
                     new_meal_type = st.selectbox(
                         "Tipo di pasto",
@@ -2476,23 +2516,98 @@ elif selected_page == t["t2"]:
                         key=f"edit_meal_category_{selected_meal_id}_{summary_date}",
                     )
                 with edit_col3:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    save_meal_type = st.button(
-                        "💾 Salva",
-                        use_container_width=True,
-                        key=f"save_meal_type_{selected_meal_id}_{summary_date}",
+                    new_quantity = st.number_input(
+                        quantity_label,
+                        min_value=0.1,
+                        value=float(current_quantity),
+                        step=quantity_step,
+                        key=f"edit_meal_quantity_{selected_meal_id}_{summary_date}",
                     )
 
-                if save_meal_type:
+                st.caption(
+                    "Puoi modificare sia i grammi sia il numero di porzioni, "
+                    "a seconda di come il pasto è stato salvato. "
+                    "Kcal e macronutrienti vengono ricalcolati automaticamente."
+                )
+
+                if st.button(
+                    "💾 Salva modifiche",
+                    use_container_width=True,
+                    key=f"save_meal_edit_{selected_meal_id}_{summary_date}",
+                ):
                     try:
-                        supabase.table("meals").update({
+                        old_quantity = float(current_quantity)
+                        new_quantity = float(new_quantity)
+
+                        base_calories = selected_meal.get("base_calories")
+                        base_protein = selected_meal.get("base_protein")
+                        base_carbs = selected_meal.get("base_carbs")
+                        base_fat = selected_meal.get("base_fat")
+
+                        has_base_values = base_calories is not None
+
+                        if has_base_values:
+                            factor = (
+                                new_quantity / 100.0
+                                if is_per_100g
+                                else new_quantity
+                            )
+                            new_calories = _safe_float(base_calories) * factor
+                            new_protein = _safe_float(base_protein) * factor
+                            new_carbs = _safe_float(base_carbs) * factor
+                            new_fat = _safe_float(base_fat) * factor
+                        else:
+                            # Legacy: mantiene le proporzioni del record attuale.
+                            scale = (
+                                new_quantity / old_quantity
+                                if old_quantity > 0
+                                else 1.0
+                            )
+                            new_calories = _safe_float(selected_meal.get("calories")) * scale
+                            new_protein = _safe_float(selected_meal.get("protein")) * scale
+                            new_carbs = _safe_float(selected_meal.get("carbs")) * scale
+                            new_fat = _safe_float(selected_meal.get("fat")) * scale
+
+                        base_name = (
+                            selected_meal.get("base_name")
+                            or _clean_meal_name(selected_meal.get("name"))
+                            or "Pasto"
+                        )
+
+                        if is_per_100g:
+                            new_display_name = f"{base_name} ({new_quantity:g}g)"
+                        else:
+                            new_display_name = f"{base_name} ({new_quantity:g} porz.)"
+
+                        update_payload = {
                             "meal_type": new_meal_type,
                             "category": new_meal_category,
-                        }).eq("id", selected_meal_id).eq("user_id", user_id).execute()
+                            "name": new_display_name,
+                            "calories": int(round(new_calories)),
+                            "protein": int(round(new_protein)),
+                            "carbs": int(round(new_carbs)),
+                            "fat": int(round(new_fat)),
+                        }
+
+                        # Solo schema esteso.
+                        if selected_meal.get("quantity") is not None:
+                            update_payload["quantity"] = new_quantity
+
+                        supabase.table("meals").update(
+                            update_payload
+                        ).eq("id", selected_meal_id).eq(
+                            "user_id", user_id
+                        ).execute()
+
+                        refresh_daily_logs(summary_date)
+
                         st.success(
-                            f"✅ Pasto aggiornato: **{new_meal_type} · {new_meal_category}**."
+                            f"✅ Pasto aggiornato: **{new_meal_type} · "
+                            f"{new_meal_category} · {new_quantity:g} "
+                            f"{quantity_unit}**."
                         )
                         st.rerun()
+
                     except Exception as e:
                         st.error(f"Errore nella modifica del pasto: {e}")
 
