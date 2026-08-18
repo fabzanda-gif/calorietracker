@@ -453,10 +453,10 @@ def _safe_float(value):
 
 def translate_activity_display(value, lang):
     maps = {
-        "Italiano": {"Bici": "Bici", "Passi (Stima)": "Passi (Stima)", "BMR (Base)": "BMR (Base)"},
-        "English": {"Bici": "Bike", "Passi (Stima)": "Steps (Estimate)", "BMR (Base)": "BMR (Base)"},
-        "Nederlands": {"Bici": "Fiets", "Passi (Stima)": "Stappen (Schatting)", "BMR (Base)": "BMR (Basis)"},
-        "Français": {"Bici": "Vélo", "Passi (Stima)": "Pas (Estimation)", "BMR (Base)": "BMR (Base)"},
+        "Italiano": {"Bici": "Bici", "Bici Elettrica": "Bici Elettrica", "Passi (Stima)": "Passi (Stima)", "BMR (Base)": "BMR (Base)"},
+        "English": {"Bici": "Bike", "Bici Elettrica": "Electric Bike", "Passi (Stima)": "Steps (Estimate)", "BMR (Base)": "BMR (Base)"},
+        "Nederlands": {"Bici": "Fiets", "Bici Elettrica": "Elektrische fiets", "Passi (Stima)": "Stappen (Schatting)", "BMR (Base)": "BMR (Basis)"},
+        "Français": {"Bici": "Vélo", "Bici Elettrica": "Vélo électrique", "Passi (Stima)": "Pas (Estimation)", "BMR (Base)": "BMR (Base)"},
     }
     return maps.get(lang, maps["Italiano"]).get(str(value), str(value))
 
@@ -2820,7 +2820,23 @@ with st.sidebar:
             "bike_note": "Somma di Bici ed E-Bike.",
             "total_steps": "Totale passi",
             "add_bike": "💾 Aggiungi Bici",
-            "notes_ph": "Es. senza lattosio, marca preferita, preparazione, condimenti..."
+            "notes_ph": "Es. senza lattosio, marca preferita, preparazione, condimenti...",
+            "can_eat_more": "🎯 Puoi mangiare ancora {kcal} kcal per chiudere la giornata con circa {target} kcal di deficit.",
+            "exact_target": "🎯 Sei esattamente sul target per un deficit di circa {target} kcal.",
+            "day_total": "🔥 Totale giornata: {kcal} kcal.",
+            "no_extra": "Nessuna caloria extra registrata per questa giornata.",
+            "other_activities": "Altre attività",
+            "bike_and_ebike": "🚲 Bici & E-Bike",
+            "bike_minutes": "Minuti Bici",
+            "burned_kcal_field": "Kcal bruciate",
+            "enter_one_minute": "Inserisci almeno 1 minuto.",
+            "bike_added": "✅ Aggiunti {minutes} min di {activity} ({kcal} kcal)!",
+            "steps_updated_toast": "✅ Passi aggiornati! ({kcal} kcal)",
+            "activity_saved": "✅ {activity} registrato con successo! ({kcal} kcal)",
+            "step_word": "passi",
+            "activity_gym": "Palestra",
+            "activity_swim": "Nuoto",
+            "activity_other": "Altro"
         },
         "English": {
             "meal_placeholder": "Select a meal...",
@@ -2845,7 +2861,23 @@ with st.sidebar:
             "bike_note": "Total from Bike and E-Bike.",
             "total_steps": "Total steps",
             "add_bike": "💾 Add Bike",
-            "notes_ph": "E.g. lactose-free, preferred brand, preparation, seasonings..."
+            "notes_ph": "E.g. lactose-free, preferred brand, preparation, seasonings...",
+            "can_eat_more": "🎯 You can eat another {kcal} kcal and finish the day at about a {target} kcal deficit.",
+            "exact_target": "🎯 You are exactly on target for about a {target} kcal deficit.",
+            "day_total": "🔥 Day total: {kcal} kcal.",
+            "no_extra": "No extra calories logged for this day.",
+            "other_activities": "Other activities",
+            "bike_and_ebike": "🚲 Bike & E-Bike",
+            "bike_minutes": "Bike minutes",
+            "burned_kcal_field": "Kcal burned",
+            "enter_one_minute": "Enter at least 1 minute.",
+            "bike_added": "✅ Added {minutes} min of {activity} ({kcal} kcal)!",
+            "steps_updated_toast": "✅ Steps updated! ({kcal} kcal)",
+            "activity_saved": "✅ {activity} logged successfully! ({kcal} kcal)",
+            "step_word": "steps",
+            "activity_gym": "Gym",
+            "activity_swim": "Swimming",
+            "activity_other": "Other"
         },
         "Nederlands": {
             "meal_placeholder": "Selecteer een maaltijd...",
@@ -2870,7 +2902,23 @@ with st.sidebar:
             "bike_note": "Totaal van fiets en e-bike.",
             "total_steps": "Totaal stappen",
             "add_bike": "💾 Fiets toevoegen",
-            "notes_ph": "Bijv. lactosevrij, voorkeursmerk, bereiding, kruiden..."
+            "notes_ph": "Bijv. lactosevrij, voorkeursmerk, bereiding, kruiden...",
+            "can_eat_more": "🎯 Je kunt nog {kcal} kcal eten en de dag afsluiten met ongeveer {target} kcal tekort.",
+            "exact_target": "🎯 Je zit precies op je doel voor ongeveer {target} kcal tekort.",
+            "day_total": "🔥 Dagtotaal: {kcal} kcal.",
+            "no_extra": "Geen extra calorieën geregistreerd voor deze dag.",
+            "other_activities": "Andere activiteiten",
+            "bike_and_ebike": "🚲 Fiets & E-bike",
+            "bike_minutes": "Minuten fietsen",
+            "burned_kcal_field": "Verbrande kcal",
+            "enter_one_minute": "Voer minstens 1 minuut in.",
+            "bike_added": "✅ {minutes} min {activity} toegevoegd ({kcal} kcal)!",
+            "steps_updated_toast": "✅ Stappen bijgewerkt! ({kcal} kcal)",
+            "activity_saved": "✅ {activity} succesvol geregistreerd! ({kcal} kcal)",
+            "step_word": "stappen",
+            "activity_gym": "Sportschool",
+            "activity_swim": "Zwemmen",
+            "activity_other": "Overig"
         },
         "Français": {
             "meal_placeholder": "Sélectionnez un repas...",
@@ -2895,7 +2943,23 @@ with st.sidebar:
             "bike_note": "Total Vélo et Vélo électrique.",
             "total_steps": "Total des pas",
             "add_bike": "💾 Ajouter le vélo",
-            "notes_ph": "Ex. sans lactose, marque préférée, préparation, assaisonnements..."
+            "notes_ph": "Ex. sans lactose, marque préférée, préparation, assaisonnements...",
+            "can_eat_more": "🎯 Vous pouvez encore manger {kcal} kcal et terminer la journée avec environ {target} kcal de déficit.",
+            "exact_target": "🎯 Vous êtes exactement sur l’objectif pour un déficit d’environ {target} kcal.",
+            "day_total": "🔥 Total de la journée : {kcal} kcal.",
+            "no_extra": "Aucune calorie supplémentaire enregistrée pour cette journée.",
+            "other_activities": "Autres activités",
+            "bike_and_ebike": "🚲 Vélo & Vélo électrique",
+            "bike_minutes": "Minutes de vélo",
+            "burned_kcal_field": "Kcal brûlées",
+            "enter_one_minute": "Saisissez au moins 1 minute.",
+            "bike_added": "✅ {minutes} min de {activity} ajoutées ({kcal} kcal) !",
+            "steps_updated_toast": "✅ Pas mis à jour ! ({kcal} kcal)",
+            "activity_saved": "✅ {activity} enregistré avec succès ! ({kcal} kcal)",
+            "step_word": "pas",
+            "activity_gym": "Salle de sport",
+            "activity_swim": "Natation",
+            "activity_other": "Autre"
         },
     }
     ux = _ui_extra.get(current_lang, _ui_extra["Italiano"])
@@ -3381,19 +3445,17 @@ elif selected_page == t["t2"]:
 
     # Messaggi cards più immediati.
     if diff_from_ideal > 0:
-        in_msg = (
-            f"🎯 Puoi mangiare ancora <b>{int(round(diff_from_ideal))} kcal</b> "
-            f"per chiudere la giornata con circa {target_deficit_kcal} kcal di deficit."
+        in_msg = ux["can_eat_more"].format(
+            kcal=f"<b>{int(round(diff_from_ideal))}</b>",
+            target=target_deficit_kcal,
         )
     elif diff_from_ideal < 0:
-        in_msg = (
-            f"⚠️ Sei oltre il target da deficit di circa "
-            f"<b>{abs(int(round(diff_from_ideal)))} kcal</b>."
+        in_msg = ux["over_target"].format(
+            kcal=f"<b>{abs(int(round(diff_from_ideal)))}</b>"
         )
     else:
-        in_msg = (
-            f"🎯 Sei esattamente sul target per un deficit di circa "
-            f"{target_deficit_kcal} kcal."
+        in_msg = ux["exact_target"].format(
+            target=target_deficit_kcal
         )
 
     # Proiezione semplice e conservativa:
@@ -3402,13 +3464,12 @@ elif selected_page == t["t2"]:
     projected_burn_end_day = int(round(float(user_bmr) + extra_burned))
 
     if summary_date == date.today():
-        burn_msg = (
-            f"🔮 Fine giornata: <b>~{projected_burn_end_day} kcal</b> "
-            f"se non registri altra attività."
+        burn_msg = ux["end_day"].format(
+            kcal=f"<b>~{projected_burn_end_day}</b>"
         )
     else:
-        burn_msg = (
-            f"🔥 Totale giornata: <b>{int(round(total_burned_finora))} kcal</b>."
+        burn_msg = ux["day_total"].format(
+            kcal=f"<b>{int(round(total_burned_finora))}</b>"
         )
 
     weight_to_lose = (float(current_weight) if current_weight else float(initial_weight)) - target_weight
@@ -3869,9 +3930,9 @@ elif selected_page == t["t2"]:
 
     with st.container(border=True):
         st.markdown(t["burned_acts"])
-        rows_acts = [{t["col_activity"]: "BMR (Base)", t["col_burned"]: bmr_so_far}]
+        rows_acts = [{t["col_activity"]: ux["bmr_base"], t["col_burned"]: bmr_so_far}]
         for act in activities_data:
-            rows_acts.append({t["col_activity"]: act.get("activity_name"), t["col_burned"]: act.get("burned_calories")})
+            rows_acts.append({t["col_activity"]: translate_activity_display(act.get("activity_name"), current_lang), t["col_burned"]: act.get("burned_calories")})
         st.dataframe(pd.DataFrame(rows_acts), use_container_width=True, hide_index=True)
 
 # 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
@@ -4689,17 +4750,17 @@ elif selected_page == t["t5"]:
     # Status Movimento intelligente: se c'è un'attività strutturata, lo status riflette l'allenamento!
     move_bg, move_border = "#FFFFFF", "#FF8B8B"
     if has_structured_activity:
-        move_msg = "🌟 Ottimo! Hai completato un'attività fisica strutturata oggi."
-        status_display_text = "🏋️ Attività registrata"
+        move_msg = ux["activity_logged_note"]
+        status_display_text = ux["activity_logged"]
     elif day_steps >= 10000:
         move_msg = t["status_very_active"]
-        status_display_text = f"{day_steps} passi"
+        status_display_text = f"{day_steps} {ux['step_word']}"
     elif day_steps >= 5000:
         move_msg = t["status_good"]
-        status_display_text = f"{day_steps} passi"
+        status_display_text = f"{day_steps} {ux['step_word']}"
     else:
         move_msg = t["status_lazy"]
-        status_display_text = f"{day_steps} passi"
+        status_display_text = f"{day_steps} {ux['step_word']}"
 
     # Tile con lo stesso design della Panoramica
     st.markdown("""
@@ -4728,11 +4789,11 @@ elif selected_page == t["t5"]:
         )
     with ac2:
         extra_caption = (
-            "Somma delle calorie registrate nelle attività della giornata selezionata."
-            if total_extra_kcal > 0 else "Nessuna caloria extra registrata per questa giornata."
+            ux["extra_burned_note"]
+            if total_extra_kcal > 0 else ux["no_extra"]
         )
         st.markdown(
-            f'<div class="custom-card"><div class="custom-card-title">🔥 Kcal bruciate extra</div>'
+            f'<div class="custom-card"><div class="custom-card-title">{ux["extra_burned"]}</div>'
             f'<div class="custom-card-value">{total_extra_kcal} kcal</div>'
             f'<div class="custom-card-caption">{extra_caption}</div></div>',
             unsafe_allow_html=True,
@@ -4742,12 +4803,12 @@ elif selected_page == t["t5"]:
     other_kcal = max(0, total_extra_kcal - steps_kcal - padel_kcal - bike_kcal)
     kc1, kc2, kc3 = st.columns(3)
     with kc1:
-        st.markdown(f'<div class="custom-card"><div class="custom-card-title">👣 Passi</div><div class="custom-card-value">{steps_kcal} kcal</div><div class="custom-card-caption">Calorie attribuite ai passi.</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">{ux["steps"]}</div><div class="custom-card-value">{steps_kcal} kcal</div><div class="custom-card-caption">{ux["steps_note"]}</div></div>', unsafe_allow_html=True)
     with kc2:
-        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🎾 Padel</div><div class="custom-card-value">{padel_kcal} kcal</div><div class="custom-card-caption">Calorie registrate come Padel.</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🎾 Padel</div><div class="custom-card-value">{padel_kcal} kcal</div><div class="custom-card-caption">{ux["padel_note"]}</div></div>', unsafe_allow_html=True)
     with kc3:
-        bike_caption = f"Bici + E-Bike. Altre attività: {other_kcal} kcal." if other_kcal > 0 else "Somma di Bici ed E-Bike."
-        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🚲 Bici</div><div class="custom-card-value">{bike_kcal} kcal</div><div class="custom-card-caption">{bike_caption}</div></div>', unsafe_allow_html=True)
+        bike_caption = f"{ux['bike_note']} {ux['other_activities']}: {other_kcal} kcal." if other_kcal > 0 else ux["bike_note"]
+        st.markdown(f'<div class="custom-card"><div class="custom-card-title">🚲 {ux["bike"]}</div><div class="custom-card-value">{bike_kcal} kcal</div><div class="custom-card-caption">{bike_caption}</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -4757,7 +4818,7 @@ elif selected_page == t["t5"]:
     with col_a1:
         with st.container(border=True):
             st.markdown(f"### {t['steps_title']}")
-            new_steps = st.number_input("Totale passi", value=int(day_steps), min_value=0, step=500)
+            new_steps = st.number_input(ux["total_steps"], value=int(day_steps), min_value=0, step=500)
             if st.button(t["update_steps"], use_container_width=True):
                 try:
                     existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(act_date)).execute().data
@@ -4787,7 +4848,7 @@ elif selected_page == t["t5"]:
                     
                     refresh_daily_logs(act_date)
                     
-                    st.toast(f"✅ Passi aggiornati! ({estim_cals} kcal)", icon="👣")
+                    st.toast(ux["steps_updated_toast"].format(kcal=estim_cals), icon="👣")
                     st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)")
                     st.rerun()
                 except Exception as e:
@@ -4803,13 +4864,13 @@ elif selected_page == t["t5"]:
 
     with col_a2:
         with st.container(border=True):
-            st.markdown("### 🚲 Bici & E-Bike")
+            st.markdown(f"### {ux['bike_and_ebike']}")
             bike_type = st.radio(t["bike_type"], [t["normal_bike"], t["ebike"]], horizontal=True, key=f"bike_type_{act_date}")
-            bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5, key=f"bike_min_{act_date}")
+            bike_min = st.number_input(ux["bike_minutes"], value=0, min_value=0, step=5, key=f"bike_min_{act_date}")
             
             if st.button(ux["add_bike"], use_container_width=True):
                 if bike_min > 0:
-                    if "Elettrica" in bike_type:
+                    if bike_type == t["ebike"]:
                         estim_cals = int(bike_min * 4)  # Stima E-bike: ~4 kcal/min
                         act_label = "Bici Elettrica"
                     else:
@@ -4823,18 +4884,27 @@ elif selected_page == t["t5"]:
 
                     refresh_daily_logs(act_date)
                     
-                    st.toast(f"✅ Aggiunti {bike_min} min di {act_label}! ({estim_cals} kcal)", icon="🚲")
-                    st.success(f"✅ Aggiunti {bike_min} min di {act_label} ({estim_cals} kcal)!")
+                    st.toast(ux["bike_added"].format(minutes=bike_min, activity=translate_activity_display(act_label, current_lang), kcal=estim_cals), icon="🚲")
+                    st.success(ux["bike_added"].format(minutes=bike_min, activity=translate_activity_display(act_label, current_lang), kcal=estim_cals))
                     st.rerun()
                 else:
-                    st.warning("Inserisci almeno 1 minuto.")
+                    st.warning(ux["enter_one_minute"])
 
     with col_a3:
         with st.container(border=True):
             st.markdown(f"### {t['other_act']}")
             with st.form("activity_form", clear_on_submit=True):
-                extra_act = st.selectbox(t["activity_label"], ["Padel", "Palestra", "Nuoto", "Altro"])
-                extra_cals = st.number_input("Kcal bruciate", value=0, min_value=0, step=50)
+                extra_act = st.selectbox(
+                    t["activity_label"],
+                    ["Padel", "Palestra", "Nuoto", "Altro"],
+                    format_func=lambda x: {
+                        "Padel": "Padel",
+                        "Palestra": ux["activity_gym"],
+                        "Nuoto": ux["activity_swim"],
+                        "Altro": ux["activity_other"],
+                    }.get(x, x),
+                )
+                extra_cals = st.number_input(ux["burned_kcal_field"], value=0, min_value=0, step=50)
                 
                 submitted_act = st.form_submit_button(t["add_act_btn"], use_container_width=True)
                 if submitted_act:
@@ -4862,6 +4932,6 @@ elif selected_page == t["t5"]:
                     refresh_daily_logs(act_date)
                     
                     # Usiamo st.success e st.toast per garantire il feedback visivo immediato
-                    st.toast(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)", icon="🎯")
-                    st.success(f"✅ {extra_act} registrato con successo! ({extra_cals} kcal)")
+                    st.toast(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals), icon="🎯")
+                    st.success(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals))
                     st.rerun()
