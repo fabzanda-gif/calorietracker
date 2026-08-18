@@ -1244,16 +1244,18 @@ with st.sidebar:
     with account_right:
         _lang = st.session_state.get("lang_selector", "Italiano")
         _gender = str(u_meta.get("gender") or "").strip().lower()
-        if _lang == "English":
-            _welcome = f"Welcome {first_name}"
-        elif _lang == "Nederlands":
-            _welcome = f"Welkom {first_name}"
-        elif _lang == "Français":
-            _welcome = f"Bienvenue {first_name}"
-        elif _gender in {"female", "f", "donna", "vrouw"}:
-            _welcome = f"Benvenuta {first_name}"
+        # Saluto dinamico in base all'ora del giorno.
+        # 05:00–11:59 = mattina, 12:00–17:59 = pomeriggio, 18:00–04:59 = sera/notte.
+        _hour = datetime.now().hour
+
+        if 5 <= _hour < 12:
+            _greeting_key = "greeting_morning"
+        elif 12 <= _hour < 18:
+            _greeting_key = "greeting_afternoon"
         else:
-            _welcome = f"Benvenuto {first_name}"
+            _greeting_key = "greeting_evening"
+
+        _welcome = t[_greeting_key].format(name=first_name)
         st.markdown(
             f'<div class="sanosync-welcome">{html.escape(_welcome)}</div>',
             unsafe_allow_html=True,
@@ -1694,6 +1696,29 @@ translations["Français"] = {
     "normal_bike": "Vélo classique",
     "ebike": "Vélo électrique",
 }
+
+
+# Saluti dinamici per fascia oraria.
+translations["Italiano"].update({
+    "greeting_morning": "Buongiorno {name}!",
+    "greeting_afternoon": "Buon pomeriggio {name}!",
+    "greeting_evening": "Buonasera {name}!",
+})
+translations["English"].update({
+    "greeting_morning": "Good morning {name}!",
+    "greeting_afternoon": "Good afternoon {name}!",
+    "greeting_evening": "Good evening {name}!",
+})
+translations["Nederlands"].update({
+    "greeting_morning": "Goedemorgen {name}!",
+    "greeting_afternoon": "Goedemiddag {name}!",
+    "greeting_evening": "Goedenavond {name}!",
+})
+translations["Français"].update({
+    "greeting_morning": "Bonjour {name}!",
+    "greeting_afternoon": "Bon après-midi {name}!",
+    "greeting_evening": "Bonsoir {name}!",
+})
 
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
