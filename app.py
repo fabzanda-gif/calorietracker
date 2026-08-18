@@ -642,13 +642,22 @@ def google_login_button():
 
 
 def handle_google_oauth_callback():
-    """Completa Google OAuth ricostruendo il verifier dal nonce del callback."""
+    """
+    Completa Google OAuth ricostruendo il verifier dal nonce del callback.
+
+    Il callback è reso idempotente:
+    - il code OAuth viene marcato come "in elaborazione";
+    - i query params vengono rimossi SUBITO dall'URL;
+    - lo stesso code non può essere scambiato due volte nello stesso ciclo
+      Streamlit, evitando flow_state_not_found dovuto a rerun/richieste duplicate.
+    """
     auth_code = st.query_params.get("code")
     oauth_error = st.query_params.get("error")
     oauth_error_description = st.query_params.get("error_description")
     nonce = st.query_params.get(GOOGLE_OAUTH_NONCE_PARAM)
 
     if oauth_error:
+        # Puliamo subito l'URL per evitare che Streamlit rielabori l'errore.
         st.query_params.clear()
         st.error(
             f"Google/Supabase ha annullato il login: "
@@ -667,8 +676,28 @@ def handle_google_oauth_callback():
         )
         return False
 
+    # Hashiamo il code: non vogliamo conservare il valore raw nello stato.
+    code_key = hashlib.sha256(
+        str(auth_code).encode("utf-8")
+    ).hexdigest()
+
+    # Se lo stesso code è già in elaborazione, non tentiamo un secondo exchange.
+    if st.session_state.get("oauth_code_processing") == code_key:
+        st.stop()
+
+    st.session_state["oauth_code_processing"] = code_key
+
+    # Copiamo tutto ciò che ci serve PRIMA di pulire i query params.
+    auth_code_value = str(auth_code)
+    nonce_value = str(nonce)
+
+    # IMPORTANTISSIMO:
+    # rimuoviamo immediatamente ?code=...&oauth_nonce=... dall'URL.
+    # Così eventuali rerun successivi non ripetono il token exchange.
+    st.query_params.clear()
+
     try:
-        verifier = _google_verifier_from_nonce(str(nonce))
+        verifier = _google_verifier_from_nonce(nonce_value)
 
         response = requests.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce",
@@ -677,7 +706,7 @@ def handle_google_oauth_callback():
                 "Content-Type": "application/json",
             },
             json={
-                "auth_code": str(auth_code),
+                "auth_code": auth_code_value,
                 "code_verifier": verifier,
             },
             timeout=20,
@@ -708,12 +737,18 @@ def handle_google_oauth_callback():
         )
 
         save_authenticated_session(auth_response)
-        st.query_params.clear()
+
+        # A successo completato, il lock non serve più.
+        st.session_state.pop("oauth_code_processing", None)
+
         st.rerun()
         return True
 
     except Exception as e:
-        st.query_params.clear()
+        # Permettiamo un nuovo tentativo OAuth solo dopo aver abbandonato
+        # definitivamente questo code.
+        st.session_state.pop("oauth_code_processing", None)
+
         st.error(f"Login Google fallito: {e}")
         return False
 
