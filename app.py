@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 from datetime import date, datetime
 import requests
@@ -7,11 +6,6 @@ import traceback
 import re
 import json
 import html
-import base64
-import secrets
-import hashlib
-import hmac
-from urllib.parse import urlencode
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -114,8 +108,6 @@ st.markdown("""
 # ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-APP_URL = str(st.secrets.get("APP_URL", "https://sanosync.streamlit.app")).rstrip("/")
-OAUTH_STATE_SECRET = str(st.secrets.get("OAUTH_STATE_SECRET", ""))
 
 # Questo client NON deve mantenere una sessione propria in memoria.
 # La sessione persistente viene gestita esplicitamente dal cookie browser.
@@ -552,7 +544,7 @@ def calculate_recipe_totals(ingredients):
 # ==============================================================================
 # 4. AUTHENTICATION & SESSION MANAGEMENT
 # ==============================================================================
-# Autenticazione email/password + Google OAuth con sessione persistente.
+# Autenticazione email/password con sessione persistente.
 #
 # Persistenza:
 # - nel browser salviamo soltanto il refresh token Supabase;
@@ -566,191 +558,6 @@ def calculate_recipe_totals(ingredients):
 # preferibile un backend che imposti cookie HttpOnly/Secure/SameSite.
 SESSION_COOKIE = "sanosync_refresh_token"
 SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60
-
-# PKCE Google senza cookie/session_state:
-# il verifier viene derivato deterministicamente da un nonce presente nella
-# redirect URL e da un segreto server-side conservato nei Secrets Streamlit.
-# In questo modo il callback può ricostruire il verifier anche dopo un redirect
-# completo del browser, senza dipendere da iframe o cookie.
-GOOGLE_OAUTH_NONCE_PARAM = "oauth_nonce"
-
-
-def _base64url(data):
-    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
-
-
-def _google_verifier_from_nonce(nonce):
-    if not OAUTH_STATE_SECRET:
-        raise RuntimeError(
-            "Manca OAUTH_STATE_SECRET nei Secrets Streamlit."
-        )
-
-    digest = hmac.new(
-        OAUTH_STATE_SECRET.encode("utf-8"),
-        str(nonce).encode("utf-8"),
-        hashlib.sha256,
-    ).digest()
-
-    # 43 caratteri URL-safe: valido come PKCE code_verifier.
-    return _base64url(digest)
-
-
-def _pkce_challenge(verifier):
-    return _base64url(
-        hashlib.sha256(verifier.encode("utf-8")).digest()
-    )
-
-
-def get_google_oauth_url():
-    """
-    Genera un URL OAuth completamente stateless per Streamlit.
-
-    Il nonce torna nel redirect URL. Al callback ricostruiamo il verifier con
-    HMAC(secret, nonce), quindi non serve più conservarlo nel browser.
-    """
-    nonce = _base64url(secrets.token_bytes(24))
-    verifier = _google_verifier_from_nonce(nonce)
-    challenge = _pkce_challenge(verifier)
-
-    callback_url = (
-        f"{APP_URL}/?"
-        + urlencode({GOOGLE_OAUTH_NONCE_PARAM: nonce})
-    )
-
-    params = {
-        "provider": "google",
-        "redirect_to": callback_url,
-        "code_challenge": challenge,
-        "code_challenge_method": "s256",
-    }
-
-    return f"{SUPABASE_URL}/auth/v1/authorize?{urlencode(params)}"
-
-
-def google_login_button():
-    """
-    Usa un vero widget Streamlit, quindi niente iframe HTML e niente bottone
-    opaco/non cliccabile.
-    """
-    google_url = get_google_oauth_url()
-    st.link_button(
-        "Continua con Google",
-        google_url,
-        use_container_width=True,
-        type="primary",
-    )
-
-
-def handle_google_oauth_callback():
-    """
-    Completa Google OAuth ricostruendo il verifier dal nonce del callback.
-
-    Il callback è reso idempotente:
-    - il code OAuth viene marcato come "in elaborazione";
-    - i query params vengono rimossi SUBITO dall'URL;
-    - lo stesso code non può essere scambiato due volte nello stesso ciclo
-      Streamlit, evitando flow_state_not_found dovuto a rerun/richieste duplicate.
-    """
-    auth_code = st.query_params.get("code")
-    oauth_error = st.query_params.get("error")
-    oauth_error_description = st.query_params.get("error_description")
-    nonce = st.query_params.get(GOOGLE_OAUTH_NONCE_PARAM)
-
-    if oauth_error:
-        # Puliamo subito l'URL per evitare che Streamlit rielabori l'errore.
-        st.query_params.clear()
-        st.error(
-            f"Google/Supabase ha annullato il login: "
-            f"{oauth_error_description or oauth_error}"
-        )
-        return False
-
-    if not auth_code:
-        return False
-
-    if not nonce:
-        st.query_params.clear()
-        st.error(
-            "Il callback Google è arrivato senza oauth_nonce. "
-            "Controlla la Redirect URL di Supabase."
-        )
-        return False
-
-    # Hashiamo il code: non vogliamo conservare il valore raw nello stato.
-    code_key = hashlib.sha256(
-        str(auth_code).encode("utf-8")
-    ).hexdigest()
-
-    # Se lo stesso code è già in elaborazione, non tentiamo un secondo exchange.
-    if st.session_state.get("oauth_code_processing") == code_key:
-        st.stop()
-
-    st.session_state["oauth_code_processing"] = code_key
-
-    # Copiamo tutto ciò che ci serve PRIMA di pulire i query params.
-    auth_code_value = str(auth_code)
-    nonce_value = str(nonce)
-
-    # IMPORTANTISSIMO:
-    # rimuoviamo immediatamente ?code=...&oauth_nonce=... dall'URL.
-    # Così eventuali rerun successivi non ripetono il token exchange.
-    st.query_params.clear()
-
-    try:
-        verifier = _google_verifier_from_nonce(nonce_value)
-
-        response = requests.post(
-            f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce",
-            headers={
-                "apikey": SUPABASE_KEY,
-                "Content-Type": "application/json",
-            },
-            json={
-                "auth_code": auth_code_value,
-                "code_verifier": verifier,
-            },
-            timeout=20,
-        )
-
-        if not response.ok:
-            try:
-                detail = response.json()
-            except Exception:
-                detail = response.text[:500]
-
-            raise RuntimeError(
-                f"Token exchange HTTP {response.status_code}: {detail}"
-            )
-
-        payload = response.json()
-        access_token = payload.get("access_token")
-        refresh_token = payload.get("refresh_token")
-
-        if not access_token or not refresh_token:
-            raise RuntimeError(
-                "Supabase non ha restituito access_token e refresh_token."
-            )
-
-        auth_response = supabase.auth.set_session(
-            access_token,
-            refresh_token,
-        )
-
-        save_authenticated_session(auth_response)
-
-        # A successo completato, il lock non serve più.
-        st.session_state.pop("oauth_code_processing", None)
-
-        st.rerun()
-        return True
-
-    except Exception as e:
-        # Permettiamo un nuovo tentativo OAuth solo dopo aver abbandonato
-        # definitivamente questo code.
-        st.session_state.pop("oauth_code_processing", None)
-
-        st.error(f"Login Google fallito: {e}")
-        return False
 
 
 def _cookie_set(name, value, max_age):
@@ -821,17 +628,7 @@ def restore_session_from_cookie():
 
 def show_login_page():
     st.title("SanoSync")
-    st.caption("Accedi con Google oppure usa email e password.")
-
-    try:
-        google_login_button()
-        st.caption(
-            "Google OAuth usa un callback PKCE stateless, senza cookie temporanei."
-        )
-    except Exception as e:
-        st.error(f"Impossibile inizializzare Google Login: {e}")
-
-    st.markdown("---")
+    st.caption("Accedi con email e password oppure crea un nuovo account.")
 
     auth_mode = st.radio(
         "Account",
@@ -961,14 +758,8 @@ def show_login_page():
 
 
 # ==============================================================================
-# 5. RESTORE SESSION / GOOGLE CALLBACK
+# 5. RESTORE SESSION
 # ==============================================================================
-# Il callback OAuth viene gestito prima del restore normale della sessione.
-if st.session_state.get("user") is None and (
-    st.query_params.get("code") or st.query_params.get("error")
-):
-    handle_google_oauth_callback()
-
 # A ogni refresh del browser Streamlit ricrea session_state. Prima di mostrare
 # il login proviamo quindi a ricostruire la sessione dal refresh token salvato
 # nel cookie persistente.
@@ -2901,10 +2692,16 @@ elif selected_page == t["t5"]:
                     else:
                         supabase.table("daily_logs").insert({"user_id": user_id, "date": str(act_date), "steps": int(new_steps)}).execute()
                     
-                    # Se ci sono già altre attività strutturate, i passi non devono generare kcal duplicate (0 kcal dai passi)
-                    # Altrimenti stimiamo le kcal dai passi come prima (0.04 kcal per passo)
-                    has_other_acts = any(a.get("activity_name") not in ["Passi (Stima)"] for a in day_activities)
-                    estim_cals = 0 if has_other_acts else int(new_steps * 0.04)
+                    # I passi sono incompatibili SOLO con attività che già
+                    # incorporano gli stessi passi/spostamenti: Padel e Corsa.
+                    # Bici/E-Bike e le altre attività possono invece sommarsi.
+                    step_conflicting_activities = {"padel", "corsa", "running"}
+                    has_step_conflict = any(
+                        str(a.get("activity_name") or "").strip().casefold()
+                        in step_conflicting_activities
+                        for a in day_activities
+                    )
+                    estim_cals = 0 if has_step_conflict else int(new_steps * 0.04)
                     
                     existing_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
                     
@@ -2938,10 +2735,8 @@ elif selected_page == t["t5"]:
                         
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": act_label, "burned_calories": estim_cals}).execute()
                     
-                    # Se inseriamo una bici, rimuoviamo o azzeriamo l'impatto dei passi per evitare sovrastima
-                    passi_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
-                    if passi_act:
-                        supabase.table("activities").update({"burned_calories": 0}).eq("id", passi_act[0]["id"]).execute()
+                    # Bici/E-Bike è compatibile con i passi:
+                    # NON azzeriamo le kcal attribuite ai passi.
 
                     refresh_daily_logs(act_date)
                     
@@ -2963,10 +2758,23 @@ elif selected_page == t["t5"]:
                     # Inseriamo l'attività
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
                     
-                    # Azzeriamo l'impatto dei passi per evitare la sovrastima delle calorie
-                    passi_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
-                    if passi_act:
-                        supabase.table("activities").update({"burned_calories": 0}).eq("id", passi_act[0]["id"]).execute()
+                    # Padel e Corsa sono incompatibili con le kcal dei passi,
+                    # perché i passi di quelle attività sarebbero già compresi.
+                    # Palestra/Nuoto/Altro restano invece cumulabili con i passi.
+                    if str(extra_act).strip().casefold() in {"padel", "corsa", "running"}:
+                        passi_act = (
+                            supabase.table("activities")
+                            .select("id")
+                            .eq("user_id", user_id)
+                            .eq("date", str(act_date))
+                            .eq("activity_name", "Passi (Stima)")
+                            .execute()
+                            .data
+                        )
+                        if passi_act:
+                            supabase.table("activities").update(
+                                {"burned_calories": 0}
+                            ).eq("id", passi_act[0]["id"]).execute()
 
                     refresh_daily_logs(act_date)
                     
