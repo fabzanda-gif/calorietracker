@@ -1233,7 +1233,7 @@ def show_login_page():
         '<div class="sano-login-shell">'
         '<div class="sano-login-hero">'
         '<div class="sano-login-eyebrow">SANOSYNC</div>'
-        '<div class="sano-login-title">🍑 Tieni tutto sotto controllo</div>'
+        '<div class="sano-login-title">🍑 Tutto sotto controllo</div>'
         '<div class="sano-login-subtitle">'
         'Alimentazione, attività, peso e progressi in un unico posto.'
         '</div>'
