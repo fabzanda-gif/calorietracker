@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import date, datetime
 import requests
@@ -8,6 +9,8 @@ import json
 import html
 from html import escape
 import uuid
+import base64
+from pathlib import Path
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -15,11 +18,51 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # ==============================================================================
+# LOCAL ASSETS
+# ==============================================================================
+ASSET_DIR = Path(__file__).resolve().parent
+APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
+
+WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "bmw-check-oshibka.mp3"
+WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "26f8b9_sonic_ring_sound_effect.mp3"
+WEIGHT_SOUND_GAIN = ASSET_DIR / "sonicded.mp3"
+
+
+def play_hidden_local_audio(audio_path):
+    """Riproduce un MP3 locale senza mostrare un player nella UI."""
+    try:
+        audio_path = Path(audio_path)
+        if not audio_path.exists():
+            st.warning(f"File audio non trovato: {audio_path.name}")
+            return
+
+        audio_b64 = base64.b64encode(audio_path.read_bytes()).decode("ascii")
+        components.html(
+            f"""
+            <audio autoplay>
+                <source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg">
+            </audio>
+            """,
+            height=0,
+            width=0,
+        )
+    except Exception as e:
+        print(f"Weight sound error: {e}")
+
+
+def render_pending_weight_sound():
+    """Riproduce una sola volta il suono accodato dopo il salvataggio del peso."""
+    pending = st.session_state.pop("pending_weight_sound", None)
+    if pending:
+        play_hidden_local_audio(pending)
+
+
+# ==============================================================================
 # 1. SETUP INIZIALE E CONFIGURAZIONE PAGINA
 # ==============================================================================
 st.set_page_config(
     page_title="SanoSync",
-    page_icon="logo2.png",
+    page_icon=str(APP_LOGO_FILE),
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -1764,7 +1807,7 @@ translations["Français"].update({
 
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
-    st.sidebar.image("https://inhmvbdujpxrqrlcgmqw.supabase.co/storage/v1/object/sign/public-assets/logo2.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jZTZjYWVhZi00MTYxLTQyYzctODliZS05ODY1ZGZiMzFlN2EiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwdWJsaWMtYXNzZXRzL2xvZ28yLnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODY1NjA3MjAsImV4cCI6MTgxODA5NjcyMH0.jrnw8BnoiAmsuywkaLe5Uk1ruiHpEjF4nxNnrJyF3s4", use_container_width=True)
+    st.sidebar.image(str(APP_LOGO_FILE), use_container_width=True)
     st.markdown("---") # Linea di separazione dopo il logo
     current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands", "Français"], key="lang_selector")
     t = translations[current_lang]
@@ -2240,7 +2283,15 @@ elif selected_page == t["t2"]:
             st.markdown("### 🧭 Piano della giornata")
 
             plan_day_label = st.selectbox(t["plan_day"], [t["today"], t["tomorrow"]], index=0, key="overview_plan_day")
-            plan_date = date.today() if plan_day_label == "Oggi" else (date.today() + pd.Timedelta(days=1)).date()
+            # Non confrontare mai l'etichetta localizzata con "Oggi":
+            # in NL/EN/FR il testo cambia. Usiamo la chiave tradotta.
+            # Inoltre date + Timedelta restituisce già una data compatibile:
+            # chiamare .date() qui può generare AttributeError.
+            plan_date = (
+                date.today()
+                if plan_day_label == t["today"]
+                else date.today() + pd.Timedelta(days=1)
+            )
             if now.hour < 12:
                 st.info(t["morning_plan"])
             else:
@@ -2653,6 +2704,9 @@ elif selected_page == t["t2"]:
 elif selected_page == t["t3"]:
     st.subheader(t["weight_tracking"])
 
+    # Se un peso è appena stato salvato, riproduci il relativo feedback sonoro.
+    render_pending_weight_sound()
+
     with st.container(border=True):
         st.markdown("#### ⚖️ Gestione pesi")
         logs_all = (
@@ -2667,12 +2721,56 @@ elif selected_page == t["t3"]:
             w_date = st.date_input("Data del peso", value=date.today(), key="new_weight_date")
             if st.button("💾 Salva peso", use_container_width=True):
                 try:
+                    # Cerchiamo il peso cronologicamente precedente alla data
+                    # che stiamo registrando. Un eventuale peso già presente
+                    # nello stesso giorno non viene usato come confronto.
+                    previous_rows = []
+                    for row in logs_all:
+                        try:
+                            row_date = pd.to_datetime(row.get("date")).date()
+                            if row_date < w_date and row.get("weight") is not None:
+                                previous_rows.append((row_date, float(row["weight"])))
+                        except Exception:
+                            continue
+
+                    previous_weight = None
+                    if previous_rows:
+                        previous_rows.sort(key=lambda item: item[0], reverse=True)
+                        previous_weight = previous_rows[0][1]
+
+                    # Decidiamo il suono PRIMA del salvataggio, ma lo accodiamo
+                    # solo dopo che Supabase conferma il successo.
+                    sound_to_play = None
+                    if previous_weight is not None:
+                        delta_weight = float(w) - float(previous_weight)
+
+                        # Perdita > 0.5 kg
+                        if delta_weight < -0.5:
+                            sound_to_play = WEIGHT_SOUND_BIG_LOSS
+
+                        # Perdita da 0.5 kg fino a peso invariato incluso
+                        elif delta_weight <= 0:
+                            sound_to_play = WEIGHT_SOUND_SMALL_LOSS
+
+                        # Aumento di peso
+                        else:
+                            sound_to_play = WEIGHT_SOUND_GAIN
+
                     supabase.table("daily_logs").upsert(
-                        {"user_id": user_id, "date": str(w_date), "weight": float(w)},
+                        {
+                            "user_id": user_id,
+                            "date": str(w_date),
+                            "weight": float(w),
+                        },
                         on_conflict="user_id,date",
                     ).execute()
+
+                    if sound_to_play is not None:
+                        st.session_state["pending_weight_sound"] = str(sound_to_play)
+
                     st.success("✅ Peso salvato!")
                     st.rerun()
+
                 except Exception as e:
                     st.error(f"Errore nel salvataggio del peso: {e}")
 
