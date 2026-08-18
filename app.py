@@ -241,10 +241,10 @@ def calculate_age(birth_date_value, on_date=None):
 
 
 DEFICIT_PRESETS = {
-    "Lenta · 250 kcal": 250,
-    "Media · 500 kcal": 500,
-    "Veloce · 750 kcal": 750,
-    "Custom": None,
+    "Custom": 0,
+    "Low · 250 kcal": 250,
+    "Medium · 500 kcal": 500,
+    "High · 750 kcal": 750,
 }
 
 
@@ -261,16 +261,15 @@ def deficit_preset_from_value(value):
     return "Custom"
 
 
-def resolve_deficit_target(preset_label, custom_value=None):
-    """Converte il preset scelto nel target kcal/giorno da salvare."""
-    preset_value = DEFICIT_PRESETS.get(preset_label)
-    if preset_value is not None:
-        return int(preset_value)
-
+def resolve_deficit_target(preset_label, entered_value=None):
+    """
+    Il campo kcal è sempre la fonte di verità.
+    Il preset serve soltanto a precompilarlo.
+    """
     try:
-        return max(50, int(round(float(custom_value))))
+        return max(0, int(round(float(entered_value))))
     except (TypeError, ValueError):
-        return 500
+        return int(DEFICIT_PRESETS.get(preset_label, 0))
 
 
 def calculate_bmr(weight, height, birth_date_value, gender):
@@ -953,6 +952,50 @@ def show_login_page():
         horizontal=True,
     )
 
+    # --------------------------------------------------------------
+    # Deficit target - fuori dal form per aggiornarsi in tempo reale.
+    # Dentro uno st.form i widget non causano rerun fino al submit:
+    # era questo il motivo per cui il campo Custom non compariva.
+    # --------------------------------------------------------------
+    deficit_plan_input = "Custom"
+    custom_deficit_input = 0
+
+    if auth_mode == "Registrazione":
+        if "signup_deficit_plan" not in st.session_state:
+            st.session_state["signup_deficit_plan"] = "Custom"
+        if "signup_deficit_kcal" not in st.session_state:
+            st.session_state["signup_deficit_kcal"] = 0
+
+        def _sync_signup_deficit_preset():
+            selected = st.session_state.get("signup_deficit_plan", "Custom")
+            st.session_state["signup_deficit_kcal"] = int(
+                DEFICIT_PRESETS.get(selected, 0)
+            )
+
+        st.markdown("#### 🎯 Obiettivo calorico")
+        deficit_plan_input = st.selectbox(
+            "Velocità di dimagrimento",
+            list(DEFICIT_PRESETS.keys()),
+            key="signup_deficit_plan",
+            on_change=_sync_signup_deficit_preset,
+            help=(
+                "Il preset precompila il deficit giornaliero. "
+                "Puoi comunque modificare manualmente il valore sotto."
+            ),
+        )
+
+        custom_deficit_input = st.number_input(
+            "Deficit kcal di base",
+            min_value=0,
+            max_value=2000,
+            step=50,
+            key="signup_deficit_kcal",
+            help=(
+                "Custom parte da 0. Low imposta 250, Medium 500, "
+                "High 750. Il valore resta sempre modificabile."
+            ),
+        )
+
     with st.form("auth_form"):
         email = st.text_input("Email")
         password = st.text_input(
@@ -966,8 +1009,6 @@ def show_login_page():
         current_weight = None
         gender = None
         birth_date_input = None
-        deficit_plan_input = "Media · 500 kcal"
-        custom_deficit_input = 500
 
         if auth_mode == "Registrazione":
             st.markdown("#### 📋 Parametri Fisici Iniziali")
@@ -1006,26 +1047,6 @@ def show_login_page():
                 step=0.5,
             )
 
-            deficit_plan_input = st.selectbox(
-                "Velocità di dimagrimento",
-                list(DEFICIT_PRESETS.keys()),
-                index=1,
-                key="signup_deficit_plan",
-                help=(
-                    "Definisce il deficit calorico giornaliero che SanoSync "
-                    "userà come obiettivo nella panoramica."
-                ),
-            )
-
-            if st.session_state.get("signup_deficit_plan") == "Custom":
-                custom_deficit_input = st.number_input(
-                    "Deficit personalizzato (kcal/giorno)",
-                    min_value=50,
-                    max_value=2000,
-                    value=int(st.session_state.get("signup_custom_deficit", 500)),
-                    step=50,
-                    key="signup_custom_deficit",
-                )
 
         submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
         submitted = st.form_submit_button(
@@ -1078,7 +1099,12 @@ def show_login_page():
                                         deficit_plan_input,
                                         custom_deficit_input,
                                     ),
-                                    "deficit_plan": deficit_plan_input,
+                                    "deficit_plan": (
+                                        deficit_plan_input
+                                        if int(custom_deficit_input)
+                                        == int(DEFICIT_PRESETS.get(deficit_plan_input, 0))
+                                        else "Custom"
+                                    ),
                                 }
                             },
                         })
@@ -1220,6 +1246,64 @@ profile_incomplete = (
 
 if profile_incomplete:
     st.warning("⚠️ Per iniziare, configura i tuoi dati.")
+
+    # Deficit target fuori dal form: il preset aggiorna subito il campo kcal.
+    existing_deficit_value = (
+        int(round(float(user_deficit_target_kcal)))
+        if user_deficit_target_kcal not in (None, "")
+        else 0
+    )
+    existing_deficit_label = (
+        user_deficit_plan
+        if user_deficit_plan in DEFICIT_PRESETS
+        else deficit_preset_from_value(existing_deficit_value)
+    )
+
+    if "profile_deficit_plan" not in st.session_state:
+        st.session_state["profile_deficit_plan"] = existing_deficit_label
+    if "profile_deficit_kcal" not in st.session_state:
+        st.session_state["profile_deficit_kcal"] = existing_deficit_value
+
+    def _sync_profile_deficit_preset():
+        selected = st.session_state.get("profile_deficit_plan", "Custom")
+        st.session_state["profile_deficit_kcal"] = int(
+            DEFICIT_PRESETS.get(selected, 0)
+        )
+
+    st.markdown("#### 🎯 Obiettivo calorico")
+    deficit_plan_val = st.selectbox(
+        "Velocità di dimagrimento",
+        list(DEFICIT_PRESETS.keys()),
+        key="profile_deficit_plan",
+        on_change=_sync_profile_deficit_preset,
+        help=(
+            "Custom = 0 · Low = 250 · Medium = 500 · High = 750. "
+            "Il valore kcal può sempre essere modificato manualmente."
+        ),
+    )
+
+    custom_deficit_val = st.number_input(
+        "Deficit kcal di base",
+        min_value=0,
+        max_value=2000,
+        step=50,
+        key="profile_deficit_kcal",
+    )
+
+    selected_deficit_target = resolve_deficit_target(
+        deficit_plan_val,
+        custom_deficit_val,
+    )
+
+    # Se l'utente modifica a mano il valore rispetto al preset, salviamo
+    # semanticamente il piano come Custom.
+    preset_default = int(DEFICIT_PRESETS.get(deficit_plan_val, 0))
+    deficit_plan_to_save = (
+        deficit_plan_val
+        if int(selected_deficit_target) == preset_default
+        else "Custom"
+    )
+
     with st.form("missing_data_form"):
         st.subheader("📋 Configurazione Profilo")
 
@@ -1262,50 +1346,6 @@ if profile_incomplete:
             step=0.5,
         )
 
-        existing_deficit_label = (
-            user_deficit_plan
-            if user_deficit_plan in DEFICIT_PRESETS
-            else deficit_preset_from_value(user_deficit_target_kcal)
-        )
-        deficit_labels = list(DEFICIT_PRESETS.keys())
-        deficit_plan_val = st.selectbox(
-            "Velocità di dimagrimento",
-            deficit_labels,
-            index=deficit_labels.index(existing_deficit_label),
-            key="profile_deficit_plan",
-            help=(
-                "Lenta = 250 kcal/giorno · Media = 500 · "
-                "Veloce = 750 · Custom = valore scelto da te."
-            ),
-        )
-
-        existing_custom_deficit = (
-            int(round(float(user_deficit_target_kcal)))
-            if user_deficit_target_kcal not in (None, "")
-            else 500
-        )
-        custom_deficit_val = existing_custom_deficit
-
-        if st.session_state.get("profile_deficit_plan") == "Custom":
-            custom_deficit_val = st.number_input(
-                "Deficit personalizzato (kcal/giorno)",
-                min_value=50,
-                max_value=2000,
-                value=int(
-                    st.session_state.get(
-                        "profile_custom_deficit",
-                        existing_custom_deficit,
-                    )
-                ),
-                step=50,
-                key="profile_custom_deficit",
-            )
-
-        selected_deficit_target = resolve_deficit_target(
-            deficit_plan_val,
-            custom_deficit_val,
-        )
-
         calculated_preview_bmr = calculate_bmr(
             w_val,
             h_val,
@@ -1331,7 +1371,7 @@ if profile_incomplete:
                         "height": float(h_val),
                         "gender": gen,
                         "deficit_target_kcal": int(selected_deficit_target),
-                        "deficit_plan": deficit_plan_val,
+                        "deficit_plan": deficit_plan_to_save,
                     }
                 })
 
