@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import date, datetime
 import requests
@@ -594,60 +595,75 @@ def _pkce_challenge(verifier):
     ).decode("utf-8").rstrip("=")
 
 
-def _new_google_pkce():
-    """Crea una nuova coppia PKCE senza avviare ancora il redirect."""
+def _new_google_pkce_pair():
+    """
+    Genera una nuova coppia PKCE.
+
+    Il verifier NON viene scritto qui con CookieController perché quel write è
+    asincrono rispetto alla navigazione OAuth. Verrà scritto dal browser in modo
+    sincrono nell'onclick del pulsante Google.
+    """
     verifier = base64.urlsafe_b64encode(
         secrets.token_bytes(48)
     ).decode("utf-8").rstrip("=")
 
-    st.session_state["google_pkce_verifier"] = verifier
-    st.session_state["google_login_pending"] = True
-
-    _cookie_set(
-        GOOGLE_PKCE_COOKIE,
-        verifier,
-        GOOGLE_PKCE_MAX_AGE,
-    )
-    return verifier
+    challenge = _pkce_challenge(verifier)
+    return verifier, challenge
 
 
 def _clear_google_pkce():
     st.session_state.pop("google_pkce_verifier", None)
-    st.session_state.pop("google_login_pending", None)
     _cookie_delete(GOOGLE_PKCE_COOKIE)
 
 
-def _prepared_google_pkce():
-    """
-    Restituisce il verifier solo quando è realmente disponibile nel browser.
-
-    Il punto chiave del flusso a due fasi è che NON avviamo Google nello stesso
-    rerun in cui il cookie viene scritto.
-    """
-    cookie_verifier = _read_cookie(GOOGLE_PKCE_COOKIE)
-    state_verifier = st.session_state.get("google_pkce_verifier")
-
-    if cookie_verifier:
-        # Sincronizza session_state col valore realmente persistito nel browser.
-        st.session_state["google_pkce_verifier"] = cookie_verifier
-        return cookie_verifier
-
-    # Se il cookie non è ancora leggibile, non procediamo.
-    return None
-
-
-def get_google_oauth_url(verifier):
-    """Costruisce l'URL OAuth solo a cookie PKCE già confermato."""
-    challenge = _pkce_challenge(verifier)
-
+def get_google_oauth_url(challenge):
     params = {
         "provider": "google",
         "redirect_to": APP_URL,
         "code_challenge": challenge,
         "code_challenge_method": "s256",
     }
-
     return f"{SUPABASE_URL}/auth/v1/authorize?{urlencode(params)}"
+
+
+def google_login_button():
+    """
+    Scrive il verifier PKCE nel cookie *sincronicamente nel browser* e poi
+    naviga la finestra principale verso Supabase OAuth.
+
+    Questo evita la race condition di streamlit-cookies-controller: il cookie
+    esiste già prima che il browser lasci SanoSync.
+    """
+    verifier, challenge = _new_google_pkce_pair()
+    oauth_url = get_google_oauth_url(challenge)
+
+    safe_verifier = verifier.replace("\\", "\\\\").replace("'", "\\'")
+    safe_url = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
+
+    button_html = f"""
+    <div style="width:100%;">
+      <button
+        onclick="
+          document.cookie = '{GOOGLE_PKCE_COOKIE}={safe_verifier}; Path=/; Max-Age={GOOGLE_PKCE_MAX_AGE}; SameSite=Lax; Secure';
+          window.top.location.href = '{safe_url}';
+        "
+        style="
+          width:100%;
+          padding:0.72rem 1rem;
+          border-radius:10px;
+          border:2px solid #FF8B8B;
+          background:#FF8B8B;
+          color:white;
+          font-weight:800;
+          cursor:pointer;
+          font-size:1rem;
+        "
+      >
+        Continua con Google
+      </button>
+    </div>
+    """
+    components.html(button_html, height=58)
 
 
 def handle_google_oauth_callback():
@@ -668,10 +684,7 @@ def handle_google_oauth_callback():
     if not auth_code:
         return False
 
-    verifier = (
-        _read_cookie(GOOGLE_PKCE_COOKIE)
-        or st.session_state.get("google_pkce_verifier")
-    )
+    verifier = _read_cookie(GOOGLE_PKCE_COOKIE)
 
     if not verifier:
         st.query_params.clear()
@@ -803,65 +816,11 @@ def show_login_page():
     st.caption("Accedi con Google oppure usa email e password.")
 
     try:
-        # FASE 1: scrivi il verifier nel cookie e fai un rerun.
-        if not st.session_state.get("google_login_pending"):
-            if st.button(
-                "Continua con Google",
-                use_container_width=True,
-                type="primary",
-                key="prepare_google_login",
-            ):
-                _clear_google_pkce()
-                _new_google_pkce()
-                st.rerun()
-
-        # FASE 2: soltanto dopo il rerun verifichiamo che il cookie sia leggibile.
-        else:
-            verifier = _prepared_google_pkce()
-
-            if verifier:
-                st.success("Google Login pronto.")
-                google_url = get_google_oauth_url(verifier)
-
-                st.link_button(
-                    "Apri Google e continua",
-                    google_url,
-                    use_container_width=True,
-                    type="primary",
-                )
-                st.caption(
-                    "Il verifier PKCE è stato salvato nel browser. Ora puoi aprire Google."
-                )
-
-                if st.button(
-                    "Annulla Google Login",
-                    use_container_width=True,
-                    key="cancel_google_login",
-                ):
-                    _clear_google_pkce()
-                    st.rerun()
-            else:
-                st.warning(
-                    "Sto preparando il login Google, ma il cookie PKCE non è ancora "
-                    "leggibile dal browser."
-                )
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button(
-                        "Riprova verifica",
-                        use_container_width=True,
-                        key="retry_google_cookie_check",
-                    ):
-                        st.rerun()
-                with c2:
-                    if st.button(
-                        "Ricomincia",
-                        use_container_width=True,
-                        key="restart_google_login",
-                    ):
-                        _clear_google_pkce()
-                        st.rerun()
-
+        google_login_button()
+        st.caption(
+            "Il login Google viene aperto nella stessa scheda; il verifier PKCE "
+            "viene salvato nel browser prima del redirect."
+        )
     except Exception as e:
         st.error(f"Impossibile inizializzare Google Login: {e}")
 
