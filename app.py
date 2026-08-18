@@ -1191,6 +1191,32 @@ if profile_incomplete:
                 print(traceback.format_exc())
     st.stop()
 
+
+# Force the logged-in welcome label to stay white on the dark sidebar.
+st.markdown(
+    """
+    <style>
+    section[data-testid="stSidebar"] .sanosync-welcome,
+    section[data-testid="stSidebar"] .sanosync-welcome *,
+    [data-testid="stSidebar"] .sanosync-welcome,
+    [data-testid="stSidebar"] .sanosync-welcome * {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        opacity: 1 !important;
+    }
+
+    section[data-testid="stSidebar"] .sanosync-welcome {
+        font-size: 1.15rem !important;
+        font-weight: 800 !important;
+        line-height: 1.25 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ==============================================================================
 # LOGGED-IN ACCOUNT — COMPACT
 # ==============================================================================
@@ -1229,8 +1255,7 @@ with st.sidebar:
         else:
             _welcome = f"Benvenuto {first_name}"
         st.markdown(
-            f"<div style='font-size:1.15rem;font-weight:800;color:#FFFFFF !important;'>"
-            f"{html.escape(_welcome)}</div>",
+            f'<div class="sanosync-welcome">{html.escape(_welcome)}</div>',
             unsafe_allow_html=True,
         )
 
