@@ -630,47 +630,55 @@ def google_login_button():
     """
     Genera il pulsante di login Google con PKCE sicuro.
     Il verifier viene salvato nel cookie prima del redirect OAuth.
+    Usa un <a target=\"_top\"> per garantire la navigazione fuori dall'iframe.
     """
     verifier, challenge = _new_google_pkce_pair()
     oauth_url = get_google_oauth_url(challenge)
 
-    # Escaping per JavaScript
+    # Escaping per JavaScript e per l'attributo href
     safe_verifier = verifier.replace("\\", "\\\\").replace("'", "\\'")
     safe_url = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
 
     button_html = f"""
     <div style="width:100%;">
-      <button
-        id="google-login-btn"
+      <a
+        href="{safe_url}"
+        target="_top"
         onclick="
           try {{
             document.cookie = '{GOOGLE_PKCE_COOKIE}={safe_verifier}; Path=/; Max-Age={GOOGLE_PKCE_MAX_AGE}; SameSite=Lax; Secure';
-            console.log('PKCE verifier salvato nel cookie');
-            setTimeout(function() {{
-              window.top.location.href = '{safe_url}';
-            }}, 100);
+            console.log('PKCE verifier salvato nel cookie via link click');
+            // Lasciamo che il browser segua l'anchor; non forziamo window.top dalla sandbox.
           }} catch(e) {{
             console.error('Errore Google login:', e);
             alert('Errore nella configurazione di Google Login');
+            return false;
           }}
         "
-        style="
-          width:100%;
-          padding:0.72rem 1rem;
-          border-radius:10px;
-          border:2px solid #FF8B8B;
-          background:#FF8B8B;
-          color:white;
-          font-weight:800;
-          cursor:pointer;
-          font-size:1rem;
-        "
+        style="display:block;text-decoration:none;"
       >
-        Continua con Google
-      </button>
+        <button
+          id="google-login-btn"
+          style="
+            width:100%;
+            padding:0.72rem 1rem;
+            border-radius:10px;
+            border:2px solid #FF8B8B;
+            background:#FF8B8B;
+            color:white;
+            font-weight:800;
+            cursor:pointer;
+            font-size:1rem;
+          "
+          type="button"
+        >
+          Continua con Google
+        </button>
+      </a>
     </div>
     """
-    components.html(button_html, height=58)
+    # Aumenta un poco l'altezza per evitare ritagli visivi e garantire clickability
+    components.html(button_html, height=72)
 
 
 def handle_google_oauth_callback():
