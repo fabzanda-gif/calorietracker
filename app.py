@@ -1010,6 +1010,31 @@ user = st.session_state["user"]
 user_id = user.id
 u_meta = user.user_metadata or {}
 
+
+def get_logged_user_identity(user_obj):
+    """Nome, email e avatar dai metadata Supabase (Google incluso)."""
+    metadata = getattr(user_obj, "user_metadata", None) or {}
+    email = str(getattr(user_obj, "email", "") or "")
+
+    display = str(
+        metadata.get("full_name")
+        or metadata.get("name")
+        or metadata.get("display_name")
+        or (email.split("@")[0] if email else "Utente")
+    )
+
+    avatar = str(
+        metadata.get("avatar_url")
+        or metadata.get("picture")
+        or ""
+    )
+
+    return display, email, avatar
+
+
+logged_name, logged_email, logged_avatar = get_logged_user_identity(user)
+
+
 display_name = u_meta.get("display_name") or user.email.split("@")[0] or "User"
 user_target_weight = u_meta.get("target_weight")
 user_height = u_meta.get("height")
@@ -1165,6 +1190,39 @@ if profile_incomplete:
                 st.error(f"Errore: {e}")
                 print(traceback.format_exc())
     st.stop()
+
+# ==============================================================================
+# LOGGED-IN ACCOUNT CARD
+# ==============================================================================
+with st.sidebar:
+    st.markdown("### 👤 Account")
+
+    account_left, account_right = st.columns([1, 3])
+
+    with account_left:
+        if logged_avatar:
+            st.image(logged_avatar, width=58)
+        else:
+            st.markdown(
+                """
+                <div style="
+                    width:54px;height:54px;border-radius:50%;
+                    display:flex;align-items:center;justify-content:center;
+                    background:#FF8B8B;color:white;font-size:1.5rem;
+                    font-weight:900;
+                ">✓</div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with account_right:
+        st.markdown(f"**{html.escape(logged_name)}**")
+        if logged_email:
+            st.caption(logged_email)
+        st.caption("🟢 Accesso effettuato")
+
+    st.markdown("---")
+
 
 # ==============================================================================
 # 8. NAVIGATION & LANGUAGE
