@@ -6,19 +6,9 @@ import traceback
 import re
 import json
 import html
-import base64
-import secrets
-import hashlib
-from urllib.parse import urlencode
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
-
-try:
-    # supabase-py / gotrue compatibility
-    from gotrue import SyncSupportedStorage
-except ImportError:
-    from supabase_auth import SyncSupportedStorage
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -118,124 +108,32 @@ st.markdown("""
 # ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-APP_URL = str(
-    st.secrets.get("APP_URL", "https://sanosync.streamlit.app")
-).rstrip("/")
 
-# ------------------------------------------------------------------------------
-# Browser cookie controller
-# ------------------------------------------------------------------------------
-# Deve essere creato PRIMA del client Supabase, perché il flusso PKCE ufficiale
-# di supabase-py usa uno storage persistente per conservare il code_verifier
-# durante il redirect Google -> Supabase -> Streamlit.
-if "_cookie_controller" not in st.session_state:
-    st.session_state["_cookie_controller"] = CookieController()
-controller = st.session_state["_cookie_controller"]
-
-
-def _auth_storage_cookie_name(key):
-    """Nome cookie deterministico e sicuro per una chiave dello storage GoTrue."""
-    digest = hashlib.sha256(str(key).encode("utf-8")).hexdigest()[:24]
-    return f"sanosync_auth_{digest}"
-
-
-class StreamlitAuthStorage(SyncSupportedStorage):
-    """
-    Storage compatibile con supabase-py / GoTrue per il flusso PKCE.
-
-    - durante i normali rerun usa st.session_state;
-    - i valori piccoli (in particolare il PKCE code_verifier) vengono anche
-      salvati in cookie così sopravvivono al redirect OAuth;
-    - le sessioni grandi non vengono forzate in un cookie: la persistenza lunga
-      viene gestita separatamente tramite il refresh-token cookie.
-    """
-
-    def get_item(self, key):
-        cache = st.session_state.setdefault("_supabase_auth_storage", {})
-        if key in cache:
-            return cache[key]
-
-        cookie_name = _auth_storage_cookie_name(key)
-
-        # Lettura primaria dopo un vero browser refresh / redirect.
-        try:
-            value = st.context.cookies.get(cookie_name)
-            if value:
-                value = str(value).strip().strip('"')
-                cache[key] = value
-                return value
-        except Exception:
-            pass
-
-        # Fallback per normali rerun nella stessa sessione Streamlit.
-        try:
-            value = controller.get(cookie_name)
-            if value:
-                value = str(value).strip().strip('"')
-                cache[key] = value
-                return value
-        except Exception:
-            pass
-
-        return None
-
-    def set_item(self, key, value):
-        value = str(value)
-        cache = st.session_state.setdefault("_supabase_auth_storage", {})
-        cache[key] = value
-
-        # I cookie browser hanno limiti dimensionali. Il code_verifier PKCE è
-        # piccolo; un'intera sessione può essere troppo grande.
-        if len(value.encode("utf-8")) <= 3000:
-            try:
-                controller.set(
-                    _auth_storage_cookie_name(key),
-                    value,
-                    max_age=15 * 60,
-                )
-            except Exception:
-                pass
-
-    def remove_item(self, key):
-        cache = st.session_state.setdefault("_supabase_auth_storage", {})
-        cache.pop(key, None)
-
-        cookie_name = _auth_storage_cookie_name(key)
-        try:
-            controller.remove(cookie_name)
-        except Exception:
-            try:
-                controller.set(cookie_name, "", max_age=0)
-            except Exception:
-                pass
-
-
-# ------------------------------------------------------------------------------
-# Supabase client
-# ------------------------------------------------------------------------------
-# flow_type="pkce" permette di usare l'implementazione OAuth ufficiale del client
-# Python: sign_in_with_oauth() genera il challenge e exchange_code_for_session()
-# usa automaticamente il verifier salvato nello storage sopra.
+# Questo client NON deve mantenere una sessione propria in memoria.
+# La sessione persistente viene gestita esplicitamente dal cookie browser.
 if "supabase" not in st.session_state:
     st.session_state["supabase"] = create_client(
         SUPABASE_URL,
         SUPABASE_KEY,
         options=ClientOptions(
             auto_refresh_token=False,
-            persist_session=True,
-            flow_type="pkce",
-            storage=StreamlitAuthStorage(),
+            persist_session=False,
         ),
     )
 
 supabase = st.session_state["supabase"]
+
+# Manteniamo il componente cookie associato alla sessione Streamlit corrente.
+# Al refresh completo la lettura primaria avviene comunque tramite st.context.cookies.
+if "_cookie_controller" not in st.session_state:
+    st.session_state["_cookie_controller"] = CookieController()
+controller = st.session_state["_cookie_controller"]
 
 # ==============================================================================
 # 2. INITIALIZE SESSION STATE
 # ==============================================================================
 state_defaults = {
     "user": None,
-    "pkce_verifier": None,
     "m_name": "",
     "m_cals": 0,
     "m_prot": 0,
@@ -646,7 +544,7 @@ def calculate_recipe_totals(ingredients):
 # ==============================================================================
 # 4. AUTHENTICATION & SESSION MANAGEMENT
 # ==============================================================================
-# Autenticazione email/password + Google OAuth (PKCE).
+# Autenticazione email/password con sessione persistente.
 #
 # Persistenza:
 # - nel browser salviamo soltanto il refresh token Supabase;
@@ -660,82 +558,6 @@ def calculate_recipe_totals(ingredients):
 # preferibile un backend che imposti cookie HttpOnly/Secure/SameSite.
 SESSION_COOKIE = "sanosync_refresh_token"
 SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60
-
-
-def _google_login_url():
-    """
-    Usa il flusso OAuth/PKCE ufficiale di supabase-py.
-    Supabase genera e salva il code_verifier nello StreamlitAuthStorage.
-    """
-    response = supabase.auth.sign_in_with_oauth(
-        {
-            "provider": "google",
-            "options": {
-                "redirect_to": APP_URL,
-            },
-        }
-    )
-
-    url = getattr(response, "url", None)
-    if not url and isinstance(response, dict):
-        url = response.get("url")
-
-    if not url:
-        raise RuntimeError("Supabase non ha restituito la URL per Google OAuth.")
-
-    return url
-
-
-def _clear_oauth_storage():
-    """
-    Pulisce soltanto la cache locale dello storage OAuth.
-    GoTrue rimuove autonomamente il verifier PKCE dopo lo scambio riuscito.
-    """
-    st.session_state.pop("_supabase_auth_storage", None)
-
-
-def handle_google_oauth_callback():
-    """
-    Completa il PKCE usando l'API ufficiale supabase-py.
-    Il verifier viene recuperato automaticamente dallo StreamlitAuthStorage.
-    """
-    auth_code = st.query_params.get("code")
-    oauth_error = st.query_params.get("error")
-    oauth_error_description = st.query_params.get("error_description")
-
-    if oauth_error:
-        st.query_params.clear()
-        st.error(
-            f"Google/Supabase ha annullato il login: "
-            f"{oauth_error_description or oauth_error}"
-        )
-        return False
-
-    if not auth_code:
-        return False
-
-    try:
-        response = supabase.auth.exchange_code_for_session(
-            {"auth_code": str(auth_code)}
-        )
-
-        if not response or not getattr(response, "session", None):
-            raise RuntimeError(
-                "Supabase non ha restituito una sessione dopo il callback Google."
-            )
-
-        save_authenticated_session(response)
-        st.query_params.clear()
-        st.rerun()
-        return True
-
-    except Exception as e:
-        st.query_params.clear()
-        st.error(
-            "Login Google fallito durante lo scambio del codice OAuth. "
-            f"Dettaglio: {e}"
-        )
-        return False
 
 
 def _cookie_set(name, value, max_age):
@@ -806,32 +628,20 @@ def restore_session_from_cookie():
 
 def show_login_page():
     st.title("SanoSync")
-    st.caption("Accedi o crea un account con Google, oppure usa email e password. Google OAuth usa il flusso PKCE ufficiale Supabase.")
+    st.caption("Accedi con email e password oppure crea un nuovo account.")
 
-    try:
-        google_url = _google_login_url()
-        google_button_html = f"""
-        <a href="{google_url}" target="_self" style="text-decoration:none;display:block;">
-            <div style="width:100%;box-sizing:border-box;padding:0.72rem 1rem;border-radius:10px;
-                        border:2px solid #FF8B8B;background:#FFFFFF;color:#1A2942;
-                        font-weight:700;text-align:center;cursor:pointer;">
-                Continua con Google
-            </div>
-        </a>
-        """
-        st.markdown(google_button_html, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Impossibile inizializzare Google Login: {e}")
-
-    st.caption(
-        f"Redirect OAuth configurato: {APP_URL}"
+    auth_mode = st.radio(
+        "Account",
+        ["Login", "Registrazione"],
+        horizontal=True,
     )
-    st.markdown("---")
-    auth_mode = st.radio("Account", ["Login", "Registrazione"], horizontal=True)
 
     with st.form("auth_form"):
         email = st.text_input("Email")
-        password = st.text_input("Password (min. 6 caratteri)", type="password")
+        password = st.text_input(
+            "Password (min. 6 caratteri)",
+            type="password",
+        )
 
         display_name_input = ""
         target_weight = None
@@ -842,13 +652,39 @@ def show_login_page():
         if auth_mode == "Registrazione":
             st.markdown("#### 📋 Parametri Fisici Iniziali")
             display_name_input = st.text_input("Display Name", value="")
-            gender = st.selectbox("Genere", ["Uomo", "Donna"], index=None, placeholder="Seleziona genere...")
-            height = st.number_input("Altezza (cm)", value=175.0, min_value=100.0, max_value=250.0, step=1.0)
-            current_weight = st.number_input("Peso Attuale (kg)", value=80.0, min_value=20.0, max_value=300.0, step=0.5)
-            target_weight = st.number_input("Peso Obiettivo (kg)", value=75.0, min_value=20.0, max_value=300.0, step=0.5)
+            gender = st.selectbox(
+                "Genere",
+                ["Uomo", "Donna"],
+                index=None,
+                placeholder="Seleziona genere...",
+            )
+            height = st.number_input(
+                "Altezza (cm)",
+                value=175.0,
+                min_value=100.0,
+                max_value=250.0,
+                step=1.0,
+            )
+            current_weight = st.number_input(
+                "Peso Attuale (kg)",
+                value=80.0,
+                min_value=20.0,
+                max_value=300.0,
+                step=0.5,
+            )
+            target_weight = st.number_input(
+                "Peso Obiettivo (kg)",
+                value=75.0,
+                min_value=20.0,
+                max_value=300.0,
+                step=0.5,
+            )
 
         submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
-        submitted = st.form_submit_button(submit_label, use_container_width=True)
+        submitted = st.form_submit_button(
+            submit_label,
+            use_container_width=True,
+        )
 
         if submitted:
             try:
@@ -860,25 +696,38 @@ def show_login_page():
                             "email": email.strip(),
                             "password": password,
                         })
+
                         if response and response.session:
                             save_authenticated_session(response)
                             st.success("✅ Login effettuato.")
                             st.rerun()
                         else:
                             st.error("Credenziali non valide.")
+
                 else:
                     if not email.strip() or len(password) < 6:
-                        st.warning("Inserisci una email valida e una password di almeno 6 caratteri.")
+                        st.warning(
+                            "Inserisci una email valida e una password "
+                            "di almeno 6 caratteri."
+                        )
                     elif not height or not current_weight or not target_weight or not gender:
                         st.warning("Compila tutti i parametri fisici.")
                     else:
-                        calculated_bmr = calculate_bmr(current_weight, height, gender)
+                        calculated_bmr = calculate_bmr(
+                            current_weight,
+                            height,
+                            gender,
+                        )
+
                         response = supabase.auth.sign_up({
                             "email": email.strip(),
                             "password": password,
                             "options": {
                                 "data": {
-                                    "display_name": display_name_input or email.split("@")[0],
+                                    "display_name": (
+                                        display_name_input
+                                        or email.split("@")[0]
+                                    ),
                                     "target_weight": float(target_weight),
                                     "bmr": calculated_bmr,
                                     "height": float(height),
@@ -886,26 +735,34 @@ def show_login_page():
                                 }
                             },
                         })
+
                         # Se la conferma email è disabilitata, Supabase può già
-                        # restituire una sessione. In quel caso persistiamola.
+                        # restituire una sessione.
                         if response and getattr(response, "session", None):
                             save_authenticated_session(response)
-                            st.success("✅ Account creato e accesso effettuato.")
+                            st.success(
+                                "✅ Account creato e accesso effettuato."
+                            )
                             st.rerun()
                         else:
-                            st.success("✅ Account creato. Controlla l'email se è richiesta la conferma, poi effettua il login.")
+                            st.success(
+                                "✅ Account creato. Controlla l'email se è "
+                                "richiesta la conferma, poi effettua il login."
+                            )
+
             except Exception as e:
-                st.error(f"Errore durante l'autenticazione: {str(e)}")
+                st.error(
+                    f"Errore durante l'autenticazione: {str(e)}"
+                )
                 print(traceback.format_exc())
 
-# ==============================================================================
-# 5. RESTORE SESSION / GOOGLE OAUTH CALLBACK
-# ==============================================================================
-if st.session_state.get("user") is None and (
-    st.query_params.get("code") or st.query_params.get("error")
-):
-    handle_google_oauth_callback()
 
+# ==============================================================================
+# 5. RESTORE SESSION
+# ==============================================================================
+# A ogni refresh del browser Streamlit ricrea session_state. Prima di mostrare
+# il login proviamo quindi a ricostruire la sessione dal refresh token salvato
+# nel cookie persistente.
 if st.session_state.get("user") is None:
     restore_session_from_cookie()
 
