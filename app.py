@@ -19,6 +19,7 @@ import plotly.graph_objects as go
 # ==============================================================================
 st.set_page_config(
     page_title="SanoSync",
+    page_icon="logo2.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
