@@ -1192,12 +1192,12 @@ if profile_incomplete:
     st.stop()
 
 # ==============================================================================
-# LOGGED-IN ACCOUNT CARD
+# LOGGED-IN ACCOUNT — COMPACT
 # ==============================================================================
 with st.sidebar:
-    st.markdown("### 👤 Account")
+    first_name = (logged_name or "Utente").strip().split()[0]
 
-    account_left, account_right = st.columns([1, 3])
+    account_left, account_right = st.columns([1, 3], vertical_alignment="center")
 
     with account_left:
         if logged_avatar:
@@ -1216,10 +1216,21 @@ with st.sidebar:
             )
 
     with account_right:
-        st.markdown(f"**{html.escape(logged_name)}**")
-        if logged_email:
-            st.caption(logged_email)
-        st.caption("🟢 Accesso effettuato")
+        _lang = st.session_state.get("lang_selector", "Italiano")
+        _gender = str(u_meta.get("gender") or "").strip().lower()
+        if _lang == "English":
+            _welcome = f"Welcome {first_name}"
+        elif _lang == "Nederlands":
+            _welcome = f"Welkom {first_name}"
+        elif _gender in {"female", "f", "donna", "vrouw"}:
+            _welcome = f"Benvenuta {first_name}"
+        else:
+            _welcome = f"Benvenuto {first_name}"
+        st.markdown(
+            f"<div style='font-size:1.15rem;font-weight:800;'>"
+            f"{html.escape(_welcome)}</div>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
 
@@ -1509,6 +1520,39 @@ translations = {
     }
 }
 
+
+# Additional UI translations for features added after the first translation pass.
+translations["Italiano"].update({
+    "no_products":"Nessun prodotto trovato. Prova marca + nome oppure un codice a barre.",
+    "search_min_chars":"Inserisci almeno 2 caratteri o un codice a barre valido.",
+    "plan_day":"Giorno da pianificare","today":"Oggi","tomorrow":"Domani",
+    "morning_plan":"Buongiorno! Imposta il tipo di giornata e il livello di attività previsto per pianificare i pasti.",
+    "day_type":"Tipo di giornata","activity_expected":"Attività prevista","save_day_plan":"💾 Salva piano della giornata",
+    "weight_value":"Peso (kg)","edit_weight":"✏️ Modifica peso","delete_weight":"🗑️ Cancella peso",
+    "recipes_title":"🍲 Ricette","search_ingredient":"🔍 Cerca ingrediente",
+    "bike_type":"Tipo Bici","normal_bike":"Bici Normale","ebike":"E-Bike (Elettrica)",
+})
+translations["English"].update({
+    "no_products":"No products found. Try brand + product name or a barcode.",
+    "search_min_chars":"Enter at least 2 characters or a valid barcode.",
+    "plan_day":"Day to plan","today":"Today","tomorrow":"Tomorrow",
+    "morning_plan":"Good morning! Set the type of day and expected activity level to plan your meals.",
+    "day_type":"Type of day","activity_expected":"Expected activity","save_day_plan":"💾 Save daily plan",
+    "weight_value":"Weight (kg)","edit_weight":"✏️ Edit weight","delete_weight":"🗑️ Delete weight",
+    "recipes_title":"🍲 Recipes","search_ingredient":"🔍 Search ingredient",
+    "bike_type":"Bike type","normal_bike":"Regular Bike","ebike":"E-Bike (Electric)",
+})
+translations["Nederlands"].update({
+    "no_products":"Geen producten gevonden. Probeer merk + productnaam of een streepjescode.",
+    "search_min_chars":"Voer minstens 2 tekens of een geldige streepjescode in.",
+    "plan_day":"Dag om te plannen","today":"Vandaag","tomorrow":"Morgen",
+    "morning_plan":"Goedemorgen! Stel het type dag en het verwachte activiteitsniveau in om je maaltijden te plannen.",
+    "day_type":"Type dag","activity_expected":"Verwachte activiteit","save_day_plan":"💾 Dagplan opslaan",
+    "weight_value":"Gewicht (kg)","edit_weight":"✏️ Gewicht bewerken","delete_weight":"🗑️ Gewicht verwijderen",
+    "recipes_title":"🍲 Recepten","search_ingredient":"🔍 Ingrediënt zoeken",
+    "bike_type":"Type fiets","normal_bike":"Normale fiets","ebike":"E-bike (elektrisch)",
+})
+
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
     st.sidebar.image("https://inhmvbdujpxrqrlcgmqw.supabase.co/storage/v1/object/sign/public-assets/logo2.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jZTZjYWVhZi00MTYxLTQyYzctODliZS05ODY1ZGZiMzFlN2EiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwdWJsaWMtYXNzZXRzL2xvZ28yLnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODY1NjA3MjAsImV4cCI6MTgxODA5NjcyMH0.jrnw8BnoiAmsuywkaLe5Uk1ruiHpEjF4nxNnrJyF3s4", use_container_width=True)
@@ -1647,10 +1691,10 @@ if selected_page == t["t1"]:
                 st.session_state["prod_select"] = ""
                 st.session_state["last_selected"] = ""
                 if not st.session_state["api_res"]:
-                    st.info("Nessun prodotto trovato. Prova marca + nome oppure un codice a barre.")
+                    st.info(t["no_products"])
                 st.rerun()
             else:
-                st.warning("Inserisci almeno 2 caratteri o un codice a barre valido.")
+                st.warning(t["search_min_chars"])
 
         api_res = st.session_state.get("api_res", {})
         if api_res:
@@ -1986,10 +2030,10 @@ elif selected_page == t["t2"]:
         with st.container(border=True):
             st.markdown("### 🧭 Piano della giornata")
 
-            plan_day_label = st.selectbox("Giorno da pianificare", ["Oggi", "Domani"], index=0, key="overview_plan_day")
+            plan_day_label = st.selectbox(t["plan_day"], [t["today"], t["tomorrow"]], index=0, key="overview_plan_day")
             plan_date = date.today() if plan_day_label == "Oggi" else (date.today() + pd.Timedelta(days=1)).date()
             if now.hour < 12:
-                st.info("Buongiorno! Imposta il tipo di giornata e il livello di attività previsto per pianificare i pasti.")
+                st.info(t["morning_plan"])
             else:
                 st.caption("Puoi aggiornare il piano della giornata anche dopo la mattina.")
 
@@ -2016,14 +2060,14 @@ elif selected_page == t["t2"]:
 
             pc1, pc2 = st.columns(2)
             with pc1:
-                day_type = st.selectbox("Tipo di giornata", day_types, index=day_types.index(default_day), key=f"overview_day_type_{plan_date}")
+                day_type = st.selectbox(t["day_type"], day_types, index=day_types.index(default_day), key=f"overview_day_type_{plan_date}")
             with pc2:
-                activity_plan = st.selectbox("Attività prevista", activity_types, index=activity_types.index(default_activity), key=f"overview_activity_plan_{plan_date}")
+                activity_plan = st.selectbox(t["activity_expected"], activity_types, index=activity_types.index(default_activity), key=f"overview_activity_plan_{plan_date}")
 
             st.session_state["day_plan_type"] = day_type
             st.session_state["day_plan_activity"] = activity_plan
 
-            if st.button("💾 Salva piano della giornata", key="save_day_plan", use_container_width=True):
+            if st.button(t["save_day_plan"], key="save_day_plan", use_container_width=True):
                 try:
                     existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
                     payload_plan = {"day_type": day_type, "activity_plan": activity_plan}
@@ -2321,10 +2365,10 @@ elif selected_page == t["t3"]:
                 with ew1:
                     edited_date = st.date_input("Data", value=pd.to_datetime(selected_row["date"]).date(), key=f"edit_weight_date_{selected_weight_id}")
                 with ew2:
-                    edited_weight = st.number_input("Peso (kg)", value=float(selected_row["weight"]), min_value=20.0, max_value=300.0, step=0.1, key=f"edit_weight_value_{selected_weight_id}")
+                    edited_weight = st.number_input(t["weight_value"], value=float(selected_row["weight"]), min_value=20.0, max_value=300.0, step=0.1, key=f"edit_weight_value_{selected_weight_id}")
                 b1, b2 = st.columns(2)
                 with b1:
-                    if st.button("✏️ Modifica peso", use_container_width=True, key=f"update_weight_{selected_weight_id}"):
+                    if st.button(t["edit_weight"], use_container_width=True, key=f"update_weight_{selected_weight_id}"):
                         try:
                             if str(edited_date) != str(selected_row["date"]):
                                 supabase.table("daily_logs").delete().eq("id", selected_row["id"]).eq("user_id", user_id).execute()
@@ -2339,7 +2383,7 @@ elif selected_page == t["t3"]:
                         except Exception as e:
                             st.error(f"Errore nella modifica: {e}")
                 with b2:
-                    if st.button("🗑️ Cancella peso", use_container_width=True, key=f"delete_weight_{selected_weight_id}"):
+                    if st.button(t["delete_weight"], use_container_width=True, key=f"delete_weight_{selected_weight_id}"):
                         try:
                             # Non cancelliamo l'intera riga se contiene passi o piano giornata:
                             # azzeriamo solo weight. Se la riga ha solo il peso, Supabase
@@ -2741,7 +2785,7 @@ elif selected_page == t["t3"]:
 # 12. PAGE 4: RICETTE / MEAL COMPOSTI
 # ==============================================================================
 elif selected_page == t["t4"]:
-    st.subheader("🍲 Ricette")
+    st.subheader(t["recipes_title"])
     st.caption(
         "Le ricette non usano più una tabella separata: sono normali record di `meals` "
         "con gli ingredienti salvati in `ingredients_json`. Quick Entry, Ricette e suggerimenti "
@@ -2853,7 +2897,7 @@ elif selected_page == t["t4"]:
 
         if source.startswith("Database"):
             iq = st.text_input("Cerca ingrediente", key=f"ingredient_search_{v}")
-            if st.button("🔍 Cerca ingrediente", key=f"ingredient_search_btn_{v}"):
+            if st.button(t["search_ingredient"], key=f"ingredient_search_btn_{v}"):
                 if len(iq.strip()) >= 2 or iq.strip().isdigit():
                     with st.spinner("Ricerca ingrediente..."):
                         st.session_state[f"ingredient_results_{v}"] = search_open_food_facts(iq)
@@ -3153,7 +3197,7 @@ elif selected_page == t["t5"]:
     with col_a2:
         with st.container(border=True):
             st.markdown("### 🚲 Bici & E-Bike")
-            bike_type = st.radio("Tipo Bici", ["Bici Normale", "E-Bike (Elettrica)"], horizontal=True, key=f"bike_type_{act_date}")
+            bike_type = st.radio(t["bike_type"], [t["normal_bike"], t["ebike"]], horizontal=True, key=f"bike_type_{act_date}")
             bike_min = st.number_input("Minuti Bici", value=0, min_value=0, step=5, key=f"bike_min_{act_date}")
             
             if st.button("💾 Aggiungi Bici", use_container_width=True):
