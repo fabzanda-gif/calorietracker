@@ -995,15 +995,189 @@ def handle_oauth_callback():
 
 def show_login_page():
     """
-    Login SanoSync:
-    - hero + card centrata, ispirata alla pagina fornita;
-    - palette SanoSync corallo / navy;
-    - Google OAuth con lo stesso identico meccanismo dell'app funzionante.
+    Login SanoSync multilingua:
+    - dropdown lingua disponibile prima del login;
+    - hero + card in palette SanoSync;
+    - Google OAuth con lo stesso flusso funzionante dell'altra app.
     """
+    LOGIN_I18N = {
+        "Italiano": {
+            "language": "🌐 Lingua",
+            "eyebrow": "SANOSYNC",
+            "title": "🍑 Il tuo equilibrio, ogni giorno",
+            "subtitle": "Alimentazione, attività, peso e progressi in un unico posto.",
+            "continue": "Accedi per continuare",
+            "google": "Continua con Google",
+            "google_note": (
+                "L’autenticazione Google viene gestita da Supabase Auth. "
+                "La password del tuo account Google non viene mai gestita da SanoSync."
+            ),
+            "divider": "oppure accedi con email e password",
+            "login": "Login",
+            "signup": "Registrazione",
+            "email": "Email",
+            "email_ph": "nome@email.com",
+            "password": "Password",
+            "password_min": "Password (min. 6 caratteri)",
+            "login_btn": "Accedi",
+            "signup_btn": "Registrati",
+            "credentials_required": "Inserisci email e password.",
+            "invalid_credentials": "Credenziali non valide.",
+            "auth_error": "Errore durante l'autenticazione: {error}",
+            "signup_invalid": "Inserisci una email valida e una password di almeno 6 caratteri.",
+            "physical_title": "📋 Parametri fisici iniziali",
+            "name": "Nome",
+            "gender": "Genere",
+            "male": "Uomo",
+            "female": "Donna",
+            "gender_placeholder": "Seleziona genere...",
+            "birth_date": "Data di nascita",
+            "height": "Altezza (cm)",
+            "current_weight": "Peso attuale (kg)",
+            "target_weight": "Peso obiettivo (kg)",
+            "physical_required": "Compila tutti i parametri fisici.",
+            "signup_success": "✅ Account creato e accesso effettuato.",
+            "signup_email_confirm": (
+                "✅ Account creato. Controlla l'email se è richiesta la conferma, "
+                "poi effettua il login."
+            ),
+            "google_error": "Non riesco a generare il link Google. Controlla la configurazione Auth di Supabase.",
+            "google_callback_error": "Login Google non completato: {error}",
+        },
+        "English": {
+            "language": "🌐 Language",
+            "eyebrow": "SANOSYNC",
+            "title": "🍑 Your balance, every day",
+            "subtitle": "Food, activity, weight and progress in one place.",
+            "continue": "Sign in to continue",
+            "google": "Continue with Google",
+            "google_note": (
+                "Google authentication is handled by Supabase Auth. "
+                "SanoSync never handles your Google account password."
+            ),
+            "divider": "or sign in with email and password",
+            "login": "Login",
+            "signup": "Sign up",
+            "email": "Email",
+            "email_ph": "name@email.com",
+            "password": "Password",
+            "password_min": "Password (min. 6 characters)",
+            "login_btn": "Sign in",
+            "signup_btn": "Create account",
+            "credentials_required": "Enter email and password.",
+            "invalid_credentials": "Invalid credentials.",
+            "auth_error": "Authentication error: {error}",
+            "signup_invalid": "Enter a valid email and a password of at least 6 characters.",
+            "physical_title": "📋 Initial physical details",
+            "name": "Name",
+            "gender": "Gender",
+            "male": "Male",
+            "female": "Female",
+            "gender_placeholder": "Select gender...",
+            "birth_date": "Date of birth",
+            "height": "Height (cm)",
+            "current_weight": "Current weight (kg)",
+            "target_weight": "Target weight (kg)",
+            "physical_required": "Complete all physical details.",
+            "signup_success": "✅ Account created and signed in.",
+            "signup_email_confirm": (
+                "✅ Account created. Check your email if confirmation is required, "
+                "then come back and sign in."
+            ),
+            "google_error": "I can't generate the Google login link. Check your Supabase Auth configuration.",
+            "google_callback_error": "Google login not completed: {error}",
+        },
+        "Nederlands": {
+            "language": "🌐 Taal",
+            "eyebrow": "SANOSYNC",
+            "title": "🍑 Jouw balans, elke dag",
+            "subtitle": "Voeding, activiteit, gewicht en voortgang op één plek.",
+            "continue": "Log in om door te gaan",
+            "google": "Doorgaan met Google",
+            "google_note": (
+                "Google-authenticatie wordt beheerd door Supabase Auth. "
+                "SanoSync verwerkt nooit het wachtwoord van je Google-account."
+            ),
+            "divider": "of log in met e-mail en wachtwoord",
+            "login": "Inloggen",
+            "signup": "Registreren",
+            "email": "E-mail",
+            "email_ph": "naam@email.com",
+            "password": "Wachtwoord",
+            "password_min": "Wachtwoord (min. 6 tekens)",
+            "login_btn": "Inloggen",
+            "signup_btn": "Account aanmaken",
+            "credentials_required": "Voer e-mail en wachtwoord in.",
+            "invalid_credentials": "Ongeldige inloggegevens.",
+            "auth_error": "Authenticatiefout: {error}",
+            "signup_invalid": "Voer een geldig e-mailadres en een wachtwoord van minimaal 6 tekens in.",
+            "physical_title": "📋 Eerste fysieke gegevens",
+            "name": "Naam",
+            "gender": "Geslacht",
+            "male": "Man",
+            "female": "Vrouw",
+            "gender_placeholder": "Selecteer geslacht...",
+            "birth_date": "Geboortedatum",
+            "height": "Lengte (cm)",
+            "current_weight": "Huidig gewicht (kg)",
+            "target_weight": "Streefgewicht (kg)",
+            "physical_required": "Vul alle fysieke gegevens in.",
+            "signup_success": "✅ Account aangemaakt en ingelogd.",
+            "signup_email_confirm": (
+                "✅ Account aangemaakt. Controleer je e-mail als bevestiging nodig is "
+                "en log daarna in."
+            ),
+            "google_error": "Ik kan de Google-loginlink niet genereren. Controleer de Supabase Auth-configuratie.",
+            "google_callback_error": "Google-login niet voltooid: {error}",
+        },
+        "Français": {
+            "language": "🌐 Langue",
+            "eyebrow": "SANOSYNC",
+            "title": "🍑 Votre équilibre, chaque jour",
+            "subtitle": "Alimentation, activité, poids et progrès au même endroit.",
+            "continue": "Connectez-vous pour continuer",
+            "google": "Continuer avec Google",
+            "google_note": (
+                "L’authentification Google est gérée par Supabase Auth. "
+                "SanoSync ne gère jamais le mot de passe de votre compte Google."
+            ),
+            "divider": "ou connectez-vous avec e-mail et mot de passe",
+            "login": "Connexion",
+            "signup": "Inscription",
+            "email": "E-mail",
+            "email_ph": "nom@email.com",
+            "password": "Mot de passe",
+            "password_min": "Mot de passe (min. 6 caractères)",
+            "login_btn": "Se connecter",
+            "signup_btn": "Créer un compte",
+            "credentials_required": "Saisissez votre e-mail et votre mot de passe.",
+            "invalid_credentials": "Identifiants invalides.",
+            "auth_error": "Erreur d’authentification : {error}",
+            "signup_invalid": "Saisissez un e-mail valide et un mot de passe d’au moins 6 caractères.",
+            "physical_title": "📋 Données physiques initiales",
+            "name": "Prénom",
+            "gender": "Sexe",
+            "male": "Homme",
+            "female": "Femme",
+            "gender_placeholder": "Sélectionnez le sexe...",
+            "birth_date": "Date de naissance",
+            "height": "Taille (cm)",
+            "current_weight": "Poids actuel (kg)",
+            "target_weight": "Poids cible (kg)",
+            "physical_required": "Complétez toutes les données physiques.",
+            "signup_success": "✅ Compte créé et connexion effectuée.",
+            "signup_email_confirm": (
+                "✅ Compte créé. Vérifiez votre e-mail si une confirmation est requise, "
+                "puis revenez vous connecter."
+            ),
+            "google_error": "Impossible de générer le lien Google. Vérifiez la configuration Supabase Auth.",
+            "google_callback_error": "Connexion Google non terminée : {error}",
+        },
+    }
+
     st.markdown(
         """
         <style>
-        /* Login: niente sidebar, contenuto compatto e centrato. */
         [data-testid="stSidebar"] { display: none !important; }
 
         [data-testid="stAppViewContainer"] {
@@ -1015,8 +1189,13 @@ def show_login_page():
 
         .block-container {
             max-width: 760px !important;
-            padding-top: 2.1rem !important;
+            padding-top: 1.35rem !important;
             padding-bottom: 3rem !important;
+        }
+
+        .login-language-wrap {
+            max-width: 610px;
+            margin: 0 auto .75rem auto;
         }
 
         .sano-login-shell {
@@ -1037,9 +1216,7 @@ def show_login_page():
         }
 
         .sano-login-hero,
-        .sano-login-hero * {
-            color: #FFFFFF !important;
-        }
+        .sano-login-hero * { color: #FFFFFF !important; }
 
         .sano-login-eyebrow {
             font-size: .78rem;
@@ -1095,12 +1272,6 @@ def show_login_page():
             font-size: 1rem;
             font-weight: 850;
             margin: 10px 0;
-            transition: transform .12s ease, box-shadow .12s ease;
-        }
-
-        .sano-social-login:hover {
-            transform: translateY(-1px);
-            text-decoration: none !important;
         }
 
         .sano-social-login.google {
@@ -1110,9 +1281,7 @@ def show_login_page():
             box-shadow: 0 5px 14px rgba(35,48,72,.06);
         }
 
-        .sano-social-login.google span {
-            color: #172A46 !important;
-        }
+        .sano-social-login.google span { color: #172A46 !important; }
 
         .sano-social-logo {
             width: 23px;
@@ -1137,9 +1306,9 @@ def show_login_page():
             font-weight: 750;
         }
 
-        /* I controlli email/password seguono la stessa larghezza della card. */
         div[data-testid="stRadio"],
         div[data-testid="stForm"],
+        .st-key-login_lang_selector,
         .st-key-signup_email,
         .st-key-signup_password,
         .st-key-signup_display_name,
@@ -1164,7 +1333,6 @@ def show_login_page():
             box-shadow: 0 9px 26px rgba(35,48,72,.06);
         }
 
-        /* Bottoni Streamlit fuori sidebar = corallo coerente con il resto dell'app. */
         .stButton > button,
         div[data-testid="stFormSubmitButton"] > button {
             border: 2px solid #FF8B8B !important;
@@ -1187,21 +1355,15 @@ def show_login_page():
             .block-container {
                 padding-left: .85rem !important;
                 padding-right: .85rem !important;
-                padding-top: 1rem !important;
+                padding-top: .8rem !important;
             }
-
             .sano-login-hero {
                 padding: 27px 19px 25px;
                 border-radius: 23px;
             }
-
             .sano-login-card {
                 padding: 23px 18px 21px;
                 border-radius: 20px;
-            }
-
-            .sano-social-login {
-                height: 55px;
             }
         }
         </style>
@@ -1209,37 +1371,44 @@ def show_login_page():
         unsafe_allow_html=True,
     )
 
+    if "login_lang_selector" not in st.session_state:
+        st.session_state["login_lang_selector"] = (
+            st.session_state.get("lang_selector", "Italiano")
+            if st.session_state.get("lang_selector", "Italiano") in LOGIN_I18N
+            else "Italiano"
+        )
+
+    current_login_lang = st.selectbox(
+        LOGIN_I18N[st.session_state["login_lang_selector"]]["language"],
+        ["Italiano", "English", "Nederlands", "Français"],
+        key="login_lang_selector",
+    )
+    lt = LOGIN_I18N[current_login_lang]
+
+    # Manteniamo la lingua anche dopo il login.
+    st.session_state["lang_selector"] = current_login_lang
+
     callback_error = st.session_state.pop("auth_callback_error", None)
 
     try:
-        # STESSO flusso dell'app di riferimento:
-        # build_provider_login_url -> client dedicato -> PKCE Supabase.
         google_url = escape(
             build_provider_login_url("google"),
             quote=True,
         )
     except Exception as exc:
-        st.error(
-            "Non riesco a generare il link Google. "
-            "Controlla la configurazione Auth di Supabase."
-        )
+        st.error(lt["google_error"])
         st.caption(str(exc))
         st.stop()
 
-    # IMPORTANTE:
-    # blocco HTML continuo e anchor target="_blank" rel="noopener",
-    # identico al pattern che funziona nell'app inviata.
     login_html = (
         '<div class="sano-login-shell">'
         '<div class="sano-login-hero">'
-        '<div class="sano-login-eyebrow">SANOSYNC</div>'
-        '<div class="sano-login-title">🍑 Tutto sotto controllo</div>'
-        '<div class="sano-login-subtitle">'
-        'Alimentazione, attività, peso e progressi in un unico posto.'
-        '</div>'
+        f'<div class="sano-login-eyebrow">{escape(lt["eyebrow"])}</div>'
+        f'<div class="sano-login-title">{escape(lt["title"])}</div>'
+        f'<div class="sano-login-subtitle">{escape(lt["subtitle"])}</div>'
         '</div>'
         '<div class="sano-login-card">'
-        '<div class="sano-login-card-title">Accedi per continuare</div>'
+        f'<div class="sano-login-card-title">{escape(lt["continue"])}</div>'
         f'<a class="sano-social-login google" href="{google_url}" '
         'target="_blank" rel="noopener">'
         '<svg class="sano-social-logo" viewBox="0 0 24 24" aria-hidden="true">'
@@ -1248,12 +1417,9 @@ def show_login_page():
         '<path fill="#FBBC05" d="M6.39 13.86A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.86V7.52H3.04A10 10 0 0 0 2 12c0 1.61.38 3.13 1.04 4.48l3.35-2.62z"/>'
         '<path fill="#EA4335" d="M12 6.01c1.47 0 2.79.51 3.83 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01z"/>'
         '</svg>'
-        '<span>Continua con Google</span>'
+        f'<span>{escape(lt["google"])}</span>'
         '</a>'
-        '<div class="sano-login-note">'
-        'L’autenticazione Google viene gestita da Supabase Auth. '
-        'La password del tuo account Google non viene mai gestita da SanoSync.'
-        '</div>'
+        f'<div class="sano-login-note">{escape(lt["google_note"])}</div>'
         '</div>'
         '</div>'
     )
@@ -1261,42 +1427,42 @@ def show_login_page():
     st.markdown(login_html, unsafe_allow_html=True)
 
     if callback_error:
-        st.error(f"Login Google non completato: {callback_error}")
+        st.error(
+            lt["google_callback_error"].format(error=callback_error)
+        )
 
     st.markdown(
-        '<div class="sano-email-divider">'
-        'oppure accedi con email e password'
-        '</div>',
+        f'<div class="sano-email-divider">{escape(lt["divider"])}</div>',
         unsafe_allow_html=True,
     )
 
     auth_mode = st.radio(
         "Account",
-        ["Login", "Registrazione"],
+        [lt["login"], lt["signup"]],
         horizontal=True,
         label_visibility="collapsed",
     )
 
-    if auth_mode == "Login":
+    if auth_mode == lt["login"]:
         with st.form("auth_login_form", clear_on_submit=False):
             email = st.text_input(
-                "Email",
-                placeholder="nome@email.com",
+                lt["email"],
+                placeholder=lt["email_ph"],
             )
             password = st.text_input(
-                "Password",
+                lt["password"],
                 type="password",
                 placeholder="••••••••",
             )
             submitted = st.form_submit_button(
-                "Accedi",
+                lt["login_btn"],
                 use_container_width=True,
             )
 
             if submitted:
                 try:
                     if not email.strip() or not password:
-                        st.warning("Inserisci email e password.")
+                        st.warning(lt["credentials_required"])
                     else:
                         response = supabase.auth.sign_in_with_password({
                             "email": email.strip(),
@@ -1305,54 +1471,62 @@ def show_login_page():
 
                         if response and response.session:
                             save_authenticated_session(response)
-                            st.success("✅ Login effettuato.")
+                            st.success("✅")
                             st.rerun()
                         else:
-                            st.error("Credenziali non valide.")
+                            st.error(lt["invalid_credentials"])
 
                 except Exception as e:
                     st.error(
-                        f"Errore durante l'autenticazione: {str(e)}"
+                        lt["auth_error"].format(error=str(e))
                     )
                     print(traceback.format_exc())
 
     else:
-        # Registrazione fuori da st.form:
-        # il preset deficit deve aggiornare immediatamente il campo kcal.
         email = st.text_input(
-            "Email",
+            lt["email"],
             key="signup_email",
-            placeholder="nome@email.com",
+            placeholder=lt["email_ph"],
         )
         password = st.text_input(
-            "Password (min. 6 caratteri)",
+            lt["password_min"],
             type="password",
             key="signup_password",
             placeholder="••••••••",
         )
 
-        st.markdown("#### 📋 Parametri fisici iniziali")
+        st.markdown(f"#### {lt['physical_title']}")
         display_name_input = st.text_input(
-            "Nome",
+            lt["name"],
             value="",
             key="signup_display_name",
         )
-        gender = st.selectbox(
-            "Genere",
-            ["Uomo", "Donna"],
+
+        gender_labels = [lt["male"], lt["female"]]
+        gender_display = st.selectbox(
+            lt["gender"],
+            gender_labels,
             index=None,
-            placeholder="Seleziona genere...",
+            placeholder=lt["gender_placeholder"],
             key="signup_gender",
         )
+        gender = (
+            "Uomo"
+            if gender_display == lt["male"]
+            else "Donna"
+            if gender_display == lt["female"]
+            else None
+        )
+
         birth_date_input = st.date_input(
-            "Data di nascita",
+            lt["birth_date"],
             value=date(1990, 1, 1),
             min_value=date(1900, 1, 1),
             max_value=date.today(),
             key="signup_birth_date",
         )
         height = st.number_input(
-            "Altezza (cm)",
+            lt["height"],
             value=175.0,
             min_value=100.0,
             max_value=250.0,
@@ -1360,7 +1534,7 @@ def show_login_page():
             key="signup_height",
         )
         current_weight = st.number_input(
-            "Peso attuale (kg)",
+            lt["current_weight"],
             value=80.0,
             min_value=20.0,
             max_value=300.0,
@@ -1368,7 +1542,7 @@ def show_login_page():
             key="signup_current_weight",
         )
         target_weight = st.number_input(
-            "Peso obiettivo (kg)",
+            lt["target_weight"],
             value=75.0,
             min_value=20.0,
             max_value=300.0,
@@ -1376,7 +1550,6 @@ def show_login_page():
             key="signup_target_weight",
         )
 
-        # Deficit ALLA FINE della registrazione.
         deficit_ui = DEFICIT_PRESET_LABELS[_ui_language()]
 
         if "signup_deficit_plan" not in st.session_state:
@@ -1419,17 +1592,14 @@ def show_login_page():
         )
 
         if st.button(
-            "Registrati",
+            lt["signup_btn"],
             use_container_width=True,
             type="primary",
             key="signup_submit",
         ):
             try:
                 if not email.strip() or len(password) < 6:
-                    st.warning(
-                        "Inserisci una email valida e una password "
-                        "di almeno 6 caratteri."
-                    )
+                    st.warning(lt["signup_invalid"])
                 elif (
                     not height
                     or not current_weight
@@ -1437,7 +1607,7 @@ def show_login_page():
                     or not gender
                     or not birth_date_input
                 ):
-                    st.warning("Compila tutti i parametri fisici.")
+                    st.warning(lt["physical_required"])
                 else:
                     selected_plan = normalize_deficit_plan(
                         deficit_plan_input
@@ -1480,19 +1650,14 @@ def show_login_page():
 
                     if response and getattr(response, "session", None):
                         save_authenticated_session(response)
-                        st.success(
-                            "✅ Account creato e accesso effettuato."
-                        )
+                        st.success(lt["signup_success"])
                         st.rerun()
                     else:
-                        st.success(
-                            "✅ Account creato. Controlla l'email se è "
-                            "richiesta la conferma, poi effettua il login."
-                        )
+                        st.success(lt["signup_email_confirm"])
 
             except Exception as e:
                 st.error(
-                    f"Errore durante l'autenticazione: {str(e)}"
+                    lt["auth_error"].format(error=str(e))
                 )
                 print(traceback.format_exc())
 
