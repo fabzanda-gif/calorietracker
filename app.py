@@ -240,6 +240,39 @@ def calculate_age(birth_date_value, on_date=None):
     )
 
 
+DEFICIT_PRESETS = {
+    "Lenta · 250 kcal": 250,
+    "Media · 500 kcal": 500,
+    "Veloce · 750 kcal": 750,
+    "Custom": None,
+}
+
+
+def deficit_preset_from_value(value):
+    """Restituisce l'etichetta preset corrispondente a un target salvato."""
+    try:
+        value = int(round(float(value)))
+    except (TypeError, ValueError):
+        return "Media · 500 kcal"
+
+    for label, kcal in DEFICIT_PRESETS.items():
+        if kcal == value:
+            return label
+    return "Custom"
+
+
+def resolve_deficit_target(preset_label, custom_value=None):
+    """Converte il preset scelto nel target kcal/giorno da salvare."""
+    preset_value = DEFICIT_PRESETS.get(preset_label)
+    if preset_value is not None:
+        return int(preset_value)
+
+    try:
+        return max(50, int(round(float(custom_value))))
+    except (TypeError, ValueError):
+        return 500
+
+
 def calculate_bmr(weight, height, birth_date_value, gender):
     """
     BMR secondo Mifflin-St Jeor.
@@ -933,6 +966,8 @@ def show_login_page():
         current_weight = None
         gender = None
         birth_date_input = None
+        deficit_plan_input = "Media · 500 kcal"
+        custom_deficit_input = 500
 
         if auth_mode == "Registrazione":
             st.markdown("#### 📋 Parametri Fisici Iniziali")
@@ -970,6 +1005,24 @@ def show_login_page():
                 max_value=300.0,
                 step=0.5,
             )
+
+            deficit_plan_input = st.selectbox(
+                "Velocità di dimagrimento",
+                list(DEFICIT_PRESETS.keys()),
+                index=1,
+                help=(
+                    "Definisce il deficit calorico giornaliero che SanoSync "
+                    "userà come obiettivo nella panoramica."
+                ),
+            )
+            if deficit_plan_input == "Custom":
+                custom_deficit_input = st.number_input(
+                    "Deficit personalizzato (kcal/giorno)",
+                    min_value=50,
+                    max_value=2000,
+                    value=500,
+                    step=50,
+                )
 
         submit_label = "Accedi" if auth_mode == "Login" else "Registrati"
         submitted = st.form_submit_button(
@@ -1018,6 +1071,11 @@ def show_login_page():
                                     "birth_date": str(birth_date_input),
                                     "height": float(height),
                                     "gender": gender,
+                                    "deficit_target_kcal": resolve_deficit_target(
+                                        deficit_plan_input,
+                                        custom_deficit_input,
+                                    ),
+                                    "deficit_plan": deficit_plan_input,
                                 }
                             },
                         })
@@ -1098,6 +1156,8 @@ user_target_weight = u_meta.get("target_weight")
 user_height = u_meta.get("height")
 user_gender = u_meta.get("gender")
 user_birth_date = u_meta.get("birth_date")
+user_deficit_target_kcal = u_meta.get("deficit_target_kcal")
+user_deficit_plan = u_meta.get("deficit_plan")
 
 # Il BMR viene calcolato dinamicamente usando l'ultimo peso registrato.
 latest_weight_row = None
@@ -1152,6 +1212,7 @@ profile_incomplete = (
     or not user_birth_date
     or user_current_weight is None
     or user_bmr is None
+    or user_deficit_target_kcal is None
 )
 
 if profile_incomplete:
@@ -1198,6 +1259,42 @@ if profile_incomplete:
             step=0.5,
         )
 
+        existing_deficit_label = (
+            user_deficit_plan
+            if user_deficit_plan in DEFICIT_PRESETS
+            else deficit_preset_from_value(user_deficit_target_kcal)
+        )
+        deficit_labels = list(DEFICIT_PRESETS.keys())
+        deficit_plan_val = st.selectbox(
+            "Velocità di dimagrimento",
+            deficit_labels,
+            index=deficit_labels.index(existing_deficit_label),
+            help=(
+                "Lenta = 250 kcal/giorno · Media = 500 · "
+                "Veloce = 750 · Custom = valore scelto da te."
+            ),
+        )
+
+        existing_custom_deficit = (
+            int(round(float(user_deficit_target_kcal)))
+            if user_deficit_target_kcal not in (None, "")
+            else 500
+        )
+        custom_deficit_val = existing_custom_deficit
+        if deficit_plan_val == "Custom":
+            custom_deficit_val = st.number_input(
+                "Deficit personalizzato (kcal/giorno)",
+                min_value=50,
+                max_value=2000,
+                value=existing_custom_deficit,
+                step=50,
+            )
+
+        selected_deficit_target = resolve_deficit_target(
+            deficit_plan_val,
+            custom_deficit_val,
+        )
+
         calculated_preview_bmr = calculate_bmr(
             w_val,
             h_val,
@@ -1209,7 +1306,8 @@ if profile_incomplete:
         if calculated_preview_bmr is not None:
             st.caption(
                 f"Età: {calculated_age} anni · "
-                f"BMR stimato: {calculated_preview_bmr} kcal/giorno"
+                f"BMR stimato: {calculated_preview_bmr} kcal/giorno · "
+                f"Deficit target: {selected_deficit_target} kcal/giorno"
             )
 
         if st.form_submit_button("Salva e Inizia"):
@@ -1221,6 +1319,8 @@ if profile_incomplete:
                         "birth_date": str(birth_val),
                         "height": float(h_val),
                         "gender": gen,
+                        "deficit_target_kcal": int(selected_deficit_target),
+                        "deficit_plan": deficit_plan_val,
                     }
                 })
 
@@ -2278,7 +2378,8 @@ elif selected_page == t["t2"]:
     deficit = total_cals_in - total_burned_finora
 
     total_estimated_burned = float(user_bmr) + extra_burned
-    ideal_target_cals = max(0, total_estimated_burned - 500)
+    target_deficit_kcal = int(round(float(user_deficit_target_kcal)))
+    ideal_target_cals = max(0, total_estimated_burned - target_deficit_kcal)
     diff_from_ideal = ideal_target_cals - total_cals_in
 
     coral_light_bg, coral_border = "#FFF5F5", "#FF8B8B"
@@ -2287,7 +2388,7 @@ elif selected_page == t["t2"]:
     if diff_from_ideal > 0:
         in_msg = (
             f"🎯 Puoi mangiare ancora <b>{int(round(diff_from_ideal))} kcal</b> "
-            f"per chiudere la giornata con circa 500 kcal di deficit."
+            f"per chiudere la giornata con circa {target_deficit_kcal} kcal di deficit."
         )
     elif diff_from_ideal < 0:
         in_msg = (
@@ -2295,7 +2396,10 @@ elif selected_page == t["t2"]:
             f"<b>{abs(int(round(diff_from_ideal)))} kcal</b>."
         )
     else:
-        in_msg = "🎯 Sei esattamente sul target per un deficit di circa 500 kcal."
+        in_msg = (
+            f"🎯 Sei esattamente sul target per un deficit di circa "
+            f"{target_deficit_kcal} kcal."
+        )
 
     # Proiezione semplice e conservativa:
     # BMR completo della giornata + attività già registrate.
@@ -3238,7 +3342,7 @@ elif selected_page == t["t3"]:
                     deficit_icon, deficit_tip = "·", "Nessun dato alimentare"
                 else:
                     daily_def = float(user_bmr) + extra - kcal_in
-                    if daily_def >= 500:
+                    if daily_def >= float(user_deficit_target_kcal):
                         deficit_icon = "👍"
                     elif daily_def >= 0:
                         deficit_icon = "😐"
@@ -3273,7 +3377,9 @@ elif selected_page == t["t3"]:
             timeline_html = (
                 '<div style="border:1px solid #E8ECF2;border-radius:12px;padding:8px 10px;overflow-x:auto;">'
                 '<div style="font-size:12px;color:#667085;margin-bottom:4px;">'
-                'Dettagli: 👍 deficit ≥500 · 😐 deficit 0–499 · 👎 surplus &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
+                f'Dettagli: 👍 deficit ≥{int(round(float(user_deficit_target_kcal)))} · '
+                f'😐 deficit 0–{max(0, int(round(float(user_deficit_target_kcal))) - 1)} · '
+                '👎 surplus &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
                 '</div>'
                 f'<div style="display:flex;gap:2px;min-width:{max(100, len(detail_cells)*50)}px;">'
                 + "".join(detail_cells) +
@@ -3695,7 +3801,15 @@ elif selected_page == t["t5"]:
                     st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Errore nel salvataggio dei passi: {e}")
+                    err_text = str(e)
+                    if "daily_logs_date_key" in err_text or "23505" in err_text:
+                        st.error(
+                            "Il database ha ancora un vincolo UNIQUE sulla sola data. "
+                            "Per usare più utenti devi eseguire la migrazione SQL "
+                            "daily_logs_user_date_fix.sql che trovi insieme al codice."
+                        )
+                    else:
+                        st.error(f"Errore nel salvataggio dei passi: {e}")
 
     with col_a2:
         with st.container(border=True):
