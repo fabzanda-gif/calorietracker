@@ -112,7 +112,7 @@ st.markdown("""
 # ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-APP_URL = str(st.secrets.get("APP_URL", "https://diario-alimentare.streamlit.app")).rstrip("/")
+APP_URL = str(st.secrets.get("APP_URL", "https://sanosync.streamlit.app")).rstrip("/")
 
 # Questo client NON deve mantenere una sessione propria in memoria.
 # La sessione persistente viene gestita esplicitamente dal cookie browser.
