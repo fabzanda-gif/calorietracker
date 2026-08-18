@@ -6,6 +6,8 @@ import traceback
 import re
 import json
 import html
+from html import escape
+import uuid
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -108,6 +110,7 @@ st.markdown("""
 # ==============================================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+APP_URL = str(st.secrets.get("APP_URL", "https://sanosync.streamlit.app")).rstrip("/")
 
 # Questo client NON deve mantenere una sessione propria in memoria.
 # La sessione persistente viene gestita esplicitamente dal cookie browser.
@@ -672,9 +675,186 @@ def restore_session_from_cookie():
     _cookie_delete(SESSION_COOKIE)
     return False
 
+AUTH_FLOW_STATE_KEY = "auth_flow_id"
+
+
+@st.cache_resource
+def get_auth_flow_client(flow_id: str):
+    """
+    Client Supabase dedicato al singolo flusso OAuth.
+    Importante: viene creato NORMALMENTE, senza ClientOptions/storage custom.
+    """
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"],
+    )
+
+
+def _oauth_response_url(response):
+    if response is None:
+        return ""
+    if isinstance(response, dict):
+        return str(response.get("url") or "")
+    return str(getattr(response, "url", "") or "")
+
+
+def get_public_app_url():
+    configured = st.secrets.get("APP_URL")
+    if configured:
+        return str(configured).rstrip("/")
+
+    try:
+        headers = st.context.headers
+        host = headers.get("Host") or headers.get("host")
+        proto = (
+            headers.get("X-Forwarded-Proto")
+            or headers.get("x-forwarded-proto")
+            or "https"
+        )
+        if host:
+            return f"{proto}://{host}".rstrip("/")
+    except Exception:
+        pass
+
+    return "http://localhost:8501"
+
+
+def build_google_login_url():
+    """
+    Genera il flusso PKCE usando direttamente supabase-py.
+
+    Ogni tentativo ha un flow_id dedicato. Il client associato viene recuperato
+    nel callback tramite lo stesso flow_id presente nella redirect URL.
+    """
+    flow_id = uuid.uuid4().hex
+    auth_client = get_auth_flow_client(flow_id)
+
+    redirect_to = (
+        f"{get_public_app_url()}"
+        f"/?auth_callback=1&auth_flow={flow_id}"
+    )
+
+    response = auth_client.auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {
+            "redirect_to": redirect_to,
+        },
+    })
+
+    oauth_url = _oauth_response_url(response)
+    if not oauth_url:
+        raise RuntimeError("Supabase non ha restituito la URL OAuth Google.")
+
+    return oauth_url
+
+
+def handle_google_oauth_callback():
+    """
+    Scambia il code PKCE restituito da Supabase con una sessione.
+
+    NOTA: exchange_code_for_session richiede un dict con auth_code,
+    non una stringa semplice.
+    """
+    code = st.query_params.get("code")
+    flow_id = st.query_params.get("auth_flow")
+
+    if not code or not flow_id:
+        return False
+
+    try:
+        auth_client = get_auth_flow_client(str(flow_id))
+
+        response = auth_client.auth.exchange_code_for_session(
+            {"auth_code": str(code)}
+        )
+
+        session = getattr(response, "session", None)
+        user_obj = getattr(response, "user", None)
+
+        if session is None:
+            session = auth_client.auth.get_session()
+
+        access_token = getattr(session, "access_token", None)
+        refresh_token = getattr(session, "refresh_token", None)
+
+        if not access_token or not refresh_token:
+            raise RuntimeError(
+                "Supabase non ha restituito una sessione valida."
+            )
+
+        if user_obj is None:
+            verified = auth_client.auth.get_user(access_token)
+            user_obj = getattr(verified, "user", None)
+
+        if user_obj is None:
+            raise RuntimeError(
+                "Supabase non ha restituito l'utente autenticato."
+            )
+
+        # Allineiamo anche il client principale dell'app.
+        main_response = supabase.auth.set_session(
+            access_token,
+            refresh_token,
+        )
+
+        # Riutilizziamo la persistenza già presente nell'app:
+        # salva utente e refresh token nel cookie persistente.
+        save_authenticated_session(main_response)
+
+        st.session_state[AUTH_FLOW_STATE_KEY] = str(flow_id)
+
+        # Il code OAuth è monouso: puliamo subito la barra URL.
+        st.query_params.clear()
+        st.rerun()
+        return True
+
+    except Exception as exc:
+        st.query_params.clear()
+        st.session_state["auth_callback_error"] = str(exc)
+        return False
+
+
 def show_login_page():
     st.title("SanoSync")
-    st.caption("Accedi con email e password oppure crea un nuovo account.")
+    st.caption("Accedi con Google oppure usa email e password.")
+
+    callback_error = st.session_state.pop("auth_callback_error", None)
+
+    try:
+        google_url = escape(build_google_login_url(), quote=True)
+
+        # Costruito come stringa HTML continua per evitare che Markdown
+        # spezzi l'anchor OAuth in frammenti non cliccabili.
+        google_html = (
+            '<a href="' + google_url + '" target="_self" '
+            'style="display:flex;align-items:center;justify-content:center;gap:10px;'
+            'width:100%;box-sizing:border-box;padding:0.72rem 1rem;'
+            'border-radius:10px;border:2px solid #FF8B8B;'
+            'background:#FFFFFF;color:#1A2942;text-decoration:none;'
+            'font-weight:800;margin:6px 0 10px 0;">'
+            '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">'
+            '<path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41z"/>'
+            '<path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22z"/>'
+            '<path fill="#FBBC05" d="M6.39 13.86A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.86V7.52H3.04A10 10 0 0 0 2 12c0 1.61.38 3.13 1.04 4.48l3.35-2.62z"/>'
+            '<path fill="#EA4335" d="M12 6.01c1.47 0 2.79.51 3.83 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01z"/>'
+            '</svg>'
+            '<span>Continua con Google</span>'
+            '</a>'
+        )
+
+        st.markdown(google_html, unsafe_allow_html=True)
+
+    except Exception as exc:
+        st.error(
+            "Non riesco a generare il link Google. "
+            "Controlla la configurazione Auth di Supabase."
+        )
+        st.caption(str(exc))
+
+    if callback_error:
+        st.error(f"Login Google non completato: {callback_error}")
+
+    st.markdown("---")
 
     auth_mode = st.radio(
         "Account",
@@ -806,11 +986,17 @@ def show_login_page():
 
 
 # ==============================================================================
-# 5. RESTORE SESSION
+# 5. RESTORE SESSION / GOOGLE CALLBACK
 # ==============================================================================
-# A ogni refresh del browser Streamlit ricrea session_state. Prima di mostrare
-# il login proviamo quindi a ricostruire la sessione dal refresh token salvato
-# nel cookie persistente.
+# Gestiamo prima il callback PKCE Google, perché il code OAuth è monouso.
+if (
+    st.session_state.get("user") is None
+    and st.query_params.get("code")
+    and st.query_params.get("auth_flow")
+):
+    handle_google_oauth_callback()
+
+# Poi proviamo il restore persistente dal refresh-token cookie.
 if st.session_state.get("user") is None:
     restore_session_from_cookie()
 
