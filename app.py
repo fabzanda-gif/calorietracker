@@ -2972,6 +2972,8 @@ with st.sidebar:
         ):
             # Sincronizza sempre la lingua della pagina Impostazioni
             # con la lingua attualmente attiva nell'app.
+            # La pagina Impostazioni parte sempre dalla lingua corrente.
+            st.session_state.pop("settings_language_live", None)
             st.session_state["settings_language_live"] = (
                 st.session_state.get("lang_selector", "Italiano")
             )
@@ -2991,18 +2993,23 @@ with st.sidebar:
         if _current_menu_lang not in _language_options:
             _current_menu_lang = "Italiano"
 
-        _new_menu_lang = st.selectbox(
-            _pm["language"],
-            _language_options,
-            index=_language_options.index(_current_menu_lang),
-            key="profile_menu_language",
-            format_func=format_language_option,
-        )
+        # Quando siamo nella pagina Impostazioni, la lingua viene gestita
+        # esclusivamente dal selettore in cima a quella pagina. Evitiamo di
+        # renderizzare anche questo widget perché una sua key "vecchia"
+        # poteva riportare silenziosamente l'app all'italiano.
+        if not st.session_state.get("show_personal_settings", False):
+            _new_menu_lang = st.selectbox(
+                _pm["language"],
+                _language_options,
+                index=_language_options.index(_current_menu_lang),
+                key="profile_menu_language",
+                format_func=format_language_option,
+            )
 
-        if _new_menu_lang != st.session_state.get("lang_selector"):
-            st.session_state["lang_selector"] = _new_menu_lang
-            st.session_state["login_lang_selector"] = _new_menu_lang
-            st.rerun()
+            if _new_menu_lang != st.session_state.get("lang_selector"):
+                st.session_state["lang_selector"] = _new_menu_lang
+                st.session_state["login_lang_selector"] = _new_menu_lang
+                st.rerun()
 
         st.divider()
 
@@ -4070,8 +4077,19 @@ with st.sidebar:
 
     for page_name, page_id in pages_map.items():
         is_active = (st.session_state.current_page_id == page_id)
-        if st.button(page_name, key=f"nav_{page_id}", use_container_width=True, type="primary" if is_active else "secondary"):
+        if st.button(
+            page_name,
+            key=f"nav_{page_id}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+        ):
             st.session_state.current_page_id = page_id
+
+            # Una tab della sidebar è sempre una navigazione fuori da Settings.
+            st.session_state["show_personal_settings"] = False
+            st.session_state.pop("settings_language_live", None)
+            st.session_state.pop("profile_menu_language", None)
+
             st.rerun()
 
     selected_page_id = st.session_state.current_page_id
@@ -4321,18 +4339,12 @@ def render_personal_settings_page():
 
     si = SETTINGS_I18N.get(settings_lang, SETTINGS_I18N["Italiano"])
 
-    def _settings_language_changed():
-        _new_lang = st.session_state.get("settings_language_live", "Italiano")
-        st.session_state["lang_selector"] = _new_lang
-        st.session_state["login_lang_selector"] = _new_lang
-
     new_language = st.selectbox(
         "🌐 Language / Lingua / Taal / Langue",
         _settings_languages,
         index=_settings_languages.index(settings_lang),
         key="settings_language_live",
         format_func=format_language_option,
-        on_change=_settings_language_changed,
     )
 
     # IMPORTANTE: usiamo direttamente il valore restituito dal widget.
@@ -4351,7 +4363,10 @@ def render_personal_settings_page():
 
     if st.button(si["back"], key="settings_back"):
         st.session_state["show_personal_settings"] = False
+        st.session_state["current_page_id"] = "t1"
         st.session_state.pop("settings_language_live", None)
+        # Il widget lingua della sidebar verrà ricreato con il valore corrente.
+        st.session_state.pop("profile_menu_language", None)
         st.rerun()
 
     metadata = dict(getattr(st.session_state["user"], "user_metadata", None) or {})
@@ -4606,6 +4621,7 @@ def render_personal_settings_page():
             st.success(si["saved"])
             st.session_state["show_personal_settings"] = False
             st.session_state.pop("settings_language_live", None)
+            st.session_state.pop("profile_menu_language", None)
             st.rerun()
 
         except Exception as exc:
@@ -4839,8 +4855,8 @@ if selected_page == t["t1"]:
     }.get(current_lang, "🍲 Ricette")
 
     _input_source_options = [
-        t["opt_off"],
         t["opt_quick"],
+        t["opt_off"],
         recipe_source_label,
         t["opt_scan"],
     ]
