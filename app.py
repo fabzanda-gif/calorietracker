@@ -2925,7 +2925,7 @@ translations = {
         "scan_mode": "Sorgente immagine",
         "scan_camera": "📷 Fotocamera",
         "scan_upload": "🖼️ Galleria / File",
-        "scan_camera_help": "Scatta una foto del piatto. Nel prossimo passaggio collegheremo l'analisi AI.",
+        "scan_camera_help": "Scatta una foto del piatto. Su alcuni telefoni il browser apre la fotocamera frontale: usa il pulsante di cambio fotocamera per passare a quella posteriore.",
         "scan_upload_help": "In alternativa puoi scegliere una foto già presente sul dispositivo.",
         "scan_photo_ready": "✅ Foto acquisita. La fotocamera funziona correttamente.",
         "scan_ai_next": "La foto è pronta per l’analisi.", "scan_analyze":"✨ Analizza con AI", "scan_analyzing":"Sto analizzando il pasto…", "scan_ai_done":"✅ Analisi completata. Controlla e correggi i valori qui sotto prima di salvare.", "scan_ai_error":"Impossibile analizzare la foto: {error}",
@@ -3027,7 +3027,7 @@ translations = {
         "scan_mode": "Image source",
         "scan_camera": "📷 Camera",
         "scan_upload": "🖼️ Gallery / File",
-        "scan_camera_help": "Take a photo of the meal. In the next step we will connect AI analysis.",
+        "scan_camera_help": "Take a photo of the meal. On some phones the browser opens the front camera first; use the camera-switch control to select the rear camera.",
         "scan_upload_help": "Alternatively, choose an existing photo from your device.",
         "scan_photo_ready": "✅ Photo captured. The camera is working correctly.",
         "scan_ai_next": "The photo is ready for analysis.", "scan_analyze":"✨ Analyze with AI", "scan_analyzing":"Analyzing your meal…", "scan_ai_done":"✅ Analysis complete. Review and edit the values below before saving.", "scan_ai_error":"Could not analyze the photo: {error}",
@@ -3129,7 +3129,7 @@ translations = {
         "scan_mode": "Afbeeldingsbron",
         "scan_camera": "📷 Camera",
         "scan_upload": "🖼️ Galerij / Bestand",
-        "scan_camera_help": "Maak een foto van de maaltijd. In de volgende stap koppelen we de AI-analyse.",
+        "scan_camera_help": "Maak een foto van de maaltijd. Op sommige telefoons opent de browser eerst de frontcamera; gebruik de camerawisselknop voor de achtercamera.",
         "scan_upload_help": "Je kunt ook een bestaande foto op je apparaat kiezen.",
         "scan_photo_ready": "✅ Foto vastgelegd. De camera werkt correct.",
         "scan_ai_next": "De foto is klaar voor analyse.", "scan_analyze":"✨ Analyseren met AI", "scan_analyzing":"Maaltijd analyseren…", "scan_ai_done":"✅ Analyse voltooid. Controleer en pas de waarden hieronder aan voordat je opslaat.", "scan_ai_error":"De foto kon niet worden geanalyseerd: {error}",
@@ -3268,7 +3268,7 @@ translations["Français"] = {
         "scan_mode": "Source de l'image",
         "scan_camera": "📷 Appareil photo",
         "scan_upload": "🖼️ Galerie / Fichier",
-        "scan_camera_help": "Prenez une photo du repas. À l'étape suivante, nous connecterons l'analyse IA.",
+        "scan_camera_help": "Prenez une photo du repas. Sur certains téléphones, le navigateur ouvre d’abord la caméra avant ; utilisez le bouton de changement de caméra pour sélectionner la caméra arrière.",
         "scan_upload_help": "Vous pouvez également choisir une photo déjà présente sur votre appareil.",
         "scan_photo_ready": "✅ Photo capturée. L'appareil photo fonctionne correctement.",
         "scan_ai_next": "La photo est prête pour l’analyse.", "scan_analyze":"✨ Analyser avec l’IA", "scan_analyzing":"Analyse du repas…", "scan_ai_done":"✅ Analyse terminée. Vérifiez et corrigez les valeurs ci-dessous avant d’enregistrer.", "scan_ai_error":"Impossible d’analyser la photo : {error}",
@@ -4461,11 +4461,24 @@ if selected_page == t["t1"]:
         "Nederlands": "🍲 Recepten",
     }.get(current_lang, "🍲 Ricette")
 
+    _input_source_options = [
+        t["opt_off"],
+        t["opt_quick"],
+        recipe_source_label,
+        t["opt_scan"],
+    ]
+
+    if (
+        "meal_input_source" not in st.session_state
+        or st.session_state["meal_input_source"] not in _input_source_options
+    ):
+        st.session_state["meal_input_source"] = _input_source_options[0]
+
     input_source = st.radio(
         t["input_source_lbl"],
-        [t["opt_off"], t["opt_quick"], recipe_source_label, t["opt_scan"]],
+        _input_source_options,
         horizontal=True,
-        index=0,
+        key="meal_input_source",
     )
 
     is_online = input_source == t["opt_off"]
@@ -4496,6 +4509,28 @@ if selected_page == t["t1"]:
         st.session_state["selected_source_note"] = str(note or "")
         st.session_state["selected_source_category"] = category if category in MEAL_CATEGORIES else "Casa"
         st.session_state["form_version"] += 1
+
+    def clear_meal_entry_after_save():
+        """
+        Ripulisce completamente il form dopo un inserimento riuscito e
+        riporta la sorgente al primo metodo predefinito.
+
+        L'incremento di form_version genera nuove key per tutti i widget
+        dinamici, quindi nome, quantità, kcal, macro, note e selezioni
+        non restano popolati dal pasto precedente.
+        """
+        # Valori nutrizionali / nome / quantità.
+        reset_or_update()
+
+        # Sorgenti e risultati temporanei.
+        st.session_state["api_res"] = {}
+        st.session_state["prod_select"] = ""
+        st.session_state.pop("ai_photo_analysis_done", None)
+
+        # Ritorna al primo campo: Open Food Facts.
+        st.session_state["meal_input_source"] = _input_source_options[0]
+        st.session_state["last_source"] = _input_source_options[0]
+
 
     if st.session_state.get("last_source") != input_source:
         st.session_state["last_source"] = input_source
@@ -4967,7 +5002,11 @@ if selected_page == t["t1"]:
                     ingredients_json=None,
                 )
                 refresh_daily_logs(log_date)
-                reset_or_update()
+
+                # Dopo il salvataggio: pulizia completa del form e ritorno
+                # automatico alla prima sorgente di inserimento.
+                clear_meal_entry_after_save()
+
                 st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
                 st.rerun()
             except Exception as e:
