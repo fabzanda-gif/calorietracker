@@ -955,6 +955,41 @@ def recipe_image_url(row):
 
 
 
+def render_recipe_ingredients_dropdown(recipe_row, key_suffix):
+    """Mostra gli ingredienti salvati nella ricetta dentro un expander."""
+    ingredients = recipe_row.get("ingredients_json") or []
+
+    with st.expander(
+        t["recipe_show_ingredients"],
+        expanded=False,
+    ):
+        if not ingredients:
+            st.caption(t["recipe_no_ingredients"])
+            return
+
+        for idx, ing in enumerate(ingredients, start=1):
+            name = str(ing.get("name") or "").strip() or f"#{idx}"
+            qty = _safe_float(ing.get("quantity_g"))
+
+            kcal_per_100 = _safe_float(ing.get("calories_per_100g"))
+            pro_per_100 = _safe_float(ing.get("protein_per_100g"))
+            carbs_per_100 = _safe_float(ing.get("carbs_per_100g"))
+            fat_per_100 = _safe_float(ing.get("fat_per_100g"))
+
+            factor = qty / 100.0 if qty > 0 else 0.0
+
+            st.markdown(f"**{html.escape(name)}** — {qty:g} g")
+            st.caption(
+                f"{kcal_per_100 * factor:.0f} kcal · "
+                f"Pro {pro_per_100 * factor:.1f} g · "
+                f"Carbs {carbs_per_100 * factor:.1f} g · "
+                f"Fat {fat_per_100 * factor:.1f} g"
+            )
+
+            if idx < len(ingredients):
+                st.divider()
+
+
 def render_recipe_card_image(image_url, alt_text="Ricetta"):
     """Landscape center-crop for recipe cards without modifying the source image."""
     safe_url = html.escape(str(image_url or ""), quote=True)
@@ -2860,8 +2895,8 @@ translations = {
         "input_source_lbl": "Fonte inserimento",
         "opt_off": "🔍 Cerca online (Open Food Facts)",
         "opt_quick": "🍳 Immissione Rapida",
-        "opt_scan": "▥ Scansiona",
-        "scan_title": "▥ Scansiona il pasto",
+        "opt_scan": "📸 Foto AI",
+        "scan_title": "📸 Foto AI",
         "scan_mode": "Sorgente immagine",
         "scan_camera": "📷 Fotocamera",
         "scan_upload": "🖼️ Galleria / File",
@@ -2962,8 +2997,8 @@ translations = {
         "input_source_lbl": "Input source",
         "opt_off": "🔍 Search online (Open Food Facts)",
         "opt_quick": "🍳 Quick Entry",
-        "opt_scan": "▥ Scan",
-        "scan_title": "▥ Scan your meal",
+        "opt_scan": "📸 AI Photo",
+        "scan_title": "📸 AI Photo",
         "scan_mode": "Image source",
         "scan_camera": "📷 Camera",
         "scan_upload": "🖼️ Gallery / File",
@@ -3064,8 +3099,8 @@ translations = {
         "input_source_lbl": "Invoerbron",
         "opt_off": "🔍 Online zoeken (Open Food Facts)",
         "opt_quick": "🍳 Snelle Invoer",
-        "opt_scan": "▥ Scannen",
-        "scan_title": "▥ Scan je maaltijd",
+        "opt_scan": "📸 AI-foto",
+        "scan_title": "📸 AI-foto",
         "scan_mode": "Afbeeldingsbron",
         "scan_camera": "📷 Camera",
         "scan_upload": "🖼️ Galerij / Bestand",
@@ -3203,8 +3238,8 @@ translations["Français"] = {
     "input_source_lbl": "Source de saisie",
     "opt_off": "🔍 Rechercher en ligne (Open Food Facts)",
     "opt_quick": "🍳 Saisie rapide",
-        "opt_scan": "▥ Scanner",
-        "scan_title": "▥ Scanner le repas",
+        "opt_scan": "📸 Photo IA",
+        "scan_title": "📸 Photo IA",
         "scan_mode": "Source de l'image",
         "scan_camera": "📷 Appareil photo",
         "scan_upload": "🖼️ Galerie / Fichier",
@@ -3341,6 +3376,8 @@ translations["Italiano"].update({
     "recipe_private": "Privata",
     "recipe_shared_badge": "Condivisa",
     "recipe_no_photo": "Nessuna foto",
+    "recipe_show_ingredients": "🧾 Ingredienti",
+    "recipe_no_ingredients": "Ingredienti non disponibili.",
     "recipe_photo_error": "Impossibile caricare la foto: {error}",
     "recipe_servings": "🍽️ Porzioni previste",
     "recipe_servings_help": "Indica quante porzioni produce l'intera ricetta. Potrai poi registrare 0,5 / 1 / 1,5 porzioni e calorie e macro verranno calcolati automaticamente.",
@@ -3399,6 +3436,8 @@ translations["English"].update({
     "recipe_private": "Private",
     "recipe_shared_badge": "Shared",
     "recipe_no_photo": "No photo",
+    "recipe_show_ingredients": "🧾 Ingredients",
+    "recipe_no_ingredients": "Ingredients not available.",
     "recipe_photo_error": "Could not upload the photo: {error}",
     "recipe_servings": "🍽️ Expected servings",
     "recipe_servings_help": "Enter how many servings the whole recipe makes. You can later log 0.5 / 1 / 1.5 servings and calories/macros will scale automatically.",
@@ -3457,6 +3496,8 @@ translations["Nederlands"].update({
     "recipe_private": "Privé",
     "recipe_shared_badge": "Gedeeld",
     "recipe_no_photo": "Geen foto",
+    "recipe_show_ingredients": "🧾 Ingrediënten",
+    "recipe_no_ingredients": "Ingrediënten niet beschikbaar.",
     "recipe_photo_error": "Foto uploaden mislukt: {error}",
     "recipe_servings": "🍽️ Verwachte porties",
     "recipe_servings_help": "Geef aan hoeveel porties het hele recept oplevert. Later kun je 0,5 / 1 / 1,5 porties registreren en calorieën/macro's worden automatisch aangepast.",
@@ -3515,6 +3556,8 @@ translations["Français"].update({
     "recipe_private": "Privée",
     "recipe_shared_badge": "Partagée",
     "recipe_no_photo": "Aucune photo",
+    "recipe_show_ingredients": "🧾 Ingrédients",
+    "recipe_no_ingredients": "Ingrédients non disponibles.",
     "recipe_photo_error": "Impossible d’importer la photo : {error}",
     "recipe_servings": "🍽️ Portions prévues",
     "recipe_servings_help": "Indiquez combien de portions produit la recette entière. Vous pourrez ensuite enregistrer 0,5 / 1 / 1,5 portion et les calories/macros seront ajustées automatiquement.",
@@ -4208,8 +4251,9 @@ if selected_page == t["t1"]:
 
     input_source = st.radio(
         t["input_source_lbl"],
-        [t["opt_off"], t["opt_quick"], recipe_source_label, t["opt_scan"]],
+        [t["opt_scan"], t["opt_off"], t["opt_quick"], recipe_source_label],
         horizontal=True,
+        index=0,
     )
 
     is_online = input_source == t["opt_off"]
@@ -5856,6 +5900,11 @@ elif selected_page == t["t4"]:
                             if r.get("notes"):
                                 st.caption(str(r.get("notes")))
 
+                            render_recipe_ingredients_dropdown(
+                                r,
+                                f"my_recipe_{r.get('id')}",
+                            )
+
             # Gestione condivisione delle ricette già esistenti.
             st.markdown(t["sharing_manage"])
             recipe_options = {
@@ -5989,6 +6038,11 @@ elif selected_page == t["t4"]:
 
                             if r.get("notes"):
                                 st.caption(str(r.get("notes")))
+
+                            render_recipe_ingredients_dropdown(
+                                r,
+                                f"shared_recipe_{r.get('id')}",
+                            )
         else:
             st.info(t["no_shared_recipes"])
 
