@@ -11,11 +11,231 @@ from html import escape
 import uuid
 import base64
 import hashlib
+import io
 from pathlib import Path
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
 from openai import OpenAI
+
+# ------------------------------------------------------------------
+# Fotocamera posteriore per Foto AI
+# Usa la Components v2 API di Streamlit per chiedere al browser
+# facingMode="environment". Se il dispositivo/browser non la rispetta,
+# fa fallback a una fotocamera disponibile.
+# ------------------------------------------------------------------
+_REAR_CAMERA_HTML = """
+<div class="sanocam">
+  <div class="sanocam-video-wrap">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+  <div id="status" class="sanocam-status"></div>
+  <div class="sanocam-actions">
+    <button id="capture" type="button">📸</button>
+    <button id="switch" type="button" title="Switch camera">🔄</button>
+  </div>
+  <canvas id="canvas" hidden></canvas>
+</div>
+"""
+
+_REAR_CAMERA_CSS = """
+.sanocam {
+  width: 100%;
+  max-width: 560px;
+  font-family: inherit;
+}
+.sanocam-video-wrap {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #111827;
+  aspect-ratio: 4 / 3;
+}
+.sanocam video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sanocam-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+.sanocam button {
+  border: 0;
+  border-radius: 999px;
+  min-width: 58px;
+  height: 48px;
+  padding: 0 18px;
+  cursor: pointer;
+  font-size: 22px;
+  background: #ff8b8b;
+  color: #1a2942;
+  box-shadow: 0 3px 10px rgba(0,0,0,.12);
+}
+.sanocam button:active {
+  transform: scale(.97);
+}
+.sanocam-status {
+  min-height: 18px;
+  margin-top: 6px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--st-text-color, #1a2942);
+}
+"""
+
+_REAR_CAMERA_JS = r"""
+export default function(component) {
+  const { parentElement, setStateValue } = component;
+  const video = parentElement.querySelector("#video");
+  const canvas = parentElement.querySelector("#canvas");
+  const capture = parentElement.querySelector("#capture");
+  const switchBtn = parentElement.querySelector("#switch");
+  const status = parentElement.querySelector("#status");
+
+  let stream = null;
+  let usingEnvironment = true;
+  let stopped = false;
+
+  async function stopStream() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+  }
+
+  async function startCamera(preferEnvironment = true) {
+    await stopStream();
+    status.textContent = "";
+
+    const preferred = preferEnvironment ? "environment" : "user";
+
+    try {
+      // First try: explicitly request the preferred camera.
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { exact: preferred },
+          width: { ideal: 1280 },
+          height: { ideal: 960 }
+        }
+      });
+    } catch (exactError) {
+      try {
+        // Fallback: tell the browser which camera we prefer.
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: preferred },
+            width: { ideal: 1280 },
+            height: { ideal: 960 }
+          }
+        });
+      } catch (idealError) {
+        // Final fallback: any available camera.
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: true
+        });
+      }
+    }
+
+    if (stopped) {
+      await stopStream();
+      return;
+    }
+
+    video.srcObject = stream;
+    await video.play();
+
+    const track = stream.getVideoTracks()[0];
+    const settings = track && track.getSettings ? track.getSettings() : {};
+    if (settings.facingMode) {
+      usingEnvironment = settings.facingMode === "environment";
+    } else {
+      usingEnvironment = preferEnvironment;
+    }
+  }
+
+  capture.onclick = () => {
+    if (!video.videoWidth || !video.videoHeight) {
+      status.textContent = "Camera not ready";
+      return;
+    }
+
+    // Keep image size reasonable for mobile upload/API usage.
+    const maxWidth = 1280;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const photo = canvas.toDataURL("image/jpeg", 0.88);
+    setStateValue("photo", photo);
+    status.textContent = "✓";
+  };
+
+  switchBtn.onclick = async () => {
+    usingEnvironment = !usingEnvironment;
+    try {
+      await startCamera(usingEnvironment);
+    } catch (err) {
+      status.textContent = err && err.message ? err.message : "Camera error";
+    }
+  };
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status.textContent = "Camera API not supported by this browser";
+  } else {
+    startCamera(true).catch((err) => {
+      status.textContent = err && err.message ? err.message : "Camera error";
+    });
+  }
+
+  return () => {
+    stopped = true;
+    stopStream();
+  };
+}
+"""
+
+rear_camera_component = st.components.v2.component(
+    "sanasync_rear_camera",
+    html=_REAR_CAMERA_HTML,
+    css=_REAR_CAMERA_CSS,
+    js=_REAR_CAMERA_JS,
+)
+
+
+def rear_camera_input(key):
+    """Restituisce BytesIO JPEG quando l'utente scatta una foto."""
+    result = rear_camera_component(
+        key=key,
+        default={"photo": None},
+        on_photo_change=lambda: None,
+        height=520,
+    )
+
+    photo_data_url = getattr(result, "photo", None)
+    if not photo_data_url:
+        return None
+
+    try:
+        _, encoded = str(photo_data_url).split(",", 1)
+        image_bytes = base64.b64decode(encoded)
+        image_file = io.BytesIO(image_bytes)
+        image_file.name = "camera.jpg"
+        image_file.type = "image/jpeg"
+        return image_file
+    except Exception:
+        return None
+
+
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -2926,7 +3146,7 @@ translations = {
         "scan_mode": "Sorgente immagine",
         "scan_camera": "📷 Fotocamera",
         "scan_upload": "🖼️ Galleria / File",
-        "scan_camera_help": "Scatta una foto del piatto. Su alcuni telefoni il browser apre la fotocamera frontale: usa il pulsante di cambio fotocamera per passare a quella posteriore.",
+        "scan_camera_help": "Scatta una foto del piatto. SanoSync proverà ad aprire direttamente la fotocamera posteriore; usa 🔄 per cambiarla se necessario.",
         "scan_upload_help": "In alternativa puoi scegliere una foto già presente sul dispositivo.",
         "scan_photo_ready": "✅ Foto acquisita. La fotocamera funziona correttamente.",
         "scan_ai_next": "La foto è pronta per l’analisi.", "scan_analyze":"✨ Analizza con AI", "scan_analyzing":"Sto analizzando il pasto…", "scan_ai_done":"✅ Analisi completata. Controlla e correggi i valori qui sotto prima di salvare.", "scan_ai_error":"Impossibile analizzare la foto: {error}",
@@ -3028,7 +3248,7 @@ translations = {
         "scan_mode": "Image source",
         "scan_camera": "📷 Camera",
         "scan_upload": "🖼️ Gallery / File",
-        "scan_camera_help": "Take a photo of the meal. On some phones the browser opens the front camera first; use the camera-switch control to select the rear camera.",
+        "scan_camera_help": "Take a photo of the meal. SanoSync will try to open the rear camera first; use 🔄 to switch if needed.",
         "scan_upload_help": "Alternatively, choose an existing photo from your device.",
         "scan_photo_ready": "✅ Photo captured. The camera is working correctly.",
         "scan_ai_next": "The photo is ready for analysis.", "scan_analyze":"✨ Analyze with AI", "scan_analyzing":"Analyzing your meal…", "scan_ai_done":"✅ Analysis complete. Review and edit the values below before saving.", "scan_ai_error":"Could not analyze the photo: {error}",
@@ -3130,7 +3350,7 @@ translations = {
         "scan_mode": "Afbeeldingsbron",
         "scan_camera": "📷 Camera",
         "scan_upload": "🖼️ Galerij / Bestand",
-        "scan_camera_help": "Maak een foto van de maaltijd. Op sommige telefoons opent de browser eerst de frontcamera; gebruik de camerawisselknop voor de achtercamera.",
+        "scan_camera_help": "Maak een foto van de maaltijd. SanoSync probeert eerst de achtercamera te openen; gebruik 🔄 om zo nodig te wisselen.",
         "scan_upload_help": "Je kunt ook een bestaande foto op je apparaat kiezen.",
         "scan_photo_ready": "✅ Foto vastgelegd. De camera werkt correct.",
         "scan_ai_next": "De foto is klaar voor analyse.", "scan_analyze":"✨ Analyseren met AI", "scan_analyzing":"Maaltijd analyseren…", "scan_ai_done":"✅ Analyse voltooid. Controleer en pas de waarden hieronder aan voordat je opslaat.", "scan_ai_error":"De foto kon niet worden geanalyseerd: {error}",
@@ -3269,7 +3489,7 @@ translations["Français"] = {
         "scan_mode": "Source de l'image",
         "scan_camera": "📷 Appareil photo",
         "scan_upload": "🖼️ Galerie / Fichier",
-        "scan_camera_help": "Prenez une photo du repas. Sur certains téléphones, le navigateur ouvre d’abord la caméra avant ; utilisez le bouton de changement de caméra pour sélectionner la caméra arrière.",
+        "scan_camera_help": "Prenez une photo du repas. SanoSync essaiera d’ouvrir d’abord la caméra arrière ; utilisez 🔄 pour changer si nécessaire.",
         "scan_upload_help": "Vous pouvez également choisir une photo déjà présente sur votre appareil.",
         "scan_photo_ready": "✅ Photo capturée. L'appareil photo fonctionne correctement.",
         "scan_ai_next": "La photo est prête pour l’analyse.", "scan_analyze":"✨ Analyser avec l’IA", "scan_analyzing":"Analyse du repas…", "scan_ai_done":"✅ Analyse terminée. Vérifiez et corrigez les valeurs ci-dessous avant d’enregistrer.", "scan_ai_error":"Impossible d’analyser la photo : {error}",
@@ -4707,9 +4927,9 @@ if selected_page == t["t1"]:
 
         _scan_photo = None
         if _scan_mode == t["scan_camera"]:
-            _scan_photo = st.camera_input(
-                t["scan_camera"],
-                key=f"meal_camera_{v}",
+            # Custom camera: asks mobile browsers for the rear camera first.
+            _scan_photo = rear_camera_input(
+                key=f"meal_rear_camera_{v}",
             )
         else:
             _scan_photo = st.file_uploader(
