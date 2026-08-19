@@ -496,6 +496,15 @@ st.markdown("""
             .recipe-card-photo { height:180px; }
         }
 
+        /* Insertion-method card */
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius:18px !important;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"] > div {
+            border-radius:18px !important;
+        }
+
         /* Metric Cards */
         [data-testid="stMetric"] {
             background-color: #FFFFFF;
@@ -3178,7 +3187,7 @@ translations = {
         "tab1_title": "🍽️ Inserimento Cibo & Pasti",
         "input_source_lbl": "Fonte inserimento",
         "opt_off": "🔍 Cerca online (Open Food Facts)",
-        "opt_quick": "🍳 Immissione Rapida",
+        "opt_quick": "🍳 Immissione Rapida","quick_select_used":t["quick_select_used"],"quick_empty":"Nessun alimento ancora disponibile. Registra prima un pasto.","quick_load_error":"Errore nel caricamento delle immissioni rapide: {error}",
         "opt_scan": "📸 Foto AI",
         "scan_title": "📸 Foto AI",
         "scan_mode": "Sorgente immagine",
@@ -3280,7 +3289,7 @@ translations = {
         "tab1_title": "🍽️ Food & Meal Logging",
         "input_source_lbl": "Input source",
         "opt_off": "🔍 Search online (Open Food Facts)",
-        "opt_quick": "🍳 Quick Entry",
+        "opt_quick": "🍳 Quick Entry","quick_select_used":"Select a previously used food","quick_empty":"No foods available yet. Log a meal first.","quick_load_error":"Error loading quick entries: {error}",
         "opt_scan": "📸 AI Photo",
         "scan_title": "📸 AI Photo",
         "scan_mode": "Image source",
@@ -3382,7 +3391,7 @@ translations = {
         "tab1_title": "🍽️ Voeding & Maaltijden Invoeren",
         "input_source_lbl": "Invoerbron",
         "opt_off": "🔍 Online zoeken (Open Food Facts)",
-        "opt_quick": "🍳 Snelle Invoer",
+        "opt_quick": "🍳 Snelle Invoer","quick_select_used":"Selecteer een eerder gebruikt voedingsmiddel","quick_empty":"Nog geen voedingsmiddelen beschikbaar. Registreer eerst een maaltijd.","quick_load_error":"Fout bij het laden van snelle invoer: {error}",
         "opt_scan": "📸 AI-foto",
         "scan_title": "📸 AI-foto",
         "scan_mode": "Afbeeldingsbron",
@@ -3521,7 +3530,7 @@ translations["Français"] = {
     "tab1_title": "🍽️ Saisie des aliments & repas",
     "input_source_lbl": "Source de saisie",
     "opt_off": "🔍 Rechercher en ligne (Open Food Facts)",
-    "opt_quick": "🍳 Saisie rapide",
+    "opt_quick": "🍳 Saisie rapide","quick_select_used":"Sélectionnez un aliment déjà utilisé","quick_empty":"Aucun aliment disponible pour le moment. Enregistrez d’abord un repas.","quick_load_error":"Erreur lors du chargement des saisies rapides : {error}",
         "opt_scan": "📸 Photo IA",
         "scan_title": "📸 Photo IA",
         "scan_mode": "Source de l'image",
@@ -4942,246 +4951,193 @@ if selected_page == t["t1"]:
         reset_or_update()
         st.rerun()
 
-    # ------------------------------------------------------------------
-    # A. Open Food Facts
-    # ------------------------------------------------------------------
-    if is_online:
-        search_q = st.text_input(t["search_food"])
-        if st.button(t["search_btn"]):
-            if len(search_q.strip()) >= 2 or search_q.strip().isdigit():
-                with st.spinner("Ricerca in Open Food Facts..."):
-                    st.session_state["api_res"] = search_open_food_facts(search_q)
-                st.session_state["prod_select"] = ""
-                st.session_state["last_selected"] = ""
-                if not st.session_state["api_res"]:
-                    st.info(t["no_products"])
-                st.rerun()
-            else:
-                st.warning(t["search_min_chars"])
+    # --------------------------------------------------------------
+    # METODO DI INSERIMENTO
+    # Card comune per Quick Entry / Open Food Facts / Ricette / Foto AI
+    # --------------------------------------------------------------
+    with st.container(border=True):
+        st.markdown(f"### {input_source}")
+        # ------------------------------------------------------------------
+        # A. Open Food Facts
+        # ------------------------------------------------------------------
+        if is_online:
+            search_q = st.text_input(t["search_food"])
+            if st.button(t["search_btn"]):
+                if len(search_q.strip()) >= 2 or search_q.strip().isdigit():
+                    with st.spinner("Ricerca in Open Food Facts..."):
+                        st.session_state["api_res"] = search_open_food_facts(search_q)
+                    st.session_state["prod_select"] = ""
+                    st.session_state["last_selected"] = ""
+                    if not st.session_state["api_res"]:
+                        st.info(t["no_products"])
+                    st.rerun()
+                else:
+                    st.warning(t["search_min_chars"])
 
-        api_res = st.session_state.get("api_res", {})
-        if api_res:
-            sel_prod = st.selectbox(t["select_db"], [""] + list(api_res.keys()), key=f"prod_select_{v}")
-            if sel_prod and sel_prod != st.session_state.get("last_selected"):
-                p_data = api_res[sel_prod]
-                reset_or_update(
-                    p_data.get("name", ""),
-                    p_data.get("calories", 0),
-                    p_data.get("protein", 0),
-                    p_data.get("carbs", 0),
-                    p_data.get("fat", 0),
-                    sel_prod,
-                    100.0,
-                    True,
-                )
-                st.rerun()
-
-    # ------------------------------------------------------------------
-    # B. Immissione rapida = storico meals, NON recipes
-    # ------------------------------------------------------------------
-    elif is_quick:
-        try:
-            quick_entries = get_quick_entries_from_meals()
-            if quick_entries:
-                quick_by_label = {q["label"]: q for q in quick_entries}
-                sel_quick = st.selectbox(
-                    "Seleziona un alimento già utilizzato",
-                    [""] + list(quick_by_label.keys()),
-                    key=f"quick_meal_select_{v}",
-                )
-                if sel_quick and sel_quick != st.session_state.get("last_selected"):
-                    q = quick_by_label[sel_quick]
+            api_res = st.session_state.get("api_res", {})
+            if api_res:
+                sel_prod = st.selectbox(t["select_db"], [""] + list(api_res.keys()), key=f"prod_select_{v}")
+                if sel_prod and sel_prod != st.session_state.get("last_selected"):
+                    p_data = api_res[sel_prod]
                     reset_or_update(
-                        q["name"], q["calories"], q["protein"], q["carbs"], q["fat"],
-                        sel_quick, q["default_quantity"], q["is_per_100g"], q.get("notes", ""), q.get("category", "Casa"),
+                        p_data.get("name", ""),
+                        p_data.get("calories", 0),
+                        p_data.get("protein", 0),
+                        p_data.get("carbs", 0),
+                        p_data.get("fat", 0),
+                        sel_prod,
+                        100.0,
+                        True,
                     )
                     st.rerun()
+
+        # ------------------------------------------------------------------
+        # B. Immissione rapida = storico meals, NON recipes
+        # ------------------------------------------------------------------
+        elif is_quick:
+            try:
+                quick_entries = get_quick_entries_from_meals()
+                if quick_entries:
+                    quick_by_label = {q["label"]: q for q in quick_entries}
+                    sel_quick = st.selectbox(
+                        "Seleziona un alimento già utilizzato",
+                        [""] + list(quick_by_label.keys()),
+                        key=f"quick_meal_select_{v}",
+                    )
+                    if sel_quick and sel_quick != st.session_state.get("last_selected"):
+                        q = quick_by_label[sel_quick]
+                        reset_or_update(
+                            q["name"], q["calories"], q["protein"], q["carbs"], q["fat"],
+                            sel_quick, q["default_quantity"], q["is_per_100g"], q.get("notes", ""), q.get("category", "Casa"),
+                        )
+                        st.rerun()
+                else:
+                    st.info(t["quick_empty"])
+            except Exception as e:
+                st.error(t["quick_load_error"].format(error=e))
+
+        # ------------------------------------------------------------------
+        # C. Foto AI
+        # La fotocamera viene creata SOLO quando l'utente seleziona Foto AI.
+        # ------------------------------------------------------------------
+        elif is_scan:
+            st.markdown(f"### {t['scan_title']}")
+            st.caption(t["scan_camera_help"])
+
+            _scan_mode = st.radio(
+                t["scan_mode"],
+                [t["scan_camera"], t["scan_upload"]],
+                horizontal=True,
+                key=f"scan_mode_{v}",
+            )
+
+            _scan_photo = None
+            if _scan_mode == t["scan_camera"]:
+                # Custom camera: asks mobile browsers for the rear camera first.
+                _scan_photo = rear_camera_input(
+                    key=f"meal_rear_camera_{v}",
+                )
             else:
-                st.info("Nessun alimento ancora disponibile. Registra prima un pasto nella Tab 1.")
-        except Exception as e:
-            st.error(f"Errore nel caricamento delle immissioni rapide: {e}")
+                _scan_photo = st.file_uploader(
+                    t["scan_upload"],
+                    type=["jpg", "jpeg", "png", "webp"],
+                    key=f"meal_scan_upload_{v}",
+                    help=t["scan_upload_help"],
+                )
 
-    # ------------------------------------------------------------------
-    # C. Foto AI
-    # La fotocamera viene creata SOLO quando l'utente seleziona Foto AI.
-    # ------------------------------------------------------------------
-    elif is_scan:
-        st.markdown(f"### {t['scan_title']}")
-        st.caption(t["scan_camera_help"])
+            if _scan_photo is not None:
+                st.image(_scan_photo, width=420)
 
-        _scan_mode = st.radio(
-            t["scan_mode"],
-            [t["scan_camera"], t["scan_upload"]],
-            horizontal=True,
-            key=f"scan_mode_{v}",
-        )
+                # Analisi automatica: una nuova foto viene inviata subito a Groq.
+                # L'hash impedisce di richiamare l'API più volte sulla stessa foto
+                # durante i normali rerun di Streamlit.
+                _scan_bytes = _scan_photo.getvalue()
+                _scan_hash = hashlib.sha256(_scan_bytes).hexdigest()
 
-        _scan_photo = None
-        if _scan_mode == t["scan_camera"]:
-            # Custom camera: asks mobile browsers for the rear camera first.
-            _scan_photo = rear_camera_input(
-                key=f"meal_rear_camera_{v}",
-            )
-        else:
-            _scan_photo = st.file_uploader(
-                t["scan_upload"],
-                type=["jpg", "jpeg", "png", "webp"],
-                key=f"meal_scan_upload_{v}",
-                help=t["scan_upload_help"],
-            )
+                if st.session_state.get("ai_last_photo_hash") != _scan_hash:
+                    try:
+                        with st.spinner(t["scan_analyzing"]):
+                            _ai_food = analyze_food_photo_with_ai(
+                                _scan_photo,
+                                current_lang,
+                            )
 
-        if _scan_photo is not None:
-            st.image(_scan_photo, width=420)
+                        st.session_state["ai_last_photo_hash"] = _scan_hash
 
-            # Analisi automatica: una nuova foto viene inviata subito a Groq.
-            # L'hash impedisce di richiamare l'API più volte sulla stessa foto
-            # durante i normali rerun di Streamlit.
-            _scan_bytes = _scan_photo.getvalue()
-            _scan_hash = hashlib.sha256(_scan_bytes).hexdigest()
+                        # L'AI restituisce i nutrienti TOTALI della porzione
+                        # fotografata. Li convertiamo in valori per 100 g, così
+                        # grammi/kcal/macros restano modificabili e sincronizzati.
+                        _ai_grams = max(
+                            1.0,
+                            _safe_float(_ai_food.get("estimated_grams")),
+                        )
+                        _factor = 100.0 / _ai_grams
 
-            if st.session_state.get("ai_last_photo_hash") != _scan_hash:
-                try:
-                    with st.spinner(t["scan_analyzing"]):
-                        _ai_food = analyze_food_photo_with_ai(
-                            _scan_photo,
-                            current_lang,
+                        reset_or_update(
+                            _ai_food["name"],
+                            _ai_food["calories"] * _factor,
+                            _ai_food["protein"] * _factor,
+                            _ai_food["carbs"] * _factor,
+                            _ai_food["fat"] * _factor,
+                            f"ai_photo_{_scan_hash[:12]}",
+                            _ai_grams,
+                            True,
+                            _ai_food.get("notes", ""),
+                            "Casa",
+                        )
+                        st.session_state["ai_photo_analysis_done"] = True
+                        st.rerun()
+
+                    except Exception as e:
+                        st.error(
+                            t["scan_ai_error"].format(error=str(e))
+                        )
+                else:
+                    st.caption(t["scan_ai_next"])
+
+            if st.session_state.pop("ai_photo_analysis_done", False):
+                st.success(t["scan_ai_done"])
+
+        # ------------------------------------------------------------------
+        # D. Ricette = catalogo permanente recipe_library
+        # ------------------------------------------------------------------
+        # Ricette legacy (blocco mantenuto per compatibilità; normalmente non raggiunto)
+        # ------------------------------------------------------------------
+        elif is_recipe:
+            try:
+                recipe_rows = load_available_recipes()
+
+                recipes_dict = {
+                    str(r.get("name") or "").strip(): r
+                    for r in recipe_rows
+                    if str(r.get("name") or "").strip()
+                }
+
+                if recipes_dict:
+                    sel_recipe = st.selectbox(
+                        t["select_recipe"],
+                        [""] + sorted(recipes_dict.keys(), key=str.casefold),
+                        key=f"recipe_select_{v}",
+                    )
+
+                    if (
+                        sel_recipe
+                        and sel_recipe != st.session_state.get("last_selected")
+                    ):
+                        r = recipes_dict[sel_recipe]
+                        # _safe_float accetta un solo argomento.
+                        # Se recipe_servings è NULL/vuoto, usiamo 1.0 come fallback.
+                        _raw_recipe_servings = r.get("recipe_servings")
+                        recipe_servings = max(
+                            _safe_float(
+                                _raw_recipe_servings
+                                if _raw_recipe_servings not in (None, "")
+                                else 1.0
+                            ),
+                            1.0,
                         )
 
-                    st.session_state["ai_last_photo_hash"] = _scan_hash
-
-                    # L'AI restituisce i nutrienti TOTALI della porzione
-                    # fotografata. Li convertiamo in valori per 100 g, così
-                    # grammi/kcal/macros restano modificabili e sincronizzati.
-                    _ai_grams = max(
-                        1.0,
-                        _safe_float(_ai_food.get("estimated_grams")),
-                    )
-                    _factor = 100.0 / _ai_grams
-
-                    reset_or_update(
-                        _ai_food["name"],
-                        _ai_food["calories"] * _factor,
-                        _ai_food["protein"] * _factor,
-                        _ai_food["carbs"] * _factor,
-                        _ai_food["fat"] * _factor,
-                        f"ai_photo_{_scan_hash[:12]}",
-                        _ai_grams,
-                        True,
-                        _ai_food.get("notes", ""),
-                        "Casa",
-                    )
-                    st.session_state["ai_photo_analysis_done"] = True
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(
-                        t["scan_ai_error"].format(error=str(e))
-                    )
-            else:
-                st.caption(t["scan_ai_next"])
-
-        if st.session_state.pop("ai_photo_analysis_done", False):
-            st.success(t["scan_ai_done"])
-
-    # ------------------------------------------------------------------
-    # D. Ricette = catalogo permanente recipe_library
-    # ------------------------------------------------------------------
-    # Ricette legacy (blocco mantenuto per compatibilità; normalmente non raggiunto)
-    # ------------------------------------------------------------------
-    elif is_recipe:
-        try:
-            recipe_rows = load_available_recipes()
-
-            recipes_dict = {
-                str(r.get("name") or "").strip(): r
-                for r in recipe_rows
-                if str(r.get("name") or "").strip()
-            }
-
-            if recipes_dict:
-                sel_recipe = st.selectbox(
-                    t["select_recipe"],
-                    [""] + sorted(recipes_dict.keys(), key=str.casefold),
-                    key=f"recipe_select_{v}",
-                )
-
-                if (
-                    sel_recipe
-                    and sel_recipe != st.session_state.get("last_selected")
-                ):
-                    r = recipes_dict[sel_recipe]
-                    # _safe_float accetta un solo argomento.
-                    # Se recipe_servings è NULL/vuoto, usiamo 1.0 come fallback.
-                    _raw_recipe_servings = r.get("recipe_servings")
-                    recipe_servings = max(
-                        _safe_float(
-                            _raw_recipe_servings
-                            if _raw_recipe_servings not in (None, "")
-                            else 1.0
-                        ),
-                        1.0,
-                    )
-
-                    # Base = UNA porzione.
-                    reset_or_update(
-                        sel_recipe,
-                        _safe_float(r.get("calories")) / recipe_servings,
-                        _safe_float(r.get("protein")) / recipe_servings,
-                        _safe_float(r.get("carbs")) / recipe_servings,
-                        _safe_float(r.get("fat")) / recipe_servings,
-                        sel_recipe,
-                        1.0,
-                        False,
-                        r.get("notes", ""),
-                        r.get("category", "Casa"),
-                    )
-                    st.rerun()
-            else:
-                st.info(t["no_recipes"])
-
-        except Exception as e:
-            st.error(f"Errore nel caricamento delle ricette: {e}")
-
-    # ------------------------------------------------------------------
-    elif is_recipe:
-        try:
-            recipe_rows = (
-                supabase.table("meals")
-                .select(
-                    "id,date,name,base_name,quantity,is_per_100g,"
-                    "base_calories,base_protein,base_carbs,base_fat,"
-                    "calories,protein,carbs,fat,notes,category,ingredients_json"
-                )
-                .eq("user_id", user_id)
-                .order("date", desc=True)
-                .execute().data
-                or []
-            )
-
-            recipes_dict = {}
-            for r in recipe_rows:
-                if not r.get("ingredients_json"):
-                    continue
-                label = (r.get("base_name") or _clean_meal_name(r.get("name")) or "").strip()
-                if not label or label in recipes_dict:
-                    continue
-                recipes_dict[label] = r
-
-            if recipes_dict:
-                sel_recipe = st.selectbox(
-                    "Seleziona una ricetta",
-                    [""] + sorted(recipes_dict.keys(), key=str.casefold),
-                    key=f"recipe_select_{v}",
-                )
-                if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
-                    r = recipes_dict[sel_recipe]
-                    recipe_servings = _safe_float(
-                        r.get("recipe_servings"),
-                        0.0,
-                    )
-
-                    if recipe_servings > 0:
-                        # Nuove ricette: base = UNA porzione.
+                        # Base = UNA porzione.
                         reset_or_update(
                             sel_recipe,
                             _safe_float(r.get("calories")) / recipe_servings,
@@ -5192,51 +5148,110 @@ if selected_page == t["t1"]:
                             1.0,
                             False,
                             r.get("notes", ""),
-                            infer_meal_category(r),
+                            r.get("category", "Casa"),
                         )
-                    else:
-                        # Ricette legacy: manteniamo il comportamento precedente.
-                        is_100g = bool(r.get("is_per_100g", True))
-                        reset_or_update(
-                            sel_recipe,
-                            _safe_float(
-                                r.get("base_calories")
-                                if r.get("base_calories") is not None
-                                else r.get("calories")
-                            ),
-                            _safe_float(
-                                r.get("base_protein")
-                                if r.get("base_protein") is not None
-                                else r.get("protein")
-                            ),
-                            _safe_float(
-                                r.get("base_carbs")
-                                if r.get("base_carbs") is not None
-                                else r.get("carbs")
-                            ),
-                            _safe_float(
-                                r.get("base_fat")
-                                if r.get("base_fat") is not None
-                                else r.get("fat")
-                            ),
-                            sel_recipe,
-                            100.0 if is_100g else 1.0,
-                            is_100g,
-                            r.get("notes", ""),
-                            infer_meal_category(r),
+                        st.rerun()
+                else:
+                    st.info(t["no_recipes"])
+
+            except Exception as e:
+                st.error(f"Errore nel caricamento delle ricette: {e}")
+
+        # ------------------------------------------------------------------
+        elif is_recipe:
+            try:
+                recipe_rows = (
+                    supabase.table("meals")
+                    .select(
+                        "id,date,name,base_name,quantity,is_per_100g,"
+                        "base_calories,base_protein,base_carbs,base_fat,"
+                        "calories,protein,carbs,fat,notes,category,ingredients_json"
+                    )
+                    .eq("user_id", user_id)
+                    .order("date", desc=True)
+                    .execute().data
+                    or []
+                )
+
+                recipes_dict = {}
+                for r in recipe_rows:
+                    if not r.get("ingredients_json"):
+                        continue
+                    label = (r.get("base_name") or _clean_meal_name(r.get("name")) or "").strip()
+                    if not label or label in recipes_dict:
+                        continue
+                    recipes_dict[label] = r
+
+                if recipes_dict:
+                    sel_recipe = st.selectbox(
+                        "Seleziona una ricetta",
+                        [""] + sorted(recipes_dict.keys(), key=str.casefold),
+                        key=f"recipe_select_{v}",
+                    )
+                    if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
+                        r = recipes_dict[sel_recipe]
+                        recipe_servings = _safe_float(
+                            r.get("recipe_servings"),
+                            0.0,
                         )
 
-                    st.rerun()
-            else:
-                st.info("Nessuna ricetta composta disponibile. Creane una nella Tab Ricette.")
-        except Exception as e:
-            st.error(f"Errore nel caricamento ricette: {e}")
+                        if recipe_servings > 0:
+                            # Nuove ricette: base = UNA porzione.
+                            reset_or_update(
+                                sel_recipe,
+                                _safe_float(r.get("calories")) / recipe_servings,
+                                _safe_float(r.get("protein")) / recipe_servings,
+                                _safe_float(r.get("carbs")) / recipe_servings,
+                                _safe_float(r.get("fat")) / recipe_servings,
+                                sel_recipe,
+                                1.0,
+                                False,
+                                r.get("notes", ""),
+                                infer_meal_category(r),
+                            )
+                        else:
+                            # Ricette legacy: manteniamo il comportamento precedente.
+                            is_100g = bool(r.get("is_per_100g", True))
+                            reset_or_update(
+                                sel_recipe,
+                                _safe_float(
+                                    r.get("base_calories")
+                                    if r.get("base_calories") is not None
+                                    else r.get("calories")
+                                ),
+                                _safe_float(
+                                    r.get("base_protein")
+                                    if r.get("base_protein") is not None
+                                    else r.get("protein")
+                                ),
+                                _safe_float(
+                                    r.get("base_carbs")
+                                    if r.get("base_carbs") is not None
+                                    else r.get("carbs")
+                                ),
+                                _safe_float(
+                                    r.get("base_fat")
+                                    if r.get("base_fat") is not None
+                                    else r.get("fat")
+                                ),
+                                sel_recipe,
+                                100.0 if is_100g else 1.0,
+                                is_100g,
+                                r.get("notes", ""),
+                                infer_meal_category(r),
+                            )
 
-    if st.session_state.get("selected_source_note"):
-        st.markdown(
-            f"Note {info_badge(st.session_state.get('selected_source_note'), 'Note alimento o ricetta')}",
-            unsafe_allow_html=True,
-        )
+                        st.rerun()
+                else:
+                    st.info("Nessuna ricetta composta disponibile. Creane una nella Tab Ricette.")
+            except Exception as e:
+                st.error(f"Errore nel caricamento ricette: {e}")
+
+        if st.session_state.get("selected_source_note"):
+            st.markdown(
+                f"Note {info_badge(st.session_state.get('selected_source_note'), 'Note alimento o ricetta')}",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("---")
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
