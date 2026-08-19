@@ -596,7 +596,7 @@ def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
     """Trova il meal replicabile più vicino al target rispettando contesto e categoria."""
     try:
         rows = (
-            supabase.table("meals")
+            supabase.table(RECIPE_LIBRARY_TABLE)
             .select("id,date,meal_type,name,base_name,calories,notes,category")
             .eq("user_id", user_id)
             .eq("meal_type", meal_type)
@@ -605,7 +605,7 @@ def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
         )
     except Exception:
         rows = (
-            supabase.table("meals")
+            supabase.table(RECIPE_LIBRARY_TABLE)
             .select("id,date,meal_type,name,base_name,calories,notes")
             .eq("user_id", user_id)
             .eq("meal_type", meal_type)
@@ -921,6 +921,7 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
 
 
 RECIPE_IMAGE_BUCKET = "recipe-images"
+RECIPE_LIBRARY_TABLE = "recipe_library"
 
 # Immagine predefinita per la ricetta Fit Lasagna già esistente.
 FIT_LASAGNA_IMAGE_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/recipe_images/WhatsApp%20Image%202026-08-19%20at%2011.49.40.jpeg"
@@ -979,6 +980,83 @@ def render_recipe_card_image(image_url, alt_text="Ricetta"):
         """,
         unsafe_allow_html=True,
     )
+
+
+
+def insert_recipe_library(
+    *,
+    name,
+    meal_type,
+    category,
+    recipe_servings,
+    calories,
+    protein,
+    carbs,
+    fat,
+    notes="",
+    ingredients_json=None,
+    is_shared=False,
+    image_url=None,
+):
+    """Salva una ricetta nel catalogo permanente, separato dal diario meals."""
+    payload = {
+        "user_id": user_id,
+        "name": str(name).strip(),
+        "meal_type": str(meal_type),
+        "category": category if category in MEAL_CATEGORIES else "Casa",
+        "recipe_servings": float(recipe_servings),
+        "calories": float(calories),
+        "protein": float(protein),
+        "carbs": float(carbs),
+        "fat": float(fat),
+        "notes": str(notes or "").strip(),
+        "ingredients_json": ingredients_json,
+        "is_shared": bool(is_shared),
+        "image_url": str(image_url or "").strip() or None,
+    }
+    return supabase.table(RECIPE_LIBRARY_TABLE).insert(payload).execute()
+
+
+def load_available_recipes():
+    """
+    Ricette disponibili nel logging:
+    - tutte le proprie
+    - quelle condivise dagli altri utenti
+    Le proprie hanno precedenza in caso di stesso nome.
+    """
+    rows = (
+        supabase.table(RECIPE_LIBRARY_TABLE)
+        .select(
+            "id,user_id,name,meal_type,category,recipe_servings,"
+            "calories,protein,carbs,fat,notes,ingredients_json,"
+            "is_shared,image_url,created_at"
+        )
+        .or_(f"user_id.eq.{user_id},is_shared.eq.true")
+        .order("created_at", desc=True)
+        .execute().data
+        or []
+    )
+
+    result = {}
+    for row in rows:
+        label = str(row.get("name") or "").strip()
+        if not label:
+            continue
+
+        key = label.casefold()
+
+        # If both shared and own recipes have same name, own recipe wins.
+        if key in result:
+            existing = result[key]
+            if str(existing.get("user_id")) == str(user_id):
+                continue
+            if str(row.get("user_id")) != str(user_id):
+                continue
+
+        result[key] = row
+
+    return sorted(result.values(), key=lambda r: str(r.get("name") or "").casefold())
+
 
 
 def upload_recipe_image(uploaded_file):
@@ -4112,7 +4190,55 @@ if selected_page == t["t1"]:
             st.error(f"Errore nel caricamento delle immissioni rapide: {e}")
 
     # ------------------------------------------------------------------
-    # C. Ricette = meals composti da ingredienti (un solo database)
+    # C. Ricette = catalogo permanente recipe_library
+    # ------------------------------------------------------------------
+    elif is_recipe:
+        try:
+            recipe_rows = load_available_recipes()
+
+            recipes_dict = {
+                str(r.get("name") or "").strip(): r
+                for r in recipe_rows
+                if str(r.get("name") or "").strip()
+            }
+
+            if recipes_dict:
+                sel_recipe = st.selectbox(
+                    t["select_recipe"],
+                    [""] + sorted(recipes_dict.keys(), key=str.casefold),
+                    key=f"recipe_select_{v}",
+                )
+
+                if (
+                    sel_recipe
+                    and sel_recipe != st.session_state.get("last_selected")
+                ):
+                    r = recipes_dict[sel_recipe]
+                    recipe_servings = max(
+                        _safe_float(r.get("recipe_servings"), 1.0),
+                        1.0,
+                    )
+
+                    # Base = UNA porzione.
+                    reset_or_update(
+                        sel_recipe,
+                        _safe_float(r.get("calories")) / recipe_servings,
+                        _safe_float(r.get("protein")) / recipe_servings,
+                        _safe_float(r.get("carbs")) / recipe_servings,
+                        _safe_float(r.get("fat")) / recipe_servings,
+                        sel_recipe,
+                        1.0,
+                        False,
+                        r.get("notes", ""),
+                        r.get("category", "Casa"),
+                    )
+                    st.rerun()
+            else:
+                st.info(t["no_recipes"])
+
+        except Exception as e:
+            st.error(f"Errore nel caricamento delle ricette: {e}")
+
     # ------------------------------------------------------------------
     elif is_recipe:
         try:
@@ -5462,15 +5588,12 @@ elif selected_page == t["t4"]:
 
         try:
             my_recipe_rows = (
-                supabase.table("meals")
+                supabase.table(RECIPE_LIBRARY_TABLE)
                 .select(
-                    "id,user_id,date,meal_type,category,name,base_name,"
-                    "calories,protein,carbs,fat,"
-                    "base_calories,base_protein,base_carbs,base_fat,"
-                    "notes,ingredients_json,is_shared,image_url,recipe_servings"
+                    "id,user_id,name,meal_type,category,recipe_servings,""calories,protein,carbs,fat,notes,ingredients_json,""is_shared,image_url,created_at"
                 )
                 .eq("user_id", user_id)
-                .order("date", desc=True)
+                .order("created_at", desc=True)
                 .execute().data
                 or []
             )
@@ -5478,19 +5601,11 @@ elif selected_page == t["t4"]:
             my_recipe_rows = []
             print(f"Errore caricamento ricette personali: {exc}")
 
-        my_recipe_rows = [
-            r for r in my_recipe_rows if r.get("ingredients_json")
-        ]
-
         # Mostriamo una sola versione per nome, prendendo la più recente.
         my_recipes = []
         _seen_my = set()
         for r in my_recipe_rows:
-            label = (
-                r.get("base_name")
-                or _clean_meal_name(r.get("name"))
-                or "Ricetta"
-            ).strip()
+            label = str(r.get("name") or "Ricetta").strip()
             key = label.casefold()
             if key in _seen_my:
                 continue
@@ -5589,7 +5704,7 @@ elif selected_page == t["t4"]:
             ):
                 try:
                     (
-                        supabase.table("meals")
+                        supabase.table(RECIPE_LIBRARY_TABLE)
                         .update({"is_shared": bool(new_share_state)})
                         .eq("id", selected_recipe_row["id"])
                         .eq("user_id", user_id)
@@ -5610,16 +5725,13 @@ elif selected_page == t["t4"]:
 
         try:
             shared_recipe_rows = (
-                supabase.table("meals")
+                supabase.table(RECIPE_LIBRARY_TABLE)
                 .select(
-                    "id,user_id,date,meal_type,category,name,base_name,"
-                    "calories,protein,carbs,fat,"
-                    "base_calories,base_protein,base_carbs,base_fat,"
-                    "notes,ingredients_json,is_shared,image_url,recipe_servings"
+                    "id,user_id,name,meal_type,category,recipe_servings,""calories,protein,carbs,fat,notes,ingredients_json,""is_shared,image_url,created_at"
                 )
                 .eq("is_shared", True)
                 .neq("user_id", user_id)
-                .order("date", desc=True)
+                .order("created_at", desc=True)
                 .execute().data
                 or []
             )
@@ -5627,18 +5739,10 @@ elif selected_page == t["t4"]:
             shared_recipe_rows = []
             print(f"Errore caricamento ricette condivise: {exc}")
 
-        shared_recipe_rows = [
-            r for r in shared_recipe_rows if r.get("ingredients_json")
-        ]
-
         shared_recipes = []
         _seen_shared = set()
         for r in shared_recipe_rows:
-            label = (
-                r.get("base_name")
-                or _clean_meal_name(r.get("name"))
-                or "Ricetta"
-            ).strip()
+            label = str(r.get("name") or "Ricetta").strip()
 
             # user_id + nome evita che ricette omonime di due persone
             # vengano fuse tra loro.
@@ -5714,21 +5818,15 @@ elif selected_page == t["t4"]:
     with st.container(border=True):
         st.markdown(t["create_meal_ingredients"])
 
-        rc1, rc2, rc3 = st.columns(3)
+        rc1, rc2 = st.columns(2)
         with rc1:
-            recipe_log_date = st.date_input(
-                t["date_label"],
-                value=date.today(),
-                key=f"recipe_meal_date_{v}",
-            )
-        with rc2:
             recipe_meal_type = st.selectbox(
                 t["meal_type_label"],
                 ["Colazione", "Pranzo", "Cena", "Snack"],
                 key=f"recipe_meal_type_{v}",
                 format_func=tr_meal_type,
             )
-        with rc3:
+        with rc2:
             recipe_category = st.selectbox(
                 t["category_label"],
                 MEAL_CATEGORIES,
@@ -5950,38 +6048,28 @@ elif selected_page == t["t4"]:
                                 )
                                 st.stop()
 
-                        display_name = f"{r_name.strip()} ({total_weight:.0f}g)"
-                        insert_meal_with_base_data(
-                            log_date=recipe_log_date,
+                        insert_recipe_library(
+                            name=r_name.strip(),
                             meal_type=recipe_meal_type,
-                            display_name=display_name,
-                            base_name=r_name.strip(),
-                            quantity=total_weight,
-                            is_per_100g=True,
+                            category=recipe_category,
+                            recipe_servings=recipe_servings,
                             calories=totals["calories"],
                             protein=totals["protein"],
                             carbs=totals["carbs"],
                             fat=totals["fat"],
-                            base_calories=per100["calories"],
-                            base_protein=per100["protein"],
-                            base_carbs=per100["carbs"],
-                            base_fat=per100["fat"],
                             notes=r_notes,
-                            category=recipe_category,
                             ingredients_json=ingredients,
                             is_shared=recipe_is_shared,
                             image_url=recipe_image_url,
-                            recipe_servings=recipe_servings,
                         )
-                        refresh_daily_logs(recipe_log_date)
                         st.session_state["recipe_builder_ingredients"] = []
                         st.session_state["recipe_form_version"] += 1
                         st.success(t["composed_saved"])
                         st.rerun()
                     except Exception as e:
                         st.error(
-                            "Impossibile salvare il meal composto. Applica la nuova migrazione SQL "
-                            "per aggiungere category e ingredients_json a meals. Errore: " + str(e)
+                            "Impossibile salvare la ricetta nel catalogo. "
+                            "Verifica che la tabella recipe_library sia stata creata. Errore: " + str(e)
                         )
         else:
             st.info(t["add_one_ingredient"])
