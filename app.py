@@ -5357,7 +5357,7 @@ elif selected_page == t["t3"]:
         elif weight_lost_30 is not None and weight_lost_30 <= 0:
             ratio_caption = t["no_weight_loss"]
 
-        lost_text = "N/D" if weight_lost_30 is None else f"{weight_lost_30:+.1f} kg"
+        lost_text = "N/D" if weight_lost_30 is None else f"{-weight_lost_30:+.1f} kg"
         lost_caption = t["first_last_diff"]
 
         goal_date_text = "N/D"
@@ -5816,7 +5816,6 @@ elif selected_page == t["t4"]:
                     "id,user_id,name,meal_type,category,recipe_servings,""calories,protein,carbs,fat,notes,ingredients_json,""is_shared,image_url,created_at"
                 )
                 .eq("is_shared", True)
-                .neq("user_id", user_id)
                 .order("created_at", desc=True)
                 .execute().data
                 or []
