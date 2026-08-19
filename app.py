@@ -2245,7 +2245,83 @@ profile_incomplete = (
 )
 
 if profile_incomplete:
-    st.warning("⚠️ Per iniziare, configura i tuoi dati.")
+    _profile_lang = _ui_language()
+    _profile_i18n = {
+        "Italiano": {
+            "warning": "⚠️ Per iniziare, configura i tuoi dati.",
+            "title": "📋 Configurazione Profilo",
+            "gender": "Genere",
+            "male": "Uomo",
+            "female": "Donna",
+            "birth": "Data di nascita",
+            "height": "Altezza (cm)",
+            "current_weight": "Peso Attuale (kg)",
+            "target_weight": "Peso Obiettivo (kg)",
+            "age": "Età",
+            "years": "anni",
+            "estimated_bmr": "BMR stimato",
+            "target_deficit": "Deficit target",
+            "save": "Salva e Inizia",
+            "saved": "✅ Profilo aggiornato! BMR attuale: {bmr} kcal/giorno.",
+            "error": "Errore: {error}",
+        },
+        "English": {
+            "warning": "⚠️ To get started, complete your profile data.",
+            "title": "📋 Profile setup",
+            "gender": "Gender",
+            "male": "Male",
+            "female": "Female",
+            "birth": "Date of birth",
+            "height": "Height (cm)",
+            "current_weight": "Current weight (kg)",
+            "target_weight": "Target weight (kg)",
+            "age": "Age",
+            "years": "years",
+            "estimated_bmr": "Estimated BMR",
+            "target_deficit": "Target deficit",
+            "save": "Save and start",
+            "saved": "✅ Profile updated! Current BMR: {bmr} kcal/day.",
+            "error": "Error: {error}",
+        },
+        "Nederlands": {
+            "warning": "⚠️ Vul je profielgegevens in om te beginnen.",
+            "title": "📋 Profiel instellen",
+            "gender": "Geslacht",
+            "male": "Man",
+            "female": "Vrouw",
+            "birth": "Geboortedatum",
+            "height": "Lengte (cm)",
+            "current_weight": "Huidig gewicht (kg)",
+            "target_weight": "Streefgewicht (kg)",
+            "age": "Leeftijd",
+            "years": "jaar",
+            "estimated_bmr": "Geschatte BMR",
+            "target_deficit": "Doeltekort",
+            "save": "Opslaan en starten",
+            "saved": "✅ Profiel bijgewerkt! Huidige BMR: {bmr} kcal/dag.",
+            "error": "Fout: {error}",
+        },
+        "Français": {
+            "warning": "⚠️ Pour commencer, complétez les données de votre profil.",
+            "title": "📋 Configuration du profil",
+            "gender": "Sexe",
+            "male": "Homme",
+            "female": "Femme",
+            "birth": "Date de naissance",
+            "height": "Taille (cm)",
+            "current_weight": "Poids actuel (kg)",
+            "target_weight": "Poids cible (kg)",
+            "age": "Âge",
+            "years": "ans",
+            "estimated_bmr": "BMR estimé",
+            "target_deficit": "Déficit cible",
+            "save": "Enregistrer et commencer",
+            "saved": "✅ Profil mis à jour ! BMR actuel : {bmr} kcal/jour.",
+            "error": "Erreur : {error}",
+        },
+    }
+    _pi = _profile_i18n.get(_profile_lang, _profile_i18n["Italiano"])
+    st.warning(_pi["warning"])
 
     # Deficit target fuori dal form: il preset aggiorna subito il campo kcal.
     existing_deficit_value = (
@@ -2306,25 +2382,29 @@ if profile_incomplete:
     )
 
     with st.form("missing_data_form"):
-        st.subheader("📋 Configurazione Profilo")
+        st.subheader(_pi["title"])
 
         gen_index = 0 if user_gender is None else (0 if user_gender == "Uomo" else 1)
+        _gender_values = ["Uomo", "Donna"]
         gen = st.selectbox(
-            "Genere",
-            ["Uomo", "Donna"],
+            _pi["gender"],
+            _gender_values,
             index=gen_index,
+            format_func=lambda value: (
+                _pi["male"] if value == "Uomo" else _pi["female"]
+            ),
         )
 
         existing_birth_date = parse_birth_date(user_birth_date)
         birth_val = st.date_input(
-            "Data di nascita",
+            _pi["birth"],
             value=existing_birth_date or date(1990, 1, 1),
             min_value=date(1900, 1, 1),
             max_value=date.today(),
         )
 
         h_val = st.number_input(
-            "Altezza (cm)",
+            _pi["height"],
             value=float(user_height) if user_height else 175.0,
             min_value=100.0,
             max_value=250.0,
@@ -2332,7 +2412,7 @@ if profile_incomplete:
         )
 
         w_val = st.number_input(
-            "Peso Attuale (kg)",
+            _pi["current_weight"],
             value=float(user_current_weight) if user_current_weight is not None else 80.0,
             min_value=20.0,
             max_value=300.0,
@@ -2340,7 +2420,7 @@ if profile_incomplete:
         )
 
         t_val = st.number_input(
-            t["target_weight_label"],
+            _pi["target_weight"],
             value=float(user_target_weight) if user_target_weight else 75.0,
             min_value=20.0,
             max_value=300.0,
@@ -2357,12 +2437,12 @@ if profile_incomplete:
 
         if calculated_preview_bmr is not None:
             st.caption(
-                f"Età: {calculated_age} anni · "
-                f"BMR stimato: {calculated_preview_bmr} kcal/giorno · "
-                f"Deficit target: {selected_deficit_target} kcal/giorno"
+                f"{_pi['age']}: {calculated_age} {_pi['years']} · "
+                f"{_pi['estimated_bmr']}: {calculated_preview_bmr} kcal/giorno · "
+                f"{_pi['target_deficit']}: {selected_deficit_target} kcal/giorno"
             )
 
-        if st.form_submit_button("Salva e Inizia"):
+        if st.form_submit_button(_pi["save"]):
             try:
                 res = supabase.auth.update_user({
                     "data": {
@@ -2391,13 +2471,12 @@ if profile_incomplete:
                     st.session_state["user"] = res.user
 
                 st.success(
-                    f"✅ Profilo aggiornato! BMR attuale: "
-                    f"{calculated_preview_bmr} kcal/giorno."
+                    _pi["saved"].format(bmr=calculated_preview_bmr)
                 )
                 st.rerun()
 
             except Exception as e:
-                st.error(t["generic_error"].format(error=e))
+                st.error(_pi["error"].format(error=e))
                 print(traceback.format_exc())
     st.stop()
 
