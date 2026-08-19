@@ -2187,18 +2187,46 @@ with st.sidebar:
     st.markdown(
         """
         <style>
+        /* Posizionamento del menu accanto al saluto */
+        .st-key-profile_menu_popover {
+            width:44px !important;
+            margin-top:-62px !important;
+            margin-left:auto !important;
+            margin-right:6px !important;
+            position:relative !important;
+            z-index:5 !important;
+        }
+
+        /* Freccia compatta, scura e leggibile */
         .st-key-profile_menu_popover button {
             border-radius:999px !important;
-            width:48px !important;
-            height:48px !important;
-            min-height:48px !important;
+            width:44px !important;
+            height:44px !important;
+            min-height:44px !important;
             padding:0 !important;
-            font-size:1.35rem !important;
+            font-size:1.15rem !important;
             font-weight:900 !important;
-            background:rgba(255,255,255,.94) !important;
+            background:#FFFFFF !important;
             color:#192E49 !important;
-            border:1px solid rgba(255,139,139,.45) !important;
-            box-shadow:0 4px 14px rgba(0,0,0,.10) !important;
+            border:1.5px solid #FF8B8B !important;
+            box-shadow:0 4px 12px rgba(0,0,0,.10) !important;
+        }
+
+        .st-key-profile_menu_popover button *,
+        .st-key-profile_menu_popover button p,
+        .st-key-profile_menu_popover button span {
+            color:#192E49 !important;
+            opacity:1 !important;
+        }
+
+        .st-key-profile_menu_popover button:hover {
+            background:#FFF3F3 !important;
+            border-color:#FF6F6F !important;
+        }
+
+        /* Mantiene il menu più vicino al blocco account */
+        [data-testid="stSidebar"] .st-key-profile_menu_popover + div {
+            margin-top:0 !important;
         }
         </style>
         """,
