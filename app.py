@@ -5000,7 +5000,7 @@ if selected_page == t["t1"]:
                 if quick_entries:
                     quick_by_label = {q["label"]: q for q in quick_entries}
                     sel_quick = st.selectbox(
-                        "Seleziona un alimento già utilizzato",
+                        t["quick_select_used"],
                         [""] + list(quick_by_label.keys()),
                         key=f"quick_meal_select_{v}",
                     )
@@ -5021,7 +5021,6 @@ if selected_page == t["t1"]:
         # La fotocamera viene creata SOLO quando l'utente seleziona Foto AI.
         # ------------------------------------------------------------------
         elif is_scan:
-            st.markdown(f"### {t['scan_title']}")
             st.caption(t["scan_camera_help"])
 
             _scan_mode = st.radio(
@@ -5253,239 +5252,243 @@ if selected_page == t["t1"]:
                 unsafe_allow_html=True,
             )
 
-    st.markdown("---")
-    meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
-
     # --------------------------------------------------------------
-    # Tipo di pasto suggerito automaticamente.
-    # - nessun pasto principale registrato -> Colazione
-    # - Colazione presente -> Pranzo
-    # - Pranzo presente -> Cena
-    # - Snack non viene mai selezionato automaticamente
-    #
-    # Il calcolo viene rifatto a ogni nuova versione del form, quindi dopo
-    # aver salvato un pasto il successivo propone automaticamente il passo
-    # logico seguente.
+    # DETTAGLI DEL PASTO
+    # Seconda card: dati, quantità e valori nutrizionali
     # --------------------------------------------------------------
-    try:
-        _logged_meal_types_today = (
-            supabase.table("meals")
-            .select("meal_type")
-            .eq("user_id", user_id)
-            .eq("date", str(log_date))
-            .execute().data
-            or []
-        )
-        _logged_main_types = {
-            str(row.get("meal_type") or "").strip().casefold()
-            for row in _logged_meal_types_today
-        }
-    except Exception as _meal_type_exc:
-        print(f"Meal type default error: {_meal_type_exc}")
-        _logged_main_types = set()
+    with st.container(border=True):
+        meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
 
-    if "pranzo" in _logged_main_types:
-        _suggested_meal_type = "Cena"
-    elif "colazione" in _logged_main_types:
-        _suggested_meal_type = "Pranzo"
-    else:
-        _suggested_meal_type = "Colazione"
+        # --------------------------------------------------------------
+        # Tipo di pasto suggerito automaticamente.
+        # - nessun pasto principale registrato -> Colazione
+        # - Colazione presente -> Pranzo
+        # - Pranzo presente -> Cena
+        # - Snack non viene mai selezionato automaticamente
+        #
+        # Il calcolo viene rifatto a ogni nuova versione del form, quindi dopo
+        # aver salvato un pasto il successivo propone automaticamente il passo
+        # logico seguente.
+        # --------------------------------------------------------------
+        try:
+            _logged_meal_types_today = (
+                supabase.table("meals")
+                .select("meal_type")
+                .eq("user_id", user_id)
+                .eq("date", str(log_date))
+                .execute().data
+                or []
+            )
+            _logged_main_types = {
+                str(row.get("meal_type") or "").strip().casefold()
+                for row in _logged_meal_types_today
+            }
+        except Exception as _meal_type_exc:
+            print(f"Meal type default error: {_meal_type_exc}")
+            _logged_main_types = set()
 
-    _meal_type_key = f"meal_type_input_{v}"
-    if _meal_type_key not in st.session_state:
-        st.session_state[_meal_type_key] = _suggested_meal_type
-
-    m_type = st.selectbox(
-        t["meal"],
-        meal_options,
-        key=_meal_type_key,
-        format_func=tr_meal_type,
-    )
-
-    name = st.text_input(
-        t["meal_name"],
-        value=st.session_state["m_name"],
-        key=f"input_meal_name_{v}",
-    )
-
-    default_category = st.session_state.get("selected_source_category", "Casa")
-    if default_category not in MEAL_CATEGORIES:
-        default_category = "Casa"
-    meal_category = st.selectbox(
-        t["category_label"],
-        MEAL_CATEGORIES,
-        index=MEAL_CATEGORIES.index(default_category),
-        key=f"meal_category_{v}",
-        help=t["category_help"],
-        format_func=tr_category,
-    )
-
-    meal_notes = st.text_area(
-        t["notes_optional"],
-        value=st.session_state.get("selected_source_note", ""),
-        placeholder=ux["notes_ph"],
-        key=f"meal_notes_{v}",
-        height=80,
-    )
-
-    mode_options = [t["per_100g"], t["per_portion"]]
-    default_index = 0 if st.session_state["is_per_100g_val"] else 1
-    mode = st.radio(
-        t["calc_mode"], mode_options, index=default_index,
-        horizontal=True, key=f"mode_radio_{v}",
-    )
-
-    is_now_100g = mode == t["per_100g"]
-    if is_now_100g != st.session_state["is_per_100g_val"]:
-        st.session_state["is_per_100g_val"] = is_now_100g
-        st.session_state["grams_val"] = 100.0 if is_now_100g else 1.0
-        st.session_state[f"dyn_qty_{v}"] = st.session_state["grams_val"]
-        st.rerun()
-
-    # ------------------------------------------------------------------
-    # Quantità + kcal/macros sincronizzati in tempo reale
-    # ------------------------------------------------------------------
-    qty_key = f"dyn_qty_{v}"
-    kcal_key = f"meal_kcal_{v}"
-    pro_key = f"meal_pro_{v}"
-    carbs_key = f"meal_carbs_{v}"
-    fat_key = f"meal_fat_{v}"
-
-    def _current_factor(qty=None):
-        if qty is None:
-            qty = float(st.session_state.get(qty_key, st.session_state["grams_val"]))
-        return qty / 100.0 if mode == t["per_100g"] else qty
-
-    def _sync_final_nutrients_from_base():
-        """
-        Quando cambiano grammi/porzioni aggiorna SUBITO i quattro widget.
-        Impostare soltanto value=... non basta in Streamlit, perché un widget
-        con key conserva il proprio valore in session_state.
-        """
-        qty = float(st.session_state.get(qty_key, st.session_state["grams_val"]))
-        st.session_state["grams_val"] = qty
-        factor_now = _current_factor(qty)
-
-        st.session_state[kcal_key] = int(round(st.session_state["base_cals"] * factor_now))
-        st.session_state[pro_key] = int(round(st.session_state["base_prot"] * factor_now))
-        st.session_state[carbs_key] = int(round(st.session_state["base_carbs"] * factor_now))
-        st.session_state[fat_key] = int(round(st.session_state["base_fat"] * factor_now))
-
-    def _sync_base_from_manual_nutrient(final_key, base_key):
-        """
-        Se l'utente corregge manualmente kcal o un macro, aggiorna anche il
-        valore base (per 100 g / per porzione). Così il successivo cambio di
-        quantità continua a scalare partendo dalla correzione manuale.
-        """
-        factor_now = _current_factor()
-        if factor_now <= 0:
-            return
-        st.session_state[base_key] = (
-            float(st.session_state.get(final_key, 0.0)) / factor_now
-        )
-
-    def on_qty_change():
-        _sync_final_nutrients_from_base()
-
-    def on_kcal_change():
-        _sync_base_from_manual_nutrient(kcal_key, "base_cals")
-
-    def on_pro_change():
-        _sync_base_from_manual_nutrient(pro_key, "base_prot")
-
-    def on_carbs_change():
-        _sync_base_from_manual_nutrient(carbs_key, "base_carbs")
-
-    def on_fat_change():
-        _sync_base_from_manual_nutrient(fat_key, "base_fat")
-
-    # Inizializza i widget nutrienti una sola volta per questa versione del form.
-    # Dopo di che saranno i callback a mantenerli sincronizzati.
-    initial_factor = _current_factor(float(st.session_state["grams_val"]))
-    if kcal_key not in st.session_state:
-        st.session_state[kcal_key] = int(round(st.session_state["base_cals"] * initial_factor))
-    if pro_key not in st.session_state:
-        st.session_state[pro_key] = int(round(st.session_state["base_prot"] * initial_factor))
-    if carbs_key not in st.session_state:
-        st.session_state[carbs_key] = int(round(st.session_state["base_carbs"] * initial_factor))
-    if fat_key not in st.session_state:
-        st.session_state[fat_key] = int(round(st.session_state["base_fat"] * initial_factor))
-
-    quantity = st.number_input(
-        t["qty_label"] if mode == t["per_100g"] else t["num_portions"],
-        value=float(st.session_state["grams_val"]),
-        min_value=0.25,
-        step=0.25,
-        key=qty_key,
-        on_change=on_qty_change,
-    )
-
-    factor = quantity / 100.0 if mode == t["per_100g"] else quantity
-    meal_display_name = f"{name} ({quantity}{'g' if mode == t['per_100g'] else ' porz.'})"
-
-    c1, c2, c3, c4 = st.columns(4)
-    cals_in = c1.number_input(
-        t["kcal"],
-        step=1,
-        key=kcal_key,
-        on_change=on_kcal_change,
-    )
-    prot_in = c2.number_input(
-        t["pro"],
-        step=1,
-        key=pro_key,
-        on_change=on_pro_change,
-    )
-    carbs_in = c3.number_input(
-        t["carbs"],
-        step=1,
-        key=carbs_key,
-        on_change=on_carbs_change,
-    )
-    fat_in = c4.number_input(
-        t["fat"],
-        step=1,
-        key=fat_key,
-        on_change=on_fat_change,
-    )
-
-    if st.button(t["add_meal"], use_container_width=True):
-        if not name.strip():
-            st.warning("Inserisci un nome per il pasto.")
+        if "pranzo" in _logged_main_types:
+            _suggested_meal_type = "Cena"
+        elif "colazione" in _logged_main_types:
+            _suggested_meal_type = "Pranzo"
         else:
-            try:
-                # I valori base vengono derivati dai valori finali modificabili,
-                # così eventuali correzioni manuali diventano riutilizzabili.
-                safe_factor = factor if factor > 0 else 1.0
-                insert_meal_with_base_data(
-                    log_date=log_date,
-                    meal_type=m_type,
-                    display_name=meal_display_name,
-                    base_name=name.strip(),
-                    quantity=quantity,
-                    is_per_100g=(mode == t["per_100g"]),
-                    calories=cals_in,
-                    protein=prot_in,
-                    carbs=carbs_in,
-                    fat=fat_in,
-                    base_calories=float(cals_in) / safe_factor,
-                    base_protein=float(prot_in) / safe_factor,
-                    base_carbs=float(carbs_in) / safe_factor,
-                    base_fat=float(fat_in) / safe_factor,
-                    notes=meal_notes,
-                    category=meal_category,
-                    ingredients_json=None,
-                )
-                refresh_daily_logs(log_date)
+            _suggested_meal_type = "Colazione"
 
-                # Dopo il salvataggio: pulizia completa del form e ritorno
-                # automatico alla prima sorgente di inserimento.
-                clear_meal_entry_after_save()
+        _meal_type_key = f"meal_type_input_{v}"
+        if _meal_type_key not in st.session_state:
+            st.session_state[_meal_type_key] = _suggested_meal_type
 
-                st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
-                st.rerun()
-            except Exception as e:
-                st.error(t["generic_error"].format(error=e))
+        m_type = st.selectbox(
+            t["meal"],
+            meal_options,
+            key=_meal_type_key,
+            format_func=tr_meal_type,
+        )
+
+        name = st.text_input(
+            t["meal_name"],
+            value=st.session_state["m_name"],
+            key=f"input_meal_name_{v}",
+        )
+
+        default_category = st.session_state.get("selected_source_category", "Casa")
+        if default_category not in MEAL_CATEGORIES:
+            default_category = "Casa"
+        meal_category = st.selectbox(
+            t["category_label"],
+            MEAL_CATEGORIES,
+            index=MEAL_CATEGORIES.index(default_category),
+            key=f"meal_category_{v}",
+            help=t["category_help"],
+            format_func=tr_category,
+        )
+
+        meal_notes = st.text_area(
+            t["notes_optional"],
+            value=st.session_state.get("selected_source_note", ""),
+            placeholder=ux["notes_ph"],
+            key=f"meal_notes_{v}",
+            height=80,
+        )
+
+        mode_options = [t["per_100g"], t["per_portion"]]
+        default_index = 0 if st.session_state["is_per_100g_val"] else 1
+        mode = st.radio(
+            t["calc_mode"], mode_options, index=default_index,
+            horizontal=True, key=f"mode_radio_{v}",
+        )
+
+        is_now_100g = mode == t["per_100g"]
+        if is_now_100g != st.session_state["is_per_100g_val"]:
+            st.session_state["is_per_100g_val"] = is_now_100g
+            st.session_state["grams_val"] = 100.0 if is_now_100g else 1.0
+            st.session_state[f"dyn_qty_{v}"] = st.session_state["grams_val"]
+            st.rerun()
+
+        # ------------------------------------------------------------------
+        # Quantità + kcal/macros sincronizzati in tempo reale
+        # ------------------------------------------------------------------
+        qty_key = f"dyn_qty_{v}"
+        kcal_key = f"meal_kcal_{v}"
+        pro_key = f"meal_pro_{v}"
+        carbs_key = f"meal_carbs_{v}"
+        fat_key = f"meal_fat_{v}"
+
+        def _current_factor(qty=None):
+            if qty is None:
+                qty = float(st.session_state.get(qty_key, st.session_state["grams_val"]))
+            return qty / 100.0 if mode == t["per_100g"] else qty
+
+        def _sync_final_nutrients_from_base():
+            """
+            Quando cambiano grammi/porzioni aggiorna SUBITO i quattro widget.
+            Impostare soltanto value=... non basta in Streamlit, perché un widget
+            con key conserva il proprio valore in session_state.
+            """
+            qty = float(st.session_state.get(qty_key, st.session_state["grams_val"]))
+            st.session_state["grams_val"] = qty
+            factor_now = _current_factor(qty)
+
+            st.session_state[kcal_key] = int(round(st.session_state["base_cals"] * factor_now))
+            st.session_state[pro_key] = int(round(st.session_state["base_prot"] * factor_now))
+            st.session_state[carbs_key] = int(round(st.session_state["base_carbs"] * factor_now))
+            st.session_state[fat_key] = int(round(st.session_state["base_fat"] * factor_now))
+
+        def _sync_base_from_manual_nutrient(final_key, base_key):
+            """
+            Se l'utente corregge manualmente kcal o un macro, aggiorna anche il
+            valore base (per 100 g / per porzione). Così il successivo cambio di
+            quantità continua a scalare partendo dalla correzione manuale.
+            """
+            factor_now = _current_factor()
+            if factor_now <= 0:
+                return
+            st.session_state[base_key] = (
+                float(st.session_state.get(final_key, 0.0)) / factor_now
+            )
+
+        def on_qty_change():
+            _sync_final_nutrients_from_base()
+
+        def on_kcal_change():
+            _sync_base_from_manual_nutrient(kcal_key, "base_cals")
+
+        def on_pro_change():
+            _sync_base_from_manual_nutrient(pro_key, "base_prot")
+
+        def on_carbs_change():
+            _sync_base_from_manual_nutrient(carbs_key, "base_carbs")
+
+        def on_fat_change():
+            _sync_base_from_manual_nutrient(fat_key, "base_fat")
+
+        # Inizializza i widget nutrienti una sola volta per questa versione del form.
+        # Dopo di che saranno i callback a mantenerli sincronizzati.
+        initial_factor = _current_factor(float(st.session_state["grams_val"]))
+        if kcal_key not in st.session_state:
+            st.session_state[kcal_key] = int(round(st.session_state["base_cals"] * initial_factor))
+        if pro_key not in st.session_state:
+            st.session_state[pro_key] = int(round(st.session_state["base_prot"] * initial_factor))
+        if carbs_key not in st.session_state:
+            st.session_state[carbs_key] = int(round(st.session_state["base_carbs"] * initial_factor))
+        if fat_key not in st.session_state:
+            st.session_state[fat_key] = int(round(st.session_state["base_fat"] * initial_factor))
+
+        quantity = st.number_input(
+            t["qty_label"] if mode == t["per_100g"] else t["num_portions"],
+            value=float(st.session_state["grams_val"]),
+            min_value=0.25,
+            step=0.25,
+            key=qty_key,
+            on_change=on_qty_change,
+        )
+
+        factor = quantity / 100.0 if mode == t["per_100g"] else quantity
+        meal_display_name = f"{name} ({quantity}{'g' if mode == t['per_100g'] else ' porz.'})"
+
+        c1, c2, c3, c4 = st.columns(4)
+        cals_in = c1.number_input(
+            t["kcal"],
+            step=1,
+            key=kcal_key,
+            on_change=on_kcal_change,
+        )
+        prot_in = c2.number_input(
+            t["pro"],
+            step=1,
+            key=pro_key,
+            on_change=on_pro_change,
+        )
+        carbs_in = c3.number_input(
+            t["carbs"],
+            step=1,
+            key=carbs_key,
+            on_change=on_carbs_change,
+        )
+        fat_in = c4.number_input(
+            t["fat"],
+            step=1,
+            key=fat_key,
+            on_change=on_fat_change,
+        )
+
+        if st.button(t["add_meal"], use_container_width=True):
+            if not name.strip():
+                st.warning("Inserisci un nome per il pasto.")
+            else:
+                try:
+                    # I valori base vengono derivati dai valori finali modificabili,
+                    # così eventuali correzioni manuali diventano riutilizzabili.
+                    safe_factor = factor if factor > 0 else 1.0
+                    insert_meal_with_base_data(
+                        log_date=log_date,
+                        meal_type=m_type,
+                        display_name=meal_display_name,
+                        base_name=name.strip(),
+                        quantity=quantity,
+                        is_per_100g=(mode == t["per_100g"]),
+                        calories=cals_in,
+                        protein=prot_in,
+                        carbs=carbs_in,
+                        fat=fat_in,
+                        base_calories=float(cals_in) / safe_factor,
+                        base_protein=float(prot_in) / safe_factor,
+                        base_carbs=float(carbs_in) / safe_factor,
+                        base_fat=float(fat_in) / safe_factor,
+                        notes=meal_notes,
+                        category=meal_category,
+                        ingredients_json=None,
+                    )
+                    refresh_daily_logs(log_date)
+
+                    # Dopo il salvataggio: pulizia completa del form e ritorno
+                    # automatico alla prima sorgente di inserimento.
+                    clear_meal_entry_after_save()
+
+                    st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
+                    st.rerun()
+                except Exception as e:
+                    st.error(t["generic_error"].format(error=e))
 
 # ==============================================================================
 # 10. PAGE 2: DAILY OVERVIEW
