@@ -2860,6 +2860,15 @@ translations = {
         "input_source_lbl": "Fonte inserimento",
         "opt_off": "🔍 Cerca online (Open Food Facts)",
         "opt_quick": "🍳 Immissione Rapida",
+        "opt_scan": "▥ Scansiona",
+        "scan_title": "▥ Scansiona il pasto",
+        "scan_mode": "Sorgente immagine",
+        "scan_camera": "📷 Fotocamera",
+        "scan_upload": "🖼️ Galleria / File",
+        "scan_camera_help": "Scatta una foto del piatto. Nel prossimo passaggio collegheremo l'analisi AI.",
+        "scan_upload_help": "In alternativa puoi scegliere una foto già presente sul dispositivo.",
+        "scan_photo_ready": "✅ Foto acquisita. La fotocamera funziona correttamente.",
+        "scan_ai_next": "Il prossimo passaggio sarà analizzare questa foto con l'AI e precompilare alimento, quantità, kcal e macronutrienti.",
         "card_kcal_in": "Kcal Ingerite",
         "card_kcal_burn": "Kcal Bruciate",
         "card_balance": "Bilancio",
@@ -2953,6 +2962,15 @@ translations = {
         "input_source_lbl": "Input source",
         "opt_off": "🔍 Search online (Open Food Facts)",
         "opt_quick": "🍳 Quick Entry",
+        "opt_scan": "▥ Scan",
+        "scan_title": "▥ Scan your meal",
+        "scan_mode": "Image source",
+        "scan_camera": "📷 Camera",
+        "scan_upload": "🖼️ Gallery / File",
+        "scan_camera_help": "Take a photo of the meal. In the next step we will connect AI analysis.",
+        "scan_upload_help": "Alternatively, choose an existing photo from your device.",
+        "scan_photo_ready": "✅ Photo captured. The camera is working correctly.",
+        "scan_ai_next": "The next step will analyze this photo with AI and prefill food, quantity, calories and macros.",
         "card_kcal_in": "Calories In",
         "card_kcal_burn": "Calories Burned",
         "card_balance": "Balance",
@@ -3046,6 +3064,15 @@ translations = {
         "input_source_lbl": "Invoerbron",
         "opt_off": "🔍 Online zoeken (Open Food Facts)",
         "opt_quick": "🍳 Snelle Invoer",
+        "opt_scan": "▥ Scannen",
+        "scan_title": "▥ Scan je maaltijd",
+        "scan_mode": "Afbeeldingsbron",
+        "scan_camera": "📷 Camera",
+        "scan_upload": "🖼️ Galerij / Bestand",
+        "scan_camera_help": "Maak een foto van de maaltijd. In de volgende stap koppelen we de AI-analyse.",
+        "scan_upload_help": "Je kunt ook een bestaande foto op je apparaat kiezen.",
+        "scan_photo_ready": "✅ Foto vastgelegd. De camera werkt correct.",
+        "scan_ai_next": "In de volgende stap analyseert AI deze foto en vult voeding, hoeveelheid, calorieën en macro's vooraf in.",
         "card_kcal_in": "Gegeten Kcal",
         "card_kcal_burn": "Verbrande Kcal",
         "card_balance": "Balans",
@@ -3176,6 +3203,15 @@ translations["Français"] = {
     "input_source_lbl": "Source de saisie",
     "opt_off": "🔍 Rechercher en ligne (Open Food Facts)",
     "opt_quick": "🍳 Saisie rapide",
+        "opt_scan": "▥ Scanner",
+        "scan_title": "▥ Scanner le repas",
+        "scan_mode": "Source de l'image",
+        "scan_camera": "📷 Appareil photo",
+        "scan_upload": "🖼️ Galerie / Fichier",
+        "scan_camera_help": "Prenez une photo du repas. À l'étape suivante, nous connecterons l'analyse IA.",
+        "scan_upload_help": "Vous pouvez également choisir une photo déjà présente sur votre appareil.",
+        "scan_photo_ready": "✅ Photo capturée. L'appareil photo fonctionne correctement.",
+        "scan_ai_next": "L'étape suivante analysera cette photo avec l'IA et préremplira aliment, quantité, calories et macros.",
     "card_kcal_in": "Kcal consommées",
     "card_kcal_burn": "Kcal brûlées",
     "card_balance": "Bilan",
@@ -4172,13 +4208,14 @@ if selected_page == t["t1"]:
 
     input_source = st.radio(
         t["input_source_lbl"],
-        [t["opt_off"], t["opt_quick"], recipe_source_label],
+        [t["opt_off"], t["opt_quick"], recipe_source_label, t["opt_scan"]],
         horizontal=True,
     )
 
     is_online = input_source == t["opt_off"]
     is_quick = input_source == t["opt_quick"]
     is_recipe = input_source == recipe_source_label
+    is_scan = input_source == t["opt_scan"]
     v = st.session_state["form_version"]
 
     if "base_cals" not in st.session_state:
@@ -4269,7 +4306,48 @@ if selected_page == t["t1"]:
             st.error(f"Errore nel caricamento delle immissioni rapide: {e}")
 
     # ------------------------------------------------------------------
-    # C. Ricette = catalogo permanente recipe_library
+    # C. Scansione foto — STEP 1
+    # Fotocamera / upload funzionanti; nessuna chiamata AI ancora.
+    # ------------------------------------------------------------------
+    elif is_scan:
+        st.markdown(f"### {t['scan_title']}")
+        st.caption(t["scan_camera_help"])
+
+        _scan_mode = st.radio(
+            t["scan_mode"],
+            [t["scan_camera"], t["scan_upload"]],
+            horizontal=True,
+            key=f"scan_mode_{v}",
+        )
+
+        _scan_photo = None
+
+        if _scan_mode == t["scan_camera"]:
+            _scan_photo = st.camera_input(
+                t["scan_camera"],
+                key=f"meal_camera_{v}",
+            )
+        else:
+            _scan_photo = st.file_uploader(
+                t["scan_upload"],
+                type=["jpg", "jpeg", "png", "webp"],
+                key=f"meal_scan_upload_{v}",
+                help=t["scan_upload_help"],
+            )
+
+        if _scan_photo is not None:
+            st.image(
+                _scan_photo,
+                caption=t["scan_photo_ready"],
+                width=420,
+            )
+            st.success(t["scan_photo_ready"])
+            st.info(t["scan_ai_next"])
+
+    # ------------------------------------------------------------------
+    # D. Ricette = catalogo permanente recipe_library
+    # ------------------------------------------------------------------
+    # Ricette legacy (blocco mantenuto per compatibilità; normalmente non raggiunto)
     # ------------------------------------------------------------------
     elif is_recipe:
         try:
