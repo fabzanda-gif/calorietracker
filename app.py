@@ -887,34 +887,50 @@ def _read_refresh_token_cookie():
 
 def save_authenticated_session(response, fallback_user=None):
     """
-    Salva la sessione Supabase e mantiene il refresh-token persistente.
-    fallback_user serve nel callback OAuth: alcune versioni di set_session()
-    possono restituire la sessione senza popolare response.user.
+    Salva la sessione come nell'app di riferimento:
+    - access token in session_state
+    - refresh token in session_state
+    - user object in session_state
+    - refresh token anche nel cookie persistente di SanoSync
     """
     session = getattr(response, "session", None)
     user_obj = getattr(response, "user", None) or fallback_user
 
+    # Alcune versioni di supabase-py possono restituire direttamente
+    # un oggetto sessione da set_session().
     if session is None and getattr(response, "access_token", None):
         session = response
 
     if session is None:
         raise RuntimeError("Supabase non ha restituito una sessione valida.")
 
+    access_token = getattr(session, "access_token", None)
+    refresh_token = getattr(session, "refresh_token", None)
+
+    if not access_token or not refresh_token:
+        raise RuntimeError("Token OAuth non disponibili.")
+
     if user_obj is None:
         user_obj = getattr(session, "user", None)
 
     if user_obj is None:
+        verified = supabase.auth.get_user(access_token)
+        user_obj = getattr(verified, "user", None)
+
+    if user_obj is None:
         raise RuntimeError("Supabase non ha restituito l'utente autenticato.")
 
-    if not getattr(session, "refresh_token", None):
-        raise RuntimeError("Supabase non ha restituito il refresh token.")
-
+    st.session_state["auth_access_token"] = access_token
+    st.session_state["auth_refresh_token"] = refresh_token
     st.session_state["user"] = user_obj
+
+    # Manteniamo anche la persistenza già presente in SanoSync.
     _cookie_set(
         SESSION_COOKIE,
-        session.refresh_token,
+        refresh_token,
         SESSION_COOKIE_MAX_AGE,
     )
+
     return user_obj
 
 def restore_session_from_cookie():
@@ -934,6 +950,59 @@ def restore_session_from_cookie():
 
     _cookie_delete(SESSION_COOKIE)
     return False
+
+def restore_and_verify_auth_session():
+    """
+    Ripristina e verifica la sessione OAuth dopo i rerun Streamlit.
+
+    Questa è la stessa logica usata nell'app di riferimento:
+    set_session sul client principale -> get_user -> aggiorna i token.
+    """
+    access_token = st.session_state.get("auth_access_token")
+    refresh_token = st.session_state.get("auth_refresh_token")
+
+    if not access_token or not refresh_token:
+        return None
+
+    try:
+        main_response = supabase.auth.set_session(
+            access_token,
+            refresh_token,
+        )
+
+        main_session = getattr(main_response, "session", None)
+        if main_session is not None:
+            access_token = getattr(
+                main_session,
+                "access_token",
+                access_token,
+            )
+            refresh_token = getattr(
+                main_session,
+                "refresh_token",
+                refresh_token,
+            )
+            st.session_state["auth_access_token"] = access_token
+            st.session_state["auth_refresh_token"] = refresh_token
+
+        verified = supabase.auth.get_user(access_token)
+        user_obj = getattr(verified, "user", None)
+
+        if user_obj is None:
+            return None
+
+        st.session_state["user"] = user_obj
+        _cookie_set(
+            SESSION_COOKIE,
+            refresh_token,
+            SESSION_COOKIE_MAX_AGE,
+        )
+        return user_obj
+
+    except Exception as exc:
+        print(f"Session verification error: {exc}")
+        return None
+
 
 AUTH_FLOW_STATE_KEY = "auth_flow_id"
 
@@ -981,8 +1050,8 @@ def get_public_app_url():
 
 def build_provider_login_url(provider):
     """
-    Genera l'URL OAuth esattamente con il pattern che funziona nell'altra app:
-    un client Supabase dedicato per ogni flow_id, conservato da cache_resource.
+    Genera URL OAuth separato per provider.
+    Ogni tentativo usa un proprio client/verifier PKCE.
     """
     flow_id = uuid.uuid4().hex
     auth_client = get_auth_flow_client(flow_id)
@@ -993,40 +1062,36 @@ def build_provider_login_url(provider):
         f"?auth_callback=1&auth_flow={flow_id}"
     )
 
-    response = auth_client.auth.sign_in_with_oauth({
-        "provider": provider,
-        "options": {
-            "redirect_to": redirect_to,
-        },
-    })
+    response = auth_client.auth.sign_in_with_oauth(
+        {
+            "provider": provider,
+            "options": {
+                "redirect_to": redirect_to,
+            },
+        }
+    )
 
-    oauth_url = _oauth_response_url(response)
-    if not oauth_url:
-        raise RuntimeError(
-            f"Supabase non ha restituito la URL OAuth per {provider}."
-        )
-
-    return oauth_url
+    return _oauth_response_url(response)
 
 
 def handle_oauth_callback():
     """
-    Scambia il code PKCE restituito da Supabase con una sessione.
-
-    NOTA: exchange_code_for_session richiede un dict con auth_code,
-    non una stringa semplice.
+    Scambia il code PKCE e trasferisce esplicitamente la sessione
+    al client Supabase principale, come nell'app di riferimento.
     """
-    code = st.query_params.get("code")
+    code_param = st.query_params.get("code")
     flow_id = st.query_params.get("auth_flow")
 
-    if not code or not flow_id:
+    if not code_param or not flow_id:
         return False
 
     try:
+        # Fondamentale: recuperiamo lo STESSO client usato per iniziare
+        # questo specifico flusso OAuth/PKCE.
         auth_client = get_auth_flow_client(str(flow_id))
 
         response = auth_client.auth.exchange_code_for_session(
-            {"auth_code": str(code)}
+            {"auth_code": str(code_param)}
         )
 
         session = getattr(response, "session", None)
@@ -1040,26 +1105,21 @@ def handle_oauth_callback():
 
         if not access_token or not refresh_token:
             raise RuntimeError(
-                "Supabase non ha restituito una sessione valida."
+                "Supabase non ha restituito una sessione OAuth valida."
             )
 
         if user_obj is None:
             verified = auth_client.auth.get_user(access_token)
             user_obj = getattr(verified, "user", None)
 
-        if user_obj is None:
-            raise RuntimeError(
-                "Supabase non ha restituito l'utente autenticato."
-            )
-
-        # Allineiamo anche il client principale dell'app.
+        # Passaggio esplicito dei token al client principale.
+        # È il punto importante della versione che funziona bene anche
+        # quando Streamlit ricrea la pagina dopo il redirect OAuth.
         main_response = supabase.auth.set_session(
             access_token,
             refresh_token,
         )
 
-        # Riutilizziamo la persistenza già presente nell'app:
-        # salva utente e refresh token nel cookie persistente.
         save_authenticated_session(
             main_response,
             fallback_user=user_obj,
@@ -1067,16 +1127,15 @@ def handle_oauth_callback():
 
         st.session_state[AUTH_FLOW_STATE_KEY] = str(flow_id)
 
-        # Il code OAuth è monouso: puliamo subito la barra URL.
         st.query_params.clear()
         st.rerun()
-        return True
 
     except Exception as exc:
         st.query_params.clear()
         st.session_state["auth_callback_error"] = str(exc)
         return False
 
+    return True
 
 def show_login_page():
     """
@@ -1788,7 +1847,7 @@ def show_login_page():
 # ==============================================================================
 # 5. RESTORE SESSION / GOOGLE CALLBACK
 # ==============================================================================
-# Gestiamo prima il callback PKCE Google, perché il code OAuth è monouso.
+# Gestiamo prima il callback PKCE, perché il code OAuth è monouso.
 if (
     st.session_state.get("user") is None
     and st.query_params.get("code")
@@ -1796,7 +1855,12 @@ if (
 ):
     handle_oauth_callback()
 
-# Poi proviamo il restore persistente dal refresh-token cookie.
+# Come nell'app di riferimento: se abbiamo già i due token, li
+# trasferiamo/verifichiamo esplicitamente sul client Supabase principale.
+if st.session_state.get("user") is None:
+    restore_and_verify_auth_session()
+
+# Fallback persistente SanoSync: utile dopo una nuova sessione/browser reload.
 if st.session_state.get("user") is None:
     restore_session_from_cookie()
 
@@ -2161,25 +2225,25 @@ with st.sidebar:
     # ------------------------------------------------------------------
     _profile_menu_i18n = {
         "Italiano": {
-            "menu": "⌄",
+            "menu": "⚙️",
             "settings": "⚙️ Impostazioni",
             "language": "🌐 Lingua",
             "logout": "🚪 Esci",
         },
         "English": {
-            "menu": "⌄",
+            "menu": "⚙️",
             "settings": "⚙️ Settings",
             "language": "🌐 Language",
             "logout": "🚪 Log out",
         },
         "Nederlands": {
-            "menu": "⌄",
+            "menu": "⚙️",
             "settings": "⚙️ Instellingen",
             "language": "🌐 Taal",
             "logout": "🚪 Uitloggen",
         },
         "Français": {
-            "menu": "⌄",
+            "menu": "⚙️",
             "settings": "⚙️ Paramètres",
             "language": "🌐 Langue",
             "logout": "🚪 Se déconnecter",
@@ -2288,9 +2352,11 @@ with st.sidebar:
                 "auth_access_token",
                 "auth_refresh_token",
                 "show_personal_settings",
+                AUTH_FLOW_STATE_KEY,
             ):
                 st.session_state.pop(_auth_key, None)
 
+            _cookie_delete(SESSION_COOKIE)
             st.rerun()
 
     st.markdown("---")
