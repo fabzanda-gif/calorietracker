@@ -23,9 +23,9 @@ import plotly.graph_objects as go
 ASSET_DIR = Path(__file__).resolve().parent
 APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
 
-WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "bmw-check-oshibka.mp3"
-WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "26f8b9_sonic_ring_sound_effect.mp3"
-WEIGHT_SOUND_GAIN = ASSET_DIR / "sonicded.mp3"
+WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
+WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
+WEIGHT_SOUND_GAIN = ASSET_DIR / "assets/sounds/sonicded.mp3"
 
 
 def play_hidden_local_audio(audio_path):
@@ -835,6 +835,36 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
 
 
 RECIPE_IMAGE_BUCKET = "recipe-images"
+
+# Immagine predefinita per la ricetta Fit Lasagna già esistente.
+FIT_LASAGNA_IMAGE_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/recipe_images/WhatsApp%20Image%202026-08-19%20at%2011.49.40.jpeg"
+CASHEW_CHEESECAKE_IMAGE_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/recipe_images/Cheesecake.jpeg"
+
+
+def recipe_image_url(row):
+    """Foto salvata su Supabase; fallback GitHub per la Fit Lasagna esistente."""
+    saved = str(row.get("image_url") or "").strip()
+    if saved:
+        return saved
+
+    recipe_name = str(
+        row.get("base_name")
+        or row.get("name")
+        or ""
+    ).strip().casefold()
+
+    if "fit lasagna" in recipe_name or "lasagna fit" in recipe_name:
+        return FIT_LASAGNA_IMAGE_URL
+
+    if (
+        "cashew nuts cheesecake" in recipe_name
+        or "cheesecake cashew nuts" in recipe_name
+        or ("cheesecake" in recipe_name and "cashew" in recipe_name)
+    ):
+        return CASHEW_CHEESECAKE_IMAGE_URL
+
+    return None
+
 
 
 def upload_recipe_image(uploaded_file):
@@ -5270,9 +5300,10 @@ elif selected_page == t["t4"]:
                     r = my_recipes[_recipe_idx]
                     with _col:
                         with st.container(border=True):
-                            if r.get("image_url"):
+                            _recipe_image = recipe_image_url(r)
+                            if _recipe_image:
                                 st.image(
-                                    r["image_url"],
+                                    _recipe_image,
                                     use_container_width=True,
                                 )
                             else:
@@ -5440,9 +5471,10 @@ elif selected_page == t["t4"]:
                     r = shared_recipes[_recipe_idx]
                     with _col:
                         with st.container(border=True):
-                            if r.get("image_url"):
+                            _recipe_image = recipe_image_url(r)
+                            if _recipe_image:
                                 st.image(
-                                    r["image_url"],
+                                    _recipe_image,
                                     use_container_width=True,
                                 )
                             else:
