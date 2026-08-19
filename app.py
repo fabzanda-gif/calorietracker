@@ -2087,17 +2087,57 @@ with st.sidebar:
     account_left, account_right = st.columns([1, 3], vertical_alignment="center")
 
     with account_left:
+        _settings_url = f"{get_public_app_url().rstrip('/')}?settings=1"
+        _settings_url_safe = html.escape(_settings_url, quote=True)
+        _avatar_safe = html.escape(logged_avatar, quote=True)
+
+        _settings_tooltips = {
+            "Italiano": "Impostazioni personali",
+            "English": "Personal settings",
+            "Nederlands": "Persoonlijke instellingen",
+            "Français": "Paramètres personnels",
+        }
+        _settings_tip = html.escape(
+            _settings_tooltips.get(
+                st.session_state.get("lang_selector", "Italiano"),
+                _settings_tooltips["Italiano"],
+            ),
+            quote=True,
+        )
+
         if logged_avatar:
-            st.image(logged_avatar, width=58)
+            st.markdown(
+                f"""
+                <a href="{_settings_url_safe}" target="_self"
+                   title="{_settings_tip}"
+                   style="display:inline-block;text-decoration:none;">
+                    <img src="{_avatar_safe}" alt="{_settings_tip}"
+                         style="
+                            width:58px;height:58px;border-radius:50%;
+                            object-fit:cover;display:block;
+                            border:2px solid #FF8B8B;
+                            box-shadow:0 4px 14px rgba(255,139,139,.28);
+                            cursor:pointer;
+                         ">
+                </a>
+                """,
+                unsafe_allow_html=True,
+            )
         else:
             st.markdown(
-                """
-                <div style="
-                    width:54px;height:54px;border-radius:50%;
-                    display:flex;align-items:center;justify-content:center;
-                    background:#FF8B8B;color:white;font-size:1.5rem;
-                    font-weight:900;
-                ">✓</div>
+                f"""
+                <a href="{_settings_url_safe}" target="_self"
+                   title="{_settings_tip}"
+                   style="display:inline-block;text-decoration:none;">
+                    <div style="
+                        width:54px;height:54px;border-radius:50%;
+                        display:flex;align-items:center;justify-content:center;
+                        background:#FF8B8B;color:white;font-size:1.5rem;
+                        font-weight:900;border:2px solid #FFFFFF;
+                        box-shadow:0 4px 14px rgba(255,139,139,.28);
+                        cursor:pointer;
+                    ">✓</div>
+                </a>
                 """,
                 unsafe_allow_html=True,
             )
@@ -2996,6 +3036,309 @@ with st.sidebar:
         _cookie_delete(SESSION_COOKIE)
         st.session_state.clear()
         st.rerun()
+
+
+# ==============================================================================
+# PERSONAL SETTINGS — linked from profile image
+# ==============================================================================
+SETTINGS_I18N = {
+    "Italiano": {
+        "title": "⚙️ Impostazioni personali",
+        "subtitle": "Gestisci i dati del tuo profilo SanoSync.",
+        "back": "← Torna all'app",
+        "account": "Account",
+        "email": "Email",
+        "name": "Nome",
+        "gender": "Genere",
+        "male": "Uomo",
+        "female": "Donna",
+        "birth": "Data di nascita",
+        "height": "Altezza (cm)",
+        "current_weight": "Peso attuale (kg)",
+        "target_weight": "Peso obiettivo (kg)",
+        "language": "Lingua preferita",
+        "deficit_title": "🎯 Obiettivo deficit",
+        "deficit_speed": "Velocità di dimagrimento",
+        "deficit_field": "Deficit kcal di base",
+        "save": "💾 Salva impostazioni",
+        "saved": "✅ Impostazioni aggiornate.",
+        "error": "Errore durante il salvataggio: {error}",
+        "hint": "La foto profilo viene gestita dal provider di accesso (es. Google/Facebook).",
+    },
+    "English": {
+        "title": "⚙️ Personal settings",
+        "subtitle": "Manage your SanoSync profile data.",
+        "back": "← Back to app",
+        "account": "Account",
+        "email": "Email",
+        "name": "Name",
+        "gender": "Gender",
+        "male": "Male",
+        "female": "Female",
+        "birth": "Date of birth",
+        "height": "Height (cm)",
+        "current_weight": "Current weight (kg)",
+        "target_weight": "Target weight (kg)",
+        "language": "Preferred language",
+        "deficit_title": "🎯 Deficit target",
+        "deficit_speed": "Weight-loss speed",
+        "deficit_field": "Base calorie deficit",
+        "save": "💾 Save settings",
+        "saved": "✅ Settings updated.",
+        "error": "Error while saving: {error}",
+        "hint": "Your profile picture is managed by your sign-in provider (e.g. Google/Facebook).",
+    },
+    "Nederlands": {
+        "title": "⚙️ Persoonlijke instellingen",
+        "subtitle": "Beheer je SanoSync-profielgegevens.",
+        "back": "← Terug naar de app",
+        "account": "Account",
+        "email": "E-mail",
+        "name": "Naam",
+        "gender": "Geslacht",
+        "male": "Man",
+        "female": "Vrouw",
+        "birth": "Geboortedatum",
+        "height": "Lengte (cm)",
+        "current_weight": "Huidig gewicht (kg)",
+        "target_weight": "Streefgewicht (kg)",
+        "language": "Voorkeurstaal",
+        "deficit_title": "🎯 Tekortdoel",
+        "deficit_speed": "Snelheid van gewichtsverlies",
+        "deficit_field": "Basis calorietekort",
+        "save": "💾 Instellingen opslaan",
+        "saved": "✅ Instellingen bijgewerkt.",
+        "error": "Fout bij opslaan: {error}",
+        "hint": "Je profielfoto wordt beheerd door je inlogprovider (bijv. Google/Facebook).",
+    },
+    "Français": {
+        "title": "⚙️ Paramètres personnels",
+        "subtitle": "Gérez les données de votre profil SanoSync.",
+        "back": "← Retour à l’application",
+        "account": "Compte",
+        "email": "E-mail",
+        "name": "Prénom / nom",
+        "gender": "Sexe",
+        "male": "Homme",
+        "female": "Femme",
+        "birth": "Date de naissance",
+        "height": "Taille (cm)",
+        "current_weight": "Poids actuel (kg)",
+        "target_weight": "Poids cible (kg)",
+        "language": "Langue préférée",
+        "deficit_title": "🎯 Objectif de déficit",
+        "deficit_speed": "Vitesse de perte de poids",
+        "deficit_field": "Déficit calorique de base",
+        "save": "💾 Enregistrer les paramètres",
+        "saved": "✅ Paramètres mis à jour.",
+        "error": "Erreur lors de l’enregistrement : {error}",
+        "hint": "Votre photo de profil est gérée par votre fournisseur de connexion (ex. Google/Facebook).",
+    },
+}
+
+
+def render_personal_settings_page():
+    settings_lang = st.session_state.get("lang_selector", "Italiano")
+    si = SETTINGS_I18N.get(settings_lang, SETTINGS_I18N["Italiano"])
+
+    render_page_title_card(si["title"])
+    st.caption(si["subtitle"])
+
+    if st.button(si["back"], key="settings_back"):
+        st.query_params.clear()
+        st.rerun()
+
+    metadata = dict(getattr(st.session_state["user"], "user_metadata", None) or {})
+
+    existing_name = str(
+        metadata.get("display_name")
+        or metadata.get("full_name")
+        or metadata.get("name")
+        or logged_name
+        or ""
+    )
+    existing_gender = str(metadata.get("gender") or "Uomo")
+    existing_birth = parse_birth_date(metadata.get("birth_date")) or date(1990, 1, 1)
+    existing_height = float(metadata.get("height") or 175.0)
+    existing_target = float(metadata.get("target_weight") or 75.0)
+    existing_current = float(
+        user_current_weight
+        if user_current_weight is not None
+        else metadata.get("current_weight") or 80.0
+    )
+
+    canonical_gender = "Donna" if existing_gender in ("Donna", "Female", "Vrouw", "Femme") else "Uomo"
+
+    existing_deficit_value = int(
+        round(float(metadata.get("deficit_target_kcal") or 0))
+    )
+    existing_deficit_plan = normalize_deficit_plan(
+        metadata.get("deficit_plan")
+        or deficit_preset_from_value(existing_deficit_value)
+    )
+
+    if "settings_deficit_plan" not in st.session_state:
+        st.session_state["settings_deficit_plan"] = existing_deficit_plan
+    if "settings_deficit_kcal" not in st.session_state:
+        st.session_state["settings_deficit_kcal"] = existing_deficit_value
+
+    def _sync_settings_deficit():
+        selected = normalize_deficit_plan(
+            st.session_state.get("settings_deficit_plan", "custom")
+        )
+        st.session_state["settings_deficit_kcal"] = int(
+            DEFICIT_PRESETS.get(selected, 0)
+        )
+
+    with st.container(border=True):
+        st.markdown(f"### {si['account']}")
+        st.text_input(si["email"], value=logged_email, disabled=True)
+
+        new_name = st.text_input(
+            si["name"],
+            value=existing_name,
+            key="settings_display_name",
+        )
+
+        gender_options = ["Uomo", "Donna"]
+        new_gender = st.selectbox(
+            si["gender"],
+            gender_options,
+            index=gender_options.index(canonical_gender),
+            format_func=lambda value: si["male"] if value == "Uomo" else si["female"],
+            key="settings_gender",
+        )
+
+        new_birth = st.date_input(
+            si["birth"],
+            value=existing_birth,
+            min_value=date(1900, 1, 1),
+            max_value=date.today(),
+            key="settings_birth_date",
+        )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            new_height = st.number_input(
+                si["height"],
+                min_value=100.0,
+                max_value=250.0,
+                value=existing_height,
+                step=1.0,
+                key="settings_height",
+            )
+        with c2:
+            new_current_weight = st.number_input(
+                si["current_weight"],
+                min_value=20.0,
+                max_value=300.0,
+                value=existing_current,
+                step=0.1,
+                key="settings_current_weight",
+            )
+
+        new_target = st.number_input(
+            si["target_weight"],
+            min_value=20.0,
+            max_value=300.0,
+            value=existing_target,
+            step=0.5,
+            key="settings_target_weight",
+        )
+
+        new_language = st.selectbox(
+            si["language"],
+            ["Italiano", "English", "Nederlands", "Français"],
+            index=["Italiano", "English", "Nederlands", "Français"].index(settings_lang),
+            key="settings_language",
+        )
+
+        st.markdown(f"### {si['deficit_title']}")
+        new_deficit_plan = st.selectbox(
+            si["deficit_speed"],
+            list(DEFICIT_PRESETS.keys()),
+            key="settings_deficit_plan",
+            format_func=lambda key: DEFICIT_PRESET_LABELS.get(
+                settings_lang,
+                DEFICIT_PRESET_LABELS["Italiano"],
+            ).get(key, key),
+            on_change=_sync_settings_deficit,
+        )
+
+        new_deficit_kcal = st.number_input(
+            si["deficit_field"],
+            min_value=0,
+            max_value=2000,
+            step=50,
+            key="settings_deficit_kcal",
+        )
+
+        st.caption(si["hint"])
+
+        if st.button(
+            si["save"],
+            type="primary",
+            use_container_width=True,
+            key="save_personal_settings",
+        ):
+            try:
+                normalized_plan = normalize_deficit_plan(new_deficit_plan)
+                preset_value = int(DEFICIT_PRESETS.get(normalized_plan, 0))
+                plan_to_save = (
+                    normalized_plan
+                    if int(new_deficit_kcal) == preset_value
+                    else "custom"
+                )
+
+                # Preserve provider metadata such as avatar_url, picture,
+                # provider identifiers, full_name, etc.
+                updated_metadata = dict(metadata)
+                updated_metadata.update({
+                    "display_name": str(new_name).strip(),
+                    "gender": new_gender,
+                    "birth_date": str(new_birth),
+                    "height": float(new_height),
+                    "current_weight": float(new_current_weight),
+                    "target_weight": float(new_target),
+                    "deficit_target_kcal": int(new_deficit_kcal),
+                    "deficit_plan": plan_to_save,
+                    "preferred_language": new_language,
+                })
+
+                response = supabase.auth.update_user({
+                    "data": updated_metadata
+                })
+
+                # Keep weight history aligned with the edited current weight.
+                supabase.table("daily_logs").upsert(
+                    {
+                        "user_id": user_id,
+                        "date": str(date.today()),
+                        "weight": float(new_current_weight),
+                    },
+                    on_conflict="user_id,date",
+                ).execute()
+
+                if getattr(response, "user", None):
+                    st.session_state["user"] = response.user
+
+                st.session_state["lang_selector"] = new_language
+                st.session_state["login_lang_selector"] = new_language
+
+                st.success(si["saved"])
+                st.query_params.clear()
+                st.rerun()
+
+            except Exception as exc:
+                st.error(si["error"].format(error=exc))
+                print(traceback.format_exc())
+
+
+_is_settings_page = str(st.query_params.get("settings") or "") == "1"
+if _is_settings_page:
+    render_personal_settings_page()
+    st.stop()
+
 
 # Su mobile la sidebar parte aperta (initial_sidebar_state="expanded") e viene
 # chiusa dopo la selezione di una tab. I selettori (es. lingua) non la chiudono.
