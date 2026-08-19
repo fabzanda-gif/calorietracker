@@ -2321,9 +2321,29 @@ def show_login_page():
         protein_goal_enabled_input = protein_goal_choice == lt["protein_goal_yes"]
         protein_goal_g_input = 0.0
         if protein_goal_enabled_input:
+            # Default sensato: 2 g di proteine per kg di peso.
+            # Durante la registrazione usiamo il peso appena inserito;
+            # se non disponibile/valido, fallback 70 kg -> 140 g.
+            _signup_weight_for_protein = _safe_float(
+                locals().get("current_weight_input")
+                or locals().get("current_weight")
+                or locals().get("peso_attuale")
+            )
+            if _signup_weight_for_protein <= 0:
+                _signup_weight_for_protein = 70.0
+
+            _signup_protein_default = min(
+                500.0,
+                max(1.0, round(_signup_weight_for_protein * 2.0)),
+            )
+
             protein_goal_g_input = st.number_input(
-                lt["protein_goal_g"], min_value=1.0, max_value=500.0,
-                value=120.0, step=5.0, key="signup_protein_goal_g",
+                lt["protein_goal_g"],
+                min_value=1.0,
+                max_value=500.0,
+                value=float(_signup_protein_default),
+                step=5.0,
+                key="signup_protein_goal_g",
             )
 
         if st.button(
@@ -2467,7 +2487,13 @@ user_protein_goal_g = _safe_float(u_meta.get("protein_goal_g"))
 if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in u_meta:
     user_protein_goal_enabled = True
     if user_protein_goal_g <= 0:
-        user_protein_goal_g = 120.0
+        _special_weight = _safe_float(
+            u_meta.get("current_weight")
+            or u_meta.get("weight")
+        )
+        if _special_weight <= 0:
+            _special_weight = 70.0
+        user_protein_goal_g = round(_special_weight * 2.0)
 
 # Il BMR viene calcolato dinamicamente usando l'ultimo peso registrato.
 latest_weight_row = None
@@ -4335,7 +4361,10 @@ def render_personal_settings_page():
     ):
         existing_protein_enabled = True
         if existing_protein_g <= 0:
-            existing_protein_g = 120.0
+            _settings_special_weight = _safe_float(existing_current)
+            if _settings_special_weight <= 0:
+                _settings_special_weight = 70.0
+            existing_protein_g = round(_settings_special_weight * 2.0)
 
     if "settings_deficit_plan" not in st.session_state:
         st.session_state["settings_deficit_plan"] = existing_deficit_plan
@@ -4458,10 +4487,21 @@ def render_personal_settings_page():
         )
 
         new_protein_enabled = new_protein_choice == si["protein_yes"]
+        # Se non esiste ancora un goal salvato, proponiamo 2 g/kg
+        # usando il peso corrente presente nelle impostazioni.
+        _protein_weight_basis = _safe_float(new_current_weight)
+        if _protein_weight_basis <= 0:
+            _protein_weight_basis = 70.0
+
+        _protein_suggested_g = min(
+            500.0,
+            max(1.0, round(_protein_weight_basis * 2.0)),
+        )
+
         new_protein_g = (
             existing_protein_g
             if existing_protein_g > 0
-            else 120.0
+            else float(_protein_suggested_g)
         )
 
         if new_protein_enabled:
