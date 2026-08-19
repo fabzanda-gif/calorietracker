@@ -1088,6 +1088,7 @@ def show_login_page():
     LOGIN_I18N = {
         "Italiano": {
             "language": "🌐 Lingua",
+            "logout": "🚪 Esci",
             "eyebrow": "SANOSYNC",
             "title": "🍑 Tutto sotto controllo",
             "subtitle": "Alimentazione, attività, peso e progressi in un unico posto.",
@@ -1132,6 +1133,7 @@ def show_login_page():
         },
         "English": {
             "language": "🌐 Language",
+            "logout": "🚪 Log out",
             "eyebrow": "SANOSYNC",
             "title": "🍑 Under control",
             "subtitle": "Food, activity, weight and progress in one place.",
@@ -1176,6 +1178,7 @@ def show_login_page():
         },
         "Nederlands": {
             "language": "🌐 Taal",
+            "logout": "🚪 Uitloggen",
             "eyebrow": "SANOSYNC",
             "title": "🍑 Komt goed",
             "subtitle": "Voeding, activiteit, gewicht en voortgang op één plek.",
@@ -1220,6 +1223,7 @@ def show_login_page():
         },
         "Français": {
             "language": "🌐 Langue",
+            "logout": "🚪 Se déconnecter",
             "eyebrow": "SANOSYNC",
             "title": "🍑 C'est géré",
             "subtitle": "Alimentation, activité, poids et progrès au même endroit.",
@@ -2187,10 +2191,10 @@ with st.sidebar:
     st.markdown(
         """
         <style>
-        /* Posizionamento del menu accanto al saluto */
+        /* Menu sotto il blocco foto + saluto: non copre più il testo */
         .st-key-profile_menu_popover {
             width:44px !important;
-            margin-top:-62px !important;
+            margin-top:8px !important;
             margin-left:auto !important;
             margin-right:6px !important;
             position:relative !important;
@@ -2261,6 +2265,28 @@ with st.sidebar:
         if _new_menu_lang != st.session_state.get("lang_selector"):
             st.session_state["lang_selector"] = _new_menu_lang
             st.session_state["login_lang_selector"] = _new_menu_lang
+            st.rerun()
+
+        st.divider()
+        if st.button(
+            _pm["logout"],
+            key="profile_menu_logout",
+            use_container_width=True,
+        ):
+            try:
+                supabase.auth.sign_out()
+            except Exception:
+                pass
+
+            # Rimuove soltanto lo stato di autenticazione/sessione.
+            for _auth_key in (
+                "user",
+                "auth_access_token",
+                "auth_refresh_token",
+                "show_personal_settings",
+            ):
+                st.session_state.pop(_auth_key, None)
+
             st.rerun()
 
     st.markdown("---")
@@ -3109,13 +3135,6 @@ with st.sidebar:
     selected_page = t[selected_page_id]
 
     st.markdown("---")
-    if st.button(t["logout"], use_container_width=True):
-        supabase.auth.sign_out()
-        _cookie_delete(SESSION_COOKIE)
-        st.session_state.clear()
-        st.rerun()
-
-
 # ==============================================================================
 # PERSONAL SETTINGS — linked from profile image
 # ==============================================================================
