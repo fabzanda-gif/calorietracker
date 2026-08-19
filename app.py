@@ -790,7 +790,8 @@ def get_quick_entries_from_meals():
 def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
                                quantity, is_per_100g, calories, protein, carbs, fat,
                                base_calories, base_protein, base_carbs, base_fat,
-                               notes="", category="Casa", ingredients_json=None):
+                               notes="", category="Casa", ingredients_json=None,
+                               is_shared=False):
     """Inserisce un meal conservando sia il totale sia i dati base riutilizzabili."""
     payload = {
         "user_id": user_id,
@@ -811,6 +812,7 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
         "notes": str(notes or "").strip(),
         "category": category if category in MEAL_CATEGORIES else "Casa",
         "ingredients_json": ingredients_json,
+        "is_shared": bool(is_shared),
     }
     try:
         return supabase.table("meals").insert(payload).execute()
@@ -2434,7 +2436,7 @@ translations = {
         "t1": "🚀 Inserimento", 
         "t2": "📊 Panoramica", 
         "t3": "📈 Peso", 
-        "t4": "⚡ Immissione Rapida", 
+        "t4": "🍳 Ricette", 
         "t5": "🏃 Attività",  
         "meal": "Tipo di pasto", 
         "meal_name": "Nome pasto", 
@@ -2527,7 +2529,7 @@ translations = {
         "t1": "🚀 Logging", 
         "t2": "📊 Overview", 
         "t3": "📈 Weight", 
-        "t4": "⚡ Quick Entries", 
+        "t4": "🍳 Recipes", 
         "t5": "🏃 Activity",  
         "meal": "Meal type", 
         "meal_name": "Meal name", 
@@ -2620,7 +2622,7 @@ translations = {
         "t1": "🚀 Invoer", 
         "t2": "📊 Overzicht", 
         "t3": "📈 Gewicht", 
-        "t4": "⚡ Snelle Invoer", 
+        "t4": "🍳 Recepten", 
         "t5": "🏃 Activiteit",  
         "meal": "Maaltijdtype", 
         "meal_name": "Maaltijdnaam", 
@@ -2750,7 +2752,7 @@ translations["Français"] = {
     "t1": "🚀 Saisie",
     "t2": "📊 Vue d’ensemble",
     "t3": "📈 Poids",
-    "t4": "⚡ Saisie rapide",
+    "t4": "🍳 Recettes",
     "t5": "🏃 Activité",
     "meal": "Type de repas",
     "meal_name": "Nom du repas",
@@ -2913,7 +2915,7 @@ translations["Italiano"].update({
     "no_weight_period": "Nessun peso registrato negli ultimi {days} giorni.", "ingested_kcal": "Kcal ingerite", "burned_kcal": "Kcal bruciate",
     "protein_full": "Proteine", "carbs_full": "Carboidrati", "fats_full": "Grassi", "grams": "grammi", "goal": "Obiettivo",
     "no_food_data": "Nessun dato alimentare", "chart_error": "Errore nel caricamento del grafico: {error}",
-    "recipes_caption": "Le ricette sono normali record di meals con gli ingredienti salvati. Immissioni rapide, ricette e suggerimenti usano lo stesso database.",
+    "recipes_caption": "Le ricette restano personali per impostazione predefinita. Puoi scegliere di condividere singole ricette con gli altri utenti.",
     "available_recipes": "### 📋 Ricette disponibili", "no_composed_recipes": "Nessuna ricetta composta presente nei pasti.",
     "create_meal_ingredients": "### ➕ Crea un pasto da ingredienti", "recipe_name_placeholder": "Es. Pasta al pomodoro",
     "notes_optional": "Note (opzionali)", "notes_placeholder": "Es. preparazione, sostituzioni, condimenti...",
@@ -2927,6 +2929,18 @@ translations["Italiano"].update({
     "save_as_meal": "💾 Salva come pasto", "enter_name": "Inserisci un nome.", "composed_saved": "✅ Pasto composto salvato!",
     "add_one_ingredient": "Aggiungi almeno un ingrediente per costruire il pasto.",
     "recipe_category_help": "Una-tantum non entra nei suggerimenti. Ristorante non viene mai suggerito a pranzo.",
+    "my_recipes": "### 👤 Le mie ricette",
+    "shared_recipes": "### 🌍 Ricette condivise",
+    "no_my_recipes": "Non hai ancora creato ricette.",
+    "no_shared_recipes": "Nessuna ricetta condivisa disponibile.",
+    "share_recipe": "🌍 Condividi questa ricetta con gli altri utenti",
+    "share_help": "Se attivo, gli altri utenti autenticati potranno vedere la ricetta. Tu resterai l'unico a poterla modificare o eliminare.",
+    "sharing_manage": "#### 🔐 Condivisione ricette",
+    "sharing_select": "Seleziona una tua ricetta",
+    "sharing_status": "Condivisa",
+    "sharing_save": "💾 Aggiorna condivisione",
+    "sharing_updated": "✅ Impostazione di condivisione aggiornata.",
+    "owner": "Autore",
 })
 translations["English"].update({
     "slogan": "Under control",
@@ -2952,7 +2966,7 @@ translations["English"].update({
     "view_label": "View", "view_weight": "Weight", "view_kcal": "Calories", "view_macros": "Macros", "view_meals": "Meals", "period_label": "Period",
     "no_weight_period": "No weight logged in the last {days} days.", "ingested_kcal": "Calories eaten", "burned_kcal": "Calories burned",
     "protein_full": "Protein", "carbs_full": "Carbohydrates", "fats_full": "Fat", "grams": "grams", "goal": "Goal", "no_food_data": "No food data",
-    "chart_error": "Error loading chart: {error}", "recipes_caption": "Recipes are normal meal records with saved ingredients. Quick entries, recipes and suggestions use the same database.",
+    "chart_error": "Error loading chart: {error}", "recipes_caption": "Recipes are private by default. You can choose to share individual recipes with other users.",
     "available_recipes": "### 📋 Available recipes", "no_composed_recipes": "No composed recipes found in meals.", "create_meal_ingredients": "### ➕ Create a meal from ingredients",
     "recipe_name_placeholder": "E.g. Pasta with tomato sauce", "notes_optional": "Notes (optional)", "notes_placeholder": "E.g. preparation, substitutions, seasoning...",
     "add_ingredient_title": "#### 🥕 Add ingredient", "ingredient_source": "Ingredient source", "db_off": "Database / Open Food Facts", "manual_entry": "Manual entry",
@@ -2962,6 +2976,18 @@ translations["English"].update({
     "ingredient_col": "Ingredient", "remove_ingredient": "Remove ingredient", "remove_ingredient_btn": "🗑️ Remove ingredient", "total_meal": "Total meal",
     "per_100g_label": "Per 100 g", "save_as_meal": "💾 Save as meal", "enter_name": "Enter a name.", "composed_saved": "✅ Composed meal saved!",
     "add_one_ingredient": "Add at least one ingredient to build the meal.", "recipe_category_help": "One-off meals are excluded from suggestions. Restaurants are never suggested for lunch.",
+    "my_recipes": "### 👤 My recipes",
+    "shared_recipes": "### 🌍 Shared recipes",
+    "no_my_recipes": "You have not created any recipes yet.",
+    "no_shared_recipes": "No shared recipes are available.",
+    "share_recipe": "🌍 Share this recipe with other users",
+    "share_help": "When enabled, other authenticated users can view the recipe. Only you can modify or delete it.",
+    "sharing_manage": "#### 🔐 Recipe sharing",
+    "sharing_select": "Select one of your recipes",
+    "sharing_status": "Shared",
+    "sharing_save": "💾 Update sharing",
+    "sharing_updated": "✅ Sharing setting updated.",
+    "owner": "Author",
 })
 translations["Nederlands"].update({
     "slogan": "Komt goed",
@@ -2987,7 +3013,7 @@ translations["Nederlands"].update({
     "view_label": "Weergave", "view_weight": "Gewicht", "view_kcal": "Kcal", "view_macros": "Macro's", "view_meals": "Maaltijden", "period_label": "Periode",
     "no_weight_period": "Geen gewicht geregistreerd in de afgelopen {days} dagen.", "ingested_kcal": "Kcal gegeten", "burned_kcal": "Kcal verbrand",
     "protein_full": "Eiwitten", "carbs_full": "Koolhydraten", "fats_full": "Vetten", "grams": "gram", "goal": "Doel", "no_food_data": "Geen voedingsgegevens",
-    "chart_error": "Fout bij laden van grafiek: {error}", "recipes_caption": "Recepten zijn gewone maaltijdrecords met opgeslagen ingrediënten. Snelle invoer, recepten en suggesties gebruiken dezelfde database.",
+    "chart_error": "Fout bij laden van grafiek: {error}", "recipes_caption": "Recepten zijn standaard privé. Je kunt afzonderlijke recepten delen met andere gebruikers.",
     "available_recipes": "### 📋 Beschikbare recepten", "no_composed_recipes": "Geen samengestelde recepten gevonden in maaltijden.", "create_meal_ingredients": "### ➕ Maak een maaltijd van ingrediënten",
     "recipe_name_placeholder": "Bijv. pasta met tomatensaus", "notes_optional": "Notities (optioneel)", "notes_placeholder": "Bijv. bereiding, vervangingen, kruiden...",
     "add_ingredient_title": "#### 🥕 Ingrediënt toevoegen", "ingredient_source": "Bron ingrediënt", "db_off": "Database / Open Food Facts", "manual_entry": "Handmatige invoer",
@@ -2997,6 +3023,18 @@ translations["Nederlands"].update({
     "ingredient_col": "Ingrediënt", "remove_ingredient": "Ingrediënt verwijderen", "remove_ingredient_btn": "🗑️ Ingrediënt verwijderen", "total_meal": "Totale maaltijd",
     "per_100g_label": "Per 100 g", "save_as_meal": "💾 Opslaan als maaltijd", "enter_name": "Voer een naam in.", "composed_saved": "✅ Samengestelde maaltijd opgeslagen!",
     "add_one_ingredient": "Voeg minstens één ingrediënt toe om de maaltijd te maken.", "recipe_category_help": "Eenmalige maaltijden worden niet voorgesteld. Restaurants worden nooit voor lunch voorgesteld.",
+    "my_recipes": "### 👤 Mijn recepten",
+    "shared_recipes": "### 🌍 Gedeelde recepten",
+    "no_my_recipes": "Je hebt nog geen recepten gemaakt.",
+    "no_shared_recipes": "Er zijn geen gedeelde recepten beschikbaar.",
+    "share_recipe": "🌍 Deel dit recept met andere gebruikers",
+    "share_help": "Als dit is ingeschakeld, kunnen andere ingelogde gebruikers het recept bekijken. Alleen jij kunt het wijzigen of verwijderen.",
+    "sharing_manage": "#### 🔐 Recept delen",
+    "sharing_select": "Selecteer een van je recepten",
+    "sharing_status": "Gedeeld",
+    "sharing_save": "💾 Delen bijwerken",
+    "sharing_updated": "✅ Deelinstelling bijgewerkt.",
+    "owner": "Auteur",
 })
 translations["Français"].update({
     "slogan": "C'est géré",
@@ -3022,7 +3060,7 @@ translations["Français"].update({
     "view_label": "Affichage", "view_weight": "Poids", "view_kcal": "Kcal", "view_macros": "Macros", "view_meals": "Repas", "period_label": "Période",
     "no_weight_period": "Aucun poids enregistré au cours des {days} derniers jours.", "ingested_kcal": "Kcal consommées", "burned_kcal": "Kcal brûlées",
     "protein_full": "Protéines", "carbs_full": "Glucides", "fats_full": "Lipides", "grams": "grammes", "goal": "Objectif", "no_food_data": "Aucune donnée alimentaire",
-    "chart_error": "Erreur de chargement du graphique : {error}", "recipes_caption": "Les recettes sont des repas normaux avec leurs ingrédients enregistrés. Saisie rapide, recettes et suggestions utilisent la même base.",
+    "chart_error": "Erreur de chargement du graphique : {error}", "recipes_caption": "Les recettes sont privées par défaut. Vous pouvez choisir de partager certaines recettes avec les autres utilisateurs.",
     "available_recipes": "### 📋 Recettes disponibles", "no_composed_recipes": "Aucune recette composée dans les repas.", "create_meal_ingredients": "### ➕ Créer un repas à partir d'ingrédients",
     "recipe_name_placeholder": "Ex. pâtes à la sauce tomate", "notes_optional": "Notes (facultatives)", "notes_placeholder": "Ex. préparation, substitutions, assaisonnement...",
     "add_ingredient_title": "#### 🥕 Ajouter un ingrédient", "ingredient_source": "Source de l'ingrédient", "db_off": "Base / Open Food Facts", "manual_entry": "Saisie manuelle",
@@ -3032,6 +3070,18 @@ translations["Français"].update({
     "ingredient_col": "Ingrédient", "remove_ingredient": "Retirer l'ingrédient", "remove_ingredient_btn": "🗑️ Retirer l'ingrédient", "total_meal": "Repas total",
     "per_100g_label": "Pour 100 g", "save_as_meal": "💾 Enregistrer comme repas", "enter_name": "Saisissez un nom.", "composed_saved": "✅ Repas composé enregistré !",
     "add_one_ingredient": "Ajoutez au moins un ingrédient pour construire le repas.", "recipe_category_help": "Les repas ponctuels sont exclus des suggestions. Les restaurants ne sont jamais suggérés au déjeuner.",
+    "my_recipes": "### 👤 Mes recettes",
+    "shared_recipes": "### 🌍 Recettes partagées",
+    "no_my_recipes": "Vous n'avez encore créé aucune recette.",
+    "no_shared_recipes": "Aucune recette partagée n'est disponible.",
+    "share_recipe": "🌍 Partager cette recette avec les autres utilisateurs",
+    "share_help": "Si cette option est activée, les autres utilisateurs authentifiés pourront voir la recette. Vous seul pourrez la modifier ou la supprimer.",
+    "sharing_manage": "#### 🔐 Partage des recettes",
+    "sharing_select": "Sélectionnez l'une de vos recettes",
+    "sharing_status": "Partagée",
+    "sharing_save": "💾 Mettre à jour le partage",
+    "sharing_updated": "✅ Paramètre de partage mis à jour.",
+    "owner": "Auteur",
 })
 
 translations["Italiano"].update({"period_days":"giorni","monthly_stats_error":"Impossibile calcolare le statistiche mensili: {error}","weight_edit_error":"Errore nella modifica: {error}","weight_delete_error":"Errore nella cancellazione: {error}","generic_error":"Errore: {error}","no_weight_loss":"Nessuna perdita di peso misurata negli ultimi 30 giorni.","ratio_caption":"{deficit} kcal di deficit / {kg} kg persi.","trend":"Proiezione","real_weight":"Peso reale"})
@@ -5017,7 +5067,7 @@ elif selected_page == t["t3"]:
             st.error(t["chart_error"].format(error=e))
             print(traceback.format_exc())
 
-# 12. PAGE 4: RICETTE / MEAL COMPOSTI
+# 12. PAGE 4: RICETTE / RECIPES
 # ==============================================================================
 elif selected_page == t["t4"]:
     render_page_title_card(t["recipes_title"])
@@ -5027,36 +5077,171 @@ elif selected_page == t["t4"]:
         st.session_state["recipe_form_version"] = 0
     v = st.session_state["recipe_form_version"]
 
+    # ------------------------------------------------------------------
+    # 👤 LE MIE RICETTE
+    # ------------------------------------------------------------------
     with st.container(border=True):
-        st.markdown(t["available_recipes"])
+        st.markdown(t["my_recipes"])
+
         try:
-            recipe_meals = (
+            my_recipe_rows = (
                 supabase.table("meals")
                 .select(
-                    "id,date,meal_type,category,name,base_name,calories,protein,carbs,fat,"
-                    "base_calories,base_protein,base_carbs,base_fat,notes,ingredients_json"
+                    "id,user_id,date,meal_type,category,name,base_name,"
+                    "calories,protein,carbs,fat,"
+                    "base_calories,base_protein,base_carbs,base_fat,"
+                    "notes,ingredients_json,is_shared"
                 )
                 .eq("user_id", user_id)
                 .order("date", desc=True)
                 .execute().data
                 or []
             )
-        except Exception:
-            recipe_meals = []
+        except Exception as exc:
+            my_recipe_rows = []
+            print(f"Errore caricamento ricette personali: {exc}")
 
-        recipe_meals = [r for r in recipe_meals if r.get("ingredients_json")]
+        my_recipe_rows = [
+            r for r in my_recipe_rows if r.get("ingredients_json")
+        ]
 
-        if recipe_meals:
+        # Mostriamo una sola versione per nome, prendendo la più recente.
+        my_recipes = []
+        _seen_my = set()
+        for r in my_recipe_rows:
+            label = (
+                r.get("base_name")
+                or _clean_meal_name(r.get("name"))
+                or "Ricetta"
+            ).strip()
+            key = label.casefold()
+            if key in _seen_my:
+                continue
+            _seen_my.add(key)
+            r["_recipe_label"] = label
+            my_recipes.append(r)
+
+        if my_recipes:
             display_rows = []
-            seen_names = set()
-            for r in recipe_meals:
-                label = (r.get("base_name") or _clean_meal_name(r.get("name")) or "Ricetta").strip()
-                key = label.casefold()
-                if key in seen_names:
-                    continue
-                seen_names.add(key)
+            for r in my_recipes:
                 display_rows.append({
-                    t["col_name"]: label,
+                    t["col_name"]: r["_recipe_label"],
+                    t["col_meal"]: tr_meal_type(r.get("meal_type")),
+                    t["col_category"]: tr_category(infer_meal_category(r)),
+                    "Kcal": r.get("calories"),
+                    "Pro (g)": r.get("protein"),
+                    "Carbs (g)": r.get("carbs"),
+                    "Fat (g)": r.get("fat"),
+                    t["sharing_status"]: "🌍" if r.get("is_shared") else "🔒",
+                    t["col_date"]: r.get("date"),
+                })
+
+            st.dataframe(
+                pd.DataFrame(display_rows),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            for r in my_recipes:
+                if r.get("notes"):
+                    st.markdown(
+                        f"**{html.escape(str(r['_recipe_label']))}** "
+                        f"{info_badge(r.get('notes'), 'Note ricetta')}",
+                        unsafe_allow_html=True,
+                    )
+
+            # Gestione condivisione delle ricette già esistenti.
+            st.markdown(t["sharing_manage"])
+            recipe_options = {
+                r["_recipe_label"]: r for r in my_recipes
+            }
+            selected_recipe_label = st.selectbox(
+                t["sharing_select"],
+                list(recipe_options.keys()),
+                key="recipe_share_manage_select",
+            )
+            selected_recipe_row = recipe_options[selected_recipe_label]
+
+            new_share_state = st.checkbox(
+                t["share_recipe"],
+                value=bool(selected_recipe_row.get("is_shared")),
+                key=f"recipe_share_manage_{selected_recipe_row['id']}",
+                help=t["share_help"],
+            )
+
+            if st.button(
+                t["sharing_save"],
+                key="recipe_share_manage_save",
+                use_container_width=True,
+            ):
+                try:
+                    (
+                        supabase.table("meals")
+                        .update({"is_shared": bool(new_share_state)})
+                        .eq("id", selected_recipe_row["id"])
+                        .eq("user_id", user_id)
+                        .execute()
+                    )
+                    st.success(t["sharing_updated"])
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+        else:
+            st.info(t["no_my_recipes"])
+
+    # ------------------------------------------------------------------
+    # 🌍 RICETTE CONDIVISE DAGLI ALTRI UTENTI
+    # ------------------------------------------------------------------
+    with st.container(border=True):
+        st.markdown(t["shared_recipes"])
+
+        try:
+            shared_recipe_rows = (
+                supabase.table("meals")
+                .select(
+                    "id,user_id,date,meal_type,category,name,base_name,"
+                    "calories,protein,carbs,fat,"
+                    "base_calories,base_protein,base_carbs,base_fat,"
+                    "notes,ingredients_json,is_shared"
+                )
+                .eq("is_shared", True)
+                .neq("user_id", user_id)
+                .order("date", desc=True)
+                .execute().data
+                or []
+            )
+        except Exception as exc:
+            shared_recipe_rows = []
+            print(f"Errore caricamento ricette condivise: {exc}")
+
+        shared_recipe_rows = [
+            r for r in shared_recipe_rows if r.get("ingredients_json")
+        ]
+
+        shared_recipes = []
+        _seen_shared = set()
+        for r in shared_recipe_rows:
+            label = (
+                r.get("base_name")
+                or _clean_meal_name(r.get("name"))
+                or "Ricetta"
+            ).strip()
+
+            # user_id + nome evita che ricette omonime di due persone
+            # vengano fuse tra loro.
+            key = (str(r.get("user_id")), label.casefold())
+            if key in _seen_shared:
+                continue
+
+            _seen_shared.add(key)
+            r["_recipe_label"] = label
+            shared_recipes.append(r)
+
+        if shared_recipes:
+            shared_rows = []
+            for r in shared_recipes:
+                shared_rows.append({
+                    t["col_name"]: r["_recipe_label"],
                     t["col_meal"]: tr_meal_type(r.get("meal_type")),
                     t["col_category"]: tr_category(infer_meal_category(r)),
                     "Kcal": r.get("calories"),
@@ -5065,18 +5250,22 @@ elif selected_page == t["t4"]:
                     "Fat (g)": r.get("fat"),
                     t["col_date"]: r.get("date"),
                 })
-            st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
 
-            for r in recipe_meals:
+            st.dataframe(
+                pd.DataFrame(shared_rows),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            for r in shared_recipes:
                 if r.get("notes"):
-                    label = r.get("base_name") or _clean_meal_name(r.get("name"))
                     st.markdown(
-                        f"**{html.escape(str(label or 'Ricetta'))}** "
+                        f"**{html.escape(str(r['_recipe_label']))}** "
                         f"{info_badge(r.get('notes'), 'Note ricetta')}",
                         unsafe_allow_html=True,
                     )
         else:
-            st.info(t["no_composed_recipes"])
+            st.info(t["no_shared_recipes"])
 
     with st.container(border=True):
         st.markdown(t["create_meal_ingredients"])
@@ -5242,6 +5431,13 @@ elif selected_page == t["t4"]:
                 f"Pro {per100['protein']:.1f} g · Carbs {per100['carbs']:.1f} g · Fat {per100['fat']:.1f} g"
             )
 
+            recipe_is_shared = st.checkbox(
+                t["share_recipe"],
+                value=False,
+                key=f"recipe_share_{v}",
+                help=t["share_help"],
+            )
+
             if st.button(
                 t["save_as_meal"],
                 use_container_width=True,
@@ -5270,6 +5466,7 @@ elif selected_page == t["t4"]:
                             notes=r_notes,
                             category=recipe_category,
                             ingredients_json=ingredients,
+                            is_shared=recipe_is_shared,
                         )
                         refresh_daily_logs(recipe_log_date)
                         st.session_state["recipe_builder_ingredients"] = []
