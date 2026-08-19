@@ -719,7 +719,7 @@ def get_quick_entries_from_meals():
             .select(
                 "id,date,name,base_name,quantity,is_per_100g,"
                 "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat,notes,category,ingredients_json"
+                "calories,protein,carbs,fat,notes,category,ingredients_json,recipe_servings,is_shared,image_url"
             )
             .eq("user_id", user_id)
             .order("date", desc=True)
@@ -791,7 +791,8 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
                                quantity, is_per_100g, calories, protein, carbs, fat,
                                base_calories, base_protein, base_carbs, base_fat,
                                notes="", category="Casa", ingredients_json=None,
-                               is_shared=False):
+                               is_shared=False, image_url=None,
+                               recipe_servings=None):
     """Inserisce un meal conservando sia il totale sia i dati base riutilizzabili."""
     payload = {
         "user_id": user_id,
@@ -813,6 +814,12 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
         "category": category if category in MEAL_CATEGORIES else "Casa",
         "ingredients_json": ingredients_json,
         "is_shared": bool(is_shared),
+        "image_url": str(image_url or "").strip() or None,
+        "recipe_servings": (
+            float(recipe_servings)
+            if recipe_servings is not None
+            else None
+        ),
     }
     try:
         return supabase.table("meals").insert(payload).execute()
@@ -825,6 +832,55 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
             for k in ("user_id", "date", "meal_type", "name", "calories", "protein", "carbs", "fat")
         }
         return supabase.table("meals").insert(legacy_payload).execute()
+
+
+RECIPE_IMAGE_BUCKET = "recipe-images"
+
+
+def upload_recipe_image(uploaded_file):
+    """Carica una foto ricetta su Supabase Storage e restituisce la public URL."""
+    if uploaded_file is None:
+        return None
+
+    mime = str(getattr(uploaded_file, "type", "") or "").lower()
+    ext_map = {
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+    }
+    ext = ext_map.get(mime)
+
+    if not ext:
+        original_name = str(getattr(uploaded_file, "name", "") or "")
+        suffix = Path(original_name).suffix.lower().lstrip(".")
+        ext = suffix if suffix in {"jpg", "jpeg", "png", "webp"} else "jpg"
+
+    object_path = f"{user_id}/{uuid.uuid4().hex}.{ext}"
+
+    supabase.storage.from_(RECIPE_IMAGE_BUCKET).upload(
+        path=object_path,
+        file=uploaded_file.getvalue(),
+        file_options={
+            "content-type": mime or f"image/{ext}",
+            "cache-control": "3600",
+            "upsert": "false",
+        },
+    )
+
+    public_url = supabase.storage.from_(RECIPE_IMAGE_BUCKET).get_public_url(
+        object_path
+    )
+
+    if isinstance(public_url, dict):
+        public_url = (
+            public_url.get("publicUrl")
+            or public_url.get("public_url")
+            or public_url.get("url")
+            or ""
+        )
+
+    return str(public_url or "").strip() or None
 
 
 def calculate_recipe_totals(ingredients):
@@ -2941,6 +2997,17 @@ translations["Italiano"].update({
     "sharing_save": "💾 Aggiorna condivisione",
     "sharing_updated": "✅ Impostazione di condivisione aggiornata.",
     "owner": "Autore",
+    "recipe_photo": "📷 Foto della ricetta (opzionale)",
+    "recipe_photo_help": "Puoi caricare JPG, PNG o WebP. La foto sarà visibile sulla card della ricetta.",
+    "recipe_private": "Privata",
+    "recipe_shared_badge": "Condivisa",
+    "recipe_no_photo": "Nessuna foto",
+    "recipe_photo_error": "Impossibile caricare la foto: {error}",
+    "recipe_servings": "🍽️ Porzioni previste",
+    "recipe_servings_help": "Indica quante porzioni produce l'intera ricetta. Potrai poi registrare 0,5 / 1 / 1,5 porzioni e calorie e macro verranno calcolati automaticamente.",
+    "per_serving": "Per porzione",
+    "total_recipe": "Ricetta intera",
+    "serving_weight": "circa {grams} g per porzione",
 })
 translations["English"].update({
     "slogan": "Under control",
@@ -2988,6 +3055,17 @@ translations["English"].update({
     "sharing_save": "💾 Update sharing",
     "sharing_updated": "✅ Sharing setting updated.",
     "owner": "Author",
+    "recipe_photo": "📷 Recipe photo (optional)",
+    "recipe_photo_help": "You can upload JPG, PNG or WebP. The photo will appear on the recipe card.",
+    "recipe_private": "Private",
+    "recipe_shared_badge": "Shared",
+    "recipe_no_photo": "No photo",
+    "recipe_photo_error": "Could not upload the photo: {error}",
+    "recipe_servings": "🍽️ Expected servings",
+    "recipe_servings_help": "Enter how many servings the whole recipe makes. You can later log 0.5 / 1 / 1.5 servings and calories/macros will scale automatically.",
+    "per_serving": "Per serving",
+    "total_recipe": "Whole recipe",
+    "serving_weight": "about {grams} g per serving",
 })
 translations["Nederlands"].update({
     "slogan": "Komt goed",
@@ -3035,6 +3113,17 @@ translations["Nederlands"].update({
     "sharing_save": "💾 Delen bijwerken",
     "sharing_updated": "✅ Deelinstelling bijgewerkt.",
     "owner": "Auteur",
+    "recipe_photo": "📷 Foto van het recept (optioneel)",
+    "recipe_photo_help": "Je kunt JPG, PNG of WebP uploaden. De foto verschijnt op de receptkaart.",
+    "recipe_private": "Privé",
+    "recipe_shared_badge": "Gedeeld",
+    "recipe_no_photo": "Geen foto",
+    "recipe_photo_error": "Foto uploaden mislukt: {error}",
+    "recipe_servings": "🍽️ Verwachte porties",
+    "recipe_servings_help": "Geef aan hoeveel porties het hele recept oplevert. Later kun je 0,5 / 1 / 1,5 porties registreren en calorieën/macro's worden automatisch aangepast.",
+    "per_serving": "Per portie",
+    "total_recipe": "Hele recept",
+    "serving_weight": "ongeveer {grams} g per portie",
 })
 translations["Français"].update({
     "slogan": "C'est géré",
@@ -3082,6 +3171,17 @@ translations["Français"].update({
     "sharing_save": "💾 Mettre à jour le partage",
     "sharing_updated": "✅ Paramètre de partage mis à jour.",
     "owner": "Auteur",
+    "recipe_photo": "📷 Photo de la recette (facultative)",
+    "recipe_photo_help": "Vous pouvez importer un JPG, PNG ou WebP. La photo apparaîtra sur la carte de la recette.",
+    "recipe_private": "Privée",
+    "recipe_shared_badge": "Partagée",
+    "recipe_no_photo": "Aucune photo",
+    "recipe_photo_error": "Impossible d’importer la photo : {error}",
+    "recipe_servings": "🍽️ Portions prévues",
+    "recipe_servings_help": "Indiquez combien de portions produit la recette entière. Vous pourrez ensuite enregistrer 0,5 / 1 / 1,5 portion et les calories/macros seront ajustées automatiquement.",
+    "per_serving": "Par portion",
+    "total_recipe": "Recette entière",
+    "serving_weight": "environ {grams} g par portion",
 })
 
 translations["Italiano"].update({"period_days":"giorni","monthly_stats_error":"Impossibile calcolare le statistiche mensili: {error}","weight_edit_error":"Errore nella modifica: {error}","weight_delete_error":"Errore nella cancellazione: {error}","generic_error":"Errore: {error}","no_weight_loss":"Nessuna perdita di peso misurata negli ultimi 30 giorni.","ratio_caption":"{deficit} kcal di deficit / {kg} kg persi.","trend":"Proiezione","real_weight":"Peso reale"})
@@ -3807,19 +3907,57 @@ if selected_page == t["t1"]:
                 )
                 if sel_recipe and sel_recipe != st.session_state.get("last_selected"):
                     r = recipes_dict[sel_recipe]
-                    is_100g = bool(r.get("is_per_100g", True))
-                    reset_or_update(
-                        sel_recipe,
-                        _safe_float(r.get("base_calories") if r.get("base_calories") is not None else r.get("calories")),
-                        _safe_float(r.get("base_protein") if r.get("base_protein") is not None else r.get("protein")),
-                        _safe_float(r.get("base_carbs") if r.get("base_carbs") is not None else r.get("carbs")),
-                        _safe_float(r.get("base_fat") if r.get("base_fat") is not None else r.get("fat")),
-                        sel_recipe,
-                        100.0 if is_100g else 1.0,
-                        is_100g,
-                        r.get("notes", ""),
-                        infer_meal_category(r),
+                    recipe_servings = _safe_float(
+                        r.get("recipe_servings"),
+                        0.0,
                     )
+
+                    if recipe_servings > 0:
+                        # Nuove ricette: base = UNA porzione.
+                        reset_or_update(
+                            sel_recipe,
+                            _safe_float(r.get("calories")) / recipe_servings,
+                            _safe_float(r.get("protein")) / recipe_servings,
+                            _safe_float(r.get("carbs")) / recipe_servings,
+                            _safe_float(r.get("fat")) / recipe_servings,
+                            sel_recipe,
+                            1.0,
+                            False,
+                            r.get("notes", ""),
+                            infer_meal_category(r),
+                        )
+                    else:
+                        # Ricette legacy: manteniamo il comportamento precedente.
+                        is_100g = bool(r.get("is_per_100g", True))
+                        reset_or_update(
+                            sel_recipe,
+                            _safe_float(
+                                r.get("base_calories")
+                                if r.get("base_calories") is not None
+                                else r.get("calories")
+                            ),
+                            _safe_float(
+                                r.get("base_protein")
+                                if r.get("base_protein") is not None
+                                else r.get("protein")
+                            ),
+                            _safe_float(
+                                r.get("base_carbs")
+                                if r.get("base_carbs") is not None
+                                else r.get("carbs")
+                            ),
+                            _safe_float(
+                                r.get("base_fat")
+                                if r.get("base_fat") is not None
+                                else r.get("fat")
+                            ),
+                            sel_recipe,
+                            100.0 if is_100g else 1.0,
+                            is_100g,
+                            r.get("notes", ""),
+                            infer_meal_category(r),
+                        )
+
                     st.rerun()
             else:
                 st.info("Nessuna ricetta composta disponibile. Creane una nella Tab Ricette.")
@@ -5090,7 +5228,7 @@ elif selected_page == t["t4"]:
                     "id,user_id,date,meal_type,category,name,base_name,"
                     "calories,protein,carbs,fat,"
                     "base_calories,base_protein,base_carbs,base_fat,"
-                    "notes,ingredients_json,is_shared"
+                    "notes,ingredients_json,is_shared,image_url,recipe_servings"
                 )
                 .eq("user_id", user_id)
                 .order("date", desc=True)
@@ -5122,33 +5260,87 @@ elif selected_page == t["t4"]:
             my_recipes.append(r)
 
         if my_recipes:
-            display_rows = []
-            for r in my_recipes:
-                display_rows.append({
-                    t["col_name"]: r["_recipe_label"],
-                    t["col_meal"]: tr_meal_type(r.get("meal_type")),
-                    t["col_category"]: tr_category(infer_meal_category(r)),
-                    "Kcal": r.get("calories"),
-                    "Pro (g)": r.get("protein"),
-                    "Carbs (g)": r.get("carbs"),
-                    "Fat (g)": r.get("fat"),
-                    t["sharing_status"]: "🌍" if r.get("is_shared") else "🔒",
-                    t["col_date"]: r.get("date"),
-                })
+            for _idx in range(0, len(my_recipes), 2):
+                _card_cols = st.columns(2)
+                for _offset, _col in enumerate(_card_cols):
+                    _recipe_idx = _idx + _offset
+                    if _recipe_idx >= len(my_recipes):
+                        continue
 
-            st.dataframe(
-                pd.DataFrame(display_rows),
-                use_container_width=True,
-                hide_index=True,
-            )
+                    r = my_recipes[_recipe_idx]
+                    with _col:
+                        with st.container(border=True):
+                            if r.get("image_url"):
+                                st.image(
+                                    r["image_url"],
+                                    use_container_width=True,
+                                )
+                            else:
+                                st.markdown(
+                                    """
+                                    <div style="
+                                        min-height:155px;
+                                        border-radius:14px;
+                                        display:flex;
+                                        align-items:center;
+                                        justify-content:center;
+                                        background:
+                                            radial-gradient(circle at 90% 5%, rgba(255,139,139,.20), transparent 35%),
+                                            linear-gradient(145deg,#FFF7F7,#FFFFFF);
+                                        border:1px solid #FFD0D0;
+                                        font-size:2.2rem;
+                                    ">🍽️</div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
 
-            for r in my_recipes:
-                if r.get("notes"):
-                    st.markdown(
-                        f"**{html.escape(str(r['_recipe_label']))}** "
-                        f"{info_badge(r.get('notes'), 'Note ricetta')}",
-                        unsafe_allow_html=True,
-                    )
+                            st.markdown(f"### {html.escape(str(r['_recipe_label']))}")
+
+                            _share_label = (
+                                f"🌍 {t['recipe_shared_badge']}"
+                                if r.get("is_shared")
+                                else f"🔒 {t['recipe_private']}"
+                            )
+                            st.caption(
+                                f"{tr_meal_type(r.get('meal_type'))} · "
+                                f"{tr_category(infer_meal_category(r))} · "
+                                f"{_share_label}"
+                            )
+
+                            _recipe_servings = float(
+                                r.get("recipe_servings") or 1.0
+                            )
+                            _recipe_servings = max(_recipe_servings, 1.0)
+                            _per_kcal = float(r.get("calories") or 0) / _recipe_servings
+                            _per_pro = float(r.get("protein") or 0) / _recipe_servings
+                            _per_carbs = float(r.get("carbs") or 0) / _recipe_servings
+                            _per_fat = float(r.get("fat") or 0) / _recipe_servings
+
+                            st.caption(
+                                f"🍽️ {_recipe_servings:g} {t['num_portions'].lower()}"
+                            )
+
+                            _m1, _m2 = st.columns(2)
+                            _m1.metric(
+                                f"{t['per_serving']} · Kcal",
+                                int(round(_per_kcal)),
+                            )
+                            _m2.metric(
+                                f"{t['per_serving']} · Protein",
+                                f"{_per_pro:.1f} g",
+                            )
+
+                            st.caption(
+                                f"{t['per_serving']}: "
+                                f"Carbs {_per_carbs:.1f} g · Fat {_per_fat:.1f} g"
+                            )
+                            st.caption(
+                                f"{t['total_recipe']}: "
+                                f"{int(r.get('calories') or 0)} kcal"
+                            )
+
+                            if r.get("notes"):
+                                st.caption(str(r.get("notes")))
 
             # Gestione condivisione delle ricette già esistenti.
             st.markdown(t["sharing_manage"])
@@ -5202,7 +5394,7 @@ elif selected_page == t["t4"]:
                     "id,user_id,date,meal_type,category,name,base_name,"
                     "calories,protein,carbs,fat,"
                     "base_calories,base_protein,base_carbs,base_fat,"
-                    "notes,ingredients_json,is_shared"
+                    "notes,ingredients_json,is_shared,image_url,recipe_servings"
                 )
                 .eq("is_shared", True)
                 .neq("user_id", user_id)
@@ -5238,32 +5430,81 @@ elif selected_page == t["t4"]:
             shared_recipes.append(r)
 
         if shared_recipes:
-            shared_rows = []
-            for r in shared_recipes:
-                shared_rows.append({
-                    t["col_name"]: r["_recipe_label"],
-                    t["col_meal"]: tr_meal_type(r.get("meal_type")),
-                    t["col_category"]: tr_category(infer_meal_category(r)),
-                    "Kcal": r.get("calories"),
-                    "Pro (g)": r.get("protein"),
-                    "Carbs (g)": r.get("carbs"),
-                    "Fat (g)": r.get("fat"),
-                    t["col_date"]: r.get("date"),
-                })
+            for _idx in range(0, len(shared_recipes), 2):
+                _card_cols = st.columns(2)
+                for _offset, _col in enumerate(_card_cols):
+                    _recipe_idx = _idx + _offset
+                    if _recipe_idx >= len(shared_recipes):
+                        continue
 
-            st.dataframe(
-                pd.DataFrame(shared_rows),
-                use_container_width=True,
-                hide_index=True,
-            )
+                    r = shared_recipes[_recipe_idx]
+                    with _col:
+                        with st.container(border=True):
+                            if r.get("image_url"):
+                                st.image(
+                                    r["image_url"],
+                                    use_container_width=True,
+                                )
+                            else:
+                                st.markdown(
+                                    """
+                                    <div style="
+                                        min-height:155px;
+                                        border-radius:14px;
+                                        display:flex;
+                                        align-items:center;
+                                        justify-content:center;
+                                        background:
+                                            radial-gradient(circle at 90% 5%, rgba(255,139,139,.20), transparent 35%),
+                                            linear-gradient(145deg,#FFF7F7,#FFFFFF);
+                                        border:1px solid #FFD0D0;
+                                        font-size:2.2rem;
+                                    ">🍽️</div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
 
-            for r in shared_recipes:
-                if r.get("notes"):
-                    st.markdown(
-                        f"**{html.escape(str(r['_recipe_label']))}** "
-                        f"{info_badge(r.get('notes'), 'Note ricetta')}",
-                        unsafe_allow_html=True,
-                    )
+                            st.markdown(f"### {html.escape(str(r['_recipe_label']))}")
+                            st.caption(
+                                f"{tr_meal_type(r.get('meal_type'))} · "
+                                f"{tr_category(infer_meal_category(r))} · "
+                                f"🌍 {t['recipe_shared_badge']}"
+                            )
+
+                            _recipe_servings = float(
+                                r.get("recipe_servings") or 1.0
+                            )
+                            _recipe_servings = max(_recipe_servings, 1.0)
+                            _per_kcal = float(r.get("calories") or 0) / _recipe_servings
+                            _per_pro = float(r.get("protein") or 0) / _recipe_servings
+                            _per_carbs = float(r.get("carbs") or 0) / _recipe_servings
+                            _per_fat = float(r.get("fat") or 0) / _recipe_servings
+
+                            st.caption(
+                                f"🍽️ {_recipe_servings:g} {t['num_portions'].lower()}"
+                            )
+
+                            _m1, _m2 = st.columns(2)
+                            _m1.metric(
+                                f"{t['per_serving']} · Kcal",
+                                int(round(_per_kcal)),
+                            )
+                            _m2.metric(
+                                f"{t['per_serving']} · Protein",
+                                f"{_per_pro:.1f} g",
+                            )
+
+                            st.caption(
+                                f"{t['per_serving']}: "
+                                f"Carbs {_per_carbs:.1f} g · Fat {_per_fat:.1f} g"
+                            )
+                            st.caption(
+                                f"{t['total_recipe']}: "
+                                f"{int(r.get('calories') or 0)} kcal"
+                            )
+
+                            if r.get("notes"):
+                                st.caption(str(r.get("notes")))
         else:
             st.info(t["no_shared_recipes"])
 
@@ -5304,6 +5545,30 @@ elif selected_page == t["t4"]:
             placeholder=t["notes_placeholder"],
             key=f"recipe_builder_notes_{v}",
             height=90,
+        )
+
+        recipe_photo = st.file_uploader(
+            t["recipe_photo"],
+            type=["jpg", "jpeg", "png", "webp"],
+            key=f"recipe_photo_{v}",
+            help=t["recipe_photo_help"],
+        )
+
+        if recipe_photo is not None:
+            st.image(
+                recipe_photo,
+                caption=r_name.strip() or None,
+                width=260,
+            )
+
+        recipe_servings = st.number_input(
+            t["recipe_servings"],
+            min_value=1.0,
+            max_value=100.0,
+            value=4.0,
+            step=1.0,
+            key=f"recipe_servings_{v}",
+            help=t["recipe_servings_help"],
         )
 
         st.markdown(t["add_ingredient_title"])
@@ -5422,13 +5687,36 @@ elif selected_page == t["t4"]:
 
             total_weight, totals, per100 = calculate_recipe_totals(ingredients)
 
+            _servings_safe = max(float(recipe_servings), 1.0)
+            _per_serving = {
+                key: float(value) / _servings_safe
+                for key, value in totals.items()
+            }
+            _serving_weight = float(total_weight) / _servings_safe
+
             st.markdown(
-                f"**{t['total_meal']}:** {total_weight:.0f} g · **{totals['calories']:.0f} kcal** · "
-                f"Pro {totals['protein']:.1f} g · Carbs {totals['carbs']:.1f} g · Fat {totals['fat']:.1f} g"
+                f"**{t['total_recipe']}:** {total_weight:.0f} g · "
+                f"**{totals['calories']:.0f} kcal** · "
+                f"Pro {totals['protein']:.1f} g · "
+                f"Carbs {totals['carbs']:.1f} g · "
+                f"Fat {totals['fat']:.1f} g"
+            )
+            st.markdown(
+                f"**{t['per_serving']}:** "
+                f"**{_per_serving['calories']:.0f} kcal** · "
+                f"Pro {_per_serving['protein']:.1f} g · "
+                f"Carbs {_per_serving['carbs']:.1f} g · "
+                f"Fat {_per_serving['fat']:.1f} g"
             )
             st.caption(
-                f"{t['per_100g_label']}: {per100['calories']:.0f} kcal · "
-                f"Pro {per100['protein']:.1f} g · Carbs {per100['carbs']:.1f} g · Fat {per100['fat']:.1f} g"
+                t["serving_weight"].format(
+                    grams=f"{_serving_weight:.0f}"
+                )
+                + " · "
+                + f"{t['per_100g_label']}: {per100['calories']:.0f} kcal · "
+                + f"Pro {per100['protein']:.1f} g · "
+                + f"Carbs {per100['carbs']:.1f} g · "
+                + f"Fat {per100['fat']:.1f} g"
             )
 
             recipe_is_shared = st.checkbox(
@@ -5447,6 +5735,18 @@ elif selected_page == t["t4"]:
                     st.warning(t["enter_name"])
                 else:
                     try:
+                        recipe_image_url = None
+                        if recipe_photo is not None:
+                            try:
+                                recipe_image_url = upload_recipe_image(recipe_photo)
+                            except Exception as upload_exc:
+                                st.error(
+                                    t["recipe_photo_error"].format(
+                                        error=upload_exc
+                                    )
+                                )
+                                st.stop()
+
                         display_name = f"{r_name.strip()} ({total_weight:.0f}g)"
                         insert_meal_with_base_data(
                             log_date=recipe_log_date,
@@ -5467,6 +5767,8 @@ elif selected_page == t["t4"]:
                             category=recipe_category,
                             ingredients_json=ingredients,
                             is_shared=recipe_is_shared,
+                            image_url=recipe_image_url,
+                            recipe_servings=recipe_servings,
                         )
                         refresh_daily_logs(recipe_log_date)
                         st.session_state["recipe_builder_ingredients"] = []
