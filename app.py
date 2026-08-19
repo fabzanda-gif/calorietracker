@@ -10,6 +10,7 @@ import html
 from html import escape
 import uuid
 import base64
+import hashlib
 from pathlib import Path
 from supabase import create_client
 from supabase.client import ClientOptions
@@ -4468,6 +4469,13 @@ if selected_page == t["t1"]:
         t["opt_scan"],
     ]
 
+    # Se il pasto precedente è stato salvato, il reset della sorgente viene
+    # applicato QUI, prima che il widget venga istanziato. In questo modo
+    # evitiamo l'errore Streamlit:
+    # "session_state.meal_input_source cannot be modified after the widget..."
+    if st.session_state.pop("_reset_meal_input_source_next_run", False):
+        st.session_state["meal_input_source"] = _input_source_options[0]
+
     if (
         "meal_input_source" not in st.session_state
         or st.session_state["meal_input_source"] not in _input_source_options
@@ -4527,9 +4535,14 @@ if selected_page == t["t1"]:
         st.session_state["prod_select"] = ""
         st.session_state.pop("ai_photo_analysis_done", None)
 
-        # Ritorna al primo campo: Open Food Facts.
-        st.session_state["meal_input_source"] = _input_source_options[0]
-        st.session_state["last_source"] = _input_source_options[0]
+        # Il widget meal_input_source è già stato istanziato in questa run:
+        # non possiamo modificarne direttamente il valore. Prepariamo quindi
+        # il reset per la run successiva, prima della creazione del widget.
+        st.session_state["_reset_meal_input_source_next_run"] = True
+        st.session_state.pop("last_source", None)
+
+        # Elimina anche lo stato della foto AI precedente.
+        st.session_state.pop("ai_last_photo_hash", None)
 
 
     if st.session_state.get("last_source") != input_source:
@@ -4627,13 +4640,14 @@ if selected_page == t["t1"]:
 
         if _scan_photo is not None:
             st.image(_scan_photo, width=420)
-            st.caption(t["scan_ai_next"])
 
-            if st.button(
-                t["scan_analyze"],
-                type="primary",
-                key=f"analyze_meal_photo_{v}",
-            ):
+            # Analisi automatica: una nuova foto viene inviata subito a Groq.
+            # L'hash impedisce di richiamare l'API più volte sulla stessa foto
+            # durante i normali rerun di Streamlit.
+            _scan_bytes = _scan_photo.getvalue()
+            _scan_hash = hashlib.sha256(_scan_bytes).hexdigest()
+
+            if st.session_state.get("ai_last_photo_hash") != _scan_hash:
                 try:
                     with st.spinner(t["scan_analyzing"]):
                         _ai_food = analyze_food_photo_with_ai(
@@ -4641,9 +4655,11 @@ if selected_page == t["t1"]:
                             current_lang,
                         )
 
-                    # AI returns TOTAL nutrients for the estimated photographed
-                    # portion. We convert them to per-100-g base values so the
-                    # existing quantity/macronutrient synchronization keeps working.
+                    st.session_state["ai_last_photo_hash"] = _scan_hash
+
+                    # L'AI restituisce i nutrienti TOTALI della porzione
+                    # fotografata. Li convertiamo in valori per 100 g, così
+                    # grammi/kcal/macros restano modificabili e sincronizzati.
                     _ai_grams = max(
                         1.0,
                         _safe_float(_ai_food.get("estimated_grams")),
@@ -4656,7 +4672,7 @@ if selected_page == t["t1"]:
                         _ai_food["protein"] * _factor,
                         _ai_food["carbs"] * _factor,
                         _ai_food["fat"] * _factor,
-                        f"ai_photo_{uuid.uuid4()}",
+                        f"ai_photo_{_scan_hash[:12]}",
                         _ai_grams,
                         True,
                         _ai_food.get("notes", ""),
@@ -4669,6 +4685,8 @@ if selected_page == t["t1"]:
                     st.error(
                         t["scan_ai_error"].format(error=str(e))
                     )
+            else:
+                st.caption(t["scan_ai_next"])
 
         if st.session_state.pop("ai_photo_analysis_done", False):
             st.success(t["scan_ai_done"])
@@ -4830,8 +4848,58 @@ if selected_page == t["t1"]:
 
     st.markdown("---")
     meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
-    m_type = st.selectbox(t["meal"], meal_options, key=f"meal_type_input_{v}", format_func=tr_meal_type)
-    name = st.text_input(t["meal_name"], value=st.session_state["m_name"], key=f"input_meal_name_{v}")
+
+    # --------------------------------------------------------------
+    # Tipo di pasto suggerito automaticamente.
+    # - nessun pasto principale registrato -> Colazione
+    # - Colazione presente -> Pranzo
+    # - Pranzo presente -> Cena
+    # - Snack non viene mai selezionato automaticamente
+    #
+    # Il calcolo viene rifatto a ogni nuova versione del form, quindi dopo
+    # aver salvato un pasto il successivo propone automaticamente il passo
+    # logico seguente.
+    # --------------------------------------------------------------
+    try:
+        _logged_meal_types_today = (
+            supabase.table("meals")
+            .select("meal_type")
+            .eq("user_id", user_id)
+            .eq("date", str(log_date))
+            .execute().data
+            or []
+        )
+        _logged_main_types = {
+            str(row.get("meal_type") or "").strip().casefold()
+            for row in _logged_meal_types_today
+        }
+    except Exception as _meal_type_exc:
+        print(f"Meal type default error: {_meal_type_exc}")
+        _logged_main_types = set()
+
+    if "pranzo" in _logged_main_types:
+        _suggested_meal_type = "Cena"
+    elif "colazione" in _logged_main_types:
+        _suggested_meal_type = "Pranzo"
+    else:
+        _suggested_meal_type = "Colazione"
+
+    _meal_type_key = f"meal_type_input_{v}"
+    if _meal_type_key not in st.session_state:
+        st.session_state[_meal_type_key] = _suggested_meal_type
+
+    m_type = st.selectbox(
+        t["meal"],
+        meal_options,
+        key=_meal_type_key,
+        format_func=tr_meal_type,
+    )
+
+    name = st.text_input(
+        t["meal_name"],
+        value=st.session_state["m_name"],
+        key=f"input_meal_name_{v}",
+    )
 
     default_category = st.session_state.get("selected_source_category", "Casa")
     if default_category not in MEAL_CATEGORIES:
