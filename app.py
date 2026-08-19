@@ -1481,7 +1481,7 @@ def show_login_page():
             "password": "Password",
             "password_min": "Password (min. 6 caratteri)",
             "login_btn": "Accedi",
-            "signup_btn": "Registrati",
+            "signup_btn": "Registrati","protein_goal_title":"Goal Proteico","protein_goal_enabled":"Vuoi impostare un goal proteico giornaliero?","protein_goal_no":"No","protein_goal_yes":"Sì","protein_goal_g":"Goal proteico giornaliero (g)",
             "credentials_required": "Inserisci email e password.",
             "invalid_credentials": "Credenziali non valide.",
             "auth_error": "Errore durante l'autenticazione: {error}",
@@ -1526,7 +1526,7 @@ def show_login_page():
             "password": "Password",
             "password_min": "Password (min. 6 characters)",
             "login_btn": "Sign in",
-            "signup_btn": "Create account",
+            "signup_btn": "Create account","protein_goal_title":"Protein Goal","protein_goal_enabled":"Set a daily protein goal?","protein_goal_no":"No","protein_goal_yes":"Yes","protein_goal_g":"Daily protein goal (g)",
             "credentials_required": "Enter email and password.",
             "invalid_credentials": "Invalid credentials.",
             "auth_error": "Authentication error: {error}",
@@ -1571,7 +1571,7 @@ def show_login_page():
             "password": "Wachtwoord",
             "password_min": "Wachtwoord (min. 6 tekens)",
             "login_btn": "Inloggen",
-            "signup_btn": "Account aanmaken",
+            "signup_btn": "Account aanmaken","protein_goal_title":"Eiwitdoel","protein_goal_enabled":"Een dagelijks eiwitdoel instellen?","protein_goal_no":"Nee","protein_goal_yes":"Ja","protein_goal_g":"Dagelijks eiwitdoel (g)",
             "credentials_required": "Voer e-mail en wachtwoord in.",
             "invalid_credentials": "Ongeldige inloggegevens.",
             "auth_error": "Authenticatiefout: {error}",
@@ -1616,7 +1616,7 @@ def show_login_page():
             "password": "Mot de passe",
             "password_min": "Mot de passe (min. 6 caractères)",
             "login_btn": "Se connecter",
-            "signup_btn": "Créer un compte",
+            "signup_btn": "Créer un compte","protein_goal_title":"Objectif protéique","protein_goal_enabled":"Définir un objectif quotidien de protéines ?","protein_goal_no":"Non","protein_goal_yes":"Oui","protein_goal_g":"Objectif quotidien de protéines (g)",
             "credentials_required": "Saisissez votre e-mail et votre mot de passe.",
             "invalid_credentials": "Identifiants invalides.",
             "auth_error": "Erreur d’authentification : {error}",
@@ -2089,6 +2089,21 @@ def show_login_page():
             key="signup_deficit_kcal",
         )
 
+        st.markdown(f"#### {lt['protein_goal_title']}")
+        protein_goal_choice = st.radio(
+            lt["protein_goal_enabled"],
+            [lt["protein_goal_no"], lt["protein_goal_yes"]],
+            horizontal=True,
+            key="signup_protein_goal_enabled",
+        )
+        protein_goal_enabled_input = protein_goal_choice == lt["protein_goal_yes"]
+        protein_goal_g_input = 0.0
+        if protein_goal_enabled_input:
+            protein_goal_g_input = st.number_input(
+                lt["protein_goal_g"], min_value=1.0, max_value=500.0,
+                value=120.0, step=5.0, key="signup_protein_goal_g",
+            )
+
         if st.button(
             lt["signup_btn"],
             use_container_width=True,
@@ -2142,6 +2157,8 @@ def show_login_page():
                                     selected_deficit
                                 ),
                                 "deficit_plan": plan_to_save,
+                                "protein_goal_enabled": bool(protein_goal_enabled_input),
+                                "protein_goal_g": float(protein_goal_g_input) if protein_goal_enabled_input else None,
                             }
                         },
                     })
@@ -2222,6 +2239,13 @@ user_gender = u_meta.get("gender")
 user_birth_date = u_meta.get("birth_date")
 user_deficit_target_kcal = u_meta.get("deficit_target_kcal")
 user_deficit_plan = u_meta.get("deficit_plan")
+_PROTEIN_GOAL_SPECIAL_UID = "df879484-97d5-44fb-8b20-ecf8e4e2b3e3"
+user_protein_goal_enabled = bool(u_meta.get("protein_goal_enabled", False))
+user_protein_goal_g = _safe_float(u_meta.get("protein_goal_g"))
+if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in u_meta:
+    user_protein_goal_enabled = True
+    if user_protein_goal_g <= 0:
+        user_protein_goal_g = 120.0
 
 # Il BMR viene calcolato dinamicamente usando l'ultimo peso registrato.
 latest_weight_row = None
@@ -3809,22 +3833,22 @@ with st.sidebar:
         "Italiano": {
             "label": "Kcal rimanenti oggi",
             "eaten": "ingerite",
-            "budget": "budget finale",
+            "budget": "budget finale","protein":"Proteine oggi","protein_goal":"goal",
         },
         "English": {
             "label": "Kcal remaining today",
             "eaten": "eaten",
-            "budget": "end-of-day budget",
+            "budget": "end-of-day budget","protein":"Protein today","protein_goal":"goal",
         },
         "Nederlands": {
             "label": "Kcal over vandaag",
             "eaten": "gegeten",
-            "budget": "dagbudget",
+            "budget": "dagbudget","protein":"Eiwit vandaag","protein_goal":"doel",
         },
         "Français": {
             "label": "Kcal restantes aujourd'hui",
             "eaten": "consommées",
-            "budget": "budget fin de journée",
+            "budget": "budget fin de journée","protein":"Protéines aujourd’hui","protein_goal":"objectif",
         },
     }
     _bi = _budget_i18n.get(current_lang, _budget_i18n["Italiano"])
@@ -3833,7 +3857,7 @@ with st.sidebar:
         _today_str = str(date.today())
         _today_meals = (
             supabase.table("meals")
-            .select("calories")
+            .select("calories,protein")
             .eq("user_id", user_id)
             .eq("date", _today_str)
             .execute().data
@@ -3889,6 +3913,22 @@ with st.sidebar:
             """,
             unsafe_allow_html=True,
         )
+        if user_protein_goal_enabled and user_protein_goal_g > 0:
+            _protein_eaten = sum(_safe_float(row.get("protein")) for row in _today_meals)
+            _protein_pct = min(100.0, max(0.0, (_protein_eaten / user_protein_goal_g) * 100.0))
+            st.markdown(
+                f"""
+                <div class="sano-budget-card">
+                    <div class="sano-budget-label">{html.escape(_bi["protein"])}</div>
+                    <div class="sano-budget-value"><span>{_protein_eaten:.1f}</span> g</div>
+                    <div class="sano-budget-track"><div class="sano-budget-fill" style="width:{_protein_pct:.1f}%"></div></div>
+                    <div class="sano-budget-meta">
+                        <span>{_protein_eaten:.1f} g</span>
+                        <span>{user_protein_goal_g:.0f} g {_bi["protein_goal"]}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True,
+            )
     except Exception as _budget_exc:
         print(f"Sidebar budget error: {_budget_exc}")
 
@@ -3918,7 +3958,7 @@ SETTINGS_I18N = {
         "save": "💾 Salva impostazioni",
         "saved": "✅ Impostazioni aggiornate.",
         "error": "Errore durante il salvataggio: {error}",
-        "hint": "La foto profilo viene gestita dal provider di accesso (es. Google/Facebook).",
+        "hint": "La foto profilo viene gestita dal provider di accesso (es. Google/Facebook).","protein_title":"🥩 Goal Proteico","protein_enabled":"Attiva goal proteico","protein_no":"No","protein_yes":"Sì","protein_g":"Goal proteico giornaliero (g)",
     },
     "English": {
         "title": "⚙️ Personal settings",
@@ -3941,7 +3981,7 @@ SETTINGS_I18N = {
         "save": "💾 Save settings",
         "saved": "✅ Settings updated.",
         "error": "Error while saving: {error}",
-        "hint": "Your profile picture is managed by your sign-in provider (e.g. Google/Facebook).",
+        "hint": "Your profile picture is managed by your sign-in provider (e.g. Google/Facebook).","protein_title":"🥩 Protein Goal","protein_enabled":"Enable protein goal","protein_no":"No","protein_yes":"Yes","protein_g":"Daily protein goal (g)",
     },
     "Nederlands": {
         "title": "⚙️ Persoonlijke instellingen",
@@ -3964,7 +4004,7 @@ SETTINGS_I18N = {
         "save": "💾 Instellingen opslaan",
         "saved": "✅ Instellingen bijgewerkt.",
         "error": "Fout bij opslaan: {error}",
-        "hint": "Je profielfoto wordt beheerd door je inlogprovider (bijv. Google/Facebook).",
+        "hint": "Je profielfoto wordt beheerd door je inlogprovider (bijv. Google/Facebook).","protein_title":"🥩 Eiwitdoel","protein_enabled":"Eiwitdoel activeren","protein_no":"Nee","protein_yes":"Ja","protein_g":"Dagelijks eiwitdoel (g)",
     },
     "Français": {
         "title": "⚙️ Paramètres personnels",
@@ -3987,7 +4027,7 @@ SETTINGS_I18N = {
         "save": "💾 Enregistrer les paramètres",
         "saved": "✅ Paramètres mis à jour.",
         "error": "Erreur lors de l’enregistrement : {error}",
-        "hint": "Votre photo de profil est gérée par votre fournisseur de connexion (ex. Google/Facebook).",
+        "hint": "Votre photo de profil est gérée par votre fournisseur de connexion (ex. Google/Facebook).","protein_title":"🥩 Objectif protéique","protein_enabled":"Activer l’objectif protéique","protein_no":"Non","protein_yes":"Oui","protein_g":"Objectif quotidien de protéines (g)",
     },
 }
 
@@ -4031,6 +4071,12 @@ def render_personal_settings_page():
         metadata.get("deficit_plan")
         or deficit_preset_from_value(existing_deficit_value)
     )
+    existing_protein_enabled = bool(metadata.get("protein_goal_enabled", False))
+    existing_protein_g = _safe_float(metadata.get("protein_goal_g"))
+    if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in metadata:
+        existing_protein_enabled = True
+        if existing_protein_g <= 0:
+            existing_protein_g = 120.0
 
     if "settings_deficit_plan" not in st.session_state:
         st.session_state["settings_deficit_plan"] = existing_deficit_plan
@@ -4129,6 +4175,21 @@ def render_personal_settings_page():
             key="settings_deficit_kcal",
         )
 
+        st.markdown(f"### {si['protein_title']}")
+        _protein_options = [si["protein_no"], si["protein_yes"]]
+        new_protein_choice = st.radio(
+            si["protein_enabled"], _protein_options,
+            index=1 if existing_protein_enabled else 0,
+            horizontal=True, key="settings_protein_goal_enabled",
+        )
+        new_protein_enabled = new_protein_choice == si["protein_yes"]
+        new_protein_g = existing_protein_g if existing_protein_g > 0 else 120.0
+        if new_protein_enabled:
+            new_protein_g = st.number_input(
+                si["protein_g"], min_value=1.0, max_value=500.0,
+                value=float(new_protein_g), step=5.0, key="settings_protein_goal_g",
+            )
+
         st.caption(si["hint"])
 
         if st.button(
@@ -4159,6 +4220,8 @@ def render_personal_settings_page():
                     "deficit_target_kcal": int(new_deficit_kcal),
                     "deficit_plan": plan_to_save,
                     "preferred_language": new_language,
+                    "protein_goal_enabled": bool(new_protein_enabled),
+                    "protein_goal_g": float(new_protein_g) if new_protein_enabled else None,
                 })
 
                 response = supabase.auth.update_user({
