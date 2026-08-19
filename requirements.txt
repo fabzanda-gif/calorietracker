@@ -4,3 +4,4 @@ plotly
 supabase
 requests
 streamlit-cookies-controller
+openai
