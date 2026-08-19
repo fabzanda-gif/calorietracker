@@ -14,6 +14,7 @@ from pathlib import Path
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
+from openai import OpenAI
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -2927,7 +2928,7 @@ translations = {
         "scan_camera_help": "Scatta una foto del piatto. Nel prossimo passaggio collegheremo l'analisi AI.",
         "scan_upload_help": "In alternativa puoi scegliere una foto già presente sul dispositivo.",
         "scan_photo_ready": "✅ Foto acquisita. La fotocamera funziona correttamente.",
-        "scan_ai_next": "Il prossimo passaggio sarà analizzare questa foto con l'AI e precompilare alimento, quantità, kcal e macronutrienti.",
+        "scan_ai_next": "La foto è pronta per l’analisi.", "scan_analyze":"✨ Analizza con AI", "scan_analyzing":"Sto analizzando il pasto…", "scan_ai_done":"✅ Analisi completata. Controlla e correggi i valori qui sotto prima di salvare.", "scan_ai_error":"Impossibile analizzare la foto: {error}",
         "card_kcal_in": "Kcal Ingerite",
         "card_kcal_burn": "Kcal Bruciate",
         "card_balance": "Bilancio",
@@ -3029,7 +3030,7 @@ translations = {
         "scan_camera_help": "Take a photo of the meal. In the next step we will connect AI analysis.",
         "scan_upload_help": "Alternatively, choose an existing photo from your device.",
         "scan_photo_ready": "✅ Photo captured. The camera is working correctly.",
-        "scan_ai_next": "The next step will analyze this photo with AI and prefill food, quantity, calories and macros.",
+        "scan_ai_next": "The photo is ready for analysis.", "scan_analyze":"✨ Analyze with AI", "scan_analyzing":"Analyzing your meal…", "scan_ai_done":"✅ Analysis complete. Review and edit the values below before saving.", "scan_ai_error":"Could not analyze the photo: {error}",
         "card_kcal_in": "Calories In",
         "card_kcal_burn": "Calories Burned",
         "card_balance": "Balance",
@@ -3131,7 +3132,7 @@ translations = {
         "scan_camera_help": "Maak een foto van de maaltijd. In de volgende stap koppelen we de AI-analyse.",
         "scan_upload_help": "Je kunt ook een bestaande foto op je apparaat kiezen.",
         "scan_photo_ready": "✅ Foto vastgelegd. De camera werkt correct.",
-        "scan_ai_next": "In de volgende stap analyseert AI deze foto en vult voeding, hoeveelheid, calorieën en macro's vooraf in.",
+        "scan_ai_next": "De foto is klaar voor analyse.", "scan_analyze":"✨ Analyseren met AI", "scan_analyzing":"Maaltijd analyseren…", "scan_ai_done":"✅ Analyse voltooid. Controleer en pas de waarden hieronder aan voordat je opslaat.", "scan_ai_error":"De foto kon niet worden geanalyseerd: {error}",
         "card_kcal_in": "Gegeten Kcal",
         "card_kcal_burn": "Verbrande Kcal",
         "card_balance": "Balans",
@@ -3270,7 +3271,7 @@ translations["Français"] = {
         "scan_camera_help": "Prenez une photo du repas. À l'étape suivante, nous connecterons l'analyse IA.",
         "scan_upload_help": "Vous pouvez également choisir une photo déjà présente sur votre appareil.",
         "scan_photo_ready": "✅ Photo capturée. L'appareil photo fonctionne correctement.",
-        "scan_ai_next": "L'étape suivante analysera cette photo avec l'IA et préremplira aliment, quantité, calories et macros.",
+        "scan_ai_next": "La photo est prête pour l’analyse.", "scan_analyze":"✨ Analyser avec l’IA", "scan_analyzing":"Analyse du repas…", "scan_ai_done":"✅ Analyse terminée. Vérifiez et corrigez les valeurs ci-dessous avant d’enregistrer.", "scan_ai_error":"Impossible d’analyser la photo : {error}",
     "card_kcal_in": "Kcal consommées",
     "card_kcal_burn": "Kcal brûlées",
     "card_balance": "Bilan",
@@ -4300,6 +4301,85 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
+def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
+    """
+    Analizza una foto del pasto e restituisce una stima modificabile.
+    I valori nutrizionali sono stime: l'utente deve confermarli prima del salvataggio.
+    """
+    api_key = st.secrets.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY non configurata nei Secrets di Streamlit.")
+
+    image_bytes = uploaded_file.getvalue()
+    mime = getattr(uploaded_file, "type", None) or "image/jpeg"
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    data_url = f"data:{mime};base64,{image_b64}"
+
+    language_name = {
+        "Italiano": "Italian",
+        "English": "English",
+        "Nederlands": "Dutch",
+        "Français": "French",
+    }.get(language, "Italian")
+
+    client = OpenAI(api_key=api_key)
+    response = client.responses.create(
+        model="gpt-5.4-mini",
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": f"""
+Analyze this meal photo. Return ONLY valid JSON, with no markdown.
+Use {language_name} for the food name and notes.
+
+Estimate what is visibly present. Be conservative and do not pretend
+that hidden ingredients or exact weights can be known from a photo.
+
+Required JSON:
+{{
+  "name": "short meal name",
+  "estimated_grams": 250,
+  "calories": 450,
+  "protein": 30,
+  "carbs": 45,
+  "fat": 15,
+  "notes": "brief explanation of the estimate",
+  "confidence": "low|medium|high"
+}}
+
+calories/protein/carbs/fat MUST represent the TOTAL estimated photographed
+portion, not values per 100 g.
+""".strip(),
+                    },
+                    {
+                        "type": "input_image",
+                        "image_url": data_url,
+                    },
+                ],
+            }
+        ],
+    )
+
+    raw = (response.output_text or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
+    raw = re.sub(r"\s*```$", "", raw)
+
+    data = json.loads(raw)
+    return {
+        "name": str(data.get("name") or "Pasto da foto").strip(),
+        "estimated_grams": max(1.0, _safe_float(data.get("estimated_grams"))),
+        "calories": max(0.0, _safe_float(data.get("calories"))),
+        "protein": max(0.0, _safe_float(data.get("protein"))),
+        "carbs": max(0.0, _safe_float(data.get("carbs"))),
+        "fat": max(0.0, _safe_float(data.get("fat"))),
+        "notes": str(data.get("notes") or "").strip(),
+        "confidence": str(data.get("confidence") or "low").strip().lower(),
+    }
+
+
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
 if selected_page == t["t1"]:
@@ -4314,7 +4394,7 @@ if selected_page == t["t1"]:
 
     input_source = st.radio(
         t["input_source_lbl"],
-        [t["opt_scan"], t["opt_off"], t["opt_quick"], recipe_source_label],
+        [t["opt_off"], t["opt_quick"], recipe_source_label, t["opt_scan"]],
         horizontal=True,
         index=0,
     )
@@ -4413,8 +4493,8 @@ if selected_page == t["t1"]:
             st.error(f"Errore nel caricamento delle immissioni rapide: {e}")
 
     # ------------------------------------------------------------------
-    # C. Scansione foto — STEP 1
-    # Fotocamera / upload funzionanti; nessuna chiamata AI ancora.
+    # C. Foto AI
+    # La fotocamera viene creata SOLO quando l'utente seleziona Foto AI.
     # ------------------------------------------------------------------
     elif is_scan:
         st.markdown(f"### {t['scan_title']}")
@@ -4428,7 +4508,6 @@ if selected_page == t["t1"]:
         )
 
         _scan_photo = None
-
         if _scan_mode == t["scan_camera"]:
             _scan_photo = st.camera_input(
                 t["scan_camera"],
@@ -4443,13 +4522,52 @@ if selected_page == t["t1"]:
             )
 
         if _scan_photo is not None:
-            st.image(
-                _scan_photo,
-                caption=t["scan_photo_ready"],
-                width=420,
-            )
-            st.success(t["scan_photo_ready"])
-            st.info(t["scan_ai_next"])
+            st.image(_scan_photo, width=420)
+            st.caption(t["scan_ai_next"])
+
+            if st.button(
+                t["scan_analyze"],
+                type="primary",
+                key=f"analyze_meal_photo_{v}",
+            ):
+                try:
+                    with st.spinner(t["scan_analyzing"]):
+                        _ai_food = analyze_food_photo_with_ai(
+                            _scan_photo,
+                            current_lang,
+                        )
+
+                    # AI returns TOTAL nutrients for the estimated photographed
+                    # portion. We convert them to per-100-g base values so the
+                    # existing quantity/macronutrient synchronization keeps working.
+                    _ai_grams = max(
+                        1.0,
+                        _safe_float(_ai_food.get("estimated_grams")),
+                    )
+                    _factor = 100.0 / _ai_grams
+
+                    reset_or_update(
+                        _ai_food["name"],
+                        _ai_food["calories"] * _factor,
+                        _ai_food["protein"] * _factor,
+                        _ai_food["carbs"] * _factor,
+                        _ai_food["fat"] * _factor,
+                        f"ai_photo_{uuid.uuid4()}",
+                        _ai_grams,
+                        True,
+                        _ai_food.get("notes", ""),
+                        "Casa",
+                    )
+                    st.session_state["ai_photo_analysis_done"] = True
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(
+                        t["scan_ai_error"].format(error=str(e))
+                    )
+
+        if st.session_state.pop("ai_photo_analysis_done", False):
+            st.success(t["scan_ai_done"])
 
     # ------------------------------------------------------------------
     # D. Ricette = catalogo permanente recipe_library
