@@ -200,6 +200,80 @@ st.markdown("""
             }
         }
 
+        /* Recipe cards: fixed landscape window, crop centrally */
+        .recipe-card-photo {
+            width:100%;
+            height:230px;
+            border-radius:16px;
+            background-size:cover;
+            background-position:center center;
+            background-repeat:no-repeat;
+            border:1px solid rgba(255,139,139,.28);
+            box-shadow:0 6px 18px rgba(23,42,70,.08);
+            margin-bottom:.7rem;
+        }
+        .recipe-card-photo-placeholder {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:
+                radial-gradient(circle at 90% 5%, rgba(255,139,139,.20), transparent 35%),
+                linear-gradient(145deg,#FFF7F7,#FFFFFF);
+            font-size:2.4rem;
+        }
+
+        .sano-budget-card {
+            border-radius:18px;
+            padding:16px 16px 14px;
+            margin:.3rem 0 .55rem 0;
+            background:
+                radial-gradient(circle at 95% 4%, rgba(255,139,139,.16), transparent 36%),
+                linear-gradient(145deg, rgba(255,255,255,.11), rgba(255,255,255,.06));
+            border:1px solid rgba(255,255,255,.13);
+            box-shadow:0 8px 24px rgba(0,0,0,.12);
+        }
+        .sano-budget-label {
+            color:#DDE6F2 !important;
+            font-size:.78rem;
+            font-weight:750;
+            margin-bottom:5px;
+        }
+        .sano-budget-value {
+            color:#FFFFFF !important;
+            font-size:1.75rem;
+            line-height:1;
+            font-weight:950;
+            letter-spacing:-.035em;
+            margin-bottom:10px;
+        }
+        .sano-budget-value span { color:#FF9A9A !important; }
+        .sano-budget-track {
+            width:100%;
+            height:9px;
+            overflow:hidden;
+            border-radius:999px;
+            background:rgba(255,255,255,.92);
+            margin:4px 0 8px;
+        }
+        .sano-budget-fill {
+            height:100%;
+            border-radius:999px;
+            background:linear-gradient(90deg,#FF8B8B,#FFB0B0);
+        }
+        .sano-budget-meta {
+            display:flex;
+            justify-content:space-between;
+            gap:8px;
+            color:#E8EEF7 !important;
+            font-size:.72rem;
+            font-weight:700;
+        }
+        .sano-budget-meta * { color:#E8EEF7 !important; }
+
+        @media (max-width:700px) {
+            .recipe-card-photo { height:180px; }
+        }
+
         /* Metric Cards */
         [data-testid="stMetric"] {
             background-color: #FFFFFF;
@@ -486,6 +560,18 @@ def info_badge(note, label="Note"):
         f'<span title="{safe_note}" aria-label="{safe_label}" '
         f'style="cursor:help;font-size:1.05em;margin-left:5px;color:#1A2942;">ⓘ</span>'
     )
+
+
+LANGUAGE_FLAGS = {
+    "Italiano": "🇮🇹",
+    "English": "🇬🇧",
+    "Nederlands": "🇳🇱",
+    "Français": "🇫🇷",
+}
+
+
+def format_language_option(value):
+    return f"{LANGUAGE_FLAGS.get(value, '🌐')} {value}"
 
 
 MEAL_CATEGORIES = ["Casa", "Lavoro", "Ristorante", "Una-tantum"]
@@ -865,6 +951,34 @@ def recipe_image_url(row):
 
     return None
 
+
+
+
+def render_recipe_card_image(image_url, alt_text="Ricetta"):
+    """Landscape center-crop for recipe cards without modifying the source image."""
+    safe_url = html.escape(str(image_url or ""), quote=True)
+    safe_alt = html.escape(str(alt_text or "Ricetta"), quote=True)
+
+    if not safe_url:
+        st.markdown(
+            """
+            <div class="recipe-card-photo recipe-card-photo-placeholder"
+                 role="img" aria-label="Recipe">🍽️</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        f"""
+        <div class="recipe-card-photo"
+             role="img"
+             aria-label="{safe_alt}"
+             style="background-image:url('{safe_url}');">
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def upload_recipe_image(uploaded_file):
@@ -1638,6 +1752,7 @@ def show_login_page():
         LOGIN_I18N[st.session_state["login_lang_selector"]]["language"],
         ["Italiano", "English", "Nederlands", "Français"],
         key="login_lang_selector",
+        format_func=format_language_option,
     )
     lt = LOGIN_I18N[current_login_lang]
 
@@ -2412,6 +2527,7 @@ with st.sidebar:
             _language_options,
             index=_language_options.index(_current_menu_lang),
             key="profile_menu_language",
+            format_func=format_language_option,
         )
 
         if _new_menu_lang != st.session_state.get("lang_selector"):
@@ -3448,6 +3564,98 @@ with st.sidebar:
     selected_page_id = st.session_state.current_page_id
     selected_page = t[selected_page_id]
 
+    # --------------------------------------------------------------
+    # Kcal rimanenti: budget FINALE della giornata.
+    # Formula = BMR completo + attività registrata oggi - kcal ingerite.
+    # Non usa il BMR maturato "finora" e non sottrae il deficit target.
+    # --------------------------------------------------------------
+    _budget_i18n = {
+        "Italiano": {
+            "label": "Kcal rimanenti oggi",
+            "eaten": "ingerite",
+            "budget": "budget finale",
+        },
+        "English": {
+            "label": "Kcal remaining today",
+            "eaten": "eaten",
+            "budget": "end-of-day budget",
+        },
+        "Nederlands": {
+            "label": "Kcal over vandaag",
+            "eaten": "gegeten",
+            "budget": "dagbudget",
+        },
+        "Français": {
+            "label": "Kcal restantes aujourd'hui",
+            "eaten": "consommées",
+            "budget": "budget fin de journée",
+        },
+    }
+    _bi = _budget_i18n.get(current_lang, _budget_i18n["Italiano"])
+
+    try:
+        _today_str = str(date.today())
+        _today_meals = (
+            supabase.table("meals")
+            .select("calories")
+            .eq("user_id", user_id)
+            .eq("date", _today_str)
+            .execute().data
+            or []
+        )
+        _today_acts = (
+            supabase.table("activities")
+            .select("burned_calories")
+            .eq("user_id", user_id)
+            .eq("date", _today_str)
+            .execute().data
+            or []
+        )
+
+        _today_eaten = sum(
+            _safe_float(row.get("calories"))
+            for row in _today_meals
+        )
+        _today_activity = sum(
+            _safe_float(row.get("burned_calories"))
+            for row in _today_acts
+        )
+
+        _end_day_budget = max(
+            0.0,
+            float(user_bmr or 0) + _today_activity,
+        )
+        _remaining_today = _end_day_budget - _today_eaten
+
+        _progress_pct = (
+            min(100.0, max(0.0, (_today_eaten / _end_day_budget) * 100.0))
+            if _end_day_budget > 0
+            else 0.0
+        )
+
+        _remaining_display = int(round(_remaining_today))
+        _budget_display = int(round(_end_day_budget))
+        _eaten_display = int(round(_today_eaten))
+
+        st.markdown(
+            f"""
+            <div class="sano-budget-card">
+                <div class="sano-budget-label">{html.escape(_bi["label"])}</div>
+                <div class="sano-budget-value"><span>{_remaining_display}</span> kcal</div>
+                <div class="sano-budget-track">
+                    <div class="sano-budget-fill" style="width:{_progress_pct:.1f}%"></div>
+                </div>
+                <div class="sano-budget-meta">
+                    <span>{_eaten_display} kcal {_bi["eaten"]}</span>
+                    <span>{_budget_display} kcal {_bi["budget"]}</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception as _budget_exc:
+        print(f"Sidebar budget error: {_budget_exc}")
+
     st.markdown("---")
 # ==============================================================================
 # PERSONAL SETTINGS — linked from profile image
@@ -3662,6 +3870,7 @@ def render_personal_settings_page():
             ["Italiano", "English", "Nederlands", "Français"],
             index=["Italiano", "English", "Nederlands", "Français"].index(settings_lang),
             key="settings_language",
+            format_func=format_language_option,
         )
 
         st.markdown(f"### {si['deficit_title']}")
@@ -5301,29 +5510,10 @@ elif selected_page == t["t4"]:
                     with _col:
                         with st.container(border=True):
                             _recipe_image = recipe_image_url(r)
-                            if _recipe_image:
-                                st.image(
-                                    _recipe_image,
-                                    use_container_width=True,
-                                )
-                            else:
-                                st.markdown(
-                                    """
-                                    <div style="
-                                        min-height:155px;
-                                        border-radius:14px;
-                                        display:flex;
-                                        align-items:center;
-                                        justify-content:center;
-                                        background:
-                                            radial-gradient(circle at 90% 5%, rgba(255,139,139,.20), transparent 35%),
-                                            linear-gradient(145deg,#FFF7F7,#FFFFFF);
-                                        border:1px solid #FFD0D0;
-                                        font-size:2.2rem;
-                                    ">🍽️</div>
-                                    """,
-                                    unsafe_allow_html=True,
-                                )
+                            render_recipe_card_image(
+                                _recipe_image,
+                                r.get("_recipe_label") or r.get("name") or "Recipe",
+                            )
 
                             st.markdown(f"### {html.escape(str(r['_recipe_label']))}")
 
@@ -5472,29 +5662,10 @@ elif selected_page == t["t4"]:
                     with _col:
                         with st.container(border=True):
                             _recipe_image = recipe_image_url(r)
-                            if _recipe_image:
-                                st.image(
-                                    _recipe_image,
-                                    use_container_width=True,
-                                )
-                            else:
-                                st.markdown(
-                                    """
-                                    <div style="
-                                        min-height:155px;
-                                        border-radius:14px;
-                                        display:flex;
-                                        align-items:center;
-                                        justify-content:center;
-                                        background:
-                                            radial-gradient(circle at 90% 5%, rgba(255,139,139,.20), transparent 35%),
-                                            linear-gradient(145deg,#FFF7F7,#FFFFFF);
-                                        border:1px solid #FFD0D0;
-                                        font-size:2.2rem;
-                                    ">🍽️</div>
-                                    """,
-                                    unsafe_allow_html=True,
-                                )
+                            render_recipe_card_image(
+                                _recipe_image,
+                                r.get("_recipe_label") or r.get("name") or "Recipe",
+                            )
 
                             st.markdown(f"### {html.escape(str(r['_recipe_label']))}")
                             st.caption(
