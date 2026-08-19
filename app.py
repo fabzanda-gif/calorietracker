@@ -4034,7 +4034,36 @@ SETTINGS_I18N = {
 
 
 def render_personal_settings_page():
-    settings_lang = st.session_state.get("lang_selector", "Italiano")
+    # ------------------------------------------------------------------
+    # LINGUA SEMPRE IN ALTO
+    # La select aggiorna subito l'interfaccia, senza aspettare "Salva".
+    # ------------------------------------------------------------------
+    _settings_languages = ["Italiano", "English", "Nederlands", "Français"]
+
+    settings_lang = st.session_state.get("settings_language_live")
+    if settings_lang not in _settings_languages:
+        settings_lang = st.session_state.get("lang_selector", "Italiano")
+    if settings_lang not in _settings_languages:
+        settings_lang = "Italiano"
+
+    si = SETTINGS_I18N.get(settings_lang, SETTINGS_I18N["Italiano"])
+
+    def _settings_language_changed():
+        _new_lang = st.session_state.get("settings_language_live", "Italiano")
+        st.session_state["lang_selector"] = _new_lang
+        st.session_state["login_lang_selector"] = _new_lang
+
+    new_language = st.selectbox(
+        si["language"],
+        _settings_languages,
+        index=_settings_languages.index(settings_lang),
+        key="settings_language_live",
+        format_func=format_language_option,
+        on_change=_settings_language_changed,
+    )
+
+    # Dopo l'eventuale on_change rileggiamo lingua e traduzioni.
+    settings_lang = st.session_state.get("settings_language_live", settings_lang)
     si = SETTINGS_I18N.get(settings_lang, SETTINGS_I18N["Italiano"])
 
     render_page_title_card(si["title"])
@@ -4063,7 +4092,11 @@ def render_personal_settings_page():
         else metadata.get("current_weight") or 80.0
     )
 
-    canonical_gender = "Donna" if existing_gender in ("Donna", "Female", "Vrouw", "Femme") else "Uomo"
+    canonical_gender = (
+        "Donna"
+        if existing_gender in ("Donna", "Female", "Vrouw", "Femme")
+        else "Uomo"
+    )
 
     existing_deficit_value = int(
         round(float(metadata.get("deficit_target_kcal") or 0))
@@ -4072,9 +4105,13 @@ def render_personal_settings_page():
         metadata.get("deficit_plan")
         or deficit_preset_from_value(existing_deficit_value)
     )
+
     existing_protein_enabled = bool(metadata.get("protein_goal_enabled", False))
     existing_protein_g = _safe_float(metadata.get("protein_goal_g"))
-    if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in metadata:
+    if (
+        str(user_id) == _PROTEIN_GOAL_SPECIAL_UID
+        and "protein_goal_enabled" not in metadata
+    ):
         existing_protein_enabled = True
         if existing_protein_g <= 0:
             existing_protein_g = 120.0
@@ -4092,9 +4129,17 @@ def render_personal_settings_page():
             DEFICIT_PRESETS.get(selected, 0)
         )
 
+    # ------------------------------------------------------------------
+    # DATI ACCOUNT / FISICI
+    # ------------------------------------------------------------------
     with st.container(border=True):
         st.markdown(f"### {si['account']}")
-        st.text_input(si["email"], value=logged_email, disabled=True)
+
+        st.text_input(
+            si["email"],
+            value=logged_email,
+            disabled=True,
+        )
 
         new_name = st.text_input(
             si["name"],
@@ -4107,7 +4152,9 @@ def render_personal_settings_page():
             si["gender"],
             gender_options,
             index=gender_options.index(canonical_gender),
-            format_func=lambda value: si["male"] if value == "Uomo" else si["female"],
+            format_func=lambda value: (
+                si["male"] if value == "Uomo" else si["female"]
+            ),
             key="settings_gender",
         )
 
@@ -4129,6 +4176,7 @@ def render_personal_settings_page():
                 step=1.0,
                 key="settings_height",
             )
+
         with c2:
             new_current_weight = st.number_input(
                 si["current_weight"],
@@ -4148,15 +4196,12 @@ def render_personal_settings_page():
             key="settings_target_weight",
         )
 
-        new_language = st.selectbox(
-            si["language"],
-            ["Italiano", "English", "Nederlands", "Français"],
-            index=["Italiano", "English", "Nederlands", "Français"].index(settings_lang),
-            key="settings_language",
-            format_func=format_language_option,
-        )
-
+    # ------------------------------------------------------------------
+    # DEFICIT
+    # ------------------------------------------------------------------
+    with st.container(border=True):
         st.markdown(f"### {si['deficit_title']}")
+
         new_deficit_plan = st.selectbox(
             si["deficit_speed"],
             list(DEFICIT_PRESETS.keys()),
@@ -4176,82 +4221,100 @@ def render_personal_settings_page():
             key="settings_deficit_kcal",
         )
 
+    # ------------------------------------------------------------------
+    # GOAL PROTEICO — SEMPRE ULTIMA SEZIONE
+    # ------------------------------------------------------------------
+    with st.container(border=True):
         st.markdown(f"### {si['protein_title']}")
+
         _protein_options = [si["protein_no"], si["protein_yes"]]
         new_protein_choice = st.radio(
-            si["protein_enabled"], _protein_options,
+            si["protein_enabled"],
+            _protein_options,
             index=1 if existing_protein_enabled else 0,
-            horizontal=True, key="settings_protein_goal_enabled",
+            horizontal=True,
+            key="settings_protein_goal_enabled",
         )
+
         new_protein_enabled = new_protein_choice == si["protein_yes"]
-        new_protein_g = existing_protein_g if existing_protein_g > 0 else 120.0
+        new_protein_g = (
+            existing_protein_g
+            if existing_protein_g > 0
+            else 120.0
+        )
+
         if new_protein_enabled:
             new_protein_g = st.number_input(
-                si["protein_g"], min_value=1.0, max_value=500.0,
-                value=float(new_protein_g), step=5.0, key="settings_protein_goal_g",
+                si["protein_g"],
+                min_value=1.0,
+                max_value=500.0,
+                value=float(new_protein_g),
+                step=5.0,
+                key="settings_protein_goal_g",
             )
 
-        st.caption(si["hint"])
+    st.caption(si["hint"])
 
-        if st.button(
-            si["save"],
-            type="primary",
-            use_container_width=True,
-            key="save_personal_settings",
-        ):
-            try:
-                normalized_plan = normalize_deficit_plan(new_deficit_plan)
-                preset_value = int(DEFICIT_PRESETS.get(normalized_plan, 0))
-                plan_to_save = (
-                    normalized_plan
-                    if int(new_deficit_kcal) == preset_value
-                    else "custom"
-                )
+    if st.button(
+        si["save"],
+        type="primary",
+        use_container_width=True,
+        key="save_personal_settings",
+    ):
+        try:
+            normalized_plan = normalize_deficit_plan(new_deficit_plan)
+            preset_value = int(DEFICIT_PRESETS.get(normalized_plan, 0))
+            plan_to_save = (
+                normalized_plan
+                if int(new_deficit_kcal) == preset_value
+                else "custom"
+            )
 
-                # Preserve provider metadata such as avatar_url, picture,
-                # provider identifiers, full_name, etc.
-                updated_metadata = dict(metadata)
-                updated_metadata.update({
-                    "display_name": str(new_name).strip(),
-                    "gender": new_gender,
-                    "birth_date": str(new_birth),
-                    "height": float(new_height),
-                    "current_weight": float(new_current_weight),
-                    "target_weight": float(new_target),
-                    "deficit_target_kcal": int(new_deficit_kcal),
-                    "deficit_plan": plan_to_save,
-                    "preferred_language": new_language,
-                    "protein_goal_enabled": bool(new_protein_enabled),
-                    "protein_goal_g": float(new_protein_g) if new_protein_enabled else None,
-                })
+            updated_metadata = dict(metadata)
+            updated_metadata.update({
+                "display_name": str(new_name).strip(),
+                "gender": new_gender,
+                "birth_date": str(new_birth),
+                "height": float(new_height),
+                "current_weight": float(new_current_weight),
+                "target_weight": float(new_target),
+                "deficit_target_kcal": int(new_deficit_kcal),
+                "deficit_plan": plan_to_save,
+                "preferred_language": new_language,
+                "protein_goal_enabled": bool(new_protein_enabled),
+                "protein_goal_g": (
+                    float(new_protein_g)
+                    if new_protein_enabled
+                    else None
+                ),
+            })
 
-                response = supabase.auth.update_user({
-                    "data": updated_metadata
-                })
+            response = supabase.auth.update_user({
+                "data": updated_metadata
+            })
 
-                # Keep weight history aligned with the edited current weight.
-                supabase.table("daily_logs").upsert(
-                    {
-                        "user_id": user_id,
-                        "date": str(date.today()),
-                        "weight": float(new_current_weight),
-                    },
-                    on_conflict="user_id,date",
-                ).execute()
+            supabase.table("daily_logs").upsert(
+                {
+                    "user_id": user_id,
+                    "date": str(date.today()),
+                    "weight": float(new_current_weight),
+                },
+                on_conflict="user_id,date",
+            ).execute()
 
-                if getattr(response, "user", None):
-                    st.session_state["user"] = response.user
+            if getattr(response, "user", None):
+                st.session_state["user"] = response.user
 
-                st.session_state["lang_selector"] = new_language
-                st.session_state["login_lang_selector"] = new_language
+            st.session_state["lang_selector"] = new_language
+            st.session_state["login_lang_selector"] = new_language
 
-                st.success(si["saved"])
-                st.session_state["show_personal_settings"] = False
-                st.rerun()
+            st.success(si["saved"])
+            st.session_state["show_personal_settings"] = False
+            st.rerun()
 
-            except Exception as exc:
-                st.error(si["error"].format(error=exc))
-                print(traceback.format_exc())
+        except Exception as exc:
+            st.error(si["error"].format(error=exc))
+            print(traceback.format_exc())
 
 
 _is_settings_page = bool(st.session_state.get("show_personal_settings", False))
