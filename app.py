@@ -4214,8 +4214,15 @@ if selected_page == t["t1"]:
                     and sel_recipe != st.session_state.get("last_selected")
                 ):
                     r = recipes_dict[sel_recipe]
+                    # _safe_float accetta un solo argomento.
+                    # Se recipe_servings è NULL/vuoto, usiamo 1.0 come fallback.
+                    _raw_recipe_servings = r.get("recipe_servings")
                     recipe_servings = max(
-                        _safe_float(r.get("recipe_servings"), 1.0),
+                        _safe_float(
+                            _raw_recipe_servings
+                            if _raw_recipe_servings not in (None, "")
+                            else 1.0
+                        ),
                         1.0,
                     )
 
