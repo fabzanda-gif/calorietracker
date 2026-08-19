@@ -2164,21 +2164,25 @@ with st.sidebar:
             "menu": "⌄",
             "settings": "⚙️ Impostazioni",
             "language": "🌐 Lingua",
+            "logout": "🚪 Esci",
         },
         "English": {
             "menu": "⌄",
             "settings": "⚙️ Settings",
             "language": "🌐 Language",
+            "logout": "🚪 Log out",
         },
         "Nederlands": {
             "menu": "⌄",
             "settings": "⚙️ Instellingen",
             "language": "🌐 Taal",
+            "logout": "🚪 Uitloggen",
         },
         "Français": {
             "menu": "⌄",
             "settings": "⚙️ Paramètres",
             "language": "🌐 Langue",
+            "logout": "🚪 Se déconnecter",
         },
     }
 
@@ -2269,7 +2273,7 @@ with st.sidebar:
 
         st.divider()
         if st.button(
-            _pm["logout"],
+            _pm.get("logout", "🚪 Logout"),
             key="profile_menu_logout",
             use_container_width=True,
         ):
