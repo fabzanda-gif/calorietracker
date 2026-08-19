@@ -2970,6 +2970,11 @@ with st.sidebar:
             key="profile_menu_settings",
             use_container_width=True,
         ):
+            # Sincronizza sempre la lingua della pagina Impostazioni
+            # con la lingua attualmente attiva nell'app.
+            st.session_state["settings_language_live"] = (
+                st.session_state.get("lang_selector", "Italiano")
+            )
             st.session_state["show_personal_settings"] = True
             st.rerun()
 
@@ -4189,7 +4194,7 @@ SETTINGS_I18N = {
         "title": "⚙️ Impostazioni personali",
         "subtitle": "Gestisci i dati del tuo profilo SanoSync.",
         "back": "← Torna all'app",
-        "account": "Account",
+        "account": "👤 Account e dati personali",
         "email": "Email",
         "name": "Nome",
         "gender": "Genere",
@@ -4199,20 +4204,25 @@ SETTINGS_I18N = {
         "height": "Altezza (cm)",
         "current_weight": "Peso attuale (kg)",
         "target_weight": "Peso obiettivo (kg)",
-        "language": "Lingua preferita",
-        "deficit_title": "🎯 Obiettivo deficit",
+        "language": "🌐 Lingua",
+        "deficit_title": "🎯 Obiettivo calorico",
         "deficit_speed": "Velocità di dimagrimento",
-        "deficit_field": "Deficit kcal di base",
+        "deficit_field": "Deficit calorico giornaliero (kcal)",
         "save": "💾 Salva impostazioni",
         "saved": "✅ Impostazioni aggiornate.",
         "error": "Errore durante il salvataggio: {error}",
-        "hint": "La foto profilo viene gestita dal provider di accesso (es. Google/Facebook).","protein_title":"🥩 Goal Proteico","protein_enabled":"Attiva goal proteico","protein_no":"No","protein_yes":"Sì","protein_g":"Goal proteico giornaliero (g)",
+        "hint": "La foto profilo viene gestita dal provider di accesso (es. Google/Facebook).",
+        "protein_title": "🥩 Goal Proteico",
+        "protein_enabled": "Vuoi usare un goal proteico giornaliero?",
+        "protein_no": "No",
+        "protein_yes": "Sì",
+        "protein_g": "Goal proteico giornaliero (g)",
     },
     "English": {
         "title": "⚙️ Personal settings",
-        "subtitle": "Manage your SanoSync profile data.",
-        "back": "← Back to app",
-        "account": "Account",
+        "subtitle": "Manage your SanoSync profile information.",
+        "back": "← Back to the app",
+        "account": "👤 Account and personal details",
         "email": "Email",
         "name": "Name",
         "gender": "Gender",
@@ -4222,20 +4232,25 @@ SETTINGS_I18N = {
         "height": "Height (cm)",
         "current_weight": "Current weight (kg)",
         "target_weight": "Target weight (kg)",
-        "language": "Preferred language",
-        "deficit_title": "🎯 Deficit target",
+        "language": "🌐 Language",
+        "deficit_title": "🎯 Calorie target",
         "deficit_speed": "Weight-loss speed",
-        "deficit_field": "Base calorie deficit",
+        "deficit_field": "Daily calorie deficit (kcal)",
         "save": "💾 Save settings",
         "saved": "✅ Settings updated.",
         "error": "Error while saving: {error}",
-        "hint": "Your profile picture is managed by your sign-in provider (e.g. Google/Facebook).","protein_title":"🥩 Protein Goal","protein_enabled":"Enable protein goal","protein_no":"No","protein_yes":"Yes","protein_g":"Daily protein goal (g)",
+        "hint": "Your profile picture is managed by your sign-in provider (e.g. Google/Facebook).",
+        "protein_title": "🥩 Protein Goal",
+        "protein_enabled": "Use a daily protein goal?",
+        "protein_no": "No",
+        "protein_yes": "Yes",
+        "protein_g": "Daily protein goal (g)",
     },
     "Nederlands": {
         "title": "⚙️ Persoonlijke instellingen",
         "subtitle": "Beheer je SanoSync-profielgegevens.",
         "back": "← Terug naar de app",
-        "account": "Account",
+        "account": "👤 Account en persoonlijke gegevens",
         "email": "E-mail",
         "name": "Naam",
         "gender": "Geslacht",
@@ -4245,22 +4260,27 @@ SETTINGS_I18N = {
         "height": "Lengte (cm)",
         "current_weight": "Huidig gewicht (kg)",
         "target_weight": "Streefgewicht (kg)",
-        "language": "Voorkeurstaal",
-        "deficit_title": "🎯 Tekortdoel",
+        "language": "🌐 Taal",
+        "deficit_title": "🎯 Caloriedoel",
         "deficit_speed": "Snelheid van gewichtsverlies",
-        "deficit_field": "Basis calorietekort",
+        "deficit_field": "Dagelijks calorietekort (kcal)",
         "save": "💾 Instellingen opslaan",
         "saved": "✅ Instellingen bijgewerkt.",
         "error": "Fout bij opslaan: {error}",
-        "hint": "Je profielfoto wordt beheerd door je inlogprovider (bijv. Google/Facebook).","protein_title":"🥩 Eiwitdoel","protein_enabled":"Eiwitdoel activeren","protein_no":"Nee","protein_yes":"Ja","protein_g":"Dagelijks eiwitdoel (g)",
+        "hint": "Je profielfoto wordt beheerd door je inlogprovider (bijv. Google/Facebook).",
+        "protein_title": "🥩 Eiwitdoel",
+        "protein_enabled": "Een dagelijks eiwitdoel gebruiken?",
+        "protein_no": "Nee",
+        "protein_yes": "Ja",
+        "protein_g": "Dagelijks eiwitdoel (g)",
     },
     "Français": {
         "title": "⚙️ Paramètres personnels",
-        "subtitle": "Gérez les données de votre profil SanoSync.",
-        "back": "← Retour à l’application",
-        "account": "Compte",
+        "subtitle": "Gérez les informations de votre profil SanoSync.",
+        "back": "← Retour à l'application",
+        "account": "👤 Compte et informations personnelles",
         "email": "E-mail",
-        "name": "Prénom / nom",
+        "name": "Nom",
         "gender": "Sexe",
         "male": "Homme",
         "female": "Femme",
@@ -4268,16 +4288,22 @@ SETTINGS_I18N = {
         "height": "Taille (cm)",
         "current_weight": "Poids actuel (kg)",
         "target_weight": "Poids cible (kg)",
-        "language": "Langue préférée",
-        "deficit_title": "🎯 Objectif de déficit",
+        "language": "🌐 Langue",
+        "deficit_title": "🎯 Objectif calorique",
         "deficit_speed": "Vitesse de perte de poids",
-        "deficit_field": "Déficit calorique de base",
+        "deficit_field": "Déficit calorique quotidien (kcal)",
         "save": "💾 Enregistrer les paramètres",
         "saved": "✅ Paramètres mis à jour.",
-        "error": "Erreur lors de l’enregistrement : {error}",
-        "hint": "Votre photo de profil est gérée par votre fournisseur de connexion (ex. Google/Facebook).","protein_title":"🥩 Objectif protéique","protein_enabled":"Activer l’objectif protéique","protein_no":"Non","protein_yes":"Oui","protein_g":"Objectif quotidien de protéines (g)",
+        "error": "Erreur lors de l'enregistrement : {error}",
+        "hint": "Votre photo de profil est gérée par votre fournisseur de connexion (ex. Google/Facebook).",
+        "protein_title": "🥩 Objectif protéique",
+        "protein_enabled": "Utiliser un objectif quotidien de protéines ?",
+        "protein_no": "Non",
+        "protein_yes": "Oui",
+        "protein_g": "Objectif quotidien de protéines (g)",
     },
 }
+
 
 
 def render_personal_settings_page():
@@ -4318,6 +4344,7 @@ def render_personal_settings_page():
 
     if st.button(si["back"], key="settings_back"):
         st.session_state["show_personal_settings"] = False
+        st.session_state.pop("settings_language_live", None)
         st.rerun()
 
     metadata = dict(getattr(st.session_state["user"], "user_metadata", None) or {})
@@ -4571,6 +4598,7 @@ def render_personal_settings_page():
 
             st.success(si["saved"])
             st.session_state["show_personal_settings"] = False
+            st.session_state.pop("settings_language_live", None)
             st.rerun()
 
         except Exception as exc:
