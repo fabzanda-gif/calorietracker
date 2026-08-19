@@ -2087,8 +2087,6 @@ with st.sidebar:
     account_left, account_right = st.columns([1, 3], vertical_alignment="center")
 
     with account_left:
-        _settings_url = f"{get_public_app_url().rstrip('/')}?settings=1"
-        _settings_url_safe = html.escape(_settings_url, quote=True)
         _avatar_safe = html.escape(logged_avatar, quote=True)
 
         _settings_tooltips = {
@@ -2105,42 +2103,42 @@ with st.sidebar:
             quote=True,
         )
 
+        # IMPORTANT: use a Streamlit-native control instead of <a href>.
+        # A normal hyperlink reloads the app and can create a new Streamlit
+        # session, which makes the in-memory Supabase login appear logged out.
+        _avatar_css_url = _avatar_safe.replace("'", "%27")
         if logged_avatar:
             st.markdown(
                 f"""
-                <a href="{_settings_url_safe}" target="_self"
-                   title="{_settings_tip}"
-                   style="display:inline-block;text-decoration:none;">
-                    <img src="{_avatar_safe}" alt="{_settings_tip}"
-                         style="
-                            width:58px;height:58px;border-radius:50%;
-                            object-fit:cover;display:block;
-                            border:2px solid #FF8B8B;
-                            box-shadow:0 4px 14px rgba(255,139,139,.28);
-                            cursor:pointer;
-                         ">
-                </a>
+                <style>
+                div[data-testid="stButton"]:has(button[kind="secondary"][aria-label="{_settings_tip}"]) button {{
+                    width:58px !important;
+                    height:58px !important;
+                    min-height:58px !important;
+                    padding:0 !important;
+                    border-radius:50% !important;
+                    border:2px solid #FF8B8B !important;
+                    background-image:url('{_avatar_css_url}') !important;
+                    background-size:cover !important;
+                    background-position:center !important;
+                    background-repeat:no-repeat !important;
+                    box-shadow:0 4px 14px rgba(255,139,139,.28) !important;
+                    cursor:pointer !important;
+                    font-size:0 !important;
+                }}
+                </style>
                 """,
                 unsafe_allow_html=True,
             )
-        else:
-            st.markdown(
-                f"""
-                <a href="{_settings_url_safe}" target="_self"
-                   title="{_settings_tip}"
-                   style="display:inline-block;text-decoration:none;">
-                    <div style="
-                        width:54px;height:54px;border-radius:50%;
-                        display:flex;align-items:center;justify-content:center;
-                        background:#FF8B8B;color:white;font-size:1.5rem;
-                        font-weight:900;border:2px solid #FFFFFF;
-                        box-shadow:0 4px 14px rgba(255,139,139,.28);
-                        cursor:pointer;
-                    ">✓</div>
-                </a>
-                """,
-                unsafe_allow_html=True,
-            )
+
+        if st.button(
+            "⚙",
+            key="open_personal_settings",
+            help=_settings_tip,
+            use_container_width=False,
+        ):
+            st.session_state["show_personal_settings"] = True
+            st.rerun()
 
     with account_right:
         _lang = st.session_state.get("lang_selector", "Italiano")
@@ -3145,7 +3143,7 @@ def render_personal_settings_page():
     st.caption(si["subtitle"])
 
     if st.button(si["back"], key="settings_back"):
-        st.query_params.clear()
+        st.session_state["show_personal_settings"] = False
         st.rerun()
 
     metadata = dict(getattr(st.session_state["user"], "user_metadata", None) or {})
@@ -3326,7 +3324,7 @@ def render_personal_settings_page():
                 st.session_state["login_lang_selector"] = new_language
 
                 st.success(si["saved"])
-                st.query_params.clear()
+                st.session_state["show_personal_settings"] = False
                 st.rerun()
 
             except Exception as exc:
@@ -3334,7 +3332,7 @@ def render_personal_settings_page():
                 print(traceback.format_exc())
 
 
-_is_settings_page = str(st.query_params.get("settings") or "") == "1"
+_is_settings_page = bool(st.session_state.get("show_personal_settings", False))
 if _is_settings_page:
     render_personal_settings_page()
     st.stop()
