@@ -4327,7 +4327,7 @@ def render_personal_settings_page():
         st.session_state["login_lang_selector"] = _new_lang
 
     new_language = st.selectbox(
-        si["language"],
+        "🌐 Language / Lingua / Taal / Langue",
         _settings_languages,
         index=_settings_languages.index(settings_lang),
         key="settings_language_live",
@@ -4335,9 +4335,16 @@ def render_personal_settings_page():
         on_change=_settings_language_changed,
     )
 
-    # Dopo l'eventuale on_change rileggiamo lingua e traduzioni.
-    settings_lang = st.session_state.get("settings_language_live", settings_lang)
-    si = SETTINGS_I18N.get(settings_lang, SETTINGS_I18N["Italiano"])
+    # IMPORTANTE: usiamo direttamente il valore restituito dal widget.
+    # In alcune versioni/configurazioni Streamlit, rileggere session_state
+    # nello stesso passaggio può lasciare visibile per una run il vecchio
+    # dizionario (es. dropdown "English" ma testi ancora italiani).
+    settings_lang = new_language
+    si = SETTINGS_I18N.get(new_language, SETTINGS_I18N["Italiano"])
+
+    # Manteniamo sincronizzata anche la lingua globale dell'app.
+    st.session_state["lang_selector"] = new_language
+    st.session_state["login_lang_selector"] = new_language
 
     render_page_title_card(si["title"])
     st.caption(si["subtitle"])
