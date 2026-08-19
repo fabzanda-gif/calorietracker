@@ -4306,9 +4306,9 @@ def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
     Analizza una foto del pasto e restituisce una stima modificabile.
     I valori nutrizionali sono stime: l'utente deve confermarli prima del salvataggio.
     """
-    api_key = st.secrets.get("OPENAI_API_KEY")
+    api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY non configurata nei Secrets di Streamlit.")
+        raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
 
     image_bytes = uploaded_file.getvalue()
     mime = getattr(uploaded_file, "type", None) or "image/jpeg"
@@ -4322,9 +4322,14 @@ def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
         "Français": "French",
     }.get(language, "Italian")
 
-    client = OpenAI(api_key=api_key)
+    # Groq espone un endpoint compatibile con il client OpenAI.
+    # Manteniamo quindi la dipendenza `openai` nel requirements.txt.
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
     response = client.responses.create(
-        model="gpt-5.4-mini",
+        model="qwen/qwen3.6-27b",
         input=[
             {
                 "role": "user",
@@ -4356,6 +4361,7 @@ portion, not values per 100 g.
                     },
                     {
                         "type": "input_image",
+                        "detail": "auto",
                         "image_url": data_url,
                     },
                 ],
