@@ -4367,14 +4367,23 @@ st.markdown("""
 
 def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
     """
-    Analizza una foto del pasto e restituisce una stima modificabile.
-    I valori nutrizionali sono stime: l'utente deve confermarli prima del salvataggio.
+    Analizza una foto del pasto tramite Groq/Qwen Vision.
+
+    Usa Chat Completions + JSON Object Mode, che Groq documenta
+    esplicitamente anche per input immagine. Questo evita risposte vuote
+    o non parsabili che possono verificarsi leggendo response.output_text
+    dalla Responses API beta.
     """
     api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
-        raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
+        raise RuntimeError(
+            "GROQ_API_KEY non configurata nei Secrets di Streamlit."
+        )
 
     image_bytes = uploaded_file.getvalue()
+    if not image_bytes:
+        raise RuntimeError("La foto caricata è vuota.")
+
     mime = getattr(uploaded_file, "type", None) or "image/jpeg"
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime};base64,{image_b64}"
@@ -4386,28 +4395,24 @@ def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
         "Français": "French",
     }.get(language, "Italian")
 
-    # Groq espone un endpoint compatibile con il client OpenAI.
-    # Manteniamo quindi la dipendenza `openai` nel requirements.txt.
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1",
     )
-    response = client.responses.create(
-        model="qwen/qwen3.6-27b",
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": f"""
-Analyze this meal photo. Return ONLY valid JSON, with no markdown.
+
+    prompt = f"""
+Analyze this meal photo and estimate the photographed portion.
+
+Return a JSON object ONLY.
 Use {language_name} for the food name and notes.
 
-Estimate what is visibly present. Be conservative and do not pretend
-that hidden ingredients or exact weights can be known from a photo.
+Be conservative:
+- estimate only what is reasonably visible;
+- do not pretend hidden ingredients are certain;
+- calories and macros must refer to the TOTAL photographed portion;
+- estimated_grams must be the total estimated edible weight.
 
-Required JSON:
+Required keys:
 {{
   "name": "short meal name",
   "estimated_grams": 250,
@@ -4419,34 +4424,110 @@ Required JSON:
   "confidence": "low|medium|high"
 }}
 
-calories/protein/carbs/fat MUST represent the TOTAL estimated photographed
-portion, not values per 100 g.
-""".strip(),
+Every numeric field must contain a number, not a string.
+""".strip()
+
+    completion = client.chat.completions.create(
+        model="qwen/qwen3.6-27b",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt,
                     },
                     {
-                        "type": "input_image",
-                        "detail": "auto",
-                        "image_url": data_url,
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data_url,
+                        },
                     },
                 ],
             }
         ],
+        response_format={"type": "json_object"},
+        reasoning_effort="none",
+        temperature=0.2,
+        max_completion_tokens=900,
+        stream=False,
     )
 
-    raw = (response.output_text or "").strip()
-    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
-    raw = re.sub(r"\s*```$", "", raw)
+    try:
+        raw = completion.choices[0].message.content
+    except Exception as exc:
+        raise RuntimeError(
+            f"Groq non ha restituito un contenuto leggibile: {exc}"
+        )
 
-    data = json.loads(raw)
+    if isinstance(raw, list):
+        # Defensive fallback for client versions that may expose content
+        # as a list of typed content blocks.
+        parts = []
+        for item in raw:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text") or ""))
+            else:
+                parts.append(str(getattr(item, "text", "") or ""))
+        raw = "".join(parts)
+
+    raw = str(raw or "").strip()
+
+    if not raw:
+        finish_reason = None
+        try:
+            finish_reason = completion.choices[0].finish_reason
+        except Exception:
+            pass
+        raise RuntimeError(
+            "Groq ha restituito una risposta vuota"
+            + (
+                f" (finish_reason: {finish_reason})."
+                if finish_reason
+                else "."
+            )
+        )
+
+    # JSON mode dovrebbe già garantire JSON valido, ma manteniamo
+    # una pulizia difensiva per eventuali fence.
+    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
+    raw = re.sub(r"\s*```$", "", raw).strip()
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        preview = raw[:300].replace("\n", " ")
+        raise RuntimeError(
+            f"Groq ha restituito un JSON non valido: {exc}. "
+            f"Risposta ricevuta: {preview}"
+        )
+
     return {
         "name": str(data.get("name") or "Pasto da foto").strip(),
-        "estimated_grams": max(1.0, _safe_float(data.get("estimated_grams"))),
-        "calories": max(0.0, _safe_float(data.get("calories"))),
-        "protein": max(0.0, _safe_float(data.get("protein"))),
-        "carbs": max(0.0, _safe_float(data.get("carbs"))),
-        "fat": max(0.0, _safe_float(data.get("fat"))),
+        "estimated_grams": max(
+            1.0,
+            _safe_float(data.get("estimated_grams")),
+        ),
+        "calories": max(
+            0.0,
+            _safe_float(data.get("calories")),
+        ),
+        "protein": max(
+            0.0,
+            _safe_float(data.get("protein")),
+        ),
+        "carbs": max(
+            0.0,
+            _safe_float(data.get("carbs")),
+        ),
+        "fat": max(
+            0.0,
+            _safe_float(data.get("fat")),
+        ),
         "notes": str(data.get("notes") or "").strip(),
-        "confidence": str(data.get("confidence") or "low").strip().lower(),
+        "confidence": str(
+            data.get("confidence") or "low"
+        ).strip().lower(),
     }
 
 
