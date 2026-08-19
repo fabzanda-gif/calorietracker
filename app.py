@@ -2087,58 +2087,20 @@ with st.sidebar:
     account_left, account_right = st.columns([1, 3], vertical_alignment="center")
 
     with account_left:
-        _avatar_safe = html.escape(logged_avatar, quote=True)
-
-        _settings_tooltips = {
-            "Italiano": "Impostazioni personali",
-            "English": "Personal settings",
-            "Nederlands": "Persoonlijke instellingen",
-            "Français": "Paramètres personnels",
-        }
-        _settings_tip = html.escape(
-            _settings_tooltips.get(
-                st.session_state.get("lang_selector", "Italiano"),
-                _settings_tooltips["Italiano"],
-            ),
-            quote=True,
-        )
-
-        # IMPORTANT: use a Streamlit-native control instead of <a href>.
-        # A normal hyperlink reloads the app and can create a new Streamlit
-        # session, which makes the in-memory Supabase login appear logged out.
-        _avatar_css_url = _avatar_safe.replace("'", "%27")
         if logged_avatar:
+            st.image(logged_avatar, width=58)
+        else:
             st.markdown(
-                f"""
-                <style>
-                div[data-testid="stButton"]:has(button[kind="secondary"][aria-label="{_settings_tip}"]) button {{
-                    width:58px !important;
-                    height:58px !important;
-                    min-height:58px !important;
-                    padding:0 !important;
-                    border-radius:50% !important;
-                    border:2px solid #FF8B8B !important;
-                    background-image:url('{_avatar_css_url}') !important;
-                    background-size:cover !important;
-                    background-position:center !important;
-                    background-repeat:no-repeat !important;
-                    box-shadow:0 4px 14px rgba(255,139,139,.28) !important;
-                    cursor:pointer !important;
-                    font-size:0 !important;
-                }}
-                </style>
+                """
+                <div style="
+                    width:54px;height:54px;border-radius:50%;
+                    display:flex;align-items:center;justify-content:center;
+                    background:#FF8B8B;color:white;font-size:1.5rem;
+                    font-weight:900;border:2px solid white;
+                ">✓</div>
                 """,
                 unsafe_allow_html=True,
             )
-
-        if st.button(
-            "⚙",
-            key="open_personal_settings",
-            help=_settings_tip,
-            use_container_width=False,
-        ):
-            st.session_state["show_personal_settings"] = True
-            st.rerun()
 
     with account_right:
         _lang = st.session_state.get("lang_selector", "Italiano")
@@ -2186,6 +2148,92 @@ with st.sidebar:
             f'<div class="sanosync-welcome">{html.escape(_welcome)}</div>',
             unsafe_allow_html=True,
         )
+
+    # ------------------------------------------------------------------
+    # MENU PROFILO
+    # Foto a sinistra, saluto al centro e freccia/menu separata.
+    # Il popover è Streamlit-native: non ricarica la pagina e non perde
+    # la sessione Supabase.
+    # ------------------------------------------------------------------
+    _profile_menu_i18n = {
+        "Italiano": {
+            "menu": "⌄",
+            "settings": "⚙️ Impostazioni",
+            "language": "🌐 Lingua",
+        },
+        "English": {
+            "menu": "⌄",
+            "settings": "⚙️ Settings",
+            "language": "🌐 Language",
+        },
+        "Nederlands": {
+            "menu": "⌄",
+            "settings": "⚙️ Instellingen",
+            "language": "🌐 Taal",
+        },
+        "Français": {
+            "menu": "⌄",
+            "settings": "⚙️ Paramètres",
+            "language": "🌐 Langue",
+        },
+    }
+
+    _menu_lang = st.session_state.get("lang_selector", "Italiano")
+    _pm = _profile_menu_i18n.get(
+        _menu_lang, _profile_menu_i18n["Italiano"]
+    )
+
+    # Stile della freccia, simile al riferimento inviato.
+    st.markdown(
+        """
+        <style>
+        .st-key-profile_menu_popover button {
+            border-radius:999px !important;
+            width:48px !important;
+            height:48px !important;
+            min-height:48px !important;
+            padding:0 !important;
+            font-size:1.35rem !important;
+            font-weight:900 !important;
+            background:rgba(255,255,255,.94) !important;
+            color:#192E49 !important;
+            border:1px solid rgba(255,139,139,.45) !important;
+            box-shadow:0 4px 14px rgba(0,0,0,.10) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.popover(
+        _pm["menu"],
+        key="profile_menu_popover",
+        help=_pm["settings"],
+    ):
+        if st.button(
+            _pm["settings"],
+            key="profile_menu_settings",
+            use_container_width=True,
+        ):
+            st.session_state["show_personal_settings"] = True
+            st.rerun()
+
+        _language_options = ["Italiano", "English", "Nederlands", "Français"]
+        _current_menu_lang = st.session_state.get("lang_selector", "Italiano")
+        if _current_menu_lang not in _language_options:
+            _current_menu_lang = "Italiano"
+
+        _new_menu_lang = st.selectbox(
+            _pm["language"],
+            _language_options,
+            index=_language_options.index(_current_menu_lang),
+            key="profile_menu_language",
+        )
+
+        if _new_menu_lang != st.session_state.get("lang_selector"):
+            st.session_state["lang_selector"] = _new_menu_lang
+            st.session_state["login_lang_selector"] = _new_menu_lang
+            st.rerun()
 
     st.markdown("---")
 
@@ -2831,7 +2879,11 @@ def tr_activity_plan(value): return _tr_value(ACTIVITY_PLAN_KEYS, value)
 with st.sidebar:
     # --- INSERIMENTO LOGO ---
     st.sidebar.image("logo2.png", use_container_width=True)
-    current_lang = st.selectbox("🌐 Lingua", ["Italiano", "English", "Nederlands", "Français"], key="lang_selector")
+
+    if "lang_selector" not in st.session_state:
+        st.session_state["lang_selector"] = "Italiano"
+
+    current_lang = st.session_state["lang_selector"]
     t = translations[current_lang]
 
     _ui_extra = {
