@@ -596,7 +596,7 @@ def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
     """Trova il meal replicabile più vicino al target rispettando contesto e categoria."""
     try:
         rows = (
-            supabase.table(RECIPE_LIBRARY_TABLE)
+            supabase.table("meals")
             .select("id,date,meal_type,name,base_name,calories,notes,category")
             .eq("user_id", user_id)
             .eq("meal_type", meal_type)
@@ -605,7 +605,7 @@ def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
         )
     except Exception:
         rows = (
-            supabase.table(RECIPE_LIBRARY_TABLE)
+            supabase.table("meals")
             .select("id,date,meal_type,name,base_name,calories,notes")
             .eq("user_id", user_id)
             .eq("meal_type", meal_type)
