@@ -3187,7 +3187,7 @@ translations = {
         "tab1_title": "🍽️ Inserimento Cibo & Pasti",
         "input_source_lbl": "Fonte inserimento",
         "opt_off": "🔍 Cerca online (Open Food Facts)",
-        "opt_quick": "🍳 Immissione Rapida","quick_select_used":t["quick_select_used"],"quick_empty":"Nessun alimento ancora disponibile. Registra prima un pasto.","quick_load_error":"Errore nel caricamento delle immissioni rapide: {error}",
+        "opt_quick": "🍳 Immissione Rapida","quick_select_used":"Seleziona un alimento già utilizzato","quick_empty":"Nessun alimento ancora disponibile. Registra prima un pasto.","quick_load_error":"Errore nel caricamento delle immissioni rapide: {error}",
         "opt_scan": "📸 Foto AI",
         "scan_title": "📸 Foto AI",
         "scan_mode": "Sorgente immagine",
