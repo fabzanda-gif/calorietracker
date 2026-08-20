@@ -7947,31 +7947,213 @@ elif selected_page == t["t2"]:
         else:
             st.info(t["no_meals"])
 
-    with st.container(border=True):
-        st.markdown(t["burned_acts"])
-        rows_acts = [{
-            "activity": ux["bmr_base"],
-            "burned": int(round(_safe_float(bmr_so_far))),
-        }]
-        for act in activities_data:
-            rows_acts.append({
-                "activity": translate_activity_display(
-                    act.get("activity_name"),
-                    current_lang,
-                ),
-                "burned": int(round(
-                    _safe_float(act.get("burned_calories"))
-                )),
-            })
+    # ------------------------------------------------------------------
+    # ATTIVITÀ + DISTRIBUZIONE NUTRIZIONALE / KCAL
+    # ------------------------------------------------------------------
+    _overview_chart_i18n = {
+        "Italiano": {
+            "title": "🍩 Distribuzione giornaliera",
+            "selector": "Visualizza",
+            "macros": "Macronutrienti",
+            "meals": "Kcal per pasto",
+            "protein": "Proteine",
+            "carbs": "Carboidrati",
+            "fat": "Grassi",
+            "no_data": "Nessun dato disponibile per questa data.",
+            "macro_unit": "g",
+            "kcal_unit": "kcal",
+        },
+        "English": {
+            "title": "🍩 Daily distribution",
+            "selector": "View",
+            "macros": "Macronutrients",
+            "meals": "Kcal by meal",
+            "protein": "Protein",
+            "carbs": "Carbs",
+            "fat": "Fat",
+            "no_data": "No data available for this date.",
+            "macro_unit": "g",
+            "kcal_unit": "kcal",
+        },
+        "Nederlands": {
+            "title": "🍩 Dagelijkse verdeling",
+            "selector": "Weergave",
+            "macros": "Macronutriënten",
+            "meals": "Kcal per maaltijd",
+            "protein": "Eiwitten",
+            "carbs": "Koolhydraten",
+            "fat": "Vetten",
+            "no_data": "Geen gegevens beschikbaar voor deze datum.",
+            "macro_unit": "g",
+            "kcal_unit": "kcal",
+        },
+        "Français": {
+            "title": "🍩 Répartition journalière",
+            "selector": "Afficher",
+            "macros": "Macronutriments",
+            "meals": "Kcal par repas",
+            "protein": "Protéines",
+            "carbs": "Glucides",
+            "fat": "Lipides",
+            "no_data": "Aucune donnée disponible pour cette date.",
+            "macro_unit": "g",
+            "kcal_unit": "kcal",
+        },
+    }
+    _och = _overview_chart_i18n.get(
+        current_lang,
+        _overview_chart_i18n["Italiano"],
+    )
 
-        render_sanosync_grid_table(
-            rows_acts,
-            [
-                ("activity", t["col_activity"]),
-                ("burned", t["col_burned"]),
-            ],
-            widths=[3.0, 1.0],
-        )
+    _activity_col, _chart_col = st.columns(
+        2,
+        gap="large",
+        vertical_alignment="top",
+    )
+
+    with _activity_col:
+        with st.container(border=True):
+            st.markdown(t["burned_acts"])
+
+            rows_acts = [{
+                "activity": ux["bmr_base"],
+                "burned": int(round(_safe_float(bmr_so_far))),
+            }]
+            for act in activities_data:
+                rows_acts.append({
+                    "activity": translate_activity_display(
+                        act.get("activity_name"),
+                        current_lang,
+                    ),
+                    "burned": int(round(
+                        _safe_float(act.get("burned_calories"))
+                    )),
+                })
+
+            render_sanosync_grid_table(
+                rows_acts,
+                [
+                    ("activity", t["col_activity"]),
+                    ("burned", t["col_burned"]),
+                ],
+                widths=[2.5, 1.0],
+            )
+
+    with _chart_col:
+        with st.container(border=True):
+            st.markdown(f"#### {_och['title']}")
+
+            _chart_mode = st.selectbox(
+                _och["selector"],
+                ["macros", "meals"],
+                key=f"overview_distribution_mode_{summary_date}",
+                format_func=lambda x: (
+                    _och["macros"]
+                    if x == "macros"
+                    else _och["meals"]
+                ),
+                label_visibility="collapsed",
+            )
+
+            if _chart_mode == "macros":
+                _macro_values = {
+                    _och["protein"]: sum(
+                        _safe_float(m.get("protein"))
+                        for m in meals_data
+                    ),
+                    _och["carbs"]: sum(
+                        _safe_float(m.get("carbs"))
+                        for m in meals_data
+                    ),
+                    _och["fat"]: sum(
+                        _safe_float(m.get("fat"))
+                        for m in meals_data
+                    ),
+                }
+                _macro_values = {
+                    k: v
+                    for k, v in _macro_values.items()
+                    if v > 0
+                }
+
+                if _macro_values:
+                    _pie = go.Figure(
+                        data=[
+                            go.Pie(
+                                labels=list(_macro_values.keys()),
+                                values=list(_macro_values.values()),
+                                hole=0.42,
+                                textinfo="percent+label",
+                                hovertemplate=(
+                                    "%{label}: %{value:.1f} "
+                                    + _och["macro_unit"]
+                                    + "<extra></extra>"
+                                ),
+                            )
+                        ]
+                    )
+                    _pie.update_layout(
+                        height=300,
+                        margin=dict(l=8, r=8, t=10, b=8),
+                        showlegend=False,
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                    )
+                    st.plotly_chart(
+                        _pie,
+                        use_container_width=True,
+                        config={"displayModeBar": False},
+                    )
+                else:
+                    st.info(_och["no_data"])
+
+            else:
+                _meal_kcal = {}
+                for _meal in meals_data:
+                    _meal_name = tr_meal_type(
+                        _meal.get("meal_type", "")
+                    )
+                    _meal_kcal[_meal_name] = (
+                        _meal_kcal.get(_meal_name, 0.0)
+                        + _safe_float(_meal.get("calories"))
+                    )
+
+                _meal_kcal = {
+                    k: v
+                    for k, v in _meal_kcal.items()
+                    if v > 0
+                }
+
+                if _meal_kcal:
+                    _pie = go.Figure(
+                        data=[
+                            go.Pie(
+                                labels=list(_meal_kcal.keys()),
+                                values=list(_meal_kcal.values()),
+                                hole=0.42,
+                                textinfo="percent+label",
+                                hovertemplate=(
+                                    "%{label}: %{value:.0f} "
+                                    + _och["kcal_unit"]
+                                    + "<extra></extra>"
+                                ),
+                            )
+                        ]
+                    )
+                    _pie.update_layout(
+                        height=300,
+                        margin=dict(l=8, r=8, t=10, b=8),
+                        showlegend=False,
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                    )
+                    st.plotly_chart(
+                        _pie,
+                        use_container_width=True,
+                        config={"displayModeBar": False},
+                    )
+                else:
+                    st.info(_och["no_data"])
 
 # 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
 # ==============================================================================
