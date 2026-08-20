@@ -845,6 +845,9 @@ STRICT RULES:
 - use only the data and status labels provided
 - if protein data is not provided, do not mention protein
 - if the calorie target is exceeded, keep the message neutral and constructive
+- NEVER output reasoning, analysis, chain-of-thought, planning, notes, headings or status labels
+- NEVER output <think> tags or anything inside them
+- output ONLY the final user-facing SanoSync message
 """.strip()
 
 
@@ -950,6 +953,44 @@ def sanosync_coach_fallback_message(
     return (base + addon).strip()
 
 
+def sanitize_sanosync_coach_output(message):
+    """Keep reasoning / provider artefacts out of the UI."""
+    import re
+
+    text = str(message or "").strip()
+    if not text:
+        return ""
+
+    # Remove complete <think>...</think> blocks.
+    text = re.sub(
+        r"<think>.*?</think>",
+        "",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    ).strip()
+
+    # If a provider exposes an opening think tag without a closing tag,
+    # do not risk showing hidden reasoning to the user.
+    if re.search(r"<think>", text, flags=re.IGNORECASE):
+        return ""
+
+    # Defensive filter for common reasoning-style leakage.
+    bad_prefixes = (
+        "here's a thinking process",
+        "here is a thinking process",
+        "thinking process:",
+        "analysis:",
+        "reasoning:",
+        "let me analyze",
+        "we need answer",
+    )
+    lowered = text.lower().lstrip("#* -")
+    if any(lowered.startswith(prefix) for prefix in bad_prefixes):
+        return ""
+
+    return text
+
+
 def generate_sanosync_coach_message(
     *,
     language,
@@ -1007,7 +1048,7 @@ def generate_sanosync_coach_message(
             base_url="https://api.groq.com/openai/v1",
         )
         response = client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
@@ -1023,11 +1064,11 @@ def generate_sanosync_coach_message(
             stream=False,
         )
 
-        message = str(
-            response.choices[0].message.content or ""
-        ).strip()
+        message = sanitize_sanosync_coach_output(
+            response.choices[0].message.content
+        )
 
-        # Prevent unexpectedly long UI output even if the provider ignores limits.
+        # Never expose provider reasoning or unexpectedly long output.
         if not message:
             return sanosync_coach_fallback_message(
                 language=language,
@@ -1079,6 +1120,7 @@ def get_sanosync_coach_message_cached(
 
     # Rounded values avoid a new API call for irrelevant floating-point changes.
     state_signature = (
+        "coach_v2_no_reasoning",
         str(language),
         round(maintenance_budget),
         round(calories_eaten),
