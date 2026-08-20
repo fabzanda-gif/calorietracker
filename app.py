@@ -6005,17 +6005,32 @@ def transcribe_ingredient_audio_with_groq(audio_file, language="Italiano"):
 
 
 
+
 def render_subtle_voice_input(*, widget_key, target_key, language, error_label):
     """
-    Very subtle voice input: only a small microphone icon is visible.
-    Clicking it opens the real Streamlit audio recorder in a popover.
+    Minimal voice UX:
+    - a tiny microphone button toggles recording
+    - no popover, no chevron, no extra question-button
+    - the actual audio recorder only appears while requested
+    - once transcribed, the recorder closes automatically
     """
-    with st.popover("🎙️", use_container_width=False):
+    open_key = f"{widget_key}_open"
+
+    if st.button(
+        "🎙️",
+        key=f"{widget_key}_toggle",
+        help="Detta gli ingredienti con SanoSync AI",
+        use_container_width=False,
+    ):
+        st.session_state[open_key] = not st.session_state.get(open_key, False)
+
+    if st.session_state.get(open_key, False):
         audio = st.audio_input(
             "Microphone",
             sample_rate=16000,
             key=widget_key,
             label_visibility="collapsed",
+            width=220,
         )
 
         if audio is not None:
@@ -6041,6 +6056,7 @@ def render_subtle_voice_input(*, widget_key, target_key, language, error_label):
                             else transcript
                         )
                         st.session_state[sig_key] = audio_sig
+                        st.session_state[open_key] = False
                         st.rerun()
 
                 except Exception as exc:
@@ -6057,11 +6073,12 @@ def render_ai_ingredient_header(
     error_label,
 ):
     """
-    One compact header row:
-    bold AI label + tiny microphone + subtle help tooltip.
+    Compact inline header:
+    bold title + one tiny microphone button immediately after it.
+    The explanatory text is available as hover-help on the mic button.
     """
-    _title_col, _mic_col, _help_col, _spacer = st.columns(
-        [4.0, 0.42, 0.42, 5.2],
+    _title_col, _mic_col, _spacer = st.columns(
+        [4.7, 0.42, 6.9],
         gap="small",
         vertical_alignment="center",
     )
@@ -6077,9 +6094,10 @@ def render_ai_ingredient_header(
             error_label=error_label,
         )
 
-    with _help_col:
-        with st.popover("❔", use_container_width=False):
-            st.caption(help_text)
+    # Add the explanatory text as a subtle caption only while the recorder
+    # is open, otherwise keep the form visually clean.
+    if st.session_state.get(f"{widget_key}_open", False):
+        st.caption(help_text)
 
 
 
