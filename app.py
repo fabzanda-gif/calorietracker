@@ -955,59 +955,74 @@ def zero_tone_instruction():
 
     return """
 ZERO MODE TONE:
-- be dry, sharp, concise and lightly cynical;
-- use clever understated sarcasm when it fits;
-- be more matter-of-fact than reassuring;
-- you may joke about arithmetic, excuses, dashboards, portion sizes or the situation;
-- NEVER insult the user;
-- NEVER body-shame;
-- NEVER shame food choices;
-- NEVER use guilt, disgust or humiliation;
-- NEVER recommend fasting, purging or compensatory exercise;
-- never sacrifice factual clarity for a joke;
-- the joke should punch at the situation, not the person.
+- You are not a life coach. Observe, comment and doubt; do not instruct.
+- NEVER tell the user what they must, should, need to, ought to, or have to do.
+- Use dry, realistic, affectionate humor: like an old friend who is no longer
+  interested in pretending to be impressed.
+- Be politely skeptical about the precision, completeness and honesty of
+  self-reported nutrition and activity data.
+- Unusually large deficits, suspiciously perfect targets, very high activity
+  estimates and extremely light days are excellent opportunities for a dry remark.
+- Phrase doubt as humor, not as a factual accusation.
+- Prefer bureaucratic skepticism, understated irony and deadpan observations.
+- Be brief, sharp and non-generic.
+- Put the useful number/fact first; the cynical remark comes second when useful.
+- NEVER insult the user, body-shame, humiliate or use degrading labels.
+- NEVER moralize food choices.
+- NEVER use guilt, disgust or shame.
+- NEVER recommend fasting, purging or compensatory exercise.
+- The joke should target the numbers, estimates, devices, selective memory,
+  self-reporting or the situation — not the person's worth.
+- Do not force a joke when the numbers already speak for themselves.
+
+CORE PRINCIPLE:
+ZERO observes, comments and doubts. ZERO does not give orders.
 """.strip()
 
 
 ZERO_SUGAR_COACH_SYSTEM_PROMPT = """
-You are the ZERO MODE voice of SanoSync, a food, activity and weight tracking app.
+You are SanoSync ZERO, the dry and affectionately skeptical voice of a food,
+activity and weight tracking app.
 
-Your ONLY task is to transform already-calculated SanoSync data into one
-short, natural message for the user.
+Your job is to turn already-calculated SanoSync data into one short observation.
 
-VOICE:
-- dry
-- concise
-- intelligent
-- lightly cynical
-- matter-of-fact
-- subtly sarcastic when natural
-- never sweet or motivational for its own sake
-- never cruel
+PERSONALITY:
+- not a coach;
+- dry, concise, intelligent and lightly cynical;
+- like an old friend who knows the user well enough to skip fake enthusiasm;
+- politely suspicious of self-reported food, portions, deficits and activity;
+- amused by suspicious precision and optimistic wearable estimates;
+- never cruel.
 
-STYLE EXAMPLES:
-- "The numbers remain annoyingly good at arithmetic."
-- "No catastrophe detected. Just a number worth logging."
-- "You still have room. No need to negotiate with a lettuce leaf."
+STYLE RULES:
+1. Never use imperatives.
+2. Never tell the user what they "must", "should", "need to", "ought to" or
+   "have to" do.
+3. State the useful fact first. Add one dry observation only when it earns its place.
+4. Prefer deadpan bureaucracy and skeptical understatement:
+   "according to the information kindly self-certified",
+   "the device has submitted its version of events",
+   "the figure has been entered into the record without further questions".
+5. Question precision as humor, never as a factual accusation.
+6. Do not automatically congratulate the user.
+7. Do not moralize food.
+8. Never insult, body-shame, humiliate or demean the user.
+9. Never recommend fasting, purging or compensatory exercise.
+10. Maximum 2 short sentences and 48 words.
+11. Use at most one emoji.
+12. Answer ONLY in the language specified in the context.
+13. Never invent, alter or recalculate the provided numbers.
+14. Never expose reasoning, analysis, chain-of-thought, planning or <think> tags.
 
-STRICT RULES:
-- maximum 2 short sentences
-- maximum 48 words
-- address the user directly
-- use at most 1 emoji
-- answer ONLY in the language specified in the user context
-- do not invent, recalculate or alter any number
-- do not give medical advice
-- do not diagnose
-- do not classify foods as morally good/bad, clean/dirty, guilty, cheating, etc.
-- do not body-shame
-- do not insult the user
-- do not recommend compensatory fasting or excessive exercise
-- if protein data is not provided, do not mention protein
-- if the calorie target is exceeded, stay dry and constructive, not punitive
-- NEVER output reasoning, analysis, chain-of-thought, planning, notes or status labels
-- NEVER output <think> tags or anything inside them
-- output ONLY the final user-facing SanoSync message
+GOOD EXAMPLES OF ATTITUDE:
+- A calorie deficit exists. At least according to the documentation supplied by
+  the interested party.
+- The target was hit exactly. A level of precision that raises absolutely no questions.
+- 1,300 kcal of activity. The device has formally submitted its version of events.
+- Nothing logged. We acknowledge this version of the day.
+
+CORE PRINCIPLE:
+ZERO observes, comments and doubts. ZERO does not give orders.
 """.strip()
 
 
@@ -1120,10 +1135,52 @@ def sanosync_coach_fallback_message(
         },
     }
 
-    base = messages.get(language, messages["Italiano"]).get(
-        calorie_status,
-        messages.get(language, messages["Italiano"])["ON_TRACK"],
-    )
+    if is_zero_mode():
+        zero_messages = {
+            "Italiano": {
+                "LARGE_MARGIN": "Resta un margine notevole. O giornata leggerissima, o manca un capitolo.",
+                "ON_TRACK": "I numeri risultano compatibili con il piano. Il verbale, per ora, non segnala anomalie.",
+                "CLOSE_TO_TARGET": "Il target è molto vicino. Una quantità di margine tecnicamente ancora esistente.",
+                "OVER_TARGET": "Leggermente sopra il target. La commissione ha deciso di non aprire un'inchiesta.",
+                "OVER_TARGET_HIGH": "Il target è stato superato con una certa convinzione. L'arrotondamento non sembra il principale sospettato.",
+            },
+            "English": {
+                "LARGE_MARGIN": "A sizeable margin remains. Either a very light day, or a chapter is missing.",
+                "ON_TRACK": "The numbers are compatible with the plan. The record currently shows no major irregularities.",
+                "CLOSE_TO_TARGET": "The target is very close. A technically existing amount of margin remains.",
+                "OVER_TARGET": "Slightly over target. The committee has declined to open an investigation.",
+                "OVER_TARGET_HIGH": "The target has been exceeded with some conviction. Rounding does not appear to be the main suspect.",
+            },
+            "Nederlands": {
+                "LARGE_MARGIN": "Er blijft een flinke marge over. Of een heel lichte dag, of er ontbreekt een hoofdstuk.",
+                "ON_TRACK": "De cijfers passen bij het plan. Het dossier meldt voorlopig geen grote onregelmatigheden.",
+                "CLOSE_TO_TARGET": "Het doel is heel dichtbij. Er bestaat technisch gezien nog wat marge.",
+                "OVER_TARGET": "Iets boven het doel. De commissie ziet geen reden voor een onderzoek.",
+                "OVER_TARGET_HIGH": "Het doel is vrij overtuigend overschreden. Afronding lijkt niet de hoofdverdachte.",
+            },
+            "Français": {
+                "LARGE_MARGIN": "Il reste une marge importante. Soit une journée très légère, soit il manque un chapitre.",
+                "ON_TRACK": "Les chiffres sont compatibles avec le plan. Le dossier ne signale rien de majeur pour l'instant.",
+                "CLOSE_TO_TARGET": "L'objectif est tout proche. Il reste une quantité de marge techniquement existante.",
+                "OVER_TARGET": "Légèrement au-dessus de l'objectif. La commission a renoncé à ouvrir une enquête.",
+                "OVER_TARGET_HIGH": "L'objectif a été dépassé avec une certaine conviction. L'arrondi ne semble pas être le suspect principal.",
+            },
+        }
+        base = zero_messages.get(
+            language,
+            zero_messages["Italiano"],
+        ).get(
+            calorie_status,
+            zero_messages.get(
+                language,
+                zero_messages["Italiano"],
+            )["ON_TRACK"],
+        )
+    else:
+        base = messages.get(language, messages["Italiano"]).get(
+            calorie_status,
+            messages.get(language, messages["Italiano"])["ON_TRACK"],
+        )
 
     protein_addons = {
         "Italiano": {
@@ -1144,10 +1201,37 @@ def sanosync_coach_fallback_message(
         },
     }
 
-    addon = protein_addons.get(language, protein_addons["Italiano"]).get(
-        protein_status,
-        "",
-    )
+    if is_zero_mode():
+        zero_protein_addons = {
+            "Italiano": {
+                "PROTEIN_BEHIND": " Le proteine risultano ancora piuttosto teoriche.",
+                "PROTEIN_REACHED": " Il goal proteico risulta regolarmente agli atti.",
+            },
+            "English": {
+                "PROTEIN_BEHIND": " Protein remains somewhat theoretical at this stage.",
+                "PROTEIN_REACHED": " The protein goal is formally on record as reached.",
+            },
+            "Nederlands": {
+                "PROTEIN_BEHIND": " Eiwit is op dit moment nog vrij theoretisch aanwezig.",
+                "PROTEIN_REACHED": " Het eiwitdoel staat officieel als behaald in het dossier.",
+            },
+            "Français": {
+                "PROTEIN_BEHIND": " Les protéines restent pour l'instant assez théoriques.",
+                "PROTEIN_REACHED": " L'objectif protéique figure officiellement au dossier comme atteint.",
+            },
+        }
+        addon = zero_protein_addons.get(
+            language,
+            zero_protein_addons["Italiano"],
+        ).get(protein_status, "")
+    else:
+        addon = protein_addons.get(
+            language,
+            protein_addons["Italiano"],
+        ).get(
+            protein_status,
+            "",
+        )
     return (base + addon).strip()
 
 
@@ -1502,6 +1586,8 @@ Rules:
 - do not recommend fasting or compensatory exercise;
 - do not change today's SanoSync numbers;
 - the estimate is allowed to be approximate;
+- in ZERO MODE, do not recommend what the user should choose or do;
+- in ZERO MODE, answer whether/how the numbers fit, then make one dry observation;
 - output JSON only.
 """.strip()
 
@@ -5227,6 +5313,186 @@ translations["Français"].update({
     "greeting_evening": "Bonsoir {name}!",
 })
 
+
+# ==============================================================================
+# ZERO MODE — COPY OVERLAY
+# Only user-facing remarks change. Functional labels remain standard.
+# ==============================================================================
+ZERO_COPY = {
+    "Italiano": {
+        "t": {
+            "slogan": "Tutto sotto controllo, secondo le informazioni gentilmente autocertificate.",
+            "no_food_data": "Nessun dato alimentare. Prendiamo atto di questa versione della giornata.",
+            "no_composed_recipes": "Nessuna ricetta composta. La cucina non ha ancora depositato documentazione.",
+            "no_my_recipes": "Nessuna ricetta personale. Per ora il fascicolo culinario è vuoto.",
+            "no_shared_recipes": "Nessuna ricetta condivisa. La comunità oggi mantiene un profilo basso.",
+            "add_one_ingredient": "Zero ingredienti. Perfino l'intelligenza artificiale richiede un minimo di materia.",
+            "scan_analyzing": "Analisi in corso. I numeri stanno concordando una versione comune.",
+            "in_msg_low": lambda p: f"Proiezione: {p} kcal. Una giornata sorprendentemente sobria, almeno sulla carta.",
+            "in_msg_high": lambda p: f"Proiezione: {p} kcal. Il dato è stato acquisito agli atti.",
+            "burn_msg_yes": lambda e: f"+{e} kcal di attività. Il dispositivo ha presentato la propria versione dei fatti.",
+            "burn_msg_no": "Nessuna attività extra registrata. Su questo dato, curiosamente, tendiamo a fidarci.",
+            "bilancio_ok": "C'è un deficit calorico. Almeno secondo la documentazione prodotta dall'interessato.",
+            "bilancio_bad": "C'è un surplus calorico. L'ipotesi dell'arrotondamento perde credibilità.",
+            "weight_msg_default": "Il peso ha depositato un nuovo elemento agli atti.",
+            "status_very_active": "Giornata molto attiva. Il tracker sembra particolarmente convinto.",
+            "status_good": "Attività registrata. Prendiamo atto della dichiarazione.",
+            "status_lazy": "Giornata territorialmente molto circoscritta.",
+            "in_msg_deficit": lambda target_in, diff: (
+                f"Target {target_in} kcal: "
+                + (f"restano {abs(diff)} kcal. Almeno secondo il registro."
+                   if diff >= 0 else
+                   f"risultano {abs(diff)} kcal in più. Difficile imputarle tutte all'arrotondamento.")
+            ),
+            "balance_days": lambda d: f"Stima: circa {d} giorni. La matematica non è stata informata dei weekend.",
+            "balance_surplus": "Con un surplus la data obiettivo resta, tecnicamente, materia per la narrativa.",
+            "forecast_days": lambda d, date_str: f"Data stimata: **{date_str}** ({d} giorni). Secondo la matematica, che non è stata consultata sulla vita reale.",
+            "forecast_steady": "Il trend punta nella direzione prevista. La bilancia, per ora, collabora.",
+            "forecast_flat_up": "Trend stabile o in salita. La proiezione ha deciso di non inventarsi una risposta.",
+        },
+        "ux": {
+            "over_target": "Risultano circa {kcal} kcal sopra il target. Il dato è stato regolarmente acquisito.",
+            "end_day": "Proiezione di fine giornata: ~{kcal} kcal. Salvo ulteriori sviluppi non dichiarati.",
+            "activity_logged_note": "Attività strutturata registrata. Il dispositivo dispone apparentemente di prove.",
+            "can_eat_more": "Restano {kcal} kcal sul target di oggi. Almeno secondo quanto gentilmente autocertificato.",
+            "exact_target": "Target centrato al kcal. Una precisione che non desta alcun sospetto.",
+            "day_total": "Totale giornata: {kcal} kcal. I numeri hanno raggiunto un accordo.",
+            "no_extra": "Nessuna caloria extra registrata. Una voce sorprendentemente tranquilla del fascicolo.",
+        },
+        "thinking": "Sto facendo i conti. Alcuni numeri stanno già cercando un avvocato.",
+    },
+
+    "English": {
+        "t": {
+            "slogan": "Everything under control, according to the information kindly self-certified.",
+            "no_food_data": "No food data. We acknowledge this version of the day.",
+            "no_composed_recipes": "No composed recipes. The kitchen has filed no paperwork yet.",
+            "no_my_recipes": "No personal recipes. The culinary file remains empty for now.",
+            "no_shared_recipes": "No shared recipes. The community is keeping a low profile today.",
+            "add_one_ingredient": "Zero ingredients. Even artificial intelligence requires a minimum amount of matter.",
+            "scan_analyzing": "Analysis in progress. The numbers are agreeing on a common version of events.",
+            "in_msg_low": lambda p: f"Projection: {p} kcal. A remarkably restrained day, at least on paper.",
+            "in_msg_high": lambda p: f"Projection: {p} kcal. The figure has been entered into the record.",
+            "burn_msg_yes": lambda e: f"+{e} kcal of activity. The device has formally submitted its version of events.",
+            "burn_msg_no": "No extra activity logged. Curiously, this is one figure we tend to trust.",
+            "bilancio_ok": "A calorie deficit exists. At least according to the documentation supplied by the interested party.",
+            "bilancio_bad": "There is a calorie surplus. The rounding-error defence is losing credibility.",
+            "weight_msg_default": "The scale has submitted another item of evidence.",
+            "status_very_active": "Very active day. The tracker seems unusually confident about it.",
+            "status_good": "Activity logged. We acknowledge the declaration.",
+            "status_lazy": "A geographically compact day.",
+            "in_msg_deficit": lambda target_in, diff: (
+                f"Target {target_in} kcal: "
+                + (f"{abs(diff)} kcal remain. According to the register, anyway."
+                   if diff >= 0 else
+                   f"{abs(diff)} kcal appear to be over. Rounding is a weak suspect.")
+            ),
+            "balance_days": lambda d: f"Estimate: about {d} days. The maths has not been briefed on weekends.",
+            "balance_surplus": "With a surplus, the target date remains mostly a work of fiction.",
+            "forecast_days": lambda d, date_str: f"Estimated date: **{date_str}** ({d} days). According to mathematics, which was not consulted about real life.",
+            "forecast_steady": "The trend points the intended way. The scale is cooperating, for now.",
+            "forecast_flat_up": "Trend is flat or rising. The projection has declined to invent an answer.",
+        },
+        "ux": {
+            "over_target": "About {kcal} kcal over target are currently on record.",
+            "end_day": "End-of-day projection: ~{kcal} kcal. Subject to further undeclared developments.",
+            "activity_logged_note": "Structured activity logged. The device apparently has evidence.",
+            "can_eat_more": "{kcal} kcal remain on today's target. According to the information kindly self-certified.",
+            "exact_target": "Target hit to the exact kcal. A level of precision that raises absolutely no questions.",
+            "day_total": "Daily total: {kcal} kcal. The numbers have reached an agreement.",
+            "no_extra": "No extra calories logged. An unusually quiet section of the file.",
+        },
+        "thinking": "Running the numbers. Several figures are already asking for legal representation.",
+    },
+
+    "Nederlands": {
+        "t": {
+            "slogan": "Alles onder controle, volgens de vriendelijk zelfgecertificeerde informatie.",
+            "no_food_data": "Geen voedingsgegevens. We nemen kennis van deze versie van de dag.",
+            "no_composed_recipes": "Geen samengestelde recepten. De keuken heeft nog geen dossier ingediend.",
+            "no_my_recipes": "Nog geen eigen recepten. Het culinaire dossier blijft voorlopig leeg.",
+            "no_shared_recipes": "Geen gedeelde recepten. De gemeenschap houdt zich vandaag opvallend rustig.",
+            "add_one_ingredient": "Nul ingrediënten. Zelfs kunstmatige intelligentie heeft een minimale hoeveelheid materie nodig.",
+            "scan_analyzing": "Analyse bezig. De cijfers proberen tot één gezamenlijk verhaal te komen.",
+            "in_msg_low": lambda p: f"Prognose: {p} kcal. Een opvallend sobere dag, tenminste op papier.",
+            "in_msg_high": lambda p: f"Prognose: {p} kcal. Het cijfer is in het dossier opgenomen.",
+            "burn_msg_yes": lambda e: f"+{e} kcal activiteit. Het apparaat heeft officieel zijn versie van de feiten ingediend.",
+            "burn_msg_no": "Geen extra activiteit geregistreerd. Opmerkelijk genoeg vertrouwen we dit cijfer vrij snel.",
+            "bilancio_ok": "Er is een calorietekort. Althans volgens de documentatie van de belanghebbende zelf.",
+            "bilancio_bad": "Er is een calorieoverschot. De afrondingsfout verliest geloofwaardigheid als verklaring.",
+            "weight_msg_default": "De weegschaal heeft nieuw bewijsmateriaal aangeleverd.",
+            "status_very_active": "Zeer actieve dag. De tracker klinkt er bijzonder zeker van.",
+            "status_good": "Activiteit geregistreerd. We nemen kennis van de verklaring.",
+            "status_lazy": "Een geografisch bijzonder compacte dag.",
+            "in_msg_deficit": lambda target_in, diff: (
+                f"Doel {target_in} kcal: "
+                + (f"nog {abs(diff)} kcal. Volgens het register dan."
+                   if diff >= 0 else
+                   f"{abs(diff)} kcal erboven. Afronding is een zwak alibi.")
+            ),
+            "balance_days": lambda d: f"Schatting: ongeveer {d} dagen. De wiskunde is niet geïnformeerd over weekends.",
+            "balance_surplus": "Met een overschot blijft de doeldatum vooral een literair concept.",
+            "forecast_days": lambda d, date_str: f"Geschatte datum: **{date_str}** ({d} dagen). Volgens de wiskunde, die niet over het echte leven is geraadpleegd.",
+            "forecast_steady": "De trend wijst de bedoelde kant op. De weegschaal werkt voorlopig mee.",
+            "forecast_flat_up": "De trend is vlak of stijgend. De prognose weigert een antwoord te verzinnen.",
+        },
+        "ux": {
+            "over_target": "Er staat ongeveer {kcal} kcal boven het doel in het dossier.",
+            "end_day": "Prognose einde dag: ~{kcal} kcal. Onder voorbehoud van verdere niet-gemelde ontwikkelingen.",
+            "activity_logged_note": "Gestructureerde activiteit geregistreerd. Het apparaat lijkt bewijsmateriaal te hebben.",
+            "can_eat_more": "Er resten {kcal} kcal binnen het dagdoel. Volgens de vriendelijk zelfgecertificeerde gegevens.",
+            "exact_target": "Doel exact op de kcal geraakt. Een precisie die absoluut geen vragen oproept.",
+            "day_total": "Dagtotaal: {kcal} kcal. De cijfers zijn tot overeenstemming gekomen.",
+            "no_extra": "Geen extra calorieën geregistreerd. Een opvallend rustig deel van het dossier.",
+        },
+        "thinking": "Ik reken het uit. Enkele cijfers hebben inmiddels juridische bijstand gevraagd.",
+    },
+
+    "Français": {
+        "t": {
+            "slogan": "Tout est sous contrôle, selon les informations aimablement auto-certifiées.",
+            "no_food_data": "Aucune donnée alimentaire. Nous prenons acte de cette version de la journée.",
+            "no_composed_recipes": "Aucune recette composée. La cuisine n'a encore déposé aucun dossier.",
+            "no_my_recipes": "Aucune recette personnelle. Le dossier culinaire reste vide pour l'instant.",
+            "no_shared_recipes": "Aucune recette partagée. La communauté fait profil bas aujourd'hui.",
+            "add_one_ingredient": "Zéro ingrédient. Même l'intelligence artificielle exige un minimum de matière.",
+            "scan_analyzing": "Analyse en cours. Les chiffres essaient de se mettre d'accord sur une version commune.",
+            "in_msg_low": lambda p: f"Projection : {p} kcal. Une journée remarquablement sobre, du moins sur le papier.",
+            "in_msg_high": lambda p: f"Projection : {p} kcal. Le chiffre a été versé au dossier.",
+            "burn_msg_yes": lambda e: f"+{e} kcal d'activité. L'appareil a officiellement déposé sa version des faits.",
+            "burn_msg_no": "Aucune activité supplémentaire enregistrée. Curieusement, c'est un chiffre auquel on a tendance à croire.",
+            "bilancio_ok": "Il existe un déficit calorique. Du moins selon les pièces fournies par l'intéressé.",
+            "bilancio_bad": "Il y a un surplus calorique. L'hypothèse de l'arrondi perd en crédibilité.",
+            "weight_msg_default": "La balance vient d'ajouter une nouvelle pièce au dossier.",
+            "status_very_active": "Journée très active. Le tracker semble particulièrement sûr de lui.",
+            "status_good": "Activité enregistrée. Nous prenons acte de la déclaration.",
+            "status_lazy": "Une journée géographiquement très compacte.",
+            "in_msg_deficit": lambda target_in, diff: (
+                f"Objectif {target_in} kcal : "
+                + (f"il reste {abs(diff)} kcal. Selon le registre, en tout cas."
+                   if diff >= 0 else
+                   f"{abs(diff)} kcal au-dessus. L'arrondi a un alibi assez faible.")
+            ),
+            "balance_days": lambda d: f"Estimation : environ {d} jours. Les mathématiques n'ont pas été informées des week-ends.",
+            "balance_surplus": "Avec un surplus, la date cible relève surtout de la littérature.",
+            "forecast_days": lambda d, date_str: f"Date estimée : **{date_str}** ({d} jours). Selon les mathématiques, qui n'ont pas été consultées sur la vraie vie.",
+            "forecast_steady": "La tendance va dans le sens prévu. La balance coopère, pour l'instant.",
+            "forecast_flat_up": "Tendance stable ou en hausse. La projection refuse d'inventer une réponse.",
+        },
+        "ux": {
+            "over_target": "Environ {kcal} kcal au-dessus de l'objectif figurent actuellement au dossier.",
+            "end_day": "Projection de fin de journée : ~{kcal} kcal. Sous réserve de nouveaux éléments non déclarés.",
+            "activity_logged_note": "Activité structurée enregistrée. L'appareil semble disposer de preuves.",
+            "can_eat_more": "Il reste {kcal} kcal sur l'objectif du jour. Selon les informations aimablement auto-certifiées.",
+            "exact_target": "Objectif atteint à la kcal près. Une précision qui ne soulève absolument aucune question.",
+            "day_total": "Total de la journée : {kcal} kcal. Les chiffres sont parvenus à un accord.",
+            "no_extra": "Aucune calorie supplémentaire enregistrée. Une partie étonnamment calme du dossier.",
+        },
+        "thinking": "Je fais les comptes. Plusieurs chiffres demandent déjà un avocat.",
+    },
+}
+
+
 # ------------------------------------------------------------------------------
 # Traduzioni UI aggiuntive (Tab 2/3/4 + valori canonici salvati nel database)
 # I valori nel DB restano in italiano/canonici; traduciamo solo ciò che si vede.
@@ -5738,6 +6004,17 @@ with st.sidebar:
         },
     }
     ux = _ui_extra.get(current_lang, _ui_extra["Italiano"])
+
+    # ZERO changes remarks, not functional terminology.
+    if is_zero_mode():
+        _zc = ZERO_COPY.get(
+            current_lang,
+            ZERO_COPY["Italiano"],
+        )
+        t = dict(t)
+        t.update(_zc.get("t", {}))
+        ux = dict(ux)
+        ux.update(_zc.get("ux", {}))
 
     st.markdown(
         f'<div style="text-align:center;color:#FFB4B4;font-weight:900;font-size:1rem;letter-spacing:.01em;margin:-.15rem 0 .55rem 0;">{html.escape(t["slogan"])}</div>',
@@ -7702,7 +7979,15 @@ if selected_page == t["t1"]:
             ):
                 if _can_i_eat_text.strip():
                     try:
-                        with st.spinner(_cie["thinking"]):
+                        _cie_thinking = (
+                            ZERO_COPY.get(
+                                current_lang,
+                                ZERO_COPY["Italiano"],
+                            ).get("thinking")
+                            if is_zero_mode()
+                            else _cie["thinking"]
+                        )
+                        with st.spinner(_cie_thinking):
                             _today_str = str(date.today())
 
                             _cie_meals = (
