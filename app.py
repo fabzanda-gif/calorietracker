@@ -6016,21 +6016,29 @@ def render_subtle_voice_input(*, widget_key, target_key, language, error_label):
         """
         <style>
         div[class*="st-key-sanosync_voice_"] {
-            width: 56px !important;
-            max-width: 56px !important;
+            width: 52px !important;
+            max-width: 52px !important;
             margin-left: auto !important;
-            margin-top: -74px !important;
-            margin-right: 14px !important;
-            margin-bottom: 28px !important;
+
+            /* Move the recorder fully inside the text-area footprint.
+               The previous value left the control hanging below the field. */
+            margin-top: -108px !important;
+            margin-right: 18px !important;
+            margin-bottom: 62px !important;
+
             position: relative !important;
             z-index: 5 !important;
         }
+
         div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] {
-            min-width: 52px !important;
-            width: 52px !important;
+            min-width: 48px !important;
+            width: 48px !important;
+            max-width: 48px !important;
         }
         div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] > div {
             padding: 0 !important;
+            min-height: 44px !important;
+            border-radius: 12px !important;
         }
         </style>
         """,
