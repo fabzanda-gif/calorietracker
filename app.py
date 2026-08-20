@@ -5576,6 +5576,31 @@ def _ai_recipe_clean_json(raw):
     return json.loads(raw)
 
 
+
+def render_compact_ai_list(items, *, numbered=False):
+    """Compact HTML list used in AI recipe preview to avoid oversized markdown spacing."""
+    clean = [str(x).strip() for x in (items or []) if str(x).strip()]
+    if not clean:
+        return
+
+    tag = "ol" if numbered else "ul"
+    st.markdown(
+        f"""
+        <{tag} style="
+            margin:0.2rem 0 0.15rem 1.15rem;
+            padding-left:0.45rem;
+            line-height:1.35;
+        ">
+            {''.join(
+                f'<li style="margin:0.18rem 0;padding:0;">{html.escape(item)}</li>'
+                for item in clean
+            )}
+        </{tag}>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _ai_recipe_notes(result):
     instructions = result.get("instructions") or []
     notes = str(result.get("notes") or "").strip()
@@ -5747,7 +5772,7 @@ RESPONSE TO REPAIR:
             },
         ],
         temperature=0.0,
-        max_tokens=2200,
+        max_tokens=3200,
         stream=False,
     )
 
@@ -5812,7 +5837,10 @@ IMPORTANT:
 - Never return an empty ingredient list.
 - Nutrition is per serving.
 - Ingredients quantities are for the whole recipe.
-- Include description and detailed step-by-step instructions.
+- Include a 2-4 sentence description.
+- Include complete step-by-step instructions from preparation through final plating/serving.
+- Usually provide 4-8 steps for a cooked meal.
+- The final instruction must complete the dish; never stop mid-sentence.
 
 Return ONLY valid JSON:
 {{
@@ -5864,7 +5892,7 @@ Return ONLY valid JSON:
             {"role": "user", "content": prompt},
         ],
         temperature=0.35,
-        max_tokens=2200,
+        max_tokens=3200,
         stream=False,
     )
 
@@ -5992,9 +6020,11 @@ TIME RULES:
 
 RECIPE CONTENT RULES:
 - include a useful description of the finished dish in 2 to 4 sentences;
-- instructions must be genuinely step-by-step and complete enough to cook the dish without guessing;
+- instructions must be genuinely step-by-step and COMPLETE enough to cook and serve the dish without guessing;
 - include cooking times, oven temperatures / heat levels, and key quantities in the relevant steps when useful;
-- instructions should usually contain at least 4 steps for a cooked meal, unless the recipe truly needs fewer;
+- instructions should usually contain 4 to 8 complete steps for a cooked meal, unless the recipe truly needs fewer;
+- the FINAL step must always finish the dish and explain how to assemble/plate/serve it;
+- never stop mid-sentence and never leave the preparation unfinished;
 - do not merely repeat the ingredient list as instructions.
 
 JSON OUTPUT RULES:
@@ -9019,22 +9049,32 @@ elif selected_page == t["t4"]:
                 if _ai_description:
                     st.markdown(_ai_description)
 
-                st.markdown(f"**🥕 {_air['ingredients']}**")
-                for _ing in (
-                    _ai_generated_result.get("ingredients") or []
+                with st.expander(
+                    f"🥕 {_air['ingredients']}",
+                    expanded=False,
                 ):
-                    st.markdown(
-                        f"- {html.escape(str(_ing.get('name') or ''))} — "
-                        f"{_safe_float(_ing.get('quantity_g')):g} g"
+                    _ingredient_lines = [
+                        (
+                            f"{str(_ing.get('name') or '').strip()} — "
+                            f"{_safe_float(_ing.get('quantity_g')):g} g"
+                        )
+                        for _ing in (
+                            _ai_generated_result.get("ingredients") or []
+                        )
+                        if str(_ing.get("name") or "").strip()
+                    ]
+                    render_compact_ai_list(
+                        _ingredient_lines,
+                        numbered=False,
                     )
 
-                st.markdown(f"**👩‍🍳 {_air['instructions']}**")
-                for _idx, _step in enumerate(
-                    _ai_generated_result.get("instructions") or [],
-                    start=1,
+                with st.expander(
+                    f"👩‍🍳 {_air['instructions']}",
+                    expanded=False,
                 ):
-                    st.markdown(
-                        f"{_idx}. {html.escape(str(_step))}"
+                    render_compact_ai_list(
+                        _ai_generated_result.get("instructions") or [],
+                        numbered=True,
                     )
 
                 _r1, _r2 = st.columns(2)
