@@ -6248,6 +6248,7 @@ def render_subtle_voice_input(*, widget_key, target_key, language, error_label):
                     st.error(error_label.format(error=exc))
 
 
+
 def render_ai_ingredient_header(
     *,
     title,
@@ -6258,63 +6259,76 @@ def render_ai_ingredient_header(
     error_label,
 ):
     """
-    Spacious, vertically centered AI header card.
-    Prevents the title/microphone row from looking cramped or clipped.
+    Compact AI header used inside the SanoSync AI spotlight card.
+    """
+    _title_col, _mic_col = st.columns(
+        [9.2, 0.8],
+        gap="small",
+        vertical_alignment="center",
+    )
+
+    with _title_col:
+        st.markdown(
+            f"""
+            <div style="
+                font-size:1rem;
+                font-weight:900;
+                line-height:1.25;
+                color:#1A2942;
+                padding:0;
+            ">
+                {title}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with _mic_col:
+        render_subtle_voice_input(
+            widget_key=widget_key,
+            target_key=target_key,
+            language=language,
+            error_label=error_label,
+        )
+
+
+def render_ai_spotlight_css():
+    """
+    Stronger visual treatment for the two key SanoSync AI ingredient inputs.
+    Keeps the existing SanoSync coral/navy visual language.
     """
     st.markdown(
         """
         <style>
-        div[class*="st-key-ai_header_wrap_"] {
-            border: 1px solid rgba(128,128,128,.22);
-            border-radius: 18px;
-            padding: 14px 16px 12px 16px;
-            margin: 4px 0 10px 0;
-            background: rgba(255,255,255,.16);
+        div[class*="st-key-ai_spotlight_"] {
+            border: 2px solid #FF8B8B !important;
+            border-radius: 20px !important;
+            padding: 16px 18px 18px 18px !important;
+            margin: 8px 0 14px 0 !important;
+            background:
+                radial-gradient(circle at 96% 8%, rgba(255,139,139,.18), transparent 34%),
+                linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,246,246,.92)) !important;
+            box-shadow: 0 10px 28px rgba(26,41,66,.08) !important;
         }
-        div[class*="st-key-ai_header_wrap_"] [data-testid="stMarkdownContainer"] p {
-            margin: 0 !important;
+
+        div[class*="st-key-ai_spotlight_"] textarea {
+            border: 1.5px solid rgba(255,139,139,.55) !important;
+            border-radius: 14px !important;
+            background: rgba(248,249,252,.98) !important;
         }
-        div[class*="st-key-ai_header_wrap_"] button {
-            min-height: 44px !important;
-            height: 44px !important;
-            min-width: 44px !important;
-            width: 44px !important;
-            padding: 0 !important;
+
+        div[class*="st-key-ai_spotlight_"] textarea:focus {
+            border-color: #FF6F75 !important;
+            box-shadow: 0 0 0 2px rgba(255,111,117,.12) !important;
+        }
+
+        div[class*="st-key-ai_spotlight_"] button {
             border-radius: 12px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
-    with st.container(key=f"ai_header_wrap_{widget_key}"):
-        _title_col, _mic_col = st.columns(
-            [8.8, 1.2],
-            gap="small",
-            vertical_alignment="center",
-        )
-
-        with _title_col:
-            st.markdown(
-                f"<div style='font-weight:800;line-height:1.25;"
-                f"font-size:1rem;padding:4px 0'>{title}</div>",
-                unsafe_allow_html=True,
-            )
-
-        with _mic_col:
-            render_subtle_voice_input(
-                widget_key=widget_key,
-                target_key=target_key,
-                language=language,
-                error_label=error_label,
-            )
-
-        if st.session_state.get(f"{widget_key}_open", False):
-            st.caption(help_text)
-
 
 
 def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
@@ -7020,22 +7034,26 @@ if selected_page == t["t1"]:
         # while the explanatory copy lives behind Streamlit's built-in ? tooltip.
         _tab1_ai_text_key = f"tab1_ai_ingredient_text_{v}"
 
-        render_ai_ingredient_header(
-            title=_mai["title"].replace("**", ""),
-            help_text=_mai["caption"],
-            widget_key=f"sanosync_voice_tab1_{v}",
-            target_key=_tab1_ai_text_key,
-            language=current_lang,
-            error_label=_mai["voice_error"],
-        )
+        render_ai_spotlight_css()
 
-        _tab1_ai_text = st.text_area(
-            "SanoSync AI",
-            key=_tab1_ai_text_key,
-            placeholder=_mai["placeholder"],
-            height=90,
-            label_visibility="collapsed",
-        )
+        with st.container(key=f"ai_spotlight_tab1_{v}"):
+            render_ai_ingredient_header(
+                title=_mai["title"].replace("**", ""),
+                help_text=_mai["caption"],
+                widget_key=f"sanosync_voice_tab1_{v}",
+                target_key=_tab1_ai_text_key,
+                language=current_lang,
+                error_label=_mai["voice_error"],
+            )
+
+            _tab1_ai_text = st.text_area(
+                "SanoSync AI",
+                key=_tab1_ai_text_key,
+                placeholder=_mai["placeholder"],
+                height=90,
+                label_visibility="collapsed",
+                help=_mai["caption"],
+            )
         _tab1_ai_text = str(
             st.session_state.get(_tab1_ai_text_key, "") or ""
         )
@@ -7685,19 +7703,65 @@ elif selected_page == t["t2"]:
                     ),
                 })
 
-            render_sanosync_grid_table(
-                _meal_rows,
-                [
-                    ("meal", t["col_meal"]),
-                    ("category", t["col_category"]),
-                    ("name", t["col_name"]),
-                    ("kcal", "Kcal"),
-                    ("protein", "Pro (g)"),
-                    ("carbs", "Carbs (g)"),
-                    ("fat", "Fat (g)"),
-                ],
-                widths=[1.05, 1.05, 2.35, 0.82, 0.9, 1.0, 0.82],
+            # Logged foods in the same clean grid style, with a direct
+            # trash action on each row.
+            _logged_header = st.columns(
+                [0.50, 1.05, 1.05, 2.35, 0.82, 0.90, 1.0, 0.82],
+                gap="small",
+                vertical_alignment="center",
             )
+            _logged_labels = [
+                "",
+                t["col_meal"],
+                t["col_category"],
+                t["col_name"],
+                "Kcal",
+                "Pro (g)",
+                "Carbs (g)",
+                "Fat (g)",
+            ]
+            for _col, _label in zip(_logged_header, _logged_labels):
+                _col.markdown(
+                    f"<div style='font-weight:700;color:#7b7e89;"
+                    f"padding:0.1rem 0 0.45rem 0'>{html.escape(str(_label))}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            for _meal_raw, _meal_display in zip(meals_with_id, _meal_rows):
+                _cols = st.columns(
+                    [0.50, 1.05, 1.05, 2.35, 0.82, 0.90, 1.0, 0.82],
+                    gap="small",
+                    vertical_alignment="center",
+                )
+
+                if _cols[0].button(
+                    "🗑️",
+                    key=f"delete_logged_meal_{_meal_raw.get('id')}_{summary_date}",
+                    help=t["del_meal_btn"],
+                    use_container_width=True,
+                ):
+                    try:
+                        supabase.table("meals").delete().eq(
+                            "id",
+                            _meal_raw.get("id"),
+                        ).eq(
+                            "user_id",
+                            user_id,
+                        ).execute()
+                        refresh_daily_logs(summary_date)
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(
+                            t["delete_meal_error"].format(error=exc)
+                        )
+
+                _cols[1].write(_meal_display["meal"])
+                _cols[2].write(_meal_display["category"])
+                _cols[3].write(_meal_display["name"])
+                _cols[4].write(_meal_display["kcal"])
+                _cols[5].write(_meal_display["protein"])
+                _cols[6].write(_meal_display["carbs"])
+                _cols[7].write(_meal_display["fat"])
 
             meal_by_id = {m["id"]: m for m in meals_with_id}
             meal_options = {
@@ -9178,22 +9242,26 @@ elif selected_page == t["t4"]:
 
             _recipe_ai_text_key = f"recipe_ai_ingredient_text_{v}"
 
-            render_ai_ingredient_header(
-                title=_rcu["ingredient_ai_label"].replace("**", ""),
-                help_text=_rcu["ingredient_ai_help"],
-                widget_key=f"sanosync_voice_recipe_{v}",
-                target_key=_recipe_ai_text_key,
-                language=current_lang,
-                error_label=_rcu["ingredient_voice_error"],
-            )
+            render_ai_spotlight_css()
 
-            _ingredient_free_text = st.text_area(
-                "SanoSync AI",
-                key=_recipe_ai_text_key,
-                placeholder=_rcu["ingredient_ai_placeholder"],
-                height=110,
-                label_visibility="collapsed",
-            )
+            with st.container(key=f"ai_spotlight_recipe_{v}"):
+                render_ai_ingredient_header(
+                    title=_rcu["ingredient_ai_label"].replace("**", ""),
+                    help_text=_rcu["ingredient_ai_help"],
+                    widget_key=f"sanosync_voice_recipe_{v}",
+                    target_key=_recipe_ai_text_key,
+                    language=current_lang,
+                    error_label=_rcu["ingredient_voice_error"],
+                )
+
+                _ingredient_free_text = st.text_area(
+                    "SanoSync AI",
+                    key=_recipe_ai_text_key,
+                    placeholder=_rcu["ingredient_ai_placeholder"],
+                    height=110,
+                    label_visibility="collapsed",
+                    help=_rcu["ingredient_ai_help"],
+                )
             _ingredient_free_text = str(
                 st.session_state.get(_recipe_ai_text_key, "") or ""
             )
