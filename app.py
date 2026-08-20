@@ -1287,6 +1287,71 @@ def render_sanosync_coach_card(message, language):
     )
 
 
+
+def render_sanosync_grid_table(
+    rows,
+    columns,
+    widths=None,
+    *,
+    header_weight=600,
+    value_weight=500,
+):
+    """
+    Render a lightweight table using st.columns, visually consistent with
+    the ingredient table used in Recipes.
+
+    columns: list of (key, label)
+    widths: optional list of relative column widths
+    """
+    if not rows:
+        return
+
+    if widths is None:
+        widths = [1] * len(columns)
+
+    header_cols = st.columns(
+        widths,
+        gap="small",
+        vertical_alignment="center",
+    )
+
+    for col, (_, label) in zip(header_cols, columns):
+        col.markdown(
+            (
+                "<div style='"
+                f"font-weight:{header_weight};"
+                "color:#7b7e89;"
+                "padding:0.1rem 0 0.45rem 0;"
+                "white-space:nowrap;"
+                "'>"
+                f"{html.escape(str(label))}"
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+
+    for row in rows:
+        value_cols = st.columns(
+            widths,
+            gap="small",
+            vertical_alignment="center",
+        )
+        for col, (key, _) in zip(value_cols, columns):
+            value = row.get(key, "")
+            col.markdown(
+                (
+                    "<div style='"
+                    f"font-weight:{value_weight};"
+                    "color:inherit;"
+                    "padding:0.32rem 0;"
+                    "'>"
+                    f"{html.escape(str(value))}"
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
+
+
 def translate_activity_display(value, lang):
     maps = {
         "Italiano": {"Bici": "Bici", "Bici Elettrica": "Bici Elettrica", "Passi (Stima)": "Passi (Stima)", "BMR (Base)": "BMR (Base)"},
@@ -7192,17 +7257,45 @@ elif selected_page == t["t2"]:
                     or []
                 )
 
-            df_meals = pd.DataFrame(meals_with_id)
-            df_display = df_meals.rename(columns={
-                "meal_type": t["col_meal"], "name": t["col_name"], "calories": "Kcal",
-                "protein": "Pro (g)", "carbs": "Carbs (g)", "fat": "Fat (g)", "category": t["col_category"],
-            })
-            df_display[t["col_meal"]] = df_display[t["col_meal"]].map(tr_meal_type)
-            df_display[t["col_category"]] = [tr_category(infer_meal_category(m)) for m in meals_with_id]
-            st.dataframe(
-                df_display[[t["col_meal"], t["col_category"], t["col_name"], "Kcal", "Pro (g)", "Carbs (g)", "Fat (g)"]],
-                use_container_width=True,
-                hide_index=True,
+            _meal_rows = []
+            for _meal_row in meals_with_id:
+                _meal_rows.append({
+                    "meal": tr_meal_type(
+                        _meal_row.get("meal_type", "")
+                    ),
+                    "category": tr_category(
+                        infer_meal_category(_meal_row)
+                    ),
+                    "name": _meal_row.get("name", ""),
+                    "kcal": int(round(
+                        _safe_float(_meal_row.get("calories"))
+                    )),
+                    "protein": round(
+                        _safe_float(_meal_row.get("protein")),
+                        1,
+                    ),
+                    "carbs": round(
+                        _safe_float(_meal_row.get("carbs")),
+                        1,
+                    ),
+                    "fat": round(
+                        _safe_float(_meal_row.get("fat")),
+                        1,
+                    ),
+                })
+
+            render_sanosync_grid_table(
+                _meal_rows,
+                [
+                    ("meal", t["col_meal"]),
+                    ("category", t["col_category"]),
+                    ("name", t["col_name"]),
+                    ("kcal", "Kcal"),
+                    ("protein", "Pro (g)"),
+                    ("carbs", "Carbs (g)"),
+                    ("fat", "Fat (g)"),
+                ],
+                widths=[1.05, 1.05, 2.35, 0.82, 0.9, 1.0, 0.82],
             )
 
             meal_by_id = {m["id"]: m for m in meals_with_id}
@@ -7372,10 +7465,29 @@ elif selected_page == t["t2"]:
 
     with st.container(border=True):
         st.markdown(t["burned_acts"])
-        rows_acts = [{t["col_activity"]: ux["bmr_base"], t["col_burned"]: bmr_so_far}]
+        rows_acts = [{
+            "activity": ux["bmr_base"],
+            "burned": int(round(_safe_float(bmr_so_far))),
+        }]
         for act in activities_data:
-            rows_acts.append({t["col_activity"]: translate_activity_display(act.get("activity_name"), current_lang), t["col_burned"]: act.get("burned_calories")})
-        st.dataframe(pd.DataFrame(rows_acts), use_container_width=True, hide_index=True)
+            rows_acts.append({
+                "activity": translate_activity_display(
+                    act.get("activity_name"),
+                    current_lang,
+                ),
+                "burned": int(round(
+                    _safe_float(act.get("burned_calories"))
+                )),
+            })
+
+        render_sanosync_grid_table(
+            rows_acts,
+            [
+                ("activity", t["col_activity"]),
+                ("burned", t["col_burned"]),
+            ],
+            widths=[3.0, 1.0],
+        )
 
 # 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
 # ==============================================================================
