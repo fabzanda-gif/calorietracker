@@ -6004,86 +6004,83 @@ def transcribe_ingredient_audio_with_groq(audio_file, language="Italiano"):
     return str(getattr(result, "text", "") or "").strip()
 
 
+
 def render_subtle_voice_input(*, widget_key, target_key, language, error_label):
     """
-    Compact microphone control for SanoSync AI ingredient text areas.
-
-    Streamlit's audio recorder is kept deliberately tiny (56 px wide) and
-    visually aligned at the right edge of the ingredient input. When recording
-    completes, Whisper transcription is copied into the text-area session key.
+    Very subtle voice input: only a small microphone icon is visible.
+    Clicking it opens the real Streamlit audio recorder in a popover.
     """
-    st.markdown(
-        """
-        <style>
-        div[class*="st-key-sanosync_voice_"] {
-            width: 58px !important;
-            max-width: 58px !important;
-            margin: 0 !important;
-        }
+    with st.popover("🎙️", use_container_width=False):
+        audio = st.audio_input(
+            "Microphone",
+            sample_rate=16000,
+            key=widget_key,
+            label_visibility="collapsed",
+        )
 
-        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] {
-            width: 58px !important;
-            min-width: 58px !important;
-            max-width: 58px !important;
-            overflow: hidden !important;
-        }
+        if audio is not None:
+            audio_bytes = audio.getvalue()
+            audio_sig = hashlib.sha256(audio_bytes).hexdigest()
+            sig_key = f"{widget_key}_processed_sig"
 
-        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] > div {
-            width: 58px !important;
-            min-width: 58px !important;
-            max-width: 58px !important;
-            min-height: 58px !important;
-            padding: 0 !important;
-            border-radius: 14px !important;
-            overflow: hidden !important;
-        }
+            if st.session_state.get(sig_key) != audio_sig:
+                try:
+                    with st.spinner("🎙️"):
+                        transcript = transcribe_ingredient_audio_with_groq(
+                            audio,
+                            language,
+                        )
 
-        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] button:not(:first-of-type) {
-            display: none !important;
-        }
+                    if transcript:
+                        existing = str(
+                            st.session_state.get(target_key, "") or ""
+                        ).strip()
+                        st.session_state[target_key] = (
+                            f"{existing}, {transcript}"
+                            if existing
+                            else transcript
+                        )
+                        st.session_state[sig_key] = audio_sig
+                        st.rerun()
 
-        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] svg {
-            width: 22px !important;
-            height: 22px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
+                except Exception as exc:
+                    st.error(error_label.format(error=exc))
+
+
+def render_ai_ingredient_header(
+    *,
+    title,
+    help_text,
+    widget_key,
+    target_key,
+    language,
+    error_label,
+):
+    """
+    One compact header row:
+    bold AI label + tiny microphone + subtle help tooltip.
+    """
+    _title_col, _mic_col, _help_col, _spacer = st.columns(
+        [4.0, 0.42, 0.42, 5.2],
+        gap="small",
+        vertical_alignment="center",
     )
 
-    audio = st.audio_input(
-        "Microphone",
-        sample_rate=16000,
-        key=widget_key,
-        label_visibility="collapsed",
-        width=56,
-    )
+    with _title_col:
+        st.markdown(f"**{title}**")
 
-    if audio is not None:
-        audio_bytes = audio.getvalue()
-        audio_sig = hashlib.sha256(audio_bytes).hexdigest()
-        sig_key = f"{widget_key}_processed_sig"
+    with _mic_col:
+        render_subtle_voice_input(
+            widget_key=widget_key,
+            target_key=target_key,
+            language=language,
+            error_label=error_label,
+        )
 
-        if st.session_state.get(sig_key) != audio_sig:
-            try:
-                with st.spinner("🎙️"):
-                    transcript = transcribe_ingredient_audio_with_groq(
-                        audio,
-                        language,
-                    )
-                if transcript:
-                    existing = str(
-                        st.session_state.get(target_key, "") or ""
-                    ).strip()
-                    st.session_state[target_key] = (
-                        f"{existing}, {transcript}"
-                        if existing
-                        else transcript
-                    )
-                    st.session_state[sig_key] = audio_sig
-                    st.rerun()
-            except Exception as exc:
-                st.error(error_label.format(error=exc))
+    with _help_col:
+        with st.popover("❔", use_container_width=False):
+            st.caption(help_text)
+
 
 
 def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
@@ -6788,26 +6785,23 @@ if selected_page == t["t1"]:
         # The title is the field label itself (same size as the other form labels),
         # while the explanatory copy lives behind Streamlit's built-in ? tooltip.
         _tab1_ai_text_key = f"tab1_ai_ingredient_text_{v}"
-        _tab1_text_col, _tab1_mic_col = st.columns(
-            [12, 0.8],
-            gap="small",
-            vertical_alignment="bottom",
+
+        render_ai_ingredient_header(
+            title=_mai["title"].replace("**", ""),
+            help_text=_mai["caption"],
+            widget_key=f"sanosync_voice_tab1_{v}",
+            target_key=_tab1_ai_text_key,
+            language=current_lang,
+            error_label=_mai["voice_error"],
         )
-        with _tab1_text_col:
-            _tab1_ai_text = st.text_area(
-                _mai["title"],
-                key=_tab1_ai_text_key,
-                placeholder=_mai["placeholder"],
-                help=_mai["caption"],
-                height=90,
-            )
-        with _tab1_mic_col:
-            render_subtle_voice_input(
-                widget_key=f"sanosync_voice_tab1_{v}",
-                target_key=_tab1_ai_text_key,
-                language=current_lang,
-                error_label=_mai["voice_error"],
-            )
+
+        _tab1_ai_text = st.text_area(
+            "SanoSync AI",
+            key=_tab1_ai_text_key,
+            placeholder=_mai["placeholder"],
+            height=90,
+            label_visibility="collapsed",
+        )
         _tab1_ai_text = str(
             st.session_state.get(_tab1_ai_text_key, "") or ""
         )
@@ -8899,26 +8893,23 @@ elif selected_page == t["t4"]:
             )
 
             _recipe_ai_text_key = f"recipe_ai_ingredient_text_{v}"
-            _recipe_text_col, _recipe_mic_col = st.columns(
-                [12, 0.8],
-                gap="small",
-                vertical_alignment="bottom",
+
+            render_ai_ingredient_header(
+                title=_rcu["ingredient_ai_label"].replace("**", ""),
+                help_text=_rcu["ingredient_ai_help"],
+                widget_key=f"sanosync_voice_recipe_{v}",
+                target_key=_recipe_ai_text_key,
+                language=current_lang,
+                error_label=_rcu["ingredient_voice_error"],
             )
-            with _recipe_text_col:
-                _ingredient_free_text = st.text_area(
-                    _rcu["ingredient_ai_label"],
-                    key=_recipe_ai_text_key,
-                    placeholder=_rcu["ingredient_ai_placeholder"],
-                    help=_rcu["ingredient_ai_help"],
-                    height=110,
-                )
-            with _recipe_mic_col:
-                render_subtle_voice_input(
-                    widget_key=f"sanosync_voice_recipe_{v}",
-                    target_key=_recipe_ai_text_key,
-                    language=current_lang,
-                    error_label=_rcu["ingredient_voice_error"],
-                )
+
+            _ingredient_free_text = st.text_area(
+                "SanoSync AI",
+                key=_recipe_ai_text_key,
+                placeholder=_rcu["ingredient_ai_placeholder"],
+                height=110,
+                label_visibility="collapsed",
+            )
             _ingredient_free_text = str(
                 st.session_state.get(_recipe_ai_text_key, "") or ""
             )
