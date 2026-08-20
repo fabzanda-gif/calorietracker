@@ -505,6 +505,33 @@ st.markdown("""
             border-radius:18px !important;
         }
 
+        /* Activity tab: make the "Altro → Aggiungi" form submit
+           match the outlined Passi/Bici buttons. */
+        .st-key-activity_add_submit button,
+        .st-key-activity_add_submit div[data-testid="stFormSubmitButton"] > button {
+            width: 100% !important;
+            background: #FFFFFF !important;
+            color: #1A2942 !important;
+            -webkit-text-fill-color: #1A2942 !important;
+            border: 2px solid #FF8B8B !important;
+            border-radius: 11px !important;
+            font-weight: 800 !important;
+            box-shadow: none !important;
+        }
+
+        .st-key-activity_add_submit button *,
+        .st-key-activity_add_submit div[data-testid="stFormSubmitButton"] > button * {
+            color: #1A2942 !important;
+            -webkit-text-fill-color: #1A2942 !important;
+        }
+
+        .st-key-activity_add_submit button:hover,
+        .st-key-activity_add_submit div[data-testid="stFormSubmitButton"] > button:hover {
+            background: #FFF5F5 !important;
+            border-color: #FF8B8B !important;
+            color: #1A2942 !important;
+        }
+
         /* Metric Cards */
         [data-testid="stMetric"] {
             background-color: #FFFFFF;
@@ -7421,7 +7448,11 @@ elif selected_page == t["t5"]:
                 )
                 extra_cals = st.number_input(ux["burned_kcal_field"], value=0, min_value=0, step=50)
                 
-                submitted_act = st.form_submit_button(t["add_act_btn"], use_container_width=True)
+                submitted_act = st.form_submit_button(
+                    t["add_act_btn"],
+                    use_container_width=True,
+                    key="activity_add_submit",
+                )
                 if submitted_act:
                     # Inseriamo l'attività
                     supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
