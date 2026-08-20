@@ -4310,6 +4310,109 @@ if is_zero_mode():
             color:#FF4A42 !important;
         }
 
+        /* ============================================================
+           ZERO MODE — FINAL WIDGET FIXES
+           ============================================================ */
+
+        /* Date input: Streamlit/BaseWeb can keep a pale inner control. */
+        [data-testid="stDateInput"] > div,
+        [data-testid="stDateInput"] [data-baseweb="input"],
+        [data-testid="stDateInput"] [data-baseweb="input"] > div,
+        [data-testid="stDateInput"] input {
+            background:#171717 !important;
+            color:#F7F7F7 !important;
+            -webkit-text-fill-color:#F7F7F7 !important;
+            border-color:#727272 !important;
+        }
+        [data-testid="stDateInput"] input::selection {
+            background:#7C1714 !important;
+            color:#FFFFFF !important;
+        }
+
+        /* Selectboxes: remove the pale arrow segment on the right. */
+        [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+        [data-testid="stSelectbox"] [data-baseweb="select"] > div > div,
+        [data-testid="stSelectbox"] [data-baseweb="select"] {
+            background:#171717 !important;
+            color:#F7F7F7 !important;
+            border-color:#727272 !important;
+        }
+
+        [data-testid="stSelectbox"] [data-baseweb="select"] > div > div:last-child {
+            background:#171717 !important;
+            color:#F7F7F7 !important;
+            border-left:1px solid #3F3F3F !important;
+        }
+
+        [data-testid="stSelectbox"] svg,
+        [data-testid="stSelectbox"] path {
+            color:#F7F7F7 !important;
+            fill:#F7F7F7 !important;
+        }
+
+        /* Same treatment for multiselects. */
+        [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] {
+            background:#171717 !important;
+            color:#F7F7F7 !important;
+            border-color:#727272 !important;
+        }
+
+        /* Buttons that still expose Material icon ligature text such as
+           "arrow_right" / "keyboard_double_arrow_right".
+           Restore the correct icon font only on known icon spans. */
+        [class*="material-symbols-rounded"],
+        [class*="material-symbols-outlined"],
+        [class*="material-icons"],
+        span[data-testid*="Icon"] {
+            font-family:
+                'Material Symbols Rounded',
+                'Material Symbols Outlined',
+                'Material Icons' !important;
+            font-style:normal !important;
+            font-weight:normal !important;
+            letter-spacing:normal !important;
+            text-transform:none !important;
+            white-space:nowrap !important;
+            word-wrap:normal !important;
+            direction:ltr !important;
+            -webkit-font-feature-settings:'liga' !important;
+            -webkit-font-smoothing:antialiased !important;
+            font-feature-settings:'liga' !important;
+        }
+
+        /* Streamlit sidebar collapse control / generic header buttons. */
+        [data-testid="stSidebarCollapseButton"] button,
+        [data-testid="collapsedControl"] button,
+        [data-testid="stHeader"] button {
+            font-family:inherit !important;
+        }
+        [data-testid="stSidebarCollapseButton"] button span,
+        [data-testid="collapsedControl"] button span,
+        [data-testid="stHeader"] button span {
+            font-family:
+                'Material Symbols Rounded',
+                'Material Symbols Outlined',
+                'Material Icons' !important;
+            font-feature-settings:'liga' !important;
+            -webkit-font-feature-settings:'liga' !important;
+        }
+
+        /* Popover / menu icon buttons should be dark, not white cards. */
+        [data-testid="stPopover"] > div > button,
+        [data-testid="stPopover"] button {
+            background:#111111 !important;
+            color:#F7F7F7 !important;
+            border:1px solid #5B5B5B !important;
+        }
+
+        /* Any residual BaseWeb control chrome. */
+        [data-baseweb="base-input"],
+        [data-baseweb="select"] {
+            background:#171717 !important;
+        }
+
         @media (max-width:700px) {
             .sano-page-title {
                 font-size:2.55rem !important;
