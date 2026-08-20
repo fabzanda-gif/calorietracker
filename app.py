@@ -1984,70 +1984,29 @@ def restore_and_verify_auth_session():
 
 
 AUTH_FLOW_STATE_KEY = "auth_flow_id"
-PKCE_COOKIE_PREFIX = "sanosync_pkce_"
-PKCE_COOKIE_MAX_AGE = 10 * 60  # 10 minutes; Supabase auth codes are short-lived.
 
 
-def _pkce_cookie_name(flow_id):
-    """Short, browser-safe cookie name unique to one OAuth attempt."""
-    digest = hashlib.sha256(str(flow_id).encode("utf-8")).hexdigest()[:24]
-    return f"{PKCE_COOKIE_PREFIX}{digest}"
-
-
-def _create_pkce_pair():
+@st.cache_resource
+def get_auth_flow_client(flow_id: str):
     """
-    RFC 7636 verifier + S256 challenge.
-    token_urlsafe(64) gives a verifier comfortably inside the 43–128 char range.
+    Client Supabase dedicato al singolo flusso OAuth.
+
+    Questa è intenzionalmente la stessa logica dell'altra app funzionante:
+    client Supabase NORMALE, senza ClientOptions custom e senza PKCE/cookie
+    costruiti manualmente.
     """
-    verifier = secrets.token_urlsafe(64)
-    challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(verifier.encode("ascii")).digest()
-    ).rstrip(b"=").decode("ascii")
-    return verifier, challenge
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"],
+    )
 
 
-def _store_pkce_verifier(flow_id, verifier):
-    """
-    Persist the verifier in the browser so it survives Google -> Streamlit.
-
-    session_state is retained as a same-session fallback, but the cookie is the
-    important part because a full OAuth redirect can create a fresh Streamlit run.
-    """
-    cookie_name = _pkce_cookie_name(flow_id)
-    st.session_state[f"_pkce_{flow_id}"] = verifier
-    _cookie_set(cookie_name, verifier, PKCE_COOKIE_MAX_AGE)
-
-
-def _read_pkce_verifier(flow_id):
-    cookie_name = _pkce_cookie_name(flow_id)
-
-    # On the callback request this is the most reliable source because the
-    # cookie arrived with the HTTP request.
-    try:
-        value = st.context.cookies.get(cookie_name)
-        if value:
-            return str(value).strip().strip('"')
-    except Exception:
-        pass
-
-    # CookieController fallback for normal Streamlit reruns.
-    try:
-        value = controller.get(cookie_name)
-        if value:
-            return str(value).strip().strip('"')
-    except Exception:
-        pass
-
-    # Same Streamlit-session fallback.
-    return st.session_state.get(f"_pkce_{flow_id}")
-
-
-def _remove_pkce_verifier(flow_id):
-    st.session_state.pop(f"_pkce_{flow_id}", None)
-    try:
-        _cookie_delete(_pkce_cookie_name(flow_id))
-    except Exception:
-        pass
+def _oauth_response_url(response):
+    if response is None:
+        return ""
+    if isinstance(response, dict):
+        return str(response.get("url") or "")
+    return str(getattr(response, "url", "") or "")
 
 
 def get_public_app_url():
@@ -2073,14 +2032,14 @@ def get_public_app_url():
 
 def build_provider_login_url(provider):
     """
-    Build a Supabase social-login URL using an explicit PKCE verifier.
+    Genera l'URL OAuth esattamente come nell'altra app funzionante.
 
-    This avoids relying on an in-memory supabase-py Auth client to retain the
-    code verifier across an external browser redirect.
+    Supabase-py genera e conserva internamente il verifier PKCE nel client
+    dedicato al flow_id. @st.cache_resource permette di recuperare LO STESSO
+    client quando Google ritorna all'app con auth_flow=<flow_id>.
     """
     flow_id = uuid.uuid4().hex
-    verifier, challenge = _create_pkce_pair()
-    _store_pkce_verifier(flow_id, verifier)
+    auth_client = get_auth_flow_client(flow_id)
 
     app_url = get_public_app_url().rstrip("/")
     redirect_to = (
@@ -2088,103 +2047,23 @@ def build_provider_login_url(provider):
         f"?auth_callback=1&auth_flow={flow_id}"
     )
 
-    params = {
-        "provider": str(provider),
-        "redirect_to": redirect_to,
-        "code_challenge": challenge,
-        "code_challenge_method": "s256",
-    }
-
-    return (
-        f"{SUPABASE_URL}/auth/v1/authorize?"
-        + urlencode(params)
+    response = auth_client.auth.sign_in_with_oauth(
+        {
+            "provider": provider,
+            "options": {
+                "redirect_to": redirect_to,
+            },
+        }
     )
 
-
-
-def get_or_create_provider_login_url(provider):
-    """
-    Create each OAuth URL only once per login-page session.
-
-    IMPORTANT:
-    build_provider_login_url() stores a PKCE verifier cookie. Calling it on
-    every Streamlit rerun causes CookieController to trigger another rerun,
-    which creates another flow/cookie, producing an apparent refresh loop.
-
-    Caching the generated URL in session_state breaks that cycle.
-    """
-    key = f"_oauth_login_url_{provider}"
-
-    existing = st.session_state.get(key)
-    if existing:
-        return existing
-
-    url = build_provider_login_url(provider)
-    st.session_state[key] = url
-    return url
-
-
-def clear_cached_oauth_urls():
-    for provider in ("google", "facebook"):
-        st.session_state.pop(f"_oauth_login_url_{provider}", None)
-
-
-def _exchange_pkce_code(auth_code, code_verifier):
-    """
-    Exchange the Supabase Auth code explicitly.
-
-    Supabase's PKCE token endpoint expects BOTH values in the JSON body.
-    """
-    token_url = f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce"
-
-    response = requests.post(
-        token_url,
-        headers={
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        json={
-            "auth_code": str(auth_code),
-            "code_verifier": str(code_verifier),
-        },
-        timeout=20,
-    )
-
-    try:
-        payload = response.json()
-    except Exception:
-        payload = {}
-
-    if not response.ok:
-        detail = (
-            payload.get("msg")
-            or payload.get("message")
-            or payload.get("error_description")
-            or payload.get("error")
-            or response.text
-            or f"HTTP {response.status_code}"
-        )
-        raise RuntimeError(str(detail))
-
-    access_token = payload.get("access_token")
-    refresh_token = payload.get("refresh_token")
-
-    if not access_token or not refresh_token:
-        raise RuntimeError(
-            "Supabase non ha restituito access token e refresh token."
-        )
-
-    return access_token, refresh_token
+    return _oauth_response_url(response)
 
 
 def handle_oauth_callback():
     """
-    Complete Google/Facebook OAuth without depending on Auth-client memory.
-
-    The verifier is retrieved from the short-lived browser cookie that was
-    created before leaving SanoSync.
+    Copia della logica dell'altra app funzionante:
+    recupera lo stesso client PKCE tramite flow_id, scambia il code,
+    poi trasferisce token/sessione al client principale SanoSync.
     """
     code_param = st.query_params.get("code")
     flow_id = st.query_params.get("auth_flow")
@@ -2192,55 +2071,53 @@ def handle_oauth_callback():
     if not code_param or not flow_id:
         return False
 
-    flow_id = str(flow_id)
-    code_param = str(code_param)
-
     try:
-        verifier = _read_pkce_verifier(flow_id)
+        # Questo deve essere lo STESSO client creato prima del redirect.
+        auth_client = get_auth_flow_client(str(flow_id))
 
-        if not verifier:
-            raise RuntimeError(
-                "PKCE verifier non trovato nel browser. "
-                "Riprova il login Google dalla pagina di accesso."
-            )
-
-        access_token, refresh_token = _exchange_pkce_code(
-            code_param,
-            verifier,
+        response = auth_client.auth.exchange_code_for_session(
+            {"auth_code": str(code_param)}
         )
 
-        # Move the new session into the application's main Supabase client.
+        session = getattr(response, "session", None)
+        user_obj = getattr(response, "user", None)
+
+        if session is None:
+            session = auth_client.auth.get_session()
+
+        access_token = getattr(session, "access_token", None)
+        refresh_token = getattr(session, "refresh_token", None)
+
+        if not access_token or not refresh_token:
+            raise RuntimeError(
+                "Supabase non ha restituito una sessione OAuth valida."
+            )
+
+        if user_obj is None:
+            verified = auth_client.auth.get_user(access_token)
+            user_obj = getattr(verified, "user", None)
+
+        # Manteniamo il sistema di sessione/cookie già usato da SanoSync
+        # DOPO che Supabase ha completato correttamente il PKCE.
         main_response = supabase.auth.set_session(
             access_token,
             refresh_token,
         )
-
-        user_obj = getattr(main_response, "user", None)
-        if user_obj is None:
-            verified = supabase.auth.get_user(access_token)
-            user_obj = getattr(verified, "user", None)
 
         save_authenticated_session(
             main_response,
             fallback_user=user_obj,
         )
 
-        st.session_state[AUTH_FLOW_STATE_KEY] = flow_id
-        _remove_pkce_verifier(flow_id)
-        clear_cached_oauth_urls()
+        st.session_state[AUTH_FLOW_STATE_KEY] = str(flow_id)
 
-        # Only remove the one-time OAuth code AFTER a successful exchange.
         st.query_params.clear()
         st.session_state.pop("auth_callback_error", None)
         st.rerun()
 
     except Exception as exc:
-        # Keep the diagnostic for the login page.
-        # We clear the callback URL so Streamlit does not repeatedly submit
-        # the same one-time auth code on every rerun.
-        st.session_state["auth_callback_error"] = str(exc)
-        clear_cached_oauth_urls()
         st.query_params.clear()
+        st.session_state["auth_callback_error"] = str(exc)
         return False
 
     return True
@@ -2672,11 +2549,11 @@ def show_login_page():
         # Stesso identico flusso PKCE per entrambi i provider:
         # client dedicato -> sign_in_with_oauth -> auth_flow -> callback.
         google_url = escape(
-            get_or_create_provider_login_url("google"),
+            build_provider_login_url("google"),
             quote=True,
         )
         facebook_url = escape(
-            get_or_create_provider_login_url("facebook"),
+            build_provider_login_url("facebook"),
             quote=True,
         )
     except Exception as exc:
@@ -2694,7 +2571,7 @@ def show_login_page():
         '<div class="sano-login-card">'
         f'<div class="sano-login-card-title">{escape(lt["continue"])}</div>'
         f'<a class="sano-social-login google" href="{google_url}" '
-        'target="_self">'
+        'target="_blank" rel="noopener">'
         '<svg class="sano-social-logo" viewBox="0 0 24 24" aria-hidden="true">'
         '<path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41z"/>'
         '<path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22z"/>'
@@ -2704,7 +2581,7 @@ def show_login_page():
         f'<span>{escape(lt["google"])}</span>'
         '</a>'
         f'<a class="sano-social-login facebook" href="{facebook_url}" '
-        'target="_self">'
+        'target="_blank" rel="noopener">'
         '<svg class="sano-social-logo" viewBox="0 0 24 24" aria-hidden="true">'
         '<circle cx="12" cy="12" r="12" fill="#ffffff"/>'
         '<path fill="#1877F2" d="M13.52 20v-7h2.35l.35-2.73h-2.7V8.53c0-.79.22-1.33 1.35-1.33h1.44V4.76c-.25-.03-1.1-.1-2.1-.1-2.08 0-3.5 1.27-3.5 3.6v2.01H8.36V13h2.35v7h2.81z"/>'
