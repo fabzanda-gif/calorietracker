@@ -246,6 +246,7 @@ import plotly.graph_objects as go
 # ==============================================================================
 ASSET_DIR = Path(__file__).resolve().parent
 APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
+ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
 WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
@@ -932,6 +933,83 @@ def resolve_groq_vision_model():
     )
 
 
+
+def is_zero_mode():
+    """Current SanoSync personality/theme mode."""
+    return bool(
+        st.session_state.get(
+            "zero_mode_enabled",
+            False,
+        )
+    )
+
+
+def zero_tone_instruction():
+    """
+    Tone overlay used by user-facing AI features.
+    Cynical and dry, never hostile or shaming.
+    """
+    if not is_zero_mode():
+        return ""
+
+    return """
+ZERO MODE TONE:
+- be dry, sharp, concise and lightly cynical;
+- use clever understated sarcasm when it fits;
+- be more matter-of-fact than reassuring;
+- you may joke about arithmetic, excuses, dashboards, portion sizes or the situation;
+- NEVER insult the user;
+- NEVER body-shame;
+- NEVER shame food choices;
+- NEVER use guilt, disgust or humiliation;
+- NEVER recommend fasting, purging or compensatory exercise;
+- never sacrifice factual clarity for a joke;
+- the joke should punch at the situation, not the person.
+""".strip()
+
+
+ZERO_SUGAR_COACH_SYSTEM_PROMPT = """
+You are the ZERO MODE voice of SanoSync, a food, activity and weight tracking app.
+
+Your ONLY task is to transform already-calculated SanoSync data into one
+short, natural message for the user.
+
+VOICE:
+- dry
+- concise
+- intelligent
+- lightly cynical
+- matter-of-fact
+- subtly sarcastic when natural
+- never sweet or motivational for its own sake
+- never cruel
+
+STYLE EXAMPLES:
+- "The numbers remain annoyingly good at arithmetic."
+- "No catastrophe detected. Just a number worth logging."
+- "You still have room. No need to negotiate with a lettuce leaf."
+
+STRICT RULES:
+- maximum 2 short sentences
+- maximum 48 words
+- address the user directly
+- use at most 1 emoji
+- answer ONLY in the language specified in the user context
+- do not invent, recalculate or alter any number
+- do not give medical advice
+- do not diagnose
+- do not classify foods as morally good/bad, clean/dirty, guilty, cheating, etc.
+- do not body-shame
+- do not insult the user
+- do not recommend compensatory fasting or excessive exercise
+- if protein data is not provided, do not mention protein
+- if the calorie target is exceeded, stay dry and constructive, not punitive
+- NEVER output reasoning, analysis, chain-of-thought, planning, notes or status labels
+- NEVER output <think> tags or anything inside them
+- output ONLY the final user-facing SanoSync message
+""".strip()
+
+
 SANOSYNC_COACH_SYSTEM_PROMPT = """
 You are the voice of SanoSync, a food, activity and weight tracking app.
 
@@ -1171,7 +1249,11 @@ def generate_sanosync_coach_message(
             messages=[
                 {
                     "role": "system",
-                    "content": SANOSYNC_COACH_SYSTEM_PROMPT,
+                    "content": (
+                        ZERO_SUGAR_COACH_SYSTEM_PROMPT
+                        if is_zero_mode()
+                        else SANOSYNC_COACH_SYSTEM_PROMPT
+                    ),
                 },
                 {
                     "role": "user",
@@ -1239,7 +1321,8 @@ def get_sanosync_coach_message_cached(
 
     # Rounded values avoid a new API call for irrelevant floating-point changes.
     state_signature = (
-        "coach_v2_no_reasoning",
+        "coach_v3_personality",
+        "zero" if is_zero_mode() else "standard",
         str(language),
         round(maintenance_budget),
         round(calories_eaten),
@@ -1409,6 +1492,8 @@ Return ONLY valid JSON:
   "confidence": "low|medium|high",
   "message": "2-4 concise sentences in {language_name}. Explain whether/how it fits today. Never moralize food. If it does not fit the target, suggest a practical smaller portion or lighter combination rather than telling the user they cannot eat it."
 }}
+
+{zero_tone_instruction()}
 
 Rules:
 - never give medical advice;
@@ -3351,6 +3436,11 @@ user_office_lunch_enabled = bool(u_meta.get("office_lunch_enabled", True))
 _PROTEIN_GOAL_SPECIAL_UID = "df879484-97d5-44fb-8b20-ecf8e4e2b3e3"
 user_protein_goal_enabled = bool(u_meta.get("protein_goal_enabled", False))
 user_protein_goal_g = _safe_float(u_meta.get("protein_goal_g"))
+
+# ZERO is a personality/theme preference only: nutrition logic stays identical.
+user_zero_mode_enabled = bool(u_meta.get("zero_mode_enabled", False))
+if "zero_mode_enabled" not in st.session_state:
+    st.session_state["zero_mode_enabled"] = user_zero_mode_enabled
 if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in u_meta:
     user_protein_goal_enabled = True
     if user_protein_goal_g <= 0:
@@ -3685,6 +3775,251 @@ if profile_incomplete:
                 print(traceback.format_exc())
     st.stop()
 
+
+
+# ==============================================================================
+# ZERO MODE — VISUAL THEME
+# ==============================================================================
+if is_zero_mode():
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cookie&family=Kanit:wght@400;500;600;700;800;900&display=swap');
+
+        :root {
+            --zero-bg: #050505;
+            --zero-panel: #111111;
+            --zero-panel-2: #171717;
+            --zero-border: #2A2A2A;
+            --zero-red: #E10600;
+            --zero-red-hot: #FF1B12;
+            --zero-white: #F7F7F5;
+            --zero-muted: #A9A9A9;
+        }
+
+        html, body, [data-testid="stAppViewContainer"] {
+            color: var(--zero-white) !important;
+            font-family: 'Kanit', sans-serif !important;
+        }
+
+        [data-testid="stAppViewContainer"] *,
+        [data-testid="stSidebar"] *,
+        button,
+        input,
+        textarea,
+        select,
+        label {
+            font-family: 'Kanit', sans-serif !important;
+        }
+
+        h1, h2, h3, h4,
+        .sano-page-title,
+        .sano-zero-wordmark {
+            font-family: 'Cookie', cursive !important;
+            letter-spacing: 0 !important;
+        }
+
+        [data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(circle at 100% 0%, rgba(225,6,0,.14), transparent 28%),
+                radial-gradient(circle at 0% 65%, rgba(225,6,0,.08), transparent 30%),
+                linear-gradient(135deg,#030303 0%,#090909 58%,#050505 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-testid="stSidebar"] {
+            background:
+                radial-gradient(circle at 50% 0%, rgba(225,6,0,.16), transparent 28%),
+                linear-gradient(180deg,#000000 0%,#080808 100%) !important;
+            border-right: 1px solid rgba(225,6,0,.42) !important;
+        }
+
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: var(--zero-white) !important;
+            -webkit-text-fill-color: var(--zero-white) !important;
+        }
+
+        /* Generic bordered cards */
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            background:
+                radial-gradient(circle at 100% 0%, rgba(225,6,0,.08), transparent 30%),
+                linear-gradient(145deg,#121212,#0B0B0B) !important;
+            border: 1px solid #2B2B2B !important;
+            box-shadow: 0 10px 28px rgba(0,0,0,.28) !important;
+        }
+
+        /* Page hero = racing / ZERO identity */
+        .sano-page-hero {
+            background:
+                radial-gradient(circle at 92% 4%, rgba(255,255,255,.11), transparent 30%),
+                linear-gradient(135deg,#000000 0%,#121212 58%,#E10600 160%) !important;
+            border: 1px solid rgba(225,6,0,.72) !important;
+            box-shadow: 0 18px 44px rgba(0,0,0,.34) !important;
+        }
+
+        .sano-page-kicker {
+            font-family: 'Cookie', cursive !important;
+            font-size: 1.35rem !important;
+            letter-spacing: .02em !important;
+            color: #FF2A20 !important;
+            text-transform: none !important;
+        }
+
+        .sano-page-kicker::after {
+            content: " Zero";
+        }
+
+        .sano-page-title {
+            font-size: clamp(2.1rem, 4vw, 3rem) !important;
+            font-weight: 400 !important;
+            line-height: 1 !important;
+        }
+
+        .sano-zero-wordmark {
+            font-size: 2.05rem !important;
+            font-weight: 400 !important;
+        }
+
+        /* Inputs */
+        [data-baseweb="input"] > div,
+        [data-baseweb="select"] > div,
+        textarea,
+        input {
+            background: #171717 !important;
+            color: #F7F7F5 !important;
+            border-color: #343434 !important;
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: #7F7F7F !important;
+            opacity: 1 !important;
+        }
+
+        [data-baseweb="select"] *,
+        [data-baseweb="input"] * {
+            color: #F7F7F5 !important;
+        }
+
+        /* Buttons */
+        [data-testid="stAppViewContainer"] .stButton > button {
+            background: #101010 !important;
+            color: #F7F7F5 !important;
+            border: 1.7px solid #E10600 !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stAppViewContainer"] .stButton > button *,
+        [data-testid="stAppViewContainer"] .stButton > button p,
+        [data-testid="stAppViewContainer"] .stButton > button span {
+            color: #F7F7F5 !important;
+            -webkit-text-fill-color: #F7F7F5 !important;
+        }
+
+        [data-testid="stAppViewContainer"] .stButton > button:hover,
+        [data-testid="stAppViewContainer"] .stButton > button[kind="primary"] {
+            background: linear-gradient(135deg,#E10600,#A90000) !important;
+            border-color: #FF1B12 !important;
+            color: #FFFFFF !important;
+        }
+
+        /* Sidebar navigation */
+        [data-testid="stSidebar"] .stButton > button {
+            background: #0D0D0D !important;
+            border: 1px solid #2E2E2E !important;
+            color: #F7F7F5 !important;
+        }
+
+        [data-testid="stSidebar"] .stButton > button[kind="primary"],
+        [data-testid="stSidebar"] .stButton > button:hover {
+            background: linear-gradient(135deg,#E10600,#A80000) !important;
+            border-color: #FF1B12 !important;
+            color: #FFFFFF !important;
+        }
+
+        /* Metrics / budget / coach */
+        [data-testid="stMetric"] {
+            background:
+                radial-gradient(circle at 96% 4%, rgba(225,6,0,.13), transparent 36%),
+                linear-gradient(145deg,#151515,#0D0D0D) !important;
+            border: 1px solid #3A1515 !important;
+        }
+
+        [data-testid="stMetric"] * {
+            color: #F7F7F5 !important;
+        }
+
+        .sano-budget-card,
+        .sano-ai-coach-card {
+            background:
+                radial-gradient(circle at 96% 4%, rgba(225,6,0,.20), transparent 38%),
+                linear-gradient(145deg,#151515,#090909) !important;
+            border: 1px solid rgba(225,6,0,.38) !important;
+        }
+
+        .sano-budget-fill {
+            background: linear-gradient(90deg,#E10600,#FF352B) !important;
+        }
+
+        .sano-budget-value span,
+        .sano-ai-coach-title {
+            color: #FF3027 !important;
+            -webkit-text-fill-color: #FF3027 !important;
+        }
+
+        /* AI spotlight */
+        div[class*="st-key-ai_spotlight_"],
+        .st-key-can_i_eat_spotlight {
+            background:
+                radial-gradient(circle at 96% 8%, rgba(225,6,0,.18), transparent 34%),
+                linear-gradient(135deg,#171717,#0B0B0B) !important;
+            border-color: #E10600 !important;
+            box-shadow: 0 12px 30px rgba(0,0,0,.28) !important;
+        }
+
+        /* ZERO wordmark */
+        .sano-zero-wordmark {
+            font-family:'Cookie', cursive;
+            color:#FFFFFF !important;
+            font-size:1.55rem;
+            line-height:1;
+            text-align:center;
+            margin:.25rem 0 .75rem 0;
+            text-shadow:0 2px 16px rgba(225,6,0,.45);
+        }
+        .sano-zero-wordmark span {
+            font-family:'Kanit',sans-serif !important;
+            font-weight:950;
+            letter-spacing:.14em;
+            color:#FF2018 !important;
+            font-size:.70rem;
+            display:block;
+            margin-top:.28rem;
+        }
+
+        /* Tables / text */
+        h1,h2,h3,h4,h5,h6,p,label,span,div {
+            border-color: inherit;
+        }
+
+        [data-testid="stDataFrame"],
+        [data-testid="stTable"] {
+            color:#F7F7F5 !important;
+        }
+
+        /* Dividers */
+        hr {
+            border-color:#2A2A2A !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # Force the logged-in welcome label to stay white on the dark sidebar.
 st.markdown(
@@ -4773,8 +5108,59 @@ def tr_day_type(value): return _tr_value(DAY_TYPE_KEYS, value)
 def tr_activity_plan(value): return _tr_value(ACTIVITY_PLAN_KEYS, value)
 
 with st.sidebar:
-    # --- INSERIMENTO LOGO ---
-    st.sidebar.image("logo2.png", use_container_width=True)
+    # --- LOGO / PERSONALITY MODE ---
+    if is_zero_mode() and ZERO_LOGO_FILE.exists():
+        st.sidebar.image(str(ZERO_LOGO_FILE), use_container_width=True)
+        st.markdown(
+            '<div class="sano-zero-wordmark">SanoSync<span>ZERO MODE</span></div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.sidebar.image("logo2.png", use_container_width=True)
+
+    _zero_toggle_i18n = {
+        "Italiano": "ZERO",
+        "English": "ZERO",
+        "Nederlands": "ZERO",
+        "Français": "ZERO",
+    }
+
+    _zero_widget_value = st.toggle(
+        _zero_toggle_i18n.get(
+            st.session_state.get("lang_selector", "Italiano"),
+            "ZERO",
+        ),
+        value=is_zero_mode(),
+        key="zero_mode_sidebar_toggle",
+        help="Stessa SanoSync. Meno zucchero nel tono.",
+    )
+
+    if _zero_widget_value != is_zero_mode():
+        try:
+            _zero_meta = dict(
+                getattr(
+                    st.session_state.get("user"),
+                    "user_metadata",
+                    {},
+                )
+                or {}
+            )
+            _zero_meta["zero_mode_enabled"] = bool(_zero_widget_value)
+
+            _zero_update = supabase.auth.update_user(
+                {"data": _zero_meta}
+            )
+            if getattr(_zero_update, "user", None):
+                st.session_state["user"] = _zero_update.user
+
+            st.session_state["zero_mode_enabled"] = bool(
+                _zero_widget_value
+            )
+            st.session_state.pop("ai_coach_state", None)
+            st.session_state.pop("ai_coach_message", None)
+            st.rerun()
+        except Exception as exc:
+            st.error(f"ZERO mode: {exc}")
 
     if "lang_selector" not in st.session_state:
         st.session_state["lang_selector"] = "Italiano"
@@ -6163,6 +6549,8 @@ EQUIPMENT: {", ".join(equipment) if equipment else "standard kitchen equipment"}
 AVAILABLE INGREDIENTS: {available_ingredients or "none specified"}
 INGREDIENTS TO AVOID: {avoid_ingredients or "none"}
 
+{zero_tone_instruction()}
+
 IMPORTANT:
 - The previous attempt failed because it returned no usable ingredients.
 - You MUST return at least 2 valid ingredients with positive quantity_g.
@@ -6352,8 +6740,12 @@ TIME RULES:
 - active_minutes must not exceed the requested active time;
 - active_minutes cannot exceed total_minutes.
 
+{zero_tone_instruction()}
+
 RECIPE CONTENT RULES:
 - include a useful description of the finished dish in 2 to 4 sentences;
+- when ZERO MODE is active, the description/warning/notes may use dry, witty wording,
+  but the cooking instructions themselves must remain precise and practical;
 - instructions must be genuinely step-by-step and COMPLETE enough to cook and serve the dish without guessing;
 - include cooking times, oven temperatures / heat levels, and key quantities in the relevant steps when useful;
 - instructions should usually contain 4 to 8 complete steps for a cooked meal, unless the recipe truly needs fewer;
@@ -6793,6 +7185,144 @@ Rules:
 if selected_page == t["t1"]:
     log_date = st.date_input("📅 Data", value=date.today())
     render_page_title_card(t["tab1_title"])
+
+    # ------------------------------------------------------------------
+    # ✨ SANOSYNC AI · POSSO MANGIARLO?
+    # Dedicated prospective-food field, intentionally separate from logging.
+    # ------------------------------------------------------------------
+    _cie = CAN_I_EAT_I18N.get(
+        current_lang,
+        CAN_I_EAT_I18N["Italiano"],
+    )
+
+    if log_date == date.today():
+        st.markdown(
+            """
+            <style>
+            .st-key-can_i_eat_spotlight {
+                border: 2px solid #FF8B8B !important;
+                border-radius: 20px !important;
+                padding: 16px 18px 18px 18px !important;
+                margin: 0 0 1rem 0 !important;
+                background:
+                    radial-gradient(circle at 96% 6%, rgba(255,139,139,.20), transparent 32%),
+                    linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,246,246,.94)) !important;
+                box-shadow: 0 10px 28px rgba(26,41,66,.08) !important;
+            }
+            .st-key-can_i_eat_spotlight input {
+                border: 1.5px solid rgba(255,139,139,.55) !important;
+                border-radius: 13px !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.container(key="can_i_eat_spotlight"):
+            st.markdown(f"### {_cie['title']}")
+
+            _can_i_eat_text = st.text_input(
+                _cie["label"],
+                placeholder=_cie["placeholder"],
+                help=_cie["help"],
+                key="can_i_eat_query",
+            )
+
+            if st.button(
+                _cie["button"],
+                type="primary",
+                use_container_width=True,
+                key="can_i_eat_submit",
+            ):
+                if _can_i_eat_text.strip():
+                    try:
+                        with st.spinner(_cie["thinking"]):
+                            _today_str = str(date.today())
+
+                            _cie_meals = (
+                                supabase.table("meals")
+                                .select("calories,protein")
+                                .eq("user_id", user_id)
+                                .eq("date", _today_str)
+                                .execute().data
+                                or []
+                            )
+                            _cie_activities = (
+                                supabase.table("activities")
+                                .select("burned_calories")
+                                .eq("user_id", user_id)
+                                .eq("date", _today_str)
+                                .execute().data
+                                or []
+                            )
+
+                            _cie_calories_eaten = sum(
+                                _safe_float(row.get("calories"))
+                                for row in _cie_meals
+                            )
+                            _cie_protein_eaten = sum(
+                                _safe_float(row.get("protein"))
+                                for row in _cie_meals
+                            )
+                            _cie_activity_burn = sum(
+                                _safe_float(row.get("burned_calories"))
+                                for row in _cie_activities
+                            )
+
+                            # Full-day BMR + today's logged activity.
+                            _cie_maintenance_budget = max(
+                                0.0,
+                                _safe_float(user_bmr) + _cie_activity_burn,
+                            )
+
+                            _can_i_eat_result = generate_can_i_eat_advice(
+                                food_request=_can_i_eat_text.strip(),
+                                language=current_lang,
+                                calories_eaten=_cie_calories_eaten,
+                                maintenance_budget=_cie_maintenance_budget,
+                                deficit_target=user_deficit_target_kcal,
+                                protein_eaten=_cie_protein_eaten,
+                                protein_goal=(
+                                    user_protein_goal_g
+                                    if user_protein_goal_enabled
+                                    else None
+                                ),
+                            )
+                        st.session_state[
+                            "can_i_eat_result"
+                        ] = _can_i_eat_result
+                    except Exception as exc:
+                        st.error(
+                            _cie["error"].format(error=exc)
+                        )
+
+            _can_i_eat_result = st.session_state.get(
+                "can_i_eat_result"
+            )
+            if _can_i_eat_result:
+                st.markdown(
+                    f"**{html.escape(_can_i_eat_result['food_name'])}**"
+                )
+                if _can_i_eat_result.get("message"):
+                    st.write(_can_i_eat_result["message"])
+
+                _cie_c1, _cie_c2, _cie_c3, _cie_c4 = st.columns(4)
+                _cie_c1.metric(
+                    _cie["estimate"],
+                    f"{_can_i_eat_result['estimated_kcal']:.0f} kcal",
+                )
+                _cie_c2.metric(
+                    "Pro",
+                    f"{_can_i_eat_result['estimated_protein_g']:.0f} g",
+                )
+                _cie_c3.metric(
+                    "Carbs",
+                    f"{_can_i_eat_result['estimated_carbs_g']:.0f} g",
+                )
+                _cie_c4.metric(
+                    _cie["remaining_after"],
+                    f"{_can_i_eat_result['remaining_after']:+.0f} kcal",
+                )
 
     recipe_source_label = {
         "Italiano": "🍲 Ricette",
@@ -7764,86 +8294,6 @@ elif selected_page == t["t2"]:
     with col_c4:
         weight_str = f"{float(current_weight):.1f} kg" if current_weight else "N/D"
         st.markdown(f'<div class="custom-card"><div class="custom-card-title">📉 {t["card_weight"]}</div><div class="custom-card-value">{weight_str}</div><div class="custom-card-caption">{weight_msg}</div></div>', unsafe_allow_html=True)
-
-    # ------------------------------------------------------------------
-    # SANOSYNC AI · POSSO MANGIARLO?
-    # ------------------------------------------------------------------
-    if summary_date == date.today():
-        _cie = CAN_I_EAT_I18N.get(
-            current_lang,
-            CAN_I_EAT_I18N["Italiano"],
-        )
-
-        with st.container(border=True):
-            st.markdown(f"### {_cie['title']}")
-
-            _can_i_eat_text = st.text_input(
-                _cie["label"],
-                placeholder=_cie["placeholder"],
-                help=_cie["help"],
-                key="can_i_eat_query",
-            )
-
-            if st.button(
-                _cie["button"],
-                type="primary",
-                use_container_width=True,
-                key="can_i_eat_submit",
-            ):
-                if _can_i_eat_text.strip():
-                    try:
-                        with st.spinner(_cie["thinking"]):
-                            _can_i_eat_result = generate_can_i_eat_advice(
-                                food_request=_can_i_eat_text.strip(),
-                                language=current_lang,
-                                calories_eaten=total_cals_in,
-                                maintenance_budget=total_estimated_burned,
-                                deficit_target=target_deficit_kcal,
-                                protein_eaten=sum(
-                                    _safe_float(m.get("protein"))
-                                    for m in meals_data
-                                ),
-                                protein_goal=(
-                                    user_protein_goal_g
-                                    if user_protein_goal_enabled
-                                    else None
-                                ),
-                            )
-                        st.session_state[
-                            "can_i_eat_result"
-                        ] = _can_i_eat_result
-                    except Exception as exc:
-                        st.error(
-                            _cie["error"].format(error=exc)
-                        )
-
-            _can_i_eat_result = st.session_state.get(
-                "can_i_eat_result"
-            )
-            if _can_i_eat_result:
-                st.markdown(
-                    f"**{html.escape(_can_i_eat_result['food_name'])}**"
-                )
-                if _can_i_eat_result.get("message"):
-                    st.write(_can_i_eat_result["message"])
-
-                _cie_c1, _cie_c2, _cie_c3, _cie_c4 = st.columns(4)
-                _cie_c1.metric(
-                    _cie["estimate"],
-                    f"{_can_i_eat_result['estimated_kcal']:.0f} kcal",
-                )
-                _cie_c2.metric(
-                    "Pro",
-                    f"{_can_i_eat_result['estimated_protein_g']:.0f} g",
-                )
-                _cie_c3.metric(
-                    "Carbs",
-                    f"{_can_i_eat_result['estimated_carbs_g']:.0f} g",
-                )
-                _cie_c4.metric(
-                    _cie["remaining_after"],
-                    f"{_can_i_eat_result['remaining_after']:+.0f} kcal",
-                )
 
     # ------------------------------------------------------------------
     # PIANIFICAZIONE DELLA GIORNATA E SUGGERIMENTI PASTI
