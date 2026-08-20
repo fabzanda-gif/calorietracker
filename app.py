@@ -12061,3 +12061,103 @@ elif selected_page == t["t5"]:
                     st.toast(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals), icon="🎯")
                     st.success(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals))
                     st.rerun()
+
+
+# ============================================================
+# ZERO MODE — final component-level visual fixes
+# ============================================================
+def _zero_mode_component_visual_fixes():
+    if not st.session_state.get("zero_mode", False):
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* DATE INPUT — closed field */
+        [data-testid="stDateInput"] input {
+            background:#151515 !important;
+            color:#f5f5f5 !important;
+            -webkit-text-fill-color:#f5f5f5 !important;
+            border-color:#ff3b43 !important;
+            caret-color:#fff !important;
+        }
+        [data-testid="stDateInput"] input::selection {
+            background:#ff4b55 !important;
+            color:#fff !important;
+        }
+
+        /* DATE PICKER — explicitly undo ZERO's global white text inside
+           Streamlit/BaseWeb's light calendar popup. */
+        [data-baseweb="calendar"],
+        [data-baseweb="calendar"] > div,
+        [data-baseweb="popover"] [role="dialog"]:has([data-baseweb="calendar"]) {
+            background:#f7f7f9 !important;
+            color:#292b35 !important;
+        }
+        [data-baseweb="calendar"] *,
+        [data-baseweb="calendar"] button,
+        [data-baseweb="calendar"] span,
+        [data-baseweb="calendar"] div {
+            color:#292b35 !important;
+            -webkit-text-fill-color:#292b35 !important;
+        }
+        [data-baseweb="calendar"] button:disabled,
+        [data-baseweb="calendar"] [aria-disabled="true"] {
+            color:#a9abb1 !important;
+            -webkit-text-fill-color:#a9abb1 !important;
+            opacity:1 !important;
+        }
+        [data-baseweb="calendar"] [aria-selected="true"],
+        [data-baseweb="calendar"] [aria-selected="true"] * {
+            background:#ff4b55 !important;
+            color:#fff !important;
+            -webkit-text-fill-color:#fff !important;
+        }
+        [data-baseweb="calendar"] svg {
+            fill:#292b35 !important;
+            color:#292b35 !important;
+        }
+
+        /* SETTINGS / PROFILE POPOVER */
+        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) > div {
+            background:
+              radial-gradient(circle at 100% 0%, rgba(130,15,15,.26), transparent 42%),
+              #090909 !important;
+            border:1px solid rgba(255,45,45,.75) !important;
+            border-radius:22px !important;
+            box-shadow:0 16px 40px rgba(0,0,0,.55) !important;
+        }
+        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) label,
+        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) p,
+        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) span {
+            color:#f5f5f5 !important;
+            -webkit-text-fill-color:#f5f5f5 !important;
+        }
+        [data-baseweb="popover"] [data-testid="stSelectbox"] > div > div,
+        [data-baseweb="popover"] [data-baseweb="select"] > div {
+            background:#171717 !important;
+            color:#f5f5f5 !important;
+            border-color:#777 !important;
+        }
+        [data-baseweb="popover"] [data-testid="stBaseButton-primary"] {
+            background:linear-gradient(90deg,#ff3038,#c90000) !important;
+            color:#fff !important;
+            border:1px solid #ff4b55 !important;
+            font-weight:800 !important;
+        }
+        [data-baseweb="popover"] [data-testid="stBaseButton-secondary"] {
+            background:#111 !important;
+            color:#f5f5f5 !important;
+            border:1px solid #777 !important;
+            font-weight:700 !important;
+        }
+        [data-baseweb="popover"] hr {
+            border-color:#555 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+_zero_mode_component_visual_fixes()
