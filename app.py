@@ -4603,149 +4603,128 @@ with st.sidebar:
     )
 
     # --------------------------------------------------------------
-    # MENU PROFILO — in alto a sinistra, separato da foto e saluto.
+    # PROFILO + LINGUA — controlli diretti, niente pannello unico.
     # --------------------------------------------------------------
+    _language_options = [
+        "Italiano",
+        "English",
+        "Nederlands",
+        "Français",
+    ]
+    _language_flags = {
+        "Italiano": "🇮🇹",
+        "English": "🇬🇧",
+        "Nederlands": "🇳🇱",
+        "Français": "🇫🇷",
+    }
+
+    _current_menu_lang = st.session_state.get(
+        "lang_selector",
+        "Italiano",
+    )
+    if _current_menu_lang not in _language_options:
+        _current_menu_lang = "Italiano"
+
     st.markdown(
         """
         <style>
-        /* Trigger del menu */
-        .st-key-profile_menu_popover {
-            width:42px !important;
-            margin:0 0 .75rem 0 !important;
-        }
-
-        .st-key-profile_menu_popover button {
-            width:42px !important;
-            min-width:42px !important;
-            height:42px !important;
-            min-height:42px !important;
+        /* Direct profile + language controls */
+        .st-key-profile_direct_button button,
+        .st-key-language_flag_popover button {
+            width:44px !important;
+            min-width:44px !important;
+            height:44px !important;
+            min-height:44px !important;
             padding:0 !important;
-            border-radius:12px !important;
-            border:1.5px solid rgba(255,139,139,.72) !important;
-            background:linear-gradient(145deg,#FFFFFF,#FFF4F4) !important;
-            color:#192E49 !important;
-            box-shadow:0 5px 14px rgba(0,0,0,.10) !important;
-            font-size:1.05rem !important;
+            border-radius:13px !important;
+            font-size:1.15rem !important;
             font-weight:900 !important;
+            box-shadow:none !important;
         }
 
-        .st-key-profile_menu_popover button *,
-        .st-key-profile_menu_popover button span,
-        .st-key-profile_menu_popover button p {
+        /* Standard mode */
+        .st-key-profile_direct_button button,
+        .st-key-language_flag_popover button {
+            background:linear-gradient(145deg,#FFFFFF,#FFF5F5) !important;
+            border:1.5px solid rgba(255,139,139,.78) !important;
             color:#192E49 !important;
-            opacity:1 !important;
         }
 
-        .st-key-profile_menu_popover button:hover {
+        .st-key-profile_direct_button button:hover,
+        .st-key-language_flag_popover button:hover {
             background:#FFEDED !important;
             border-color:#FF6F6F !important;
-            transform:translateY(-1px);
         }
 
-        /* Pannello del popover coerente con SanoSync */
-        div[data-testid="stPopoverBody"] {
+        /* Language-only popover */
+        div[data-testid="stPopoverBody"]:has(.st-key-language_picker_select) {
             border:1px solid #FFD0D0 !important;
-            border-radius:18px !important;
+            border-radius:16px !important;
+            background:linear-gradient(145deg,#FFFFFF,#FFF7F7) !important;
+            box-shadow:0 14px 34px rgba(23,42,70,.14) !important;
+            padding:.75rem !important;
+            min-width:230px !important;
+        }
+
+        .st-key-language_picker_select div[data-baseweb="select"] > div {
+            border-radius:10px !important;
+        }
+
+        /* ZERO mode */
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-profile_direct_button button,
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-language_flag_popover button {
+            background:#101010 !important;
+            border:1.5px solid #B91C1C !important;
+            color:#F7F7F7 !important;
+        }
+
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-profile_direct_button button:hover,
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-language_flag_popover button:hover {
+            background:#1A0909 !important;
+            border-color:#FF2A20 !important;
+        }
+
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        div[data-testid="stPopoverBody"]:has(.st-key-language_picker_select) {
             background:
-                radial-gradient(circle at 100% 0%, rgba(255,139,139,.16), transparent 35%),
-                linear-gradient(145deg,#FFFFFF,#FFF7F7) !important;
-            box-shadow:0 16px 38px rgba(23,42,70,.16) !important;
-            padding:1rem !important;
+                radial-gradient(circle at 100% 0%,rgba(140,12,12,.20),transparent 42%),
+                linear-gradient(145deg,#111111,#070707) !important;
+            border:1px solid #B91C1C !important;
+            box-shadow:0 16px 38px rgba(0,0,0,.52) !important;
         }
 
-        /* Pulsante Impostazioni */
-        .st-key-profile_menu_settings button {
-            background:linear-gradient(135deg,#FF8B8B,#FF7474) !important;
-            color:#FFFFFF !important;
-            border:1px solid #FF7474 !important;
-            border-radius:11px !important;
-            min-height:44px !important;
-            font-weight:850 !important;
-            box-shadow:0 6px 16px rgba(255,139,139,.22) !important;
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        div[data-testid="stPopoverBody"]:has(.st-key-language_picker_select) * {
+            color:#F5F5F5 !important;
+            -webkit-text-fill-color:#F5F5F5 !important;
         }
 
-        .st-key-profile_menu_settings button *,
-        .st-key-profile_menu_settings button p,
-        .st-key-profile_menu_settings button span {
-            color:#FFFFFF !important;
-        }
-
-        /* Logout secondario ma coerente */
-        .st-key-profile_menu_logout button {
-            background:#FFFFFF !important;
-            color:#192E49 !important;
-            border:1.5px solid #FF8B8B !important;
-            border-radius:11px !important;
-            min-height:44px !important;
-            font-weight:850 !important;
-        }
-
-        .st-key-profile_menu_logout button *,
-        .st-key-profile_menu_logout button p,
-        .st-key-profile_menu_logout button span {
-            color:#192E49 !important;
-        }
-
-        .st-key-profile_menu_logout button:hover {
-            background:#FFF1F1 !important;
-        }
-
-        /* Select lingua */
-        .st-key-profile_menu_language div[data-baseweb="select"] > div {
-            border-radius:11px !important;
-            border-color:#FFD0D0 !important;
-            background:#FFFFFF !important;
-        }
-
-        /* Foto profilo più pulita e coerente */
-        [data-testid="stSidebar"] [data-testid="stImage"] img {
-            border-radius:14px !important;
-        }
-
-        .sanosync-account-row {
-            margin-top:.10rem;
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-language_picker_select div[data-baseweb="select"] > div {
+            background:#171717 !important;
+            border-color:#666 !important;
+            color:#F5F5F5 !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    with st.popover(
-        _pm["menu"],
-        key="profile_menu_popover",
-        help=_pm["settings"],
-    ):
-        _language_options = [
-            "Italiano",
-            "English",
-            "Nederlands",
-            "Français",
-        ]
-        _current_menu_lang = st.session_state.get(
-            "lang_selector",
-            "Italiano",
-        )
-        if _current_menu_lang not in _language_options:
-            _current_menu_lang = "Italiano"
+    _profile_col, _language_col, _account_spacer = st.columns(
+        [0.72, 0.72, 3.8],
+        gap="small",
+        vertical_alignment="center",
+    )
 
-        # Language first: it now reads as a menu preference, not a page title.
-        if not st.session_state.get("show_personal_settings", False):
-            _new_menu_lang = st.selectbox(
-                _pm["language"],
-                _language_options,
-                index=_language_options.index(_current_menu_lang),
-                key="profile_menu_language",
-                format_func=format_language_option,
-            )
-
-            if _new_menu_lang != st.session_state.get("lang_selector"):
-                st.session_state["lang_selector"] = _new_menu_lang
-                st.session_state["login_lang_selector"] = _new_menu_lang
-                st.rerun()
-
+    with _profile_col:
         if st.button(
-            _pm["settings"],
-            key="profile_menu_settings",
+            "👤",
+            key="profile_direct_button",
+            help=_pm["settings"],
             use_container_width=True,
         ):
             st.session_state.pop("settings_language_live", None)
@@ -4755,29 +4734,29 @@ with st.sidebar:
             st.session_state["show_personal_settings"] = True
             st.rerun()
 
-        st.divider()
-
-        if st.button(
-            _pm.get("logout", "🚪 Logout"),
-            key="profile_menu_logout",
-            use_container_width=True,
+    with _language_col:
+        with st.popover(
+            _language_flags.get(_current_menu_lang, "🌐"),
+            key="language_flag_popover",
+            help=_pm["language"],
         ):
-            try:
-                supabase.auth.sign_out()
-            except Exception:
-                pass
+            _new_menu_lang = st.selectbox(
+                _pm["language"],
+                _language_options,
+                index=_language_options.index(_current_menu_lang),
+                key="language_picker_select",
+                format_func=format_language_option,
+                label_visibility="collapsed",
+            )
 
-            for _auth_key in (
-                "user",
-                "auth_access_token",
-                "auth_refresh_token",
-                "show_personal_settings",
-                AUTH_FLOW_STATE_KEY,
-            ):
-                st.session_state.pop(_auth_key, None)
+            if _new_menu_lang != st.session_state.get("lang_selector"):
+                st.session_state["lang_selector"] = _new_menu_lang
+                st.session_state["login_lang_selector"] = _new_menu_lang
 
-            _cookie_delete(SESSION_COOKIE)
-            st.rerun()
+                if st.session_state.get("show_personal_settings", False):
+                    st.session_state["settings_language_live"] = _new_menu_lang
+
+                st.rerun()
 
     # --------------------------------------------------------------
     # FOTO + SALUTO
