@@ -12067,97 +12067,160 @@ elif selected_page == t["t5"]:
 # ZERO MODE — final component-level visual fixes
 # ============================================================
 def _zero_mode_component_visual_fixes():
-    if not st.session_state.get("zero_mode", False):
+    # Use the same source of truth as the rest of the app.
+    if not is_zero_mode():
         return
 
     st.markdown(
         """
         <style>
-        /* DATE INPUT — closed field */
-        [data-testid="stDateInput"] input {
+        /* =========================================================
+           ZERO — DATE FIELD
+           ========================================================= */
+        [data-testid="stDateInput"] input,
+        [data-testid="stDateInput"] [data-baseweb="input"] input,
+        [data-testid="stDateInput"] [data-baseweb="input"],
+        [data-testid="stDateInput"] [data-baseweb="base-input"] {
             background:#151515 !important;
-            color:#f5f5f5 !important;
-            -webkit-text-fill-color:#f5f5f5 !important;
-            border-color:#ff3b43 !important;
-            caret-color:#fff !important;
-        }
-        [data-testid="stDateInput"] input::selection {
-            background:#ff4b55 !important;
-            color:#fff !important;
+            background-color:#151515 !important;
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+            border-color:#6E6E6E !important;
+            caret-color:#FFFFFF !important;
         }
 
-        /* DATE PICKER — explicitly undo ZERO's global white text inside
-           Streamlit/BaseWeb's light calendar popup. */
-        [data-baseweb="calendar"],
-        [data-baseweb="calendar"] > div,
-        [data-baseweb="popover"] [role="dialog"]:has([data-baseweb="calendar"]) {
-            background:#f7f7f9 !important;
-            color:#292b35 !important;
+        [data-testid="stDateInput"] input::selection {
+            background:#E32020 !important;
+            color:#FFFFFF !important;
         }
-        [data-baseweb="calendar"] *,
-        [data-baseweb="calendar"] button,
-        [data-baseweb="calendar"] span,
-        [data-baseweb="calendar"] div {
-            color:#292b35 !important;
-            -webkit-text-fill-color:#292b35 !important;
+
+        /* =========================================================
+           ZERO — CALENDAR POPOVER
+           Streamlit's date picker is a BaseWeb calendar rendered in
+           a portal outside the main app container. Keep it light,
+           but force readable dark text explicitly.
+           ========================================================= */
+        div[data-baseweb="popover"] div[data-baseweb="calendar"],
+        div[data-baseweb="calendar"],
+        div[data-baseweb="calendar"] > div {
+            background:#F7F7F8 !important;
+            background-color:#F7F7F8 !important;
         }
-        [data-baseweb="calendar"] button:disabled,
-        [data-baseweb="calendar"] [aria-disabled="true"] {
-            color:#a9abb1 !important;
-            -webkit-text-fill-color:#a9abb1 !important;
+
+        div[data-baseweb="calendar"],
+        div[data-baseweb="calendar"] div,
+        div[data-baseweb="calendar"] span,
+        div[data-baseweb="calendar"] button,
+        div[data-baseweb="calendar"] select,
+        div[data-baseweb="calendar"] option {
+            color:#252832 !important;
+            -webkit-text-fill-color:#252832 !important;
+        }
+
+        div[data-baseweb="calendar"] button:disabled,
+        div[data-baseweb="calendar"] [aria-disabled="true"],
+        div[data-baseweb="calendar"] [aria-disabled="true"] * {
+            color:#A7A9AF !important;
+            -webkit-text-fill-color:#A7A9AF !important;
             opacity:1 !important;
         }
-        [data-baseweb="calendar"] [aria-selected="true"],
-        [data-baseweb="calendar"] [aria-selected="true"] * {
-            background:#ff4b55 !important;
-            color:#fff !important;
-            -webkit-text-fill-color:#fff !important;
-        }
-        [data-baseweb="calendar"] svg {
-            fill:#292b35 !important;
-            color:#292b35 !important;
+
+        div[data-baseweb="calendar"] [aria-selected="true"],
+        div[data-baseweb="calendar"] [aria-selected="true"] *,
+        div[data-baseweb="calendar"] button[aria-selected="true"] {
+            background:#FF4B55 !important;
+            background-color:#FF4B55 !important;
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+            border-radius:10px !important;
         }
 
-        /* SETTINGS / PROFILE POPOVER */
-        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) > div {
+        div[data-baseweb="calendar"] svg,
+        div[data-baseweb="calendar"] path {
+            color:#252832 !important;
+            fill:#252832 !important;
+        }
+
+        /* =========================================================
+           ZERO — PROFILE / LANGUAGE POPOVER
+           Streamlit popovers can be rendered either with stPopover
+           wrappers or a BaseWeb popover portal, so target both.
+           ========================================================= */
+
+        /* Outer panel */
+        div[data-testid="stPopoverBody"],
+        div[data-testid="stPopoverBody"] > div,
+        div[data-baseweb="popover"]:has([data-testid="stSelectbox"]) > div {
             background:
-              radial-gradient(circle at 100% 0%, rgba(130,15,15,.26), transparent 42%),
-              #090909 !important;
-            border:1px solid rgba(255,45,45,.75) !important;
-            border-radius:22px !important;
-            box-shadow:0 16px 40px rgba(0,0,0,.55) !important;
+                radial-gradient(circle at 100% 0%, rgba(150,12,12,.24), transparent 40%),
+                linear-gradient(145deg,#111111,#070707) !important;
+            background-color:#0B0B0B !important;
+            border:1px solid #B91C1C !important;
+            border-radius:20px !important;
+            box-shadow:0 18px 42px rgba(0,0,0,.55) !important;
         }
-        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) label,
-        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) p,
-        [data-baseweb="popover"]:has([data-testid="stSelectbox"]) span {
-            color:#f5f5f5 !important;
-            -webkit-text-fill-color:#f5f5f5 !important;
+
+        /* Typography inside panel */
+        div[data-testid="stPopoverBody"] *,
+        div[data-baseweb="popover"]:has([data-testid="stSelectbox"]) * {
+            color:#F5F5F5 !important;
+            -webkit-text-fill-color:#F5F5F5 !important;
         }
-        [data-baseweb="popover"] [data-testid="stSelectbox"] > div > div,
-        [data-baseweb="popover"] [data-baseweb="select"] > div {
+
+        /* Language select shell */
+        div[data-testid="stPopoverBody"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+        div[data-baseweb="popover"] [data-testid="stSelectbox"] [data-baseweb="select"] > div {
             background:#171717 !important;
-            color:#f5f5f5 !important;
-            border-color:#777 !important;
+            background-color:#171717 !important;
+            border:1px solid #6E6E6E !important;
+            color:#F5F5F5 !important;
         }
-        [data-baseweb="popover"] [data-testid="stBaseButton-primary"] {
-            background:linear-gradient(90deg,#ff3038,#c90000) !important;
-            color:#fff !important;
-            border:1px solid #ff4b55 !important;
+
+        /* Select arrow segment */
+        div[data-testid="stPopoverBody"] [data-testid="stSelectbox"] [data-baseweb="select"] > div > div:last-child,
+        div[data-baseweb="popover"] [data-testid="stSelectbox"] [data-baseweb="select"] > div > div:last-child {
+            background:#171717 !important;
+            border-left:1px solid #3C3C3C !important;
+        }
+
+        div[data-testid="stPopoverBody"] [data-testid="stSelectbox"] svg,
+        div[data-baseweb="popover"] [data-testid="stSelectbox"] svg {
+            fill:#F5F5F5 !important;
+            color:#F5F5F5 !important;
+        }
+
+        /* Profile primary action */
+        div[data-testid="stPopoverBody"] [data-testid="stBaseButton-primary"],
+        div[data-testid="stPopoverBody"] button[kind="primary"],
+        div[data-baseweb="popover"] [data-testid="stBaseButton-primary"] {
+            background:linear-gradient(90deg,#E10600,#A80000) !important;
+            border:1.5px solid #FF2A20 !important;
+            color:#FFFFFF !important;
             font-weight:800 !important;
+            box-shadow:none !important;
         }
-        [data-baseweb="popover"] [data-testid="stBaseButton-secondary"] {
-            background:#111 !important;
-            color:#f5f5f5 !important;
-            border:1px solid #777 !important;
+
+        /* Logout / secondary action */
+        div[data-testid="stPopoverBody"] [data-testid="stBaseButton-secondary"],
+        div[data-testid="stPopoverBody"] button[kind="secondary"],
+        div[data-baseweb="popover"] [data-testid="stBaseButton-secondary"] {
+            background:#111111 !important;
+            border:1px solid #777777 !important;
+            color:#FFFFFF !important;
             font-weight:700 !important;
         }
-        [data-baseweb="popover"] hr {
-            border-color:#555 !important;
+
+        div[data-testid="stPopoverBody"] hr,
+        div[data-baseweb="popover"] hr {
+            border-color:#555555 !important;
+        }
+
+        /* Popover arrow */
+        div[data-baseweb="popover"] [data-baseweb="popover"] {
+            background:#0B0B0B !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-
-_zero_mode_component_visual_fixes()
