@@ -247,7 +247,7 @@ import plotly.graph_objects as go
 ASSET_DIR = Path(__file__).resolve().parent
 APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
 ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
-ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/SanoSync_Zero.jpg"
+ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/4xrxp.jpg"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
 WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
@@ -4500,6 +4500,34 @@ if is_zero_mode():
             background:#171717 !important;
         }
 
+        /* Date controls: remove the last white-on-white native styling. */
+        [data-testid="stDateInput"] > div,
+        [data-testid="stDateInput"] [data-baseweb="input"],
+        [data-testid="stDateInput"] [data-baseweb="input"] > div,
+        [data-testid="stDateInput"] input,
+        input[type="date"] {
+            background:#171717 !important;
+            background-color:#171717 !important;
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+            border-color:#737373 !important;
+            caret-color:#FFFFFF !important;
+        }
+        [data-testid="stDateInput"] input::-webkit-datetime-edit,
+        [data-testid="stDateInput"] input::-webkit-datetime-edit-fields-wrapper,
+        [data-testid="stDateInput"] input::-webkit-datetime-edit-text,
+        [data-testid="stDateInput"] input::-webkit-datetime-edit-month-field,
+        [data-testid="stDateInput"] input::-webkit-datetime-edit-day-field,
+        [data-testid="stDateInput"] input::-webkit-datetime-edit-year-field {
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+            background:transparent !important;
+        }
+        [data-testid="stDateInput"] input::-webkit-calendar-picker-indicator {
+            filter:invert(1) brightness(1.8) !important;
+            opacity:.9 !important;
+        }
+
         @media (max-width:700px) {
             .sano-page-title {
                 font-size:2.55rem !important;
@@ -5335,7 +5363,11 @@ ZERO_COPY = {
             "burn_msg_no": "Nessuna attività extra registrata. Curiosamente, è uno dei dati più facili da credere.",
             "bilancio_ok": "C'è un deficit calorico. O stai dimagrendo, o la memoria selettiva ha colpito ancora.",
             "bilancio_bad": "C'è un surplus calorico. L'ipotesi dell'arrotondamento perde credibilità.",
-            "weight_msg_default": "Il peso ha depositato un nuovo elemento agli atti.",
+            "weight_msg_default": "Il peso ha depositato un nuovo elemento agli atti. La bilancia, naturalmente, pretende di essere creduta.",
+            "first_last_diff": "Differenza tra prima e ultima pesata. Sempre che entrambe abbiano detto la verità.",
+            "estimate_based": "Stima basata su {deficit} kcal/giorno di deficit medio ({days} giorni dichiarati). Il futuro non ha ancora firmato nulla.",
+            "target_reached_caption": "Il peso registrato coincide con l'obiettivo. Stranamente comodo, ma prendiamo atto.",
+            "need_positive_deficit": "Senza un deficit medio positivo la data obiettivo resta soprattutto letteratura.",
             "status_very_active": "Giornata molto attiva. Il tracker ci crede; SanoSync conserva prudentemente il diritto di dubitare.",
             "status_good": "Attività registrata. Abbastanza da sembrare credibile, non abbastanza da eliminare ogni dubbio.",
             "status_lazy": "Giornata territorialmente molto circoscritta.",
@@ -5349,7 +5381,7 @@ ZERO_COPY = {
             "balance_surplus": "Con un surplus la data obiettivo resta, tecnicamente, materia per la narrativa.",
             "forecast_days": lambda d, date_str: f"Data stimata: **{date_str}** ({d} giorni). Possibile, sempre che la costanza improvvisamente diventi una tua caratteristica stabile.",
             "forecast_steady": "Il trend va nella direzione giusta. Per ora. Sarebbe prematuro attribuirti una nuova personalità.",
-            "forecast_flat_up": "Trend stabile o in salita. La proiezione ha deciso di non inventarsi una risposta.",
+            "forecast_flat_up": "Trend stabile o in salita. Almeno questo dato non sta cercando di impressionare nessuno.",
         },
         "ux": {
             "over_target": "Risultano circa {kcal} kcal sopra il target. Il dato è stato regolarmente acquisito.",
@@ -5359,6 +5391,10 @@ ZERO_COPY = {
             "exact_target": "Target centrato al kcal. O sei diventato improvvisamente precisissimo, o qualche dettaglio ha avuto una giornata libera.",
             "day_total": "Totale giornata: {kcal} kcal. I numeri hanno raggiunto un accordo.",
             "no_extra": "Nessuna caloria extra registrata. Una voce sorprendentemente tranquilla del fascicolo.",
+            "extra_burned_note": "Somma delle calorie dichiarate dalle attività della giornata. Il tracker giura che siano vere.",
+            "steps_note": "Calorie attribuite ai passi. Il telefono dispone apparentemente di una ricostruzione dettagliata.",
+            "padel_note": "Calorie registrate come Padel. Una cifra che il dispositivo sostiene con notevole sicurezza.",
+            "bike_note": "Somma di Bici ed E-Bike. Le ruote hanno presentato la propria versione dei fatti.",
         },
         "thinking": "Sto facendo i conti. Alcuni numeri stanno già cercando un avvocato.",
     },
@@ -5378,7 +5414,11 @@ ZERO_COPY = {
             "burn_msg_no": "No extra activity logged. Curiously, this is one figure we tend to trust.",
             "bilancio_ok": "A calorie deficit exists. At least according to the documentation supplied by the interested party.",
             "bilancio_bad": "There is a calorie surplus. The rounding-error defence is losing credibility.",
-            "weight_msg_default": "The scale has submitted another item of evidence.",
+            "weight_msg_default": "The scale has submitted another item of evidence. Naturally, it expects to be believed.",
+            "first_last_diff": "Difference between the first and latest weigh-in. Assuming both told the truth.",
+            "estimate_based": "Estimate based on an average deficit of {deficit} kcal/day ({days} reported days). The future has not signed off yet.",
+            "target_reached_caption": "The recorded weight matches the target. Suspiciously convenient, but duly noted.",
+            "need_positive_deficit": "Without a positive average deficit, the target date remains mostly a work of fiction.",
             "status_very_active": "Very active day. The tracker seems unusually confident about it.",
             "status_good": "Activity logged. We acknowledge the declaration.",
             "status_lazy": "A geographically compact day.",
@@ -5391,8 +5431,8 @@ ZERO_COPY = {
             "balance_days": lambda d: f"Estimate: about {d} days. Unless you start making a complete mess of it.",
             "balance_surplus": "With a surplus, the target date remains mostly a work of fiction.",
             "forecast_days": lambda d, date_str: f"Estimated date: **{date_str}** ({d} days). According to mathematics, which was not consulted about real life.",
-            "forecast_steady": "The trend points the intended way. The scale is cooperating, for now.",
-            "forecast_flat_up": "Trend is flat or rising. The projection has declined to invent an answer.",
+            "forecast_steady": "The trend points the intended way. On paper. Paper, it should be noted, trusts you rather a lot.",
+            "forecast_flat_up": "Trend is flat or rising. At least this number is not trying to impress anyone.",
         },
         "ux": {
             "over_target": "About {kcal} kcal over target are currently on record.",
@@ -5402,6 +5442,10 @@ ZERO_COPY = {
             "exact_target": "Target hit to the exact kcal. A level of precision that raises absolutely no questions.",
             "day_total": "Daily total: {kcal} kcal. The numbers have reached an agreement.",
             "no_extra": "No extra calories logged. An unusually quiet section of the file.",
+            "extra_burned_note": "Sum of calories claimed by today's activities. The tracker swears they are real.",
+            "steps_note": "Calories attributed to steps. The phone apparently has a detailed reconstruction.",
+            "padel_note": "Calories logged as padel. A figure the device presents with remarkable confidence.",
+            "bike_note": "Bike and e-bike combined. The wheels have submitted their version of events.",
         },
         "thinking": "Running the numbers. Several figures are already asking for legal representation.",
     },
@@ -5421,7 +5465,11 @@ ZERO_COPY = {
             "burn_msg_no": "Geen extra activiteit geregistreerd. Opmerkelijk genoeg vertrouwen we dit cijfer vrij snel.",
             "bilancio_ok": "Er is een calorietekort. Althans volgens de documentatie van de belanghebbende zelf.",
             "bilancio_bad": "Er is een calorieoverschot. De afrondingsfout verliest geloofwaardigheid als verklaring.",
-            "weight_msg_default": "De weegschaal heeft nieuw bewijsmateriaal aangeleverd.",
+            "weight_msg_default": "De weegschaal heeft nieuw bewijsmateriaal aangeleverd. Uiteraard verwacht hij dat we het geloven.",
+            "first_last_diff": "Verschil tussen de eerste en laatste meting. Ervan uitgaande dat beide eerlijk waren.",
+            "estimate_based": "Schatting op basis van gemiddeld {deficit} kcal/dag tekort ({days} opgegeven dagen). De toekomst heeft nog niet getekend.",
+            "target_reached_caption": "Het geregistreerde gewicht komt overeen met het doel. Opvallend handig, maar genoteerd.",
+            "need_positive_deficit": "Zonder positief gemiddeld tekort blijft de doeldatum vooral fictie.",
             "status_very_active": "Zeer actieve dag. De tracker klinkt er bijzonder zeker van.",
             "status_good": "Activiteit geregistreerd. We nemen kennis van de verklaring.",
             "status_lazy": "Een geografisch bijzonder compacte dag.",
@@ -5434,8 +5482,8 @@ ZERO_COPY = {
             "balance_days": lambda d: f"Schatting: ongeveer {d} dagen. Tenzij je er onderweg natuurlijk een complete puinhoop van maakt.",
             "balance_surplus": "Met een overschot blijft de doeldatum vooral een literair concept.",
             "forecast_days": lambda d, date_str: f"Geschatte datum: **{date_str}** ({d} dagen). Volgens de wiskunde, die niet over het echte leven is geraadpleegd.",
-            "forecast_steady": "De trend wijst de bedoelde kant op. De weegschaal werkt voorlopig mee.",
-            "forecast_flat_up": "De trend is vlak of stijgend. De prognose weigert een antwoord te verzinnen.",
+            "forecast_steady": "De trend wijst de bedoelde kant op. Op papier. Papier heeft opvallend veel vertrouwen in je.",
+            "forecast_flat_up": "De trend is vlak of stijgend. Dit cijfer probeert tenminste niemand te imponeren.",
         },
         "ux": {
             "over_target": "Er staat ongeveer {kcal} kcal boven het doel in het dossier.",
@@ -5445,6 +5493,10 @@ ZERO_COPY = {
             "exact_target": "Doel exact op de kcal geraakt. Een precisie die absoluut geen vragen oproept.",
             "day_total": "Dagtotaal: {kcal} kcal. De cijfers zijn tot overeenstemming gekomen.",
             "no_extra": "Geen extra calorieën geregistreerd. Een opvallend rustig deel van het dossier.",
+            "extra_burned_note": "Som van de calorieën die de activiteiten van vandaag claimen. De tracker zweert dat het klopt.",
+            "steps_note": "Calorieën toegeschreven aan stappen. De telefoon beschikt blijkbaar over een gedetailleerde reconstructie.",
+            "padel_note": "Calorieën geregistreerd als padel. Een cijfer waar het apparaat opvallend zeker van is.",
+            "bike_note": "Fiets en e-bike samen. De wielen hebben hun versie van de feiten ingediend.",
         },
         "thinking": "Ik reken het uit. Enkele cijfers hebben inmiddels juridische bijstand gevraagd.",
     },
@@ -5464,7 +5516,11 @@ ZERO_COPY = {
             "burn_msg_no": "Aucune activité supplémentaire enregistrée. Curieusement, c'est un chiffre auquel on a tendance à croire.",
             "bilancio_ok": "Il existe un déficit calorique. Du moins selon les pièces fournies par l'intéressé.",
             "bilancio_bad": "Il y a un surplus calorique. L'hypothèse de l'arrondi perd en crédibilité.",
-            "weight_msg_default": "La balance vient d'ajouter une nouvelle pièce au dossier.",
+            "weight_msg_default": "La balance vient d'ajouter une nouvelle pièce au dossier. Naturellement, elle s'attend à être crue.",
+            "first_last_diff": "Écart entre la première et la dernière pesée. En supposant qu'elles aient toutes les deux dit vrai.",
+            "estimate_based": "Estimation basée sur {deficit} kcal/jour de déficit moyen ({days} jours déclarés). Le futur n'a encore rien signé.",
+            "target_reached_caption": "Le poids enregistré correspond à l'objectif. Étonnamment pratique, mais acte pris.",
+            "need_positive_deficit": "Sans déficit moyen positif, la date cible relève surtout de la fiction.",
             "status_very_active": "Journée très active. Le tracker semble particulièrement sûr de lui.",
             "status_good": "Activité enregistrée. Nous prenons acte de la déclaration.",
             "status_lazy": "Une journée géographiquement très compacte.",
@@ -5474,11 +5530,11 @@ ZERO_COPY = {
                    if diff >= 0 else
                    f"{abs(diff)} kcal au-dessus. L'arrondi a un alibi assez faible.")
             ),
-            "balance_days": lambda d: f"Estimation : environ {d} jours. Les mathématiques n'ont pas été informées des week-ends.",
+            "balance_days": lambda d: f"Estimation : environ {d} jours. À moins que vous ne décidiez soudainement de tout gâcher.",
             "balance_surplus": "Avec un surplus, la date cible relève surtout de la littérature.",
             "forecast_days": lambda d, date_str: f"Date estimée : **{date_str}** ({d} jours). Selon les mathématiques, qui n'ont pas été consultées sur la vraie vie.",
-            "forecast_steady": "La tendance va dans le sens prévu. La balance coopère, pour l'instant.",
-            "forecast_flat_up": "Tendance stable ou en hausse. La projection refuse d'inventer une réponse.",
+            "forecast_steady": "La tendance va dans le sens prévu. Sur le papier. Le papier, lui, vous fait étonnamment confiance.",
+            "forecast_flat_up": "Tendance stable ou en hausse. Au moins, ce chiffre n'essaie d'impressionner personne.",
         },
         "ux": {
             "over_target": "Environ {kcal} kcal au-dessus de l'objectif figurent actuellement au dossier.",
@@ -5488,6 +5544,10 @@ ZERO_COPY = {
             "exact_target": "Objectif atteint à la kcal près. Une précision qui ne soulève absolument aucune question.",
             "day_total": "Total de la journée : {kcal} kcal. Les chiffres sont parvenus à un accord.",
             "no_extra": "Aucune calorie supplémentaire enregistrée. Une partie étonnamment calme du dossier.",
+            "extra_burned_note": "Somme des calories revendiquées par les activités du jour. Le tracker jure que c'est vrai.",
+            "steps_note": "Calories attribuées aux pas. Le téléphone semble disposer d'une reconstitution détaillée.",
+            "padel_note": "Calories enregistrées comme padel. Un chiffre que l'appareil défend avec une remarquable assurance.",
+            "bike_note": "Vélo et e-bike réunis. Les roues ont déposé leur version des faits.",
         },
         "thinking": "Je fais les comptes. Plusieurs chiffres demandent déjà un avocat.",
     },
@@ -5779,12 +5839,8 @@ def tr_activity_plan(value): return _tr_value(ACTIVITY_PLAN_KEYS, value)
 with st.sidebar:
     # --- LOGO / PERSONALITY MODE ---
     if is_zero_mode():
-        # Use the dedicated ZERO logo from the repository.
+        # The dedicated asset already contains the ZERO wordmark.
         st.sidebar.image(ZERO_LOGO_URL, use_container_width=True)
-        st.markdown(
-            '<div class="sano-zero-wordmark">SanoSync<span>ZERO MODE</span></div>',
-            unsafe_allow_html=True,
-        )
     else:
         st.sidebar.image("logo2.png", use_container_width=True)
 
