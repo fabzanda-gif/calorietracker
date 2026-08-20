@@ -8032,7 +8032,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Sto analizzando gli ingredienti…",
             "ingredient_ai_done": "✅ Ingredienti compilati automaticamente.",
             "ingredient_ai_empty": "Inserisci almeno un ingrediente.",
-            "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}","creation_mode":"Come vuoi creare la ricetta?","mode_known":"🍳 So già cosa cucinare","mode_ai":"✨ Voglio un aiuto dall’AI","mode_known_help":"Scrivi gli ingredienti che hai deciso di usare: SanoSync calcolerà automaticamente kcal e macro.","mode_ai_help":"Descrivi i tuoi obiettivi e lascia che SanoSync proponga una ricetta completa.","ai_starting_ingredients":"✨ Ingredienti di partenza per l’AI (opzionale)","ai_starting_help":"Se li inserisci, l’AI li userà come base (modalità svuotafrigo) e aggiungerà solo ciò che serve.","ai_generated_loaded":"✅ Ricetta generata. Controlla ingredienti e valori prima di salvarla.",
+            "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}","creation_mode":"Come vuoi creare la ricetta?","mode_known":"🍳 So già cosa cucinare","mode_ai":"✨ Voglio un aiuto dall’AI","mode_known_help":"Scrivi gli ingredienti che hai deciso di usare: SanoSync calcolerà automaticamente kcal e macro.","mode_ai_help":"Descrivi i tuoi obiettivi e lascia che SanoSync proponga una ricetta completa.","ai_starting_ingredients":"✨ Ingredienti di partenza per l’AI (opzionale)","ai_starting_help":"Se li inserisci, l’AI li userà come base (modalità svuotafrigo) e aggiungerà solo ciò che serve.","ai_generated_loaded":"✅ Ricetta AI caricata in modifica. Controlla ingredienti e valori prima di salvarla.",
         },
         "English": {
             "my": "👤 My recipes",
@@ -8058,7 +8058,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Analyzing ingredients…",
             "ingredient_ai_done": "✅ Ingredients filled automatically.",
             "ingredient_ai_empty": "Enter at least one ingredient.",
-            "ingredient_ai_error": "Ingredient analysis error: {error}","creation_mode":"How do you want to create the recipe?","mode_known":"🍳 I already know what to cook","mode_ai":"✨ I want AI help","mode_known_help":"Enter the ingredients you have chosen: SanoSync will calculate calories and macros automatically.","mode_ai_help":"Set your targets and let SanoSync propose a complete recipe.","ai_starting_ingredients":"✨ Starting ingredients for AI (optional)","ai_starting_help":"If provided, AI will use them as the base (fridge-clear-out mode) and add only what is needed.","ai_generated_loaded":"✅ Recipe generated. Review ingredients and values before saving.",
+            "ingredient_ai_error": "Ingredient analysis error: {error}","creation_mode":"How do you want to create the recipe?","mode_known":"🍳 I already know what to cook","mode_ai":"✨ I want AI help","mode_known_help":"Enter the ingredients you have chosen: SanoSync will calculate calories and macros automatically.","mode_ai_help":"Set your targets and let SanoSync propose a complete recipe.","ai_starting_ingredients":"✨ Starting ingredients for AI (optional)","ai_starting_help":"If provided, AI will use them as the base (fridge-clear-out mode) and add only what is needed.","ai_generated_loaded":"✅ AI recipe loaded for editing. Review ingredients and values before saving.",
         },
         "Nederlands": {
             "my": "👤 Mijn recepten",
@@ -8084,7 +8084,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Ingrediënten analyseren…",
             "ingredient_ai_done": "✅ Ingrediënten automatisch ingevuld.",
             "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
-            "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ Recept gegenereerd. Controleer ingrediënten en waarden voor je opslaat.",
+            "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ AI-recept geladen om te bewerken. Controleer ingrediënten en waarden voor je opslaat.",
         },
         "Français": {
             "my": "👤 Mes recettes",
@@ -8110,7 +8110,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Analyse des ingrédients…",
             "ingredient_ai_done": "✅ Ingrédients remplis automatiquement.",
             "ingredient_ai_empty": "Saisissez au moins un ingrédient.",
-            "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}","creation_mode":"Comment souhaitez-vous créer la recette ?","mode_known":"🍳 Je sais déjà quoi cuisiner","mode_ai":"✨ Je veux l’aide de l’IA","mode_known_help":"Saisissez les ingrédients choisis : SanoSync calculera automatiquement calories et macros.","mode_ai_help":"Définissez vos objectifs et laissez SanoSync proposer une recette complète.","ai_starting_ingredients":"✨ Ingrédients de départ pour l’IA (optionnel)","ai_starting_help":"Si vous les indiquez, l’IA les utilisera comme base (mode vide-frigo) et n’ajoutera que le nécessaire.","ai_generated_loaded":"✅ Recette générée. Vérifiez ingrédients et valeurs avant de l’enregistrer.",
+            "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}","creation_mode":"Comment souhaitez-vous créer la recette ?","mode_known":"🍳 Je sais déjà quoi cuisiner","mode_ai":"✨ Je veux l’aide de l’IA","mode_known_help":"Saisissez les ingrédients choisis : SanoSync calculera automatiquement calories et macros.","mode_ai_help":"Définissez vos objectifs et laissez SanoSync proposer une recette complète.","ai_starting_ingredients":"✨ Ingrédients de départ pour l’IA (optionnel)","ai_starting_help":"Si vous les indiquez, l’IA les utilisera comme base (mode vide-frigo) et n’ajoutera que le nécessaire.","ai_generated_loaded":"✅ Recette IA chargée en modification. Vérifiez les ingrédients et valeurs avant l’enregistrement.",
         },
     }
     _rcu = _recipe_compact_i18n.get(
@@ -8310,6 +8310,8 @@ elif selected_page == t["t4"]:
     # Apply an AI-generated recipe BEFORE any builder widget is instantiated.
     _pending_recipe = st.session_state.pop("_pending_ai_recipe_for_builder", None)
     if _pending_recipe:
+        # Only switch to the manual/known mode when the user explicitly asks
+        # to edit/use the generated recipe.
         st.session_state["recipe_creation_mode"] = "known"
         st.session_state["recipe_builder_ingredients"] = list(
             _pending_recipe.get("ingredients") or []
@@ -8541,14 +8543,112 @@ elif selected_page == t["t4"]:
                             avoid_ingredients=_ai_avoid,
                         )
 
+                    if not (_generated.get("ingredients") or []):
+                        raise RuntimeError(
+                            "La ricetta generata non contiene ingredienti validi."
+                        )
+
                     st.session_state[
-                        "_pending_ai_recipe_for_builder"
+                        "unified_ai_recipe_result"
                     ] = _generated
+                    st.session_state[
+                        "recipe_creation_mode"
+                    ] = "ai"
                     st.rerun()
 
                 except Exception as exc:
                     st.error(_air["error"].format(error=exc))
                     print(traceback.format_exc())
+
+            _ai_generated_result = st.session_state.get(
+                "unified_ai_recipe_result"
+            )
+
+            if _ai_generated_result:
+                _ai_nutr = _ai_generated_result.get(
+                    "nutrition_per_serving",
+                    {},
+                )
+
+                st.divider()
+                st.markdown(
+                    f"### 🍽️ {html.escape(str(_ai_generated_result.get('name') or 'Ricetta AI'))}"
+                )
+
+                st.caption(
+                    f"⏱️ {_ai_generated_result.get('total_minutes', 0)} min · "
+                    f"{_ai_generated_result.get('active_minutes', 0)} min {_air['active']} · "
+                    f"🍽️ {_safe_float(_ai_generated_result.get('servings') or 1):g}"
+                )
+
+                _m1, _m2, _m3, _m4 = st.columns(4)
+                _m1.metric(
+                    "Kcal",
+                    int(round(_safe_float(_ai_nutr.get("calories")))),
+                )
+                _m2.metric(
+                    "Pro",
+                    f"{_safe_float(_ai_nutr.get('protein')):.1f} g",
+                )
+                _m3.metric(
+                    "Carbs",
+                    f"{_safe_float(_ai_nutr.get('carbs')):.1f} g",
+                )
+                _m4.metric(
+                    "Fat",
+                    f"{_safe_float(_ai_nutr.get('fat')):.1f} g",
+                )
+
+                if _ai_generated_result.get("warning"):
+                    st.warning(
+                        str(_ai_generated_result.get("warning"))
+                    )
+
+                st.markdown(f"**🥕 {_air['ingredients']}**")
+                for _ing in (
+                    _ai_generated_result.get("ingredients") or []
+                ):
+                    st.markdown(
+                        f"- {html.escape(str(_ing.get('name') or ''))} — "
+                        f"{_safe_float(_ing.get('quantity_g')):g} g"
+                    )
+
+                st.markdown(f"**👩‍🍳 {_air['instructions']}**")
+                for _idx, _step in enumerate(
+                    _ai_generated_result.get("instructions") or [],
+                    start=1,
+                ):
+                    st.markdown(
+                        f"{_idx}. {html.escape(str(_step))}"
+                    )
+
+                _r1, _r2 = st.columns(2)
+                with _r1:
+                    if st.button(
+                        _air["regenerate"],
+                        use_container_width=True,
+                        key="unified_ai_recipe_regenerate",
+                    ):
+                        st.session_state.pop(
+                            "unified_ai_recipe_result",
+                            None,
+                        )
+                        st.rerun()
+
+                with _r2:
+                    if st.button(
+                        _air["edit"],
+                        use_container_width=True,
+                        key="unified_ai_recipe_use_edit",
+                    ):
+                        st.session_state[
+                            "_pending_ai_recipe_for_builder"
+                        ] = _ai_generated_result
+                        st.session_state.pop(
+                            "unified_ai_recipe_result",
+                            None,
+                        )
+                        st.rerun()
 
         else:
             st.caption(_rcu["mode_known_help"])
