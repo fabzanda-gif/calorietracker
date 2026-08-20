@@ -1282,6 +1282,190 @@ def get_sanosync_coach_message_cached(
     return message
 
 
+
+CAN_I_EAT_I18N = {
+    "Italiano": {
+        "title": "✨ SanoSync AI · Posso mangiarlo?",
+        "label": "Cosa vorresti mangiare?",
+        "placeholder": "Es. Posso mangiare una pizza Domino's stasera?",
+        "help": (
+            "SanoSync AI considera le calorie già registrate oggi, il budget "
+            "di fine giornata, il deficit o mantenimento e il goal proteico."
+        ),
+        "button": "✨ Chiedi a SanoSync AI",
+        "thinking": "Sto valutando come farlo rientrare nella tua giornata…",
+        "error": "Non riesco a valutare questo alimento: {error}",
+        "estimate": "Stima AI",
+        "remaining_after": "Margine stimato dopo",
+    },
+    "English": {
+        "title": "✨ SanoSync AI · Can I eat this?",
+        "label": "What would you like to eat?",
+        "placeholder": "E.g. Can I have a Domino's pizza tonight?",
+        "help": (
+            "SanoSync AI considers today's logged calories, your end-of-day "
+            "budget, deficit or maintenance goal, and protein target."
+        ),
+        "button": "✨ Ask SanoSync AI",
+        "thinking": "Checking how it could fit into your day…",
+        "error": "I couldn't evaluate this food: {error}",
+        "estimate": "AI estimate",
+        "remaining_after": "Estimated margin after",
+    },
+    "Nederlands": {
+        "title": "✨ SanoSync AI · Kan ik dit eten?",
+        "label": "Wat zou je willen eten?",
+        "placeholder": "Bijv. Kan ik vanavond een Domino's pizza eten?",
+        "help": (
+            "SanoSync AI houdt rekening met de calorieën van vandaag, je "
+            "dagbudget, tekort of onderhoud en je eiwitdoel."
+        ),
+        "button": "✨ Vraag SanoSync AI",
+        "thinking": "Ik kijk hoe dit in je dag kan passen…",
+        "error": "Ik kan dit voedingsmiddel niet beoordelen: {error}",
+        "estimate": "AI-schatting",
+        "remaining_after": "Geschatte marge daarna",
+    },
+    "Français": {
+        "title": "✨ SanoSync AI · Puis-je manger ça ?",
+        "label": "Qu'aimeriez-vous manger ?",
+        "placeholder": "Ex. Puis-je manger une pizza Domino's ce soir ?",
+        "help": (
+            "SanoSync AI tient compte des calories déjà enregistrées, de votre "
+            "budget de fin de journée, du déficit ou maintien et de l'objectif protéique."
+        ),
+        "button": "✨ Demander à SanoSync AI",
+        "thinking": "Je vérifie comment l'intégrer à votre journée…",
+        "error": "Impossible d'évaluer cet aliment : {error}",
+        "estimate": "Estimation IA",
+        "remaining_after": "Marge estimée après",
+    },
+}
+
+
+def generate_can_i_eat_advice(
+    *,
+    food_request,
+    language,
+    calories_eaten,
+    maintenance_budget,
+    deficit_target,
+    protein_eaten=None,
+    protein_goal=None,
+):
+    """
+    Estimate the requested food and explain how it fits today's target.
+    Nutrition numbers for the user's day are deterministic; only the requested
+    food estimate is delegated to AI.
+    """
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY non configurata.")
+
+    language_name = {
+        "Italiano": "Italian",
+        "English": "English",
+        "Nederlands": "Dutch",
+        "Français": "French",
+    }.get(language, "Italian")
+
+    target_intake = max(
+        0.0,
+        float(maintenance_budget) - float(deficit_target),
+    )
+    remaining_before = target_intake - float(calories_eaten)
+
+    protein_context = ""
+    if protein_goal is not None and float(protein_goal or 0) > 0:
+        protein_context = (
+            f"\nPROTEIN EATEN: {float(protein_eaten or 0):.0f} g"
+            f"\nPROTEIN GOAL: {float(protein_goal):.0f} g"
+        )
+
+    prompt = f"""
+LANGUAGE: {language_name}
+USER REQUEST: {food_request}
+
+TODAY'S CALCULATED SANOSYNC DATA:
+- maintenance/end-of-day burn budget: {float(maintenance_budget):.0f} kcal
+- desired deficit: {float(deficit_target):.0f} kcal
+- intake target for today: {target_intake:.0f} kcal
+- calories already eaten: {float(calories_eaten):.0f} kcal
+- calories remaining before this food: {remaining_before:.0f} kcal
+{protein_context}
+
+TASK:
+Estimate a realistic SINGLE serving/order for what the user described.
+If it is a branded/restaurant food and exact nutrition is uncertain, explicitly
+treat it as an estimate and use a reasonable typical value.
+
+Return ONLY valid JSON:
+{{
+  "food_name": "short normalized name",
+  "estimated_kcal": 800,
+  "estimated_protein_g": 30,
+  "estimated_carbs_g": 90,
+  "estimated_fat_g": 30,
+  "confidence": "low|medium|high",
+  "message": "2-4 concise sentences in {language_name}. Explain whether/how it fits today. Never moralize food. If it does not fit the target, suggest a practical smaller portion or lighter combination rather than telling the user they cannot eat it."
+}}
+
+Rules:
+- never give medical advice;
+- never use guilt/shame language;
+- do not recommend fasting or compensatory exercise;
+- do not change today's SanoSync numbers;
+- the estimate is allowed to be approximate;
+- output JSON only.
+""".strip()
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    model_id = resolve_groq_text_model()
+
+    response = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are SanoSync food-fit assistant. "
+                    "Return one valid JSON object only."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.35,
+        max_tokens=700,
+        stream=False,
+    )
+
+    raw = response.choices[0].message.content
+    data = _extract_json_object_tolerant(raw)
+
+    estimated_kcal = max(0.0, _safe_float(data.get("estimated_kcal")))
+    return {
+        "food_name": str(data.get("food_name") or food_request).strip(),
+        "estimated_kcal": estimated_kcal,
+        "estimated_protein_g": max(
+            0.0, _safe_float(data.get("estimated_protein_g"))
+        ),
+        "estimated_carbs_g": max(
+            0.0, _safe_float(data.get("estimated_carbs_g"))
+        ),
+        "estimated_fat_g": max(
+            0.0, _safe_float(data.get("estimated_fat_g"))
+        ),
+        "confidence": str(data.get("confidence") or "medium").strip(),
+        "message": sanitize_sanosync_coach_output(
+            data.get("message") or ""
+        ),
+        "remaining_after": remaining_before - estimated_kcal,
+    }
+
+
 def render_sanosync_coach_card(message, language):
     if not message:
         return
@@ -1436,6 +1620,41 @@ def infer_meal_category(row):
     if label.casefold().startswith("adyen"):
         return "Lavoro"
     return "Casa"
+
+
+
+def suggest_next_meal_type(log_date=None):
+    """
+    Shared meal-type default logic used across SanoSync:
+    - no main meal logged -> Breakfast
+    - Breakfast logged -> Lunch
+    - Lunch logged -> Dinner
+    - Snack is never auto-selected
+    """
+    target_date = log_date or date.today()
+
+    try:
+        rows = (
+            supabase.table("meals")
+            .select("meal_type")
+            .eq("user_id", user_id)
+            .eq("date", str(target_date))
+            .execute().data
+            or []
+        )
+        logged = {
+            str(row.get("meal_type") or "").strip().casefold()
+            for row in rows
+        }
+    except Exception as exc:
+        print(f"Meal type default error: {exc}")
+        logged = set()
+
+    if "pranzo" in logged:
+        return "Cena"
+    if "colazione" in logged:
+        return "Pranzo"
+    return "Colazione"
 
 
 def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
@@ -3013,6 +3232,11 @@ def show_login_page():
                         custom_deficit_input,
                     )
 
+                    # Reaching the target weight always means maintenance.
+                    if abs(float(current_weight) - float(target_weight)) <= 0.05:
+                        selected_plan = "maintenance"
+                        selected_deficit = 0
+
                     preset_value = int(
                         DEFICIT_PRESETS.get(selected_plan, 0)
                     )
@@ -3166,6 +3390,37 @@ else:
         if metadata_weight not in (None, "")
         else None
     )
+
+
+# Self-heal older metadata: if latest weight equals target, force maintenance.
+try:
+    _target_now = _safe_float(user_target_weight)
+    if (
+        user_current_weight is not None
+        and _target_now > 0
+        and abs(float(user_current_weight) - _target_now) <= 0.05
+        and (
+            _safe_float(user_deficit_target_kcal) != 0
+            or normalize_deficit_plan(user_deficit_plan) != "maintenance"
+        )
+    ):
+        _maintenance_meta = dict(u_meta)
+        _maintenance_meta["current_weight"] = float(user_current_weight)
+        _maintenance_meta["deficit_target_kcal"] = 0
+        _maintenance_meta["deficit_plan"] = "maintenance"
+
+        _maintenance_response = supabase.auth.update_user(
+            {"data": _maintenance_meta}
+        )
+        if getattr(_maintenance_response, "user", None):
+            st.session_state["user"] = _maintenance_response.user
+
+        u_meta = _maintenance_meta
+        user_deficit_target_kcal = 0
+        user_deficit_plan = "maintenance"
+except Exception as exc:
+    print(f"Maintenance metadata sync error: {exc}")
+
 
 user_bmr = None
 if (
@@ -5293,6 +5548,12 @@ def render_personal_settings_page():
     ):
         try:
             normalized_plan = normalize_deficit_plan(new_deficit_plan)
+
+            # If current and target weight match, force maintenance in metadata.
+            if abs(float(new_current_weight) - float(new_target)) <= 0.05:
+                normalized_plan = "maintenance"
+                new_deficit_kcal = 0
+
             preset_value = int(DEFICIT_PRESETS.get(normalized_plan, 0))
             plan_to_save = (
                 normalized_plan
@@ -6911,40 +7172,8 @@ if selected_page == t["t1"]:
     with st.container(border=True):
         meal_options = ["Colazione", "Pranzo", "Cena", "Snack"]
 
-        # --------------------------------------------------------------
-        # Tipo di pasto suggerito automaticamente.
-        # - nessun pasto principale registrato -> Colazione
-        # - Colazione presente -> Pranzo
-        # - Pranzo presente -> Cena
-        # - Snack non viene mai selezionato automaticamente
-        #
-        # Il calcolo viene rifatto a ogni nuova versione del form, quindi dopo
-        # aver salvato un pasto il successivo propone automaticamente il passo
-        # logico seguente.
-        # --------------------------------------------------------------
-        try:
-            _logged_meal_types_today = (
-                supabase.table("meals")
-                .select("meal_type")
-                .eq("user_id", user_id)
-                .eq("date", str(log_date))
-                .execute().data
-                or []
-            )
-            _logged_main_types = {
-                str(row.get("meal_type") or "").strip().casefold()
-                for row in _logged_meal_types_today
-            }
-        except Exception as _meal_type_exc:
-            print(f"Meal type default error: {_meal_type_exc}")
-            _logged_main_types = set()
-
-        if "pranzo" in _logged_main_types:
-            _suggested_meal_type = "Cena"
-        elif "colazione" in _logged_main_types:
-            _suggested_meal_type = "Pranzo"
-        else:
-            _suggested_meal_type = "Colazione"
+        # Shared default logic used everywhere in SanoSync.
+        _suggested_meal_type = suggest_next_meal_type(log_date)
 
         _meal_type_key = f"meal_type_input_{v}"
         if _meal_type_key not in st.session_state:
@@ -7344,7 +7573,15 @@ elif selected_page == t["t2"]:
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
     total_cals_in = sum(_safe_float(m.get("calories")) for m in meals_data)
 
-    current_weight = daily_log_res[0].get("weight") if daily_log_res else None
+    current_weight = (
+        daily_log_res[0].get("weight")
+        if daily_log_res and daily_log_res[0].get("weight") is not None
+        else (
+            float(user_current_weight)
+            if user_current_weight is not None
+            else None
+        )
+    )
     initial_weight = all_weight_logs[0]["weight"] if all_weight_logs else 89.0
     target_weight = float(user_target_weight) if user_target_weight else 78.0
 
@@ -7439,6 +7676,86 @@ elif selected_page == t["t2"]:
     with col_c4:
         weight_str = f"{float(current_weight):.1f} kg" if current_weight else "N/D"
         st.markdown(f'<div class="custom-card"><div class="custom-card-title">📉 {t["card_weight"]}</div><div class="custom-card-value">{weight_str}</div><div class="custom-card-caption">{weight_msg}</div></div>', unsafe_allow_html=True)
+
+    # ------------------------------------------------------------------
+    # SANOSYNC AI · POSSO MANGIARLO?
+    # ------------------------------------------------------------------
+    if summary_date == date.today():
+        _cie = CAN_I_EAT_I18N.get(
+            current_lang,
+            CAN_I_EAT_I18N["Italiano"],
+        )
+
+        with st.container(border=True):
+            st.markdown(f"### {_cie['title']}")
+
+            _can_i_eat_text = st.text_input(
+                _cie["label"],
+                placeholder=_cie["placeholder"],
+                help=_cie["help"],
+                key="can_i_eat_query",
+            )
+
+            if st.button(
+                _cie["button"],
+                type="primary",
+                use_container_width=True,
+                key="can_i_eat_submit",
+            ):
+                if _can_i_eat_text.strip():
+                    try:
+                        with st.spinner(_cie["thinking"]):
+                            _can_i_eat_result = generate_can_i_eat_advice(
+                                food_request=_can_i_eat_text.strip(),
+                                language=current_lang,
+                                calories_eaten=total_cals_in,
+                                maintenance_budget=total_estimated_burned,
+                                deficit_target=target_deficit_kcal,
+                                protein_eaten=sum(
+                                    _safe_float(m.get("protein"))
+                                    for m in meals_data
+                                ),
+                                protein_goal=(
+                                    user_protein_goal_g
+                                    if user_protein_goal_enabled
+                                    else None
+                                ),
+                            )
+                        st.session_state[
+                            "can_i_eat_result"
+                        ] = _can_i_eat_result
+                    except Exception as exc:
+                        st.error(
+                            _cie["error"].format(error=exc)
+                        )
+
+            _can_i_eat_result = st.session_state.get(
+                "can_i_eat_result"
+            )
+            if _can_i_eat_result:
+                st.markdown(
+                    f"**{html.escape(_can_i_eat_result['food_name'])}**"
+                )
+                if _can_i_eat_result.get("message"):
+                    st.write(_can_i_eat_result["message"])
+
+                _cie_c1, _cie_c2, _cie_c3, _cie_c4 = st.columns(4)
+                _cie_c1.metric(
+                    _cie["estimate"],
+                    f"{_can_i_eat_result['estimated_kcal']:.0f} kcal",
+                )
+                _cie_c2.metric(
+                    "Pro",
+                    f"{_can_i_eat_result['estimated_protein_g']:.0f} g",
+                )
+                _cie_c3.metric(
+                    "Carbs",
+                    f"{_can_i_eat_result['estimated_carbs_g']:.0f} g",
+                )
+                _cie_c4.metric(
+                    _cie["remaining_after"],
+                    f"{_can_i_eat_result['remaining_after']:+.0f} kcal",
+                )
 
     # ------------------------------------------------------------------
     # PIANIFICAZIONE DELLA GIORNATA E SUGGERIMENTI PASTI
@@ -8173,7 +8490,24 @@ elif selected_page == t["t3"]:
 
         c1, c2 = st.columns(2)
         with c1:
-            w = st.number_input(t["new_weight"], value=80.0, min_value=20.0, max_value=300.0, step=0.1, key="new_weight_value")
+            _latest_weight_default = (
+                float(logs_all[0]["weight"])
+                if logs_all and logs_all[0].get("weight") is not None
+                else (
+                    float(user_current_weight)
+                    if user_current_weight is not None
+                    else 80.0
+                )
+            )
+            if "new_weight_value" not in st.session_state:
+                st.session_state["new_weight_value"] = _latest_weight_default
+            w = st.number_input(
+                t["new_weight"],
+                min_value=20.0,
+                max_value=300.0,
+                step=0.1,
+                key="new_weight_value",
+            )
             w_date = st.date_input(t["weight_date"], value=date.today(), key="new_weight_date")
             if st.button(t["save_weight_ui"], use_container_width=True):
                 try:
@@ -8220,6 +8554,34 @@ elif selected_page == t["t3"]:
                         },
                         on_conflict="user_id,date",
                     ).execute()
+
+                    # Keep auth metadata aligned with the latest entered weight.
+                    _weight_metadata = dict(
+                        getattr(
+                            st.session_state.get("user"),
+                            "user_metadata",
+                            {},
+                        )
+                        or {}
+                    )
+                    _weight_metadata["current_weight"] = float(w)
+
+                    _target_for_maintenance = _safe_float(
+                        _weight_metadata.get("target_weight")
+                        or user_target_weight
+                    )
+                    if (
+                        _target_for_maintenance > 0
+                        and abs(float(w) - _target_for_maintenance) <= 0.05
+                    ):
+                        _weight_metadata["deficit_target_kcal"] = 0
+                        _weight_metadata["deficit_plan"] = "maintenance"
+
+                    _weight_auth_response = supabase.auth.update_user(
+                        {"data": _weight_metadata}
+                    )
+                    if getattr(_weight_auth_response, "user", None):
+                        st.session_state["user"] = _weight_auth_response.user
 
                     if sound_to_play is not None:
                         st.session_state["pending_weight_sound"] = str(sound_to_play)
@@ -9031,6 +9393,10 @@ elif selected_page == t["t4"]:
 
             _ai1, _ai2 = st.columns(2)
             with _ai1:
+                if "unified_ai_recipe_meal_type" not in st.session_state:
+                    st.session_state["unified_ai_recipe_meal_type"] = (
+                        suggest_next_meal_type(date.today())
+                    )
                 _ai_meal_type = st.selectbox(
                     _air["meal_type"],
                     ["Colazione", "Pranzo", "Cena", "Snack"],
@@ -9381,10 +9747,15 @@ elif selected_page == t["t4"]:
 
             rc1, rc2 = st.columns(2)
             with rc1:
+                _recipe_meal_key = f"recipe_meal_type_{v}"
+                if _recipe_meal_key not in st.session_state:
+                    st.session_state[_recipe_meal_key] = (
+                        suggest_next_meal_type(date.today())
+                    )
                 recipe_meal_type = st.selectbox(
                     t["meal_type_label"],
                     ["Colazione", "Pranzo", "Cena", "Snack"],
-                    key=f"recipe_meal_type_{v}",
+                    key=_recipe_meal_key,
                     format_func=tr_meal_type,
                 )
             with rc2:
