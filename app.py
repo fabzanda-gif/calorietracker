@@ -3830,14 +3830,26 @@ if is_zero_mode():
             font-family: 'Kanit', sans-serif !important;
         }
 
-        [data-testid="stAppViewContainer"] *,
-        [data-testid="stSidebar"] *,
+        body,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stSidebar"],
+        p,
+        label,
         button,
         input,
         textarea,
         select,
-        label {
+        [data-testid="stMarkdownContainer"],
+        [data-testid="stMetricLabel"],
+        [data-testid="stMetricValue"] {
             font-family: 'Kanit', sans-serif !important;
+        }
+
+        /* Never override Streamlit / Material icon fonts. */
+        [class*="material-symbols"],
+        [data-testid*="Icon"],
+        svg {
+            font-family: initial !important;
         }
 
         h1, h2, h3, h4,
@@ -4101,6 +4113,13 @@ if is_zero_mode():
             border:1.5px solid #C91A16 !important;
             box-shadow:0 10px 24px rgba(0,0,0,.32) !important;
         }
+
+        div[data-testid="stMetric"],
+        div[data-testid="stMetric"] > div {
+            background:
+                radial-gradient(circle at 96% 4%, rgba(225,6,0,.18), transparent 34%),
+                linear-gradient(145deg,#151515,#090909) !important;
+        }
         [data-testid="stMetric"] label,
         [data-testid="stMetric"] [data-testid="stMetricValue"],
         [data-testid="stMetric"] [data-testid="stMetricDelta"],
@@ -4173,10 +4192,34 @@ if is_zero_mode():
             border:1px solid #626262 !important;
             border-radius:14px !important;
         }
+        [data-testid="stExpander"],
+        details[data-testid="stExpander"] {
+            background:#0B0B0B !important;
+            border:1px solid #666666 !important;
+            border-radius:14px !important;
+            overflow:hidden !important;
+        }
+
         [data-testid="stExpander"] summary,
-        [data-testid="stExpander"] summary * {
+        details[data-testid="stExpander"] > summary {
+            background:#111111 !important;
+            border-bottom:1px solid #3E3E3E !important;
+            color:#F5F5F5 !important;
+        }
+
+        [data-testid="stExpander"] summary *,
+        details[data-testid="stExpander"] > summary * {
             color:#F5F5F5 !important;
             -webkit-text-fill-color:#F5F5F5 !important;
+        }
+
+        [data-testid="stExpander"] summary [class*="material-symbols"],
+        details[data-testid="stExpander"] > summary [class*="material-symbols"] {
+            font-family:'Material Symbols Rounded','Material Symbols Outlined' !important;
+        }
+
+        [data-testid="stExpanderDetails"] {
+            background:#0B0B0B !important;
         }
 
         /* Radio / segmented options */
@@ -4201,7 +4244,7 @@ if is_zero_mode():
         }
 
         h4, h5, h6,
-        p, span, label, div,
+        p, label,
         button, input, textarea, select {
             font-family:'Kanit', sans-serif !important;
         }
@@ -4249,6 +4292,17 @@ if is_zero_mode():
             background:#080808 !important;
             border:1px solid #3B3B3B !important;
             border-radius:16px !important;
+        }
+
+        /* Alerts follow ZERO palette instead of blue/green light fills. */
+        [data-testid="stAlert"] {
+            background:#101010 !important;
+            border:1px solid #626262 !important;
+            color:#F5F5F5 !important;
+        }
+        [data-testid="stAlert"] * {
+            color:#F5F5F5 !important;
+            -webkit-text-fill-color:#F5F5F5 !important;
         }
 
         /* Links */
@@ -7246,7 +7300,7 @@ def render_ai_ingredient_header(
                 font-size:1rem;
                 font-weight:900;
                 line-height:1.25;
-                color:#1A2942;
+                color:{'#F7F7F7' if is_zero_mode() else '#1A2942'};
                 padding:0;
             ">
                 {title}
@@ -7265,42 +7319,81 @@ def render_ai_ingredient_header(
 
 
 def render_ai_spotlight_css():
-    """
-    Stronger visual treatment for the two key SanoSync AI ingredient inputs.
-    Keeps the existing SanoSync coral/navy visual language.
-    """
-    st.markdown(
-        """
-        <style>
-        div[class*="st-key-ai_spotlight_"] {
-            border: 2px solid #FF8B8B !important;
-            border-radius: 20px !important;
-            padding: 16px 18px 18px 18px !important;
-            margin: 8px 0 14px 0 !important;
-            background:
-                radial-gradient(circle at 96% 8%, rgba(255,139,139,.18), transparent 34%),
-                linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,246,246,.92)) !important;
-            box-shadow: 0 10px 28px rgba(26,41,66,.08) !important;
-        }
+    """Visual treatment for the SanoSync AI ingredient fields."""
+    if is_zero_mode():
+        st.markdown(
+            """
+            <style>
+            div[class*="st-key-ai_spotlight_"] {
+                border: 1.5px solid #C91A16 !important;
+                border-radius: 18px !important;
+                padding: 15px 17px 17px 17px !important;
+                margin: 8px 0 14px 0 !important;
+                background:
+                    radial-gradient(circle at 96% 8%, rgba(225,6,0,.17), transparent 34%),
+                    linear-gradient(145deg,#121212,#080808) !important;
+                box-shadow: 0 10px 26px rgba(0,0,0,.30) !important;
+            }
 
-        div[class*="st-key-ai_spotlight_"] textarea {
-            border: 1.5px solid rgba(255,139,139,.55) !important;
-            border-radius: 14px !important;
-            background: rgba(248,249,252,.98) !important;
-        }
+            div[class*="st-key-ai_spotlight_"] textarea {
+                border: 1.2px solid #696969 !important;
+                border-radius: 13px !important;
+                background: #151515 !important;
+                color:#F5F5F5 !important;
+                -webkit-text-fill-color:#F5F5F5 !important;
+            }
 
-        div[class*="st-key-ai_spotlight_"] textarea:focus {
-            border-color: #FF6F75 !important;
-            box-shadow: 0 0 0 2px rgba(255,111,117,.12) !important;
-        }
+            div[class*="st-key-ai_spotlight_"] textarea::placeholder {
+                color:#919191 !important;
+                -webkit-text-fill-color:#919191 !important;
+            }
 
-        div[class*="st-key-ai_spotlight_"] button {
-            border-radius: 12px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+            div[class*="st-key-ai_spotlight_"] textarea:focus {
+                border-color: #FF2A20 !important;
+                box-shadow: 0 0 0 2px rgba(225,6,0,.14) !important;
+            }
+
+            div[class*="st-key-ai_spotlight_"] button {
+                border-radius: 11px !important;
+                background:#111 !important;
+                border-color:#C91A16 !important;
+                color:#FFF !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <style>
+            div[class*="st-key-ai_spotlight_"] {
+                border: 2px solid #FF8B8B !important;
+                border-radius: 20px !important;
+                padding: 16px 18px 18px 18px !important;
+                margin: 8px 0 14px 0 !important;
+                background:
+                    radial-gradient(circle at 96% 8%, rgba(255,139,139,.18), transparent 34%),
+                    linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,246,246,.92)) !important;
+                box-shadow: 0 10px 28px rgba(26,41,66,.08) !important;
+            }
+            div[class*="st-key-ai_spotlight_"] textarea {
+                border: 1.5px solid rgba(255,139,139,.55) !important;
+                border-radius: 14px !important;
+                background: rgba(248,249,252,.98) !important;
+            }
+            div[class*="st-key-ai_spotlight_"] textarea:focus {
+                border-color: #FF6F75 !important;
+                box-shadow: 0 0 0 2px rgba(255,111,117,.12) !important;
+            }
+            div[class*="st-key-ai_spotlight_"] button {
+                border-radius: 12px !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
 
 
 def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
@@ -7442,27 +7535,51 @@ if selected_page == t["t1"]:
     )
 
     if log_date == date.today():
-        st.markdown(
-            """
-            <style>
-            .st-key-can_i_eat_spotlight {
-                border: 2px solid #FF8B8B !important;
-                border-radius: 20px !important;
-                padding: 16px 18px 18px 18px !important;
-                margin: 0 0 1rem 0 !important;
-                background:
-                    radial-gradient(circle at 96% 6%, rgba(255,139,139,.20), transparent 32%),
-                    linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,246,246,.94)) !important;
-                box-shadow: 0 10px 28px rgba(26,41,66,.08) !important;
-            }
-            .st-key-can_i_eat_spotlight input {
-                border: 1.5px solid rgba(255,139,139,.55) !important;
-                border-radius: 13px !important;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+        if is_zero_mode():
+            st.markdown(
+                """
+                <style>
+                .st-key-can_i_eat_spotlight {
+                    border:1.5px solid #C91A16 !important;
+                    border-radius:18px !important;
+                    padding:16px 18px 18px 18px !important;
+                    margin:0 0 1rem 0 !important;
+                    background:
+                        radial-gradient(circle at 96% 6%, rgba(225,6,0,.17), transparent 34%),
+                        linear-gradient(145deg,#121212,#080808) !important;
+                    box-shadow:0 10px 26px rgba(0,0,0,.30) !important;
+                }
+                .st-key-can_i_eat_spotlight input {
+                    background:#151515 !important;
+                    border:1.2px solid #696969 !important;
+                    color:#F5F5F5 !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """
+                <style>
+                .st-key-can_i_eat_spotlight {
+                    border: 2px solid #FF8B8B !important;
+                    border-radius: 20px !important;
+                    padding: 16px 18px 18px 18px !important;
+                    margin: 0 0 1rem 0 !important;
+                    background:
+                        radial-gradient(circle at 96% 6%, rgba(255,139,139,.20), transparent 32%),
+                        linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,246,246,.94)) !important;
+                    box-shadow: 0 10px 28px rgba(26,41,66,.08) !important;
+                }
+                .st-key-can_i_eat_spotlight input {
+                    border: 1.5px solid rgba(255,139,139,.55) !important;
+                    border-radius: 13px !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
 
         with st.container(key="can_i_eat_spotlight"):
             st.markdown(f"### {_cie['title']}")
@@ -8514,21 +8631,41 @@ elif selected_page == t["t2"]:
         diff_tgt = float(current_weight) - target_weight
         weight_msg = t["weight_msg_val"](initial_weight, diff_ini, target_weight, diff_tgt)
 
-    st.markdown(f"""
-        <style>
-            .custom-card {{
-                background-color: {coral_light_bg};
-                border: 1.5px solid {coral_border};
-                border-radius: 16px;
-                padding: 16px;
-                height: 100%;
-                box-shadow: 0 2px 6px rgba(255, 139, 139, 0.08);
-            }}
-            .custom-card-title {{ font-size: .95rem; font-weight: 600; color: #1A2942; margin-bottom: 4px; }}
-            .custom-card-value {{ font-size: 1.8rem; font-weight: 700; color: #1A2942; margin-bottom: 8px; }}
-            .custom-card-caption {{ font-size: .86rem; color: #4A4A4A; line-height: 1.42; }}
-        </style>
-    """, unsafe_allow_html=True)
+    if is_zero_mode():
+        st.markdown("""
+            <style>
+                .custom-card {
+                    background:
+                        radial-gradient(circle at 96% 4%, rgba(225,6,0,.18), transparent 36%),
+                        linear-gradient(145deg,#151515,#090909) !important;
+                    border:1.5px solid #C91A16 !important;
+                    border-radius:18px;
+                    padding:17px;
+                    height:100%;
+                    box-shadow:0 9px 24px rgba(0,0,0,.30);
+                }
+                .custom-card-title {font-size:.95rem;font-weight:700;color:#D9D9D9 !important;margin-bottom:5px;}
+                .custom-card-value {font-size:1.8rem;font-weight:800;color:#FFFFFF !important;margin-bottom:8px;}
+                .custom-card-caption {font-size:.86rem;color:#BDBDBD !important;line-height:1.42;}
+                .custom-card * {-webkit-text-fill-color:currentColor !important;}
+            </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+            <style>
+                .custom-card {{
+                    background-color:{coral_light_bg};
+                    border:1.5px solid {coral_border};
+                    border-radius:16px;
+                    padding:16px;
+                    height:100%;
+                    box-shadow:0 2px 6px rgba(255,139,139,.08);
+                }}
+                .custom-card-title {{font-size:.95rem;font-weight:600;color:#1A2942;margin-bottom:4px;}}
+                .custom-card-value {{font-size:1.8rem;font-weight:700;color:#1A2942;margin-bottom:8px;}}
+                .custom-card-caption {{font-size:.86rem;color:#4A4A4A;line-height:1.42;}}
+            </style>
+        """, unsafe_allow_html=True)
 
     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
     with col_c1:
@@ -9184,6 +9321,7 @@ elif selected_page == t["t2"]:
                                 labels=list(_macro_values.keys()),
                                 values=list(_macro_values.values()),
                                 hole=0.42,
+                                marker=dict(colors=(["#E10600","#F2F2F2","#777777"] if is_zero_mode() else None)),
                                 textinfo="percent+label",
                                 hovertemplate=(
                                     "%{label}: %{value:.1f} "
@@ -9232,6 +9370,7 @@ elif selected_page == t["t2"]:
                                 labels=list(_meal_kcal.keys()),
                                 values=list(_meal_kcal.values()),
                                 hole=0.42,
+                                marker=dict(colors=(["#E10600","#F2F2F2","#777777","#3A3A3A"] if is_zero_mode() else None)),
                                 textinfo="percent+label",
                                 hovertemplate=(
                                     "%{label}: %{value:.0f} "
@@ -9534,21 +9673,40 @@ elif selected_page == t["t3"]:
                 goal_date_text = projected_date.strftime("%d/%m/%Y")
                 goal_caption = t["estimate_based"].format(deficit=f"{avg_daily_deficit_30:.0f}", days=valid_deficit_days)
 
-        st.markdown('''
-            <style>
-                .custom-card {
-                    background-color: #FFF5F5;
-                    border: 1.5px solid #FF8B8B;
-                    border-radius: 16px;
-                    padding: 16px;
-                    height: 100%;
-                    box-shadow: 0 2px 6px rgba(255,139,139,.08);
-                }
-                .custom-card-title { font-size:.95rem;font-weight:600;color:#1A2942;margin-bottom:4px; }
-                .custom-card-value { font-size:1.8rem;font-weight:700;color:#1A2942;margin-bottom:8px; }
-                .custom-card-caption { font-size:.82rem;color:#555;line-height:1.35; }
-            </style>
-        ''', unsafe_allow_html=True)
+        if is_zero_mode():
+            st.markdown('''
+                <style>
+                    .custom-card {
+                        background:
+                            radial-gradient(circle at 96% 4%, rgba(225,6,0,.18), transparent 36%),
+                            linear-gradient(145deg,#151515,#090909);
+                        border:1.5px solid #C91A16;
+                        border-radius:18px;
+                        padding:17px;
+                        height:100%;
+                        box-shadow:0 9px 24px rgba(0,0,0,.30);
+                    }
+                    .custom-card-title {font-size:.95rem;font-weight:700;color:#D9D9D9;margin-bottom:5px;}
+                    .custom-card-value {font-size:1.8rem;font-weight:800;color:#FFFFFF;margin-bottom:8px;}
+                    .custom-card-caption {font-size:.82rem;color:#BDBDBD;line-height:1.38;}
+                </style>
+            ''', unsafe_allow_html=True)
+        else:
+            st.markdown('''
+                <style>
+                    .custom-card {
+                        background-color:#FFF5F5;
+                        border:1.5px solid #FF8B8B;
+                        border-radius:16px;
+                        padding:16px;
+                        height:100%;
+                        box-shadow:0 2px 6px rgba(255,139,139,.08);
+                    }
+                    .custom-card-title {font-size:.95rem;font-weight:600;color:#1A2942;margin-bottom:4px;}
+                    .custom-card-value {font-size:1.8rem;font-weight:700;color:#1A2942;margin-bottom:8px;}
+                    .custom-card-caption {font-size:.82rem;color:#555;line-height:1.35;}
+                </style>
+            ''', unsafe_allow_html=True)
 
         wk1, wk2, wk3 = st.columns(3)
         with wk1:
@@ -9736,15 +9894,39 @@ elif selected_page == t["t3"]:
                 showgrid=False,
                 fixedrange=False,
             )
-            fig.update_yaxes(title=y_title, gridcolor="#E8ECF2", zeroline=False, fixedrange=False)
+            _chart_grid = "#333333" if is_zero_mode() else "#E8ECF2"
+            _chart_bg = "#080808" if is_zero_mode() else "#FFFFFF"
+            _chart_font = "#F2F2F2" if is_zero_mode() else "#1A2942"
+            _legend_bg = "rgba(8,8,8,.88)" if is_zero_mode() else "rgba(255,255,255,.85)"
+
+            fig.update_yaxes(
+                title=y_title,
+                gridcolor=_chart_grid,
+                zeroline=False,
+                fixedrange=False,
+            )
+            fig.update_xaxes(
+                color=_chart_font,
+            )
+            fig.update_yaxes(
+                color=_chart_font,
+            )
             fig.update_layout(
                 height=500,
-                plot_bgcolor="#FFFFFF",
+                plot_bgcolor=_chart_bg,
                 paper_bgcolor="rgba(0,0,0,0)",
                 hovermode="x unified",
-                font=dict(color="#1A2942"),
+                font=dict(color=_chart_font),
                 margin=dict(l=55, r=25, t=45, b=55),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(255,255,255,.85)"),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    bgcolor=_legend_bg,
+                    font=dict(color=_chart_font),
+                ),
             )
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
@@ -11225,21 +11407,40 @@ elif selected_page == t["t5"]:
         status_display_text = f"{day_steps} {ux['step_word']}"
 
     # Tile con lo stesso design della Panoramica
-    st.markdown("""
-        <style>
-            .custom-card {
-                background-color: #FFF5F5;
-                border: 1.5px solid #FF8B8B;
-                border-radius: 16px;
-                padding: 16px;
-                height: 100%;
-                box-shadow: 0 2px 6px rgba(255,139,139,.08);
-            }
-            .custom-card-title { font-size:.95rem;font-weight:600;color:#1A2942;margin-bottom:4px; }
-            .custom-card-value { font-size:1.8rem;font-weight:700;color:#1A2942;margin-bottom:8px; }
-            .custom-card-caption { font-size:.82rem;color:#555;line-height:1.35; }
-        </style>
-    """, unsafe_allow_html=True)
+    if is_zero_mode():
+        st.markdown("""
+            <style>
+                .custom-card {
+                    background:
+                        radial-gradient(circle at 96% 4%, rgba(225,6,0,.18), transparent 36%),
+                        linear-gradient(145deg,#151515,#090909);
+                    border:1.5px solid #C91A16;
+                    border-radius:18px;
+                    padding:17px;
+                    height:100%;
+                    box-shadow:0 9px 24px rgba(0,0,0,.30);
+                }
+                .custom-card-title {font-size:.95rem;font-weight:700;color:#D9D9D9;margin-bottom:5px;}
+                .custom-card-value {font-size:1.8rem;font-weight:800;color:#FFFFFF;margin-bottom:8px;}
+                .custom-card-caption {font-size:.82rem;color:#BDBDBD;line-height:1.38;}
+            </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <style>
+                .custom-card {
+                    background-color:#FFF5F5;
+                    border:1.5px solid #FF8B8B;
+                    border-radius:16px;
+                    padding:16px;
+                    height:100%;
+                    box-shadow:0 2px 6px rgba(255,139,139,.08);
+                }
+                .custom-card-title {font-size:.95rem;font-weight:600;color:#1A2942;margin-bottom:4px;}
+                .custom-card-value {font-size:1.8rem;font-weight:700;color:#1A2942;margin-bottom:8px;}
+                .custom-card-caption {font-size:.82rem;color:#555;line-height:1.35;}
+            </style>
+        """, unsafe_allow_html=True)
 
     ac1, ac2 = st.columns(2)
     with ac1:
