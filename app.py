@@ -6414,6 +6414,70 @@ with st.sidebar:
         )
 
 
+    st.markdown(
+        f'<div style="text-align:center;color:#FFB4B4;font-weight:900;font-size:1rem;letter-spacing:.01em;margin:-.15rem 0 .55rem 0;">{html.escape(t["slogan"])}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("---")
+    
+    pages_map = {
+        t["t1"]: "t1",
+        t["t2"]: "t2",
+        t["t3"]: "t3",
+        t["t4"]: "t4",
+        t["t5"]: "t5"
+    }
+    
+    if "current_page_id" not in st.session_state:
+        st.session_state.current_page_id = "t1"
+
+    for page_name, page_id in pages_map.items():
+        is_active = (st.session_state.current_page_id == page_id)
+        if st.button(
+            page_name,
+            key=f"nav_{page_id}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+        ):
+            st.session_state.current_page_id = page_id
+
+            # Una tab della sidebar è sempre una navigazione fuori da Settings.
+            st.session_state["show_personal_settings"] = False
+            st.session_state.pop("settings_language_live", None)
+            st.session_state.pop("profile_menu_language", None)
+            st.session_state["_collapse_sidebar_mobile_next_run"] = True
+            st.rerun()
+
+    if st.session_state.pop("_collapse_sidebar_mobile_next_run", False):
+        st.components.v1.html(
+            """
+            <script>
+            (() => {
+              try {
+                const w = window.parent;
+                if (w.innerWidth > 800) return;
+                const d = w.document;
+                const selectors = [
+                  '[data-testid="stSidebarCollapseButton"] button',
+                  'button[aria-label="Close sidebar"]',
+                  'button[aria-label="Collapse sidebar"]'
+                ];
+                for (const sel of selectors) {
+                  const btn = d.querySelector(sel);
+                  if (btn) { setTimeout(() => btn.click(), 100); break; }
+                }
+              } catch (e) {}
+            })();
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
+
+    selected_page_id = st.session_state.current_page_id
+    selected_page = t[selected_page_id]
+
+
     # --------------------------------------------------------------
     # Kcal rimanenti: budget FINALE della giornata.
     # Formula = BMR completo + attività registrata oggi - kcal ingerite.
