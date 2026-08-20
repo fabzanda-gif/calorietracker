@@ -492,6 +492,35 @@ st.markdown("""
         }
         .sano-budget-meta * { color:#E8EEF7 !important; }
 
+        .sano-ai-coach-card {
+            border-radius:18px;
+            padding:16px;
+            margin:.35rem 0 .6rem 0;
+            background:
+                radial-gradient(circle at 96% 4%, rgba(255,139,139,.20), transparent 38%),
+                linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.07));
+            border:1px solid rgba(255,255,255,.14);
+            box-shadow:0 8px 24px rgba(0,0,0,.12);
+        }
+
+        .sano-ai-coach-title {
+            color:#FFD0D0 !important;
+            -webkit-text-fill-color:#FFD0D0 !important;
+            font-size:.82rem;
+            font-weight:900;
+            letter-spacing:.02em;
+            margin-bottom:7px;
+        }
+
+        .sano-ai-coach-message,
+        .sano-ai-coach-message * {
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+            font-size:.88rem;
+            line-height:1.42;
+            font-weight:650;
+        }
+
         @media (max-width:700px) {
             .recipe-card-photo { height:180px; }
         }
@@ -781,6 +810,252 @@ def _safe_float(value):
     except (TypeError, ValueError):
         return 0.0
 
+
+
+
+SANOSYNC_COACH_SYSTEM_PROMPT = """
+You are the voice of SanoSync, a food, activity and weight tracking app.
+
+Your ONLY task is to transform already-calculated SanoSync data into one
+short, natural message for the user.
+
+TONE OF VOICE:
+- friendly
+- calm
+- concrete
+- positive without sounding celebratory for everything
+- lightly witty only when it feels natural
+- never paternalistic
+- never judgmental
+- never guilt-inducing
+
+STRICT RULES:
+- maximum 2 short sentences
+- maximum 45 words
+- address the user directly
+- use at most 1 emoji
+- answer ONLY in the language specified in the user context
+- do not invent, recalculate or alter any number
+- do not give medical advice
+- do not diagnose
+- do not classify foods as morally good/bad, clean/dirty, guilty, cheating, etc.
+- do not present one day above target as a failure
+- avoid generic motivational clichés
+- do not recommend compensatory fasting or excessive exercise
+- use only the data and status labels provided
+- if protein data is not provided, do not mention protein
+- if the calorie target is exceeded, keep the message neutral and constructive
+""".strip()
+
+
+def classify_sanosync_coach_state(
+    remaining_to_deficit_target,
+    protein_eaten=None,
+    protein_goal=None,
+):
+    """Deterministic classification. AI does not perform the calculations."""
+    remaining = float(remaining_to_deficit_target)
+
+    if remaining < -300:
+        calorie_status = "OVER_TARGET_HIGH"
+    elif remaining < 0:
+        calorie_status = "OVER_TARGET"
+    elif remaining <= 250:
+        calorie_status = "CLOSE_TO_TARGET"
+    elif remaining <= 700:
+        calorie_status = "ON_TRACK"
+    else:
+        calorie_status = "LARGE_MARGIN"
+
+    protein_status = None
+    if protein_goal is not None and float(protein_goal) > 0:
+        ratio = float(protein_eaten or 0) / float(protein_goal)
+        if ratio >= 1.0:
+            protein_status = "PROTEIN_REACHED"
+        elif ratio < 0.60:
+            protein_status = "PROTEIN_BEHIND"
+        else:
+            protein_status = "PROTEIN_ON_TRACK"
+
+    return calorie_status, protein_status
+
+
+def generate_sanosync_coach_message(
+    *,
+    language,
+    first_name,
+    calorie_status,
+    maintenance_budget,
+    calories_eaten,
+    deficit_target,
+    target_intake,
+    remaining_to_deficit_target,
+    protein_status=None,
+    protein_eaten=None,
+    protein_goal=None,
+):
+    """
+    Generate wording only. All nutrition math is performed by SanoSync.
+    Uses Groq through the already-installed OpenAI-compatible client.
+    """
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        return None
+
+    language_name = {
+        "Italiano": "Italian",
+        "English": "English",
+        "Nederlands": "Dutch",
+        "Français": "French",
+    }.get(language, "Italian")
+
+    context_lines = [
+        f"LANGUAGE: {language_name}",
+        f"USER FIRST NAME: {first_name or ''}",
+        f"CALORIE STATUS: {calorie_status}",
+        f"MAINTENANCE BUDGET FOR END OF DAY: {maintenance_budget:.0f} kcal",
+        f"CALORIES EATEN: {calories_eaten:.0f} kcal",
+        f"USER'S DESIRED DAILY DEFICIT: {deficit_target:.0f} kcal",
+        f"TARGET INTAKE TO ACHIEVE THAT DEFICIT: {target_intake:.0f} kcal",
+        f"CALORIES REMAINING TO THAT TARGET: {remaining_to_deficit_target:.0f} kcal",
+    ]
+
+    if protein_status and protein_goal and float(protein_goal) > 0:
+        context_lines.extend([
+            f"PROTEIN STATUS: {protein_status}",
+            f"PROTEIN EATEN: {float(protein_eaten or 0):.0f} g",
+            f"PROTEIN GOAL: {float(protein_goal):.0f} g",
+        ])
+
+    context_lines.append(
+        "Write the short SanoSync message now. Do not repeat all the numbers."
+    )
+
+    try:
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.groq.com/openai/v1",
+        )
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "system",
+                    "content": SANOSYNC_COACH_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": "\n".join(context_lines),
+                },
+            ],
+            temperature=0.72,
+            max_tokens=110,
+            stream=False,
+        )
+
+        message = str(
+            response.choices[0].message.content or ""
+        ).strip()
+
+        # Prevent unexpectedly long UI output even if the provider ignores limits.
+        return message[:420].strip() or None
+
+    except Exception as exc:
+        print(f"SanoSync AI Coach error: {exc}")
+        return None
+
+
+def get_sanosync_coach_message_cached(
+    *,
+    language,
+    first_name,
+    maintenance_budget,
+    calories_eaten,
+    deficit_target,
+    protein_eaten=None,
+    protein_goal=None,
+):
+    """
+    Calls Groq only when the meaningful nutritional state changes.
+    Ordinary Streamlit reruns reuse the existing session message.
+    """
+    maintenance_budget = max(0.0, float(maintenance_budget or 0))
+    calories_eaten = max(0.0, float(calories_eaten or 0))
+    deficit_target = max(0.0, float(deficit_target or 0))
+
+    target_intake = max(
+        0.0,
+        maintenance_budget - deficit_target,
+    )
+    remaining_to_target = target_intake - calories_eaten
+
+    calorie_status, protein_status = classify_sanosync_coach_state(
+        remaining_to_target,
+        protein_eaten=protein_eaten,
+        protein_goal=protein_goal,
+    )
+
+    # Rounded values avoid a new API call for irrelevant floating-point changes.
+    state_signature = (
+        str(language),
+        round(maintenance_budget),
+        round(calories_eaten),
+        round(deficit_target),
+        round(target_intake),
+        round(remaining_to_target),
+        calorie_status,
+        protein_status,
+        round(float(protein_eaten or 0)),
+        round(float(protein_goal or 0)),
+    )
+
+    if st.session_state.get("ai_coach_state") == state_signature:
+        return st.session_state.get("ai_coach_message")
+
+    message = generate_sanosync_coach_message(
+        language=language,
+        first_name=first_name,
+        calorie_status=calorie_status,
+        maintenance_budget=maintenance_budget,
+        calories_eaten=calories_eaten,
+        deficit_target=deficit_target,
+        target_intake=target_intake,
+        remaining_to_deficit_target=remaining_to_target,
+        protein_status=protein_status,
+        protein_eaten=protein_eaten,
+        protein_goal=protein_goal,
+    )
+
+    # Store the signature even on temporary API failure, avoiding request storms
+    # during the same Streamlit rerun cycle.
+    st.session_state["ai_coach_state"] = state_signature
+    st.session_state["ai_coach_message"] = message
+
+    return message
+
+
+def render_sanosync_coach_card(message, language):
+    if not message:
+        return
+
+    titles = {
+        "Italiano": "✨ SanoSync",
+        "English": "✨ SanoSync",
+        "Nederlands": "✨ SanoSync",
+        "Français": "✨ SanoSync",
+    }
+    safe_title = html.escape(titles.get(language, "✨ SanoSync"))
+    safe_message = html.escape(str(message))
+
+    st.markdown(
+        f"""
+        <div class="sano-ai-coach-card">
+            <div class="sano-ai-coach-title">{safe_title}</div>
+            <div class="sano-ai-coach-message">{safe_message}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def translate_activity_display(value, lang):
@@ -4242,6 +4517,11 @@ with st.sidebar:
         _budget_display = int(round(_end_day_budget))
         _eaten_display = int(round(_today_eaten))
 
+        _protein_eaten = sum(
+            _safe_float(row.get("protein"))
+            for row in _today_meals
+        )
+
         st.markdown(
             f"""
             <div class="sano-budget-card">
@@ -4259,8 +4539,13 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
         if user_protein_goal_enabled and user_protein_goal_g > 0:
-            _protein_eaten = sum(_safe_float(row.get("protein")) for row in _today_meals)
-            _protein_pct = min(100.0, max(0.0, (_protein_eaten / user_protein_goal_g) * 100.0))
+            _protein_pct = min(
+                100.0,
+                max(
+                    0.0,
+                    (_protein_eaten / user_protein_goal_g) * 100.0,
+                ),
+            )
             st.markdown(
                 f"""
                 <div class="sano-budget-card">
@@ -4274,6 +4559,31 @@ with st.sidebar:
                 </div>
                 """, unsafe_allow_html=True,
             )
+
+        _coach_message = get_sanosync_coach_message_cached(
+            language=current_lang,
+            first_name=first_name,
+            maintenance_budget=_end_day_budget,
+            calories_eaten=_today_eaten,
+            deficit_target=_safe_float(user_deficit_target_kcal),
+            protein_eaten=(
+                _protein_eaten
+                if user_protein_goal_enabled
+                and user_protein_goal_g > 0
+                else None
+            ),
+            protein_goal=(
+                user_protein_goal_g
+                if user_protein_goal_enabled
+                and user_protein_goal_g > 0
+                else None
+            ),
+        )
+        render_sanosync_coach_card(
+            _coach_message,
+            current_lang,
+        )
+
     except Exception as _budget_exc:
         print(f"Sidebar budget error: {_budget_exc}")
 
