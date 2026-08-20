@@ -6495,68 +6495,61 @@ if selected_page == t["t1"]:
             format_func=tr_category,
         )
 
-        meal_notes = st.text_area(
-            t["notes_optional"],
-            value=st.session_state.get("selected_source_note", ""),
-            placeholder=ux["notes_ph"],
-            key=f"meal_notes_{v}",
-            height=80,
-        )
-
+        # AI ingredient calculator replaces the old Notes field.
         _meal_ai_i18n = {
             "Italiano": {
-                "title": "✨ Calcola un pasto da ingredienti con AI",
-                "caption": "Scrivi ingredienti e quantità: SanoSync stima kcal e macro totali e per porzione.",
-                "ingredients": "Ingredienti",
+                "title": "✨ **SanoSync AI · Calcola da ingredienti**",
+                "caption": "Scrivi liberamente cosa hai mangiato o cosa vuoi mangiare. L’AI riconosce ingredienti e quantità e calcola kcal e macro.",
+                "ingredients": "Ingredienti / descrizione del pasto",
                 "placeholder": "Es. 250g pollo, 120g riso, 200g zucchine, 10g olio",
-                "portions": "Numero di porzioni",
-                "analyze": "✨ Analizza ingredienti",
-                "spinner": "Sto calcolando il pasto…",
-                "total": "Totale ricetta",
+                "portions": "Porzioni",
+                "analyze": "✨ Analizza con SanoSync AI",
+                "spinner": "SanoSync AI sta calcolando il pasto…",
+                "total": "Totale",
                 "per_portion": "Per porzione",
-                "use": "↗️ Usa questi valori nel pasto",
+                "use": "↗️ Usa questi valori",
                 "used": "Valori AI caricati nel pasto.",
                 "error": "Errore nell'analisi: {error}",
             },
             "English": {
-                "title": "✨ Calculate a meal from ingredients with AI",
-                "caption": "Enter ingredients and quantities: SanoSync estimates total and per-serving calories and macros.",
-                "ingredients": "Ingredients",
+                "title": "✨ **SanoSync AI · Calculate from ingredients**",
+                "caption": "Describe what you ate or want to eat. AI recognizes ingredients and quantities and calculates calories and macros.",
+                "ingredients": "Ingredients / meal description",
                 "placeholder": "E.g. 250g chicken, 120g rice, 200g courgette, 10g oil",
-                "portions": "Number of servings",
-                "analyze": "✨ Analyze ingredients",
-                "spinner": "Calculating the meal…",
-                "total": "Recipe total",
+                "portions": "Servings",
+                "analyze": "✨ Analyze with SanoSync AI",
+                "spinner": "SanoSync AI is calculating the meal…",
+                "total": "Total",
                 "per_portion": "Per serving",
-                "use": "↗️ Use these values for the meal",
+                "use": "↗️ Use these values",
                 "used": "AI values loaded into the meal.",
                 "error": "Analysis error: {error}",
             },
             "Nederlands": {
-                "title": "✨ Bereken een maaltijd uit ingrediënten met AI",
-                "caption": "Voer ingrediënten en hoeveelheden in: SanoSync schat totale en per-portie calorieën en macro's.",
-                "ingredients": "Ingrediënten",
+                "title": "✨ **SanoSync AI · Bereken uit ingrediënten**",
+                "caption": "Beschrijf wat je hebt gegeten of wilt eten. AI herkent ingrediënten en hoeveelheden en berekent calorieën en macro's.",
+                "ingredients": "Ingrediënten / beschrijving maaltijd",
                 "placeholder": "Bijv. 250g kip, 120g rijst, 200g courgette, 10g olie",
-                "portions": "Aantal porties",
-                "analyze": "✨ Ingrediënten analyseren",
-                "spinner": "Maaltijd berekenen…",
-                "total": "Totaal recept",
+                "portions": "Porties",
+                "analyze": "✨ Analyseer met SanoSync AI",
+                "spinner": "SanoSync AI berekent de maaltijd…",
+                "total": "Totaal",
                 "per_portion": "Per portie",
-                "use": "↗️ Gebruik deze waarden voor de maaltijd",
+                "use": "↗️ Gebruik deze waarden",
                 "used": "AI-waarden in de maaltijd geladen.",
                 "error": "Analysefout: {error}",
             },
             "Français": {
-                "title": "✨ Calculer un repas à partir d'ingrédients avec l'IA",
-                "caption": "Saisissez ingrédients et quantités : SanoSync estime calories et macros totales et par portion.",
-                "ingredients": "Ingrédients",
+                "title": "✨ **SanoSync AI · Calculer à partir des ingrédients**",
+                "caption": "Décrivez ce que vous avez mangé ou souhaitez manger. L’IA reconnaît ingrédients et quantités et calcule calories et macros.",
+                "ingredients": "Ingrédients / description du repas",
                 "placeholder": "Ex. 250g poulet, 120g riz, 200g courgettes, 10g huile",
-                "portions": "Nombre de portions",
-                "analyze": "✨ Analyser les ingrédients",
-                "spinner": "Calcul du repas…",
-                "total": "Total de la recette",
+                "portions": "Portions",
+                "analyze": "✨ Analyser avec SanoSync AI",
+                "spinner": "SanoSync AI calcule le repas…",
+                "total": "Total",
                 "per_portion": "Par portion",
-                "use": "↗️ Utiliser ces valeurs pour le repas",
+                "use": "↗️ Utiliser ces valeurs",
                 "used": "Valeurs IA chargées dans le repas.",
                 "error": "Erreur d'analyse : {error}",
             },
@@ -6566,108 +6559,96 @@ if selected_page == t["t1"]:
             _meal_ai_i18n["Italiano"],
         )
 
-        with st.expander(_mai["title"], expanded=False):
-            st.caption(_mai["caption"])
+        # Keep notes internally available for existing DB insert logic,
+        # but remove the visible Notes widget from Tab 1.
+        meal_notes = ""
 
-            _tab1_ai_text = st.text_area(
-                _mai["ingredients"],
-                key=f"tab1_ai_ingredient_text_{v}",
-                placeholder=_mai["placeholder"],
-                height=90,
+        # Always visible: this is a primary AI feature, not an optional dropdown.
+        st.markdown(_mai["title"])
+        st.caption(_mai["caption"])
+
+        _tab1_ai_text = st.text_area(
+            _mai["ingredients"],
+            key=f"tab1_ai_ingredient_text_{v}",
+            placeholder=_mai["placeholder"],
+            height=90,
+        )
+
+        _tab1_ai_portions = st.number_input(
+            _mai["portions"],
+            min_value=1.0,
+            max_value=20.0,
+            value=1.0,
+            step=1.0,
+            key=f"tab1_ai_portions_{v}",
+        )
+
+        if st.button(
+            _mai["analyze"],
+            use_container_width=True,
+            key=f"tab1_ai_analyze_{v}",
+        ):
+            if _tab1_ai_text.strip():
+                try:
+                    with st.spinner(_mai["spinner"]):
+                        _tab1_parsed = parse_recipe_ingredients_with_ai(
+                            _tab1_ai_text,
+                            current_lang,
+                        )
+                    if _tab1_parsed:
+                        st.session_state[
+                            f"tab1_ai_result_{v}"
+                        ] = _tab1_parsed
+                        st.rerun()
+                except Exception as exc:
+                    st.error(_mai["error"].format(error=exc))
+
+        _tab1_result = st.session_state.get(
+            f"tab1_ai_result_{v}"
+        )
+        if _tab1_result:
+            _tw, _tt, _p100 = calculate_recipe_totals(
+                _tab1_result
             )
-            _tab1_ai_portions = st.number_input(
-                _mai["portions"],
-                min_value=1.0,
-                max_value=20.0,
-                value=1.0,
-                step=1.0,
-                key=f"tab1_ai_portions_{v}",
+            _parts = max(float(_tab1_ai_portions), 1.0)
+            _pp = {
+                k: float(val) / _parts
+                for k, val in _tt.items()
+            }
+
+            st.markdown(
+                f"**{_mai['total']}:** "
+                f"{_tt['calories']:.0f} kcal · "
+                f"Pro {_tt['protein']:.1f} g · "
+                f"Carbs {_tt['carbs']:.1f} g · "
+                f"Fat {_tt['fat']:.1f} g"
+            )
+            st.markdown(
+                f"**{_mai['per_portion']}:** "
+                f"**{_pp['calories']:.0f} kcal** · "
+                f"Pro {_pp['protein']:.1f} g · "
+                f"Carbs {_pp['carbs']:.1f} g · "
+                f"Fat {_pp['fat']:.1f} g"
             )
 
             if st.button(
-                _mai["analyze"],
+                _mai["use"],
                 use_container_width=True,
-                key=f"tab1_ai_analyze_{v}",
+                key=f"tab1_ai_use_{v}",
             ):
-                if _tab1_ai_text.strip():
-                    try:
-                        with st.spinner(_mai["spinner"]):
-                            _tab1_parsed = (
-                                parse_recipe_ingredients_with_ai(
-                                    _tab1_ai_text,
-                                    current_lang,
-                                )
-                            )
-                        if _tab1_parsed:
-                            st.session_state[
-                                f"tab1_ai_result_{v}"
-                            ] = _tab1_parsed
-                            st.rerun()
-                    except Exception as exc:
-                        st.error(
-                            _mai["error"].format(error=exc)
-                        )
-
-            _tab1_result = st.session_state.get(
-                f"tab1_ai_result_{v}"
-            )
-            if _tab1_result:
-                _tw, _tt, _p100 = calculate_recipe_totals(
-                    _tab1_result
-                )
-                _parts = max(float(_tab1_ai_portions), 1.0)
-                _pp = {
-                    k: float(val) / _parts
-                    for k, val in _tt.items()
-                }
-
-                st.markdown(
-                    f"**{_mai['total']}:** "
-                    f"{_tt['calories']:.0f} kcal · "
-                    f"Pro {_tt['protein']:.1f} g · "
-                    f"Carbs {_tt['carbs']:.1f} g · "
-                    f"Fat {_tt['fat']:.1f} g"
-                )
-                st.markdown(
-                    f"**{_mai['per_portion']}:** "
-                    f"**{_pp['calories']:.0f} kcal** · "
-                    f"Pro {_pp['protein']:.1f} g · "
-                    f"Carbs {_pp['carbs']:.1f} g · "
-                    f"Fat {_pp['fat']:.1f} g"
-                )
-
-                if st.button(
-                    _mai["use"],
-                    use_container_width=True,
-                    key=f"tab1_ai_use_{v}",
-                ):
-                    # This button is rendered before the mode/nutrient widgets,
-                    # so these state values can safely be changed here.
-                    st.session_state["is_per_100g_val"] = False
-                    st.session_state["grams_val"] = 1.0
-                    st.session_state["base_cals"] = _pp["calories"]
-                    st.session_state["base_prot"] = _pp["protein"]
-                    st.session_state["base_carbs"] = _pp["carbs"]
-                    st.session_state["base_fat"] = _pp["fat"]
-                    st.session_state[f"mode_radio_{v}"] = t["per_portion"]
-                    st.session_state.pop(
-                        f"meal_kcal_{v}",
-                        None,
-                    )
-                    st.session_state.pop(
-                        f"meal_pro_{v}",
-                        None,
-                    )
-                    st.session_state.pop(
-                        f"meal_carbs_{v}",
-                        None,
-                    )
-                    st.session_state.pop(
-                        f"meal_fat_{v}",
-                        None,
-                    )
-                    st.success(_mai["used"])
-                    st.rerun()
+                st.session_state["is_per_100g_val"] = False
+                st.session_state["grams_val"] = 1.0
+                st.session_state["base_cals"] = _pp["calories"]
+                st.session_state["base_prot"] = _pp["protein"]
+                st.session_state["base_carbs"] = _pp["carbs"]
+                st.session_state["base_fat"] = _pp["fat"]
+                st.session_state[f"mode_radio_{v}"] = t["per_portion"]
+                st.session_state.pop(f"meal_kcal_{v}", None)
+                st.session_state.pop(f"meal_pro_{v}", None)
+                st.session_state.pop(f"meal_carbs_{v}", None)
+                st.session_state.pop(f"meal_fat_{v}", None)
+                st.success(_mai["used"])
+                st.rerun()
 
         mode_options = [t["per_100g"], t["per_portion"]]
         default_index = 0 if st.session_state["is_per_100g_val"] else 1
