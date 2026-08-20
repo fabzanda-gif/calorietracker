@@ -880,6 +880,76 @@ def classify_sanosync_coach_state(
     return calorie_status, protein_status
 
 
+def sanosync_coach_fallback_message(
+    *,
+    language,
+    calorie_status,
+    remaining_to_deficit_target,
+    protein_status=None,
+):
+    """Messaggio locale di fallback: la card resta sempre visibile."""
+    messages = {
+        "Italiano": {
+            "LARGE_MARGIN": "Hai ancora un buon margine per oggi. Puoi gestire il resto della giornata con tranquillità 👌",
+            "ON_TRACK": "Sei in una zona molto gestibile per il resto della giornata. Continua così, senza bisogno di fare calcoli acrobatici.",
+            "CLOSE_TO_TARGET": "Sei vicino al target previsto per oggi. Ti rimane poco margine, ma la giornata è sostanzialmente centrata 🎯",
+            "OVER_TARGET": "Oggi sei leggermente oltre il target previsto. Registriamo il dato e guardiamo soprattutto l’andamento nel tempo.",
+            "OVER_TARGET_HIGH": "Oggi il target è stato superato in modo più evidente. Una singola giornata però non definisce il percorso: teniamola semplicemente nei dati.",
+        },
+        "English": {
+            "LARGE_MARGIN": "You still have a comfortable margin today. You can manage the rest of the day without overthinking it 👌",
+            "ON_TRACK": "You’re in a very manageable range for the rest of the day. No calorie gymnastics needed.",
+            "CLOSE_TO_TARGET": "You’re close to today’s planned target. There isn’t much room left, but the day is essentially on track 🎯",
+            "OVER_TARGET": "You’re slightly above today’s planned target. Log it and focus on the longer-term trend.",
+            "OVER_TARGET_HIGH": "Today is more clearly above the planned target. One day does not define the trend, so just keep it in the data.",
+        },
+        "Nederlands": {
+            "LARGE_MARGIN": "Je hebt vandaag nog een comfortabele marge. Je kunt de rest van de dag rustig indelen 👌",
+            "ON_TRACK": "Je zit voor de rest van de dag in een goed beheersbare zone. Geen calorie-acrobatiek nodig.",
+            "CLOSE_TO_TARGET": "Je zit dicht bij het geplande doel voor vandaag. Er is weinig marge over, maar de dag ligt vrijwel op schema 🎯",
+            "OVER_TARGET": "Je zit vandaag iets boven het geplande doel. Noteer het gewoon en kijk vooral naar de trend over langere tijd.",
+            "OVER_TARGET_HIGH": "Vandaag ligt duidelijker boven het geplande doel. Eén dag bepaalt de trend niet, dus houd het gewoon bij in de gegevens.",
+        },
+        "Français": {
+            "LARGE_MARGIN": "Il vous reste encore une marge confortable aujourd’hui. Vous pouvez gérer la suite de la journée sereinement 👌",
+            "ON_TRACK": "Vous êtes dans une zone très facile à gérer pour la suite de la journée. Pas besoin d’acrobaties avec les calories.",
+            "CLOSE_TO_TARGET": "Vous êtes proche de l’objectif prévu aujourd’hui. Il reste peu de marge, mais la journée est globalement bien alignée 🎯",
+            "OVER_TARGET": "Vous êtes légèrement au-dessus de l’objectif prévu aujourd’hui. Enregistrez-le et regardez surtout la tendance dans le temps.",
+            "OVER_TARGET_HIGH": "Aujourd’hui, l’objectif prévu est davantage dépassé. Une seule journée ne définit pas la tendance : gardons-la simplement dans les données.",
+        },
+    }
+
+    base = messages.get(language, messages["Italiano"]).get(
+        calorie_status,
+        messages.get(language, messages["Italiano"])["ON_TRACK"],
+    )
+
+    protein_addons = {
+        "Italiano": {
+            "PROTEIN_BEHIND": " Sul fronte proteine c’è ancora spazio per recuperare.",
+            "PROTEIN_REACHED": " Il goal proteico è già raggiunto.",
+        },
+        "English": {
+            "PROTEIN_BEHIND": " There is still room to catch up on protein.",
+            "PROTEIN_REACHED": " Your protein goal is already reached.",
+        },
+        "Nederlands": {
+            "PROTEIN_BEHIND": " Voor eiwitten is er nog ruimte om bij te sturen.",
+            "PROTEIN_REACHED": " Je eiwitdoel is al bereikt.",
+        },
+        "Français": {
+            "PROTEIN_BEHIND": " Il reste encore de la marge pour compléter les protéines.",
+            "PROTEIN_REACHED": " Votre objectif protéique est déjà atteint.",
+        },
+    }
+
+    addon = protein_addons.get(language, protein_addons["Italiano"]).get(
+        protein_status,
+        "",
+    )
+    return (base + addon).strip()
+
+
 def generate_sanosync_coach_message(
     *,
     language,
@@ -937,7 +1007,7 @@ def generate_sanosync_coach_message(
             base_url="https://api.groq.com/openai/v1",
         )
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {
                     "role": "system",
@@ -958,11 +1028,23 @@ def generate_sanosync_coach_message(
         ).strip()
 
         # Prevent unexpectedly long UI output even if the provider ignores limits.
-        return message[:420].strip() or None
+        if not message:
+            return sanosync_coach_fallback_message(
+                language=language,
+                calorie_status=calorie_status,
+                remaining_to_deficit_target=remaining_to_deficit_target,
+                protein_status=protein_status,
+            )
+        return message[:420].strip()
 
     except Exception as exc:
         print(f"SanoSync AI Coach error: {exc}")
-        return None
+        return sanosync_coach_fallback_message(
+            language=language,
+            calorie_status=calorie_status,
+            remaining_to_deficit_target=remaining_to_deficit_target,
+            protein_status=protein_status,
+        )
 
 
 def get_sanosync_coach_message_cached(
@@ -1010,7 +1092,12 @@ def get_sanosync_coach_message_cached(
     )
 
     if st.session_state.get("ai_coach_state") == state_signature:
-        return st.session_state.get("ai_coach_message")
+        _cached = st.session_state.get("ai_coach_message")
+        if _cached:
+            return _cached
+        # Previous versions could cache None after an API error.
+        st.session_state.pop("ai_coach_state", None)
+        st.session_state.pop("ai_coach_message", None)
 
     message = generate_sanosync_coach_message(
         language=language,
