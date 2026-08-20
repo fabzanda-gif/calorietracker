@@ -815,6 +815,104 @@ def _safe_float(value):
 
 
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_groq_available_model_ids():
+    """
+    Return the model IDs ACTUALLY available to the configured Groq key/project.
+
+    We use the REST /models endpoint directly instead of depending on a specific
+    openai-python client version.
+    """
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        return []
+
+    try:
+        response = requests.get(
+            "https://api.groq.com/openai/v1/models",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return [
+            str(item.get("id"))
+            for item in (payload.get("data") or [])
+            if item.get("id")
+        ]
+    except Exception as exc:
+        print(f"Groq models lookup error: {exc}")
+        return []
+
+
+def resolve_groq_text_model():
+    """
+    Pick a text model that this specific Groq project can actually use.
+
+    Preference intentionally starts with current GPT-OSS production models,
+    because the user's project has returned model_not_found for both Llama
+    production IDs.
+    """
+    available = set(get_groq_available_model_ids())
+
+    preferred = [
+        "openai/gpt-oss-20b",
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.6-27b",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "groq/compound-mini",
+        "groq/compound",
+    ]
+
+    for model_id in preferred:
+        if model_id in available:
+            return model_id
+
+    # Last-resort: select the first non-audio / non-safety active model.
+    excluded_tokens = (
+        "whisper",
+        "orpheus",
+        "guard",
+        "safeguard",
+        "prompt-guard",
+    )
+    candidates = [
+        m
+        for m in sorted(available)
+        if not any(token in m.lower() for token in excluded_tokens)
+    ]
+    if candidates:
+        return candidates[0]
+
+    raise RuntimeError(
+        "Groq non restituisce alcun modello testuale disponibile per questa API key. "
+        "Controlla la chiave/progetto nella Groq Console."
+    )
+
+
+def resolve_groq_vision_model():
+    """Pick an actually available multimodal/vision model."""
+    available = set(get_groq_available_model_ids())
+
+    preferred = [
+        "qwen/qwen3.6-27b",
+    ]
+    for model_id in preferred:
+        if model_id in available:
+            return model_id
+
+    raise RuntimeError(
+        "Nessun modello Vision disponibile per questa API key Groq. "
+        f"Modelli disponibili: {', '.join(sorted(available)) or 'nessuno'}"
+    )
+
+
 SANOSYNC_COACH_SYSTEM_PROMPT = """
 You are the voice of SanoSync, a food, activity and weight tracking app.
 
@@ -1050,7 +1148,7 @@ def generate_sanosync_coach_message(
             base_url="https://api.groq.com/openai/v1",
         )
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=resolve_groq_text_model(),
             messages=[
                 {
                     "role": "system",
@@ -5640,24 +5738,7 @@ Return ONLY valid JSON with this exact structure:
         base_url="https://api.groq.com/openai/v1",
     )
 
-    # Pick a model that is actually exposed to this Groq project/key.
-    # This avoids a hard failure when a model is unavailable for the project.
-    _preferred_models = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-    ]
-    try:
-        _available_models = {
-            str(m.id)
-            for m in client.models.list().data
-        }
-    except Exception:
-        _available_models = set()
-
-    _recipe_model = next(
-        (m for m in _preferred_models if m in _available_models),
-        "llama-3.1-8b-instant",
-    )
+    _recipe_model = resolve_groq_text_model()
 
     response = client.chat.completions.create(
         model=_recipe_model,
@@ -5745,7 +5826,7 @@ Rules:
     )
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=resolve_groq_text_model(),
         messages=[
             {
                 "role": "system",
@@ -8045,7 +8126,13 @@ elif selected_page == t["t4"]:
                         int(st.session_state.get("ai_recipe_generation_id", 0)) + 1
                     )
             except Exception as exc:
+                _available_debug = get_groq_available_model_ids()
                 st.error(_air["error"].format(error=exc))
+                if "model" in str(exc).lower():
+                    st.caption(
+                        "Modelli disponibili per questa chiave Groq: "
+                        + (", ".join(_available_debug) if _available_debug else "nessuno / lookup fallito")
+                    )
                 print(traceback.format_exc())
 
         if st.button(
