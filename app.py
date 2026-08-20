@@ -6137,140 +6137,282 @@ with st.sidebar:
         ux = dict(ux)
         ux.update(_zc.get("ux", {}))
 
-    _display_mode_hint_i18n = {
-        "Italiano": {
-            "standard": "Meglio in light mode",
-            "zero": "Meglio in Dark Mode",
-        },
-        "English": {
-            "standard": "Best in light mode",
-            "zero": "Best in Dark Mode",
-        },
-        "Nederlands": {
-            "standard": "Het beste in light mode",
-            "zero": "Het beste in Dark Mode",
-        },
-        "Français": {
-            "standard": "Mieux en mode clair",
-            "zero": "Mieux en Dark Mode",
-        },
-    }
-
-    _display_mode_hint = _display_mode_hint_i18n.get(
-        current_lang,
-        _display_mode_hint_i18n["Italiano"],
-    )["zero" if is_zero_mode() else "standard"]
-
-    st.markdown(
-        f"""
-        <style>
-        .sanosync-display-mode-hint {{
-            position:fixed;
-            top:.78rem;
-            right:5.2rem;
-            z-index:999990;
-            padding:.34rem .62rem;
-            border-radius:999px;
-            font-family:'Kanit',sans-serif;
-            font-size:.72rem;
-            font-weight:700;
-            line-height:1;
-            white-space:nowrap;
-            pointer-events:none;
-            backdrop-filter:blur(10px);
-        }}
-
-        .sanosync-display-mode-hint.standard {{
-            color:#6C7180;
-            background:rgba(255,255,255,.82);
-            border:1px solid rgba(25,46,73,.11);
-        }}
-
-        .sanosync-display-mode-hint.zero {{
-            color:#EAEAEA;
-            background:rgba(7,7,7,.84);
-            border:1px solid rgba(225,6,0,.42);
-        }}
-
-        @media (max-width:700px) {{
-            .sanosync-display-mode-hint {{
-                top:.72rem;
-                right:4rem;
-                font-size:.62rem;
-                padding:.28rem .46rem;
-            }}
-        }}
-        </style>
-
-        <div class="sanosync-display-mode-hint {'zero' if is_zero_mode() else 'standard'}">
-            {html.escape(_display_mode_hint)}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f'<div style="text-align:center;color:#FFB4B4;font-weight:900;font-size:1rem;letter-spacing:.01em;margin:-.15rem 0 .55rem 0;">{html.escape(t["slogan"])}</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown("---")
-    
-    pages_map = {
-        t["t1"]: "t1",
-        t["t2"]: "t2",
-        t["t3"]: "t3",
-        t["t4"]: "t4",
-        t["t5"]: "t5"
-    }
-    
-    if "current_page_id" not in st.session_state:
-        st.session_state.current_page_id = "t1"
-
-    for page_name, page_id in pages_map.items():
-        is_active = (st.session_state.current_page_id == page_id)
-        if st.button(
-            page_name,
-            key=f"nav_{page_id}",
-            use_container_width=True,
-            type="primary" if is_active else "secondary",
-        ):
-            st.session_state.current_page_id = page_id
-
-            # Una tab della sidebar è sempre una navigazione fuori da Settings.
-            st.session_state["show_personal_settings"] = False
-            st.session_state.pop("settings_language_live", None)
-            st.session_state.pop("profile_menu_language", None)
-            st.session_state["_collapse_sidebar_mobile_next_run"] = True
-            st.rerun()
-
-    if st.session_state.pop("_collapse_sidebar_mobile_next_run", False):
-        st.components.v1.html(
+    # ------------------------------------------------------------------
+    # FORCED APP APPEARANCE
+    # Standard is always rendered as Light; ZERO is always rendered as Black.
+    # This deliberately ignores Streamlit's native light/dark appearance.
+    # ------------------------------------------------------------------
+    if is_zero_mode():
+        st.markdown(
             """
-            <script>
-            (() => {
-              try {
-                const w = window.parent;
-                if (w.innerWidth > 800) return;
-                const d = w.document;
-                const selectors = [
-                  '[data-testid="stSidebarCollapseButton"] button',
-                  'button[aria-label="Close sidebar"]',
-                  'button[aria-label="Collapse sidebar"]'
-                ];
-                for (const sel of selectors) {
-                  const btn = d.querySelector(sel);
-                  if (btn) { setTimeout(() => btn.click(), 100); break; }
-                }
-              } catch (e) {}
-            })();
-            </script>
+            <style>
+            /* ZERO: force a black app even when Streamlit is set to Light. */
+            html, body,
+            [data-testid="stApp"],
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"],
+            [data-testid="stMainBlockContainer"] {
+                background:#050505 !important;
+                background-color:#050505 !important;
+                color:#F5F5F5 !important;
+            }
+
+            [data-testid="stHeader"] {
+                background:#050505 !important;
+                border-bottom-color:#242424 !important;
+            }
+
+            /* Keep sidebar as part of the black ZERO identity. */
+            [data-testid="stSidebar"] {
+                background:
+                    radial-gradient(circle at 50% 0%, rgba(225,6,0,.14), transparent 30%),
+                    linear-gradient(180deg,#000000,#080808) !important;
+                color:#F5F5F5 !important;
+            }
+
+            /* Generic text outside special components. */
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] label,
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4,
+            [data-testid="stAppViewContainer"] h5,
+            [data-testid="stAppViewContainer"] h6 {
+                color:#F5F5F5 !important;
+                -webkit-text-fill-color:#F5F5F5 !important;
+            }
+
+            /* Streamlit inputs / controls */
+            [data-baseweb="input"] > div,
+            [data-baseweb="base-input"],
+            [data-baseweb="textarea"] > div,
+            [data-baseweb="select"] > div,
+            [data-testid="stTextInput"] input,
+            [data-testid="stTextArea"] textarea,
+            [data-testid="stNumberInput"] input,
+            [data-testid="stDateInput"] input {
+                background:#171717 !important;
+                background-color:#171717 !important;
+                color:#F7F7F7 !important;
+                -webkit-text-fill-color:#F7F7F7 !important;
+                border-color:#666 !important;
+            }
+
+            /* Menus and dropdown lists rendered in portals */
+            [data-baseweb="menu"],
+            [data-baseweb="popover"] > div,
+            [role="listbox"] {
+                background:#111111 !important;
+                color:#F5F5F5 !important;
+                border-color:#555 !important;
+            }
+
+            [role="option"],
+            [role="option"] * {
+                color:#F5F5F5 !important;
+                -webkit-text-fill-color:#F5F5F5 !important;
+            }
+
+            [role="option"][aria-selected="true"] {
+                background:#5D0A08 !important;
+            }
+
+            /* Buttons */
+            [data-testid="stAppViewContainer"] .stButton > button,
+            [data-testid="stAppViewContainer"] [data-testid="stBaseButton-secondary"] {
+                background:#101010 !important;
+                color:#F7F7F7 !important;
+                border-color:#B91C1C !important;
+            }
+
+            [data-testid="stAppViewContainer"] [data-testid="stBaseButton-primary"] {
+                background:linear-gradient(135deg,#E10600,#990000) !important;
+                color:#FFF !important;
+                border-color:#FF2A20 !important;
+            }
+
+            /* Expanders */
+            [data-testid="stExpander"],
+            details[data-testid="stExpander"],
+            [data-testid="stExpanderDetails"] {
+                background:#0C0C0C !important;
+                color:#F5F5F5 !important;
+                border-color:#555 !important;
+            }
+
+            [data-testid="stExpander"] summary {
+                background:#111111 !important;
+                color:#F5F5F5 !important;
+            }
+
+            /* Tables / dataframes */
+            [data-testid="stTable"],
+            [data-testid="stDataFrame"] {
+                background:#090909 !important;
+                color:#F5F5F5 !important;
+                border-color:#777 !important;
+            }
+
+            /* Streamlit top menu remains legible */
+            [data-testid="stToolbar"],
+            [data-testid="stDecoration"],
+            [data-testid="stStatusWidget"] {
+                color:#F5F5F5 !important;
+            }
+            </style>
             """,
-            height=0,
-            width=0,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <style>
+            /* STANDARD: force Light rendering even when Streamlit is set to Dark. */
+            html, body,
+            [data-testid="stApp"],
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"],
+            [data-testid="stMainBlockContainer"] {
+                background:#FFFFFF !important;
+                background-color:#FFFFFF !important;
+                color:#1A2942 !important;
+            }
+
+            [data-testid="stHeader"] {
+                background:#FFFFFF !important;
+                border-bottom-color:#ECEEF2 !important;
+            }
+
+            /* Standard sidebar intentionally stays dark navy as part of the brand. */
+            [data-testid="stSidebar"] {
+                background:
+                    radial-gradient(circle at 100% 0%, rgba(255,139,139,.13), transparent 34%),
+                    linear-gradient(180deg,#192E49,#182A43) !important;
+                color:#FFFFFF !important;
+            }
+
+            [data-testid="stSidebar"] p,
+            [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] span,
+            [data-testid="stSidebar"] h1,
+            [data-testid="stSidebar"] h2,
+            [data-testid="stSidebar"] h3,
+            [data-testid="stSidebar"] h4 {
+                color:#FFFFFF !important;
+                -webkit-text-fill-color:#FFFFFF !important;
+            }
+
+            /* Main text must never inherit Streamlit Dark-mode white-on-dark assumptions. */
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] label,
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4,
+            [data-testid="stAppViewContainer"] h5,
+            [data-testid="stAppViewContainer"] h6 {
+                color:#1A2942 !important;
+                -webkit-text-fill-color:#1A2942 !important;
+            }
+
+            [data-testid="stCaptionContainer"],
+            [data-testid="stCaptionContainer"] * {
+                color:#7B7E89 !important;
+                -webkit-text-fill-color:#7B7E89 !important;
+            }
+
+            /* Inputs */
+            [data-baseweb="input"] > div,
+            [data-baseweb="base-input"],
+            [data-baseweb="textarea"] > div,
+            [data-baseweb="select"] > div,
+            [data-testid="stTextInput"] input,
+            [data-testid="stTextArea"] textarea,
+            [data-testid="stNumberInput"] input,
+            [data-testid="stDateInput"] input {
+                background:#F1F3F7 !important;
+                background-color:#F1F3F7 !important;
+                color:#292D39 !important;
+                -webkit-text-fill-color:#292D39 !important;
+                border-color:#E1E4EA !important;
+            }
+
+            input::placeholder,
+            textarea::placeholder {
+                color:#858995 !important;
+                -webkit-text-fill-color:#858995 !important;
+                opacity:1 !important;
+            }
+
+            /* Dropdown menus / popovers outside the main app tree */
+            [data-baseweb="menu"],
+            [data-baseweb="popover"] > div,
+            [role="listbox"] {
+                background:#FFFFFF !important;
+                color:#292D39 !important;
+                border-color:#E0E3E9 !important;
+            }
+
+            [role="option"],
+            [role="option"] * {
+                color:#292D39 !important;
+                -webkit-text-fill-color:#292D39 !important;
+            }
+
+            [role="option"][aria-selected="true"] {
+                background:#FFF0F0 !important;
+            }
+
+            /* Buttons */
+            [data-testid="stAppViewContainer"] .stButton > button,
+            [data-testid="stAppViewContainer"] [data-testid="stBaseButton-secondary"] {
+                background:#FFFFFF !important;
+                color:#192E49 !important;
+                border-color:#FF8B8B !important;
+            }
+
+            [data-testid="stAppViewContainer"] [data-testid="stBaseButton-primary"] {
+                background:#FF8588 !important;
+                color:#FFFFFF !important;
+                border-color:#FF777B !important;
+            }
+
+            /* Expanders */
+            [data-testid="stExpander"],
+            details[data-testid="stExpander"],
+            [data-testid="stExpanderDetails"] {
+                background:#FFFFFF !important;
+                color:#1A2942 !important;
+                border-color:#D9DCE2 !important;
+            }
+
+            [data-testid="stExpander"] summary {
+                background:#FFFFFF !important;
+                color:#1A2942 !important;
+            }
+
+            /* Tables / dataframes */
+            [data-testid="stTable"],
+            [data-testid="stDataFrame"] {
+                background:#FFFFFF !important;
+                color:#1A2942 !important;
+                border-color:#D9DCE2 !important;
+            }
+
+            /* Toolbar stays visible on the forced white header */
+            [data-testid="stToolbar"],
+            [data-testid="stToolbar"] *,
+            [data-testid="stStatusWidget"],
+            [data-testid="stStatusWidget"] * {
+                color:#292D39 !important;
+                -webkit-text-fill-color:#292D39 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
         )
 
-    selected_page_id = st.session_state.current_page_id
-    selected_page = t[selected_page_id]
 
     # --------------------------------------------------------------
     # Kcal rimanenti: budget FINALE della giornata.
