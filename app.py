@@ -957,10 +957,9 @@ def zero_tone_instruction():
 ZERO MODE TONE:
 - You are not a life coach. Observe, comment and doubt; do not instruct.
 - NEVER tell the user what they must, should, need to, ought to, or have to do.
-- Use dry, realistic, affectionate humor: like an old friend who is no longer
-  interested in pretending to be impressed.
-- Be politely skeptical about the precision, completeness and honesty of
-  self-reported nutrition and activity data.
+- Use dry, realistic, affectionate humor: like an old friend who has seen enough optimistic plans to assume the future will probably interfere.
+- Be strongly skeptical about the precision, completeness and honesty of self-reported nutrition and activity data.
+- The recurring subtext is: the numbers say it is possible; experience says the user may not sustain it, or the record may be incomplete.
 - Unusually large deficits, suspiciously perfect targets, very high activity
   estimates and extremely light days are excellent opportunities for a dry remark.
 - Phrase doubt as humor, not as a factual accusation.
@@ -990,7 +989,8 @@ PERSONALITY:
 - not a coach;
 - dry, concise, intelligent and lightly cynical;
 - like an old friend who knows the user well enough to skip fake enthusiasm;
-- politely suspicious of self-reported food, portions, deficits and activity;
+- openly skeptical of self-reported food, portions, deficits and activity, while keeping accusations humorous rather than factual;
+- expects future consistency to fail and suspects conveniently incomplete logging;
 - amused by suspicious precision and optimistic wearable estimates;
 - never cruel.
 
@@ -1003,6 +1003,7 @@ STYLE RULES:
    "according to the information kindly self-certified",
    "the device has submitted its version of events",
    "the figure has been entered into the record without further questions".
+   Recurring subtext: "possible on paper; less convincing once a human being is involved."
 5. Question precision as humor, never as a factual accusation.
 6. Do not automatically congratulate the user.
 7. Do not moralize food.
@@ -1138,11 +1139,11 @@ def sanosync_coach_fallback_message(
     if is_zero_mode():
         zero_messages = {
             "Italiano": {
-                "LARGE_MARGIN": "Resta un margine notevole. O giornata leggerissima, o manca un capitolo.",
-                "ON_TRACK": "I numeri risultano compatibili con il piano. Il verbale, per ora, non segnala anomalie.",
-                "CLOSE_TO_TARGET": "Il target è molto vicino. Una quantità di margine tecnicamente ancora esistente.",
-                "OVER_TARGET": "Leggermente sopra il target. La commissione ha deciso di non aprire un'inchiesta.",
-                "OVER_TARGET_HIGH": "Il target è stato superato con una certa convinzione. L'arrotondamento non sembra il principale sospettato.",
+                "LARGE_MARGIN": "Resta un margine notevole. O hai davvero mangiato pochissimo, o questa è la versione breve della giornata.",
+                "ON_TRACK": "I numeri dicono che sei in linea. Il fatto che continuino a dirlo fino a stasera è un’altra questione.",
+                "CLOSE_TO_TARGET": "Il target è vicino. Sulla carta è tutto gestibile; la carta, come sempre, ha molta fiducia in te.",
+                "OVER_TARGET": "Leggermente sopra il target. Probabilmente niente di grave, sempre che questa sia davvero la versione completa.",
+                "OVER_TARGET_HIGH": "Il target è stato superato con una certa convinzione. A questo punto l’arrotondamento ha un alibi migliore del diario alimentare.",
             },
             "English": {
                 "LARGE_MARGIN": "A sizeable margin remains. Either a very light day, or a chapter is missing.",
@@ -1204,8 +1205,8 @@ def sanosync_coach_fallback_message(
     if is_zero_mode():
         zero_protein_addons = {
             "Italiano": {
-                "PROTEIN_BEHIND": " Le proteine risultano ancora piuttosto teoriche.",
-                "PROTEIN_REACHED": " Il goal proteico risulta regolarmente agli atti.",
+                "PROTEIN_BEHIND": " Le proteine risultano ancora piuttosto teoriche. Magari compaiono più tardi; magari era questo il piano da sempre.",
+                "PROTEIN_REACHED": " Il goal proteico risulta raggiunto. Una coincidenza piacevolmente precisa, quindi naturalmente sospetta.",
             },
             "English": {
                 "PROTEIN_BEHIND": " Protein remains somewhat theoretical at this stage.",
@@ -5328,15 +5329,15 @@ ZERO_COPY = {
             "no_shared_recipes": "Nessuna ricetta condivisa. La comunità oggi mantiene un profilo basso.",
             "add_one_ingredient": "Zero ingredienti. Perfino l'intelligenza artificiale richiede un minimo di materia.",
             "scan_analyzing": "Analisi in corso. I numeri stanno concordando una versione comune.",
-            "in_msg_low": lambda p: f"Proiezione: {p} kcal. Una giornata sorprendentemente sobria, almeno sulla carta.",
+            "in_msg_low": lambda p: f"Proiezione: {p} kcal. Molto sobria. Abbastanza da chiedersi se abbiamo ricevuto l’intera sceneggiatura.",
             "in_msg_high": lambda p: f"Proiezione: {p} kcal. Il dato è stato acquisito agli atti.",
             "burn_msg_yes": lambda e: f"+{e} kcal di attività. Il dispositivo ha presentato la propria versione dei fatti.",
-            "burn_msg_no": "Nessuna attività extra registrata. Su questo dato, curiosamente, tendiamo a fidarci.",
-            "bilancio_ok": "C'è un deficit calorico. Almeno secondo la documentazione prodotta dall'interessato.",
+            "burn_msg_no": "Nessuna attività extra registrata. Curiosamente, è uno dei dati più facili da credere.",
+            "bilancio_ok": "C'è un deficit calorico. O stai dimagrendo, o la memoria selettiva ha colpito ancora.",
             "bilancio_bad": "C'è un surplus calorico. L'ipotesi dell'arrotondamento perde credibilità.",
             "weight_msg_default": "Il peso ha depositato un nuovo elemento agli atti.",
-            "status_very_active": "Giornata molto attiva. Il tracker sembra particolarmente convinto.",
-            "status_good": "Attività registrata. Prendiamo atto della dichiarazione.",
+            "status_very_active": "Giornata molto attiva. Il tracker ci crede; SanoSync conserva prudentemente il diritto di dubitare.",
+            "status_good": "Attività registrata. Abbastanza da sembrare credibile, non abbastanza da eliminare ogni dubbio.",
             "status_lazy": "Giornata territorialmente molto circoscritta.",
             "in_msg_deficit": lambda target_in, diff: (
                 f"Target {target_in} kcal: "
@@ -5344,18 +5345,18 @@ ZERO_COPY = {
                    if diff >= 0 else
                    f"risultano {abs(diff)} kcal in più. Difficile imputarle tutte all'arrotondamento.")
             ),
-            "balance_days": lambda d: f"Stima: circa {d} giorni. La matematica non è stata informata dei weekend.",
+            "balance_days": lambda d: f"Stima: circa {d} giorni. A meno che non ti metta a fare schifo.",
             "balance_surplus": "Con un surplus la data obiettivo resta, tecnicamente, materia per la narrativa.",
-            "forecast_days": lambda d, date_str: f"Data stimata: **{date_str}** ({d} giorni). Secondo la matematica, che non è stata consultata sulla vita reale.",
-            "forecast_steady": "Il trend punta nella direzione prevista. La bilancia, per ora, collabora.",
+            "forecast_days": lambda d, date_str: f"Data stimata: **{date_str}** ({d} giorni). Possibile, sempre che la costanza improvvisamente diventi una tua caratteristica stabile.",
+            "forecast_steady": "Il trend va nella direzione giusta. Per ora. Sarebbe prematuro attribuirti una nuova personalità.",
             "forecast_flat_up": "Trend stabile o in salita. La proiezione ha deciso di non inventarsi una risposta.",
         },
         "ux": {
             "over_target": "Risultano circa {kcal} kcal sopra il target. Il dato è stato regolarmente acquisito.",
-            "end_day": "Proiezione di fine giornata: ~{kcal} kcal. Salvo ulteriori sviluppi non dichiarati.",
+            "end_day": "Proiezione di fine giornata: ~{kcal} kcal. Naturalmente vale solo per gli eventi che arriveranno anche nel registro.",
             "activity_logged_note": "Attività strutturata registrata. Il dispositivo dispone apparentemente di prove.",
-            "can_eat_more": "Restano {kcal} kcal sul target di oggi. Almeno secondo quanto gentilmente autocertificato.",
-            "exact_target": "Target centrato al kcal. Una precisione che non desta alcun sospetto.",
+            "can_eat_more": "Restano {kcal} kcal sul target di oggi. Potresti farcela; il registro, per ragioni sue, continua a fidarsi.",
+            "exact_target": "Target centrato al kcal. O sei diventato improvvisamente precisissimo, o qualche dettaglio ha avuto una giornata libera.",
             "day_total": "Totale giornata: {kcal} kcal. I numeri hanno raggiunto un accordo.",
             "no_extra": "Nessuna caloria extra registrata. Una voce sorprendentemente tranquilla del fascicolo.",
         },
@@ -5387,7 +5388,7 @@ ZERO_COPY = {
                    if diff >= 0 else
                    f"{abs(diff)} kcal appear to be over. Rounding is a weak suspect.")
             ),
-            "balance_days": lambda d: f"Estimate: about {d} days. The maths has not been briefed on weekends.",
+            "balance_days": lambda d: f"Estimate: about {d} days. Unless you start making a complete mess of it.",
             "balance_surplus": "With a surplus, the target date remains mostly a work of fiction.",
             "forecast_days": lambda d, date_str: f"Estimated date: **{date_str}** ({d} days). According to mathematics, which was not consulted about real life.",
             "forecast_steady": "The trend points the intended way. The scale is cooperating, for now.",
@@ -5430,7 +5431,7 @@ ZERO_COPY = {
                    if diff >= 0 else
                    f"{abs(diff)} kcal erboven. Afronding is een zwak alibi.")
             ),
-            "balance_days": lambda d: f"Schatting: ongeveer {d} dagen. De wiskunde is niet geïnformeerd over weekends.",
+            "balance_days": lambda d: f"Schatting: ongeveer {d} dagen. Tenzij je er onderweg natuurlijk een complete puinhoop van maakt.",
             "balance_surplus": "Met een overschot blijft de doeldatum vooral een literair concept.",
             "forecast_days": lambda d, date_str: f"Geschatte datum: **{date_str}** ({d} dagen). Volgens de wiskunde, die niet over het echte leven is geraadpleegd.",
             "forecast_steady": "De trend wijst de bedoelde kant op. De weegschaal werkt voorlopig mee.",
