@@ -5605,6 +5605,85 @@ def _normalize_ai_recipe_result(data, requested_servings):
     }
 
 
+def _extract_json_object_tolerant(raw_text):
+    """
+    Extract a JSON object from a model response without relying on Groq's
+    server-side response_format validation.
+
+    This is deliberately defensive because some available Groq models may
+    prepend/append a tiny amount of text even when instructed to return JSON.
+    """
+    text = str(raw_text or "").strip()
+
+    # Remove markdown fences.
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
+    text = re.sub(r"\s*```$", "", text).strip()
+
+    # Remove full reasoning blocks if a provider emits them.
+    text = re.sub(
+        r"<think>.*?</think>",
+        "",
+        text,
+        flags=re.I | re.S,
+    ).strip()
+
+    # First try the whole string.
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    # Then extract from first { to last }.
+    first = text.find("{")
+    last = text.rfind("}")
+    if first >= 0 and last > first:
+        candidate = text[first:last + 1]
+        return json.loads(candidate)
+
+    raise ValueError("La risposta AI non contiene un oggetto JSON valido.")
+
+
+def _repair_recipe_json_with_groq(client, model_id, raw_text):
+    """
+    One cheap repair pass if the first recipe response is not valid JSON.
+    """
+    repair_prompt = f"""
+Convert the following response into VALID JSON only.
+
+Do not add commentary.
+Do not use markdown fences.
+Do not change the meaning or nutritional values unless needed to make the JSON syntactically valid.
+Keep exactly these top-level keys when present:
+name, meal_type, servings, total_minutes, active_minutes,
+nutrition_per_serving, ingredients, instructions, notes,
+target_not_reached, warning.
+
+RESPONSE TO REPAIR:
+{raw_text}
+""".strip()
+
+    repaired = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {
+                "role": "system",
+                "content": "Return valid JSON only. Never output reasoning.",
+            },
+            {
+                "role": "user",
+                "content": repair_prompt,
+            },
+        ],
+        temperature=0.0,
+        max_tokens=2200,
+        stream=False,
+    )
+
+    return _extract_json_object_tolerant(
+        repaired.choices[0].message.content
+    )
+
+
 def generate_ai_recipe_with_groq(
     *,
     language,
@@ -5700,6 +5779,17 @@ TIME RULES:
 - active_minutes must not exceed the requested active time;
 - active_minutes cannot exceed total_minutes.
 
+JSON OUTPUT RULES:
+- output exactly one JSON object and nothing else;
+- use double quotes for every JSON key and string;
+- do not include trailing commas;
+- all numeric values must be JSON numbers, never strings with units;
+- warning and notes must be strings, even when empty;
+- target_not_reached must be true or false;
+- instructions must be an array of strings;
+- ingredients must be an array of objects;
+- do not use NaN, Infinity, comments or markdown.
+
 Return ONLY valid JSON with this exact structure:
 {{
   "name": "recipe name",
@@ -5747,20 +5837,34 @@ Return ONLY valid JSON with this exact structure:
                 "role": "system",
                 "content": (
                     "You are SanoSync Recipe AI. "
-                    "Return only the requested JSON. "
-                    "Never output reasoning, analysis, markdown or <think> tags."
+                    "Return ONLY one valid JSON object. "
+                    "No markdown fences. No prose before or after JSON. "
+                    "Never output reasoning, analysis or <think> tags."
                 ),
             },
             {"role": "user", "content": prompt},
         ],
-        response_format={"type": "json_object"},
-        temperature=0.72,
+        # IMPORTANT:
+        # Do not use response_format/json_object here. Some Groq models
+        # available to this project reject the richer generated structure
+        # server-side with json_validate_failed even though plain completion
+        # works correctly.
+        temperature=0.55,
         max_tokens=2200,
         stream=False,
     )
 
     raw = response.choices[0].message.content
-    data = _ai_recipe_clean_json(raw)
+
+    try:
+        data = _extract_json_object_tolerant(raw)
+    except Exception:
+        data = _repair_recipe_json_with_groq(
+            client,
+            _recipe_model,
+            raw,
+        )
+
     return _normalize_ai_recipe_result(data, servings)
 
 
@@ -6398,6 +6502,172 @@ if selected_page == t["t1"]:
             key=f"meal_notes_{v}",
             height=80,
         )
+
+        _meal_ai_i18n = {
+            "Italiano": {
+                "title": "✨ Calcola un pasto da ingredienti con AI",
+                "caption": "Scrivi ingredienti e quantità: SanoSync stima kcal e macro totali e per porzione.",
+                "ingredients": "Ingredienti",
+                "placeholder": "Es. 250g pollo, 120g riso, 200g zucchine, 10g olio",
+                "portions": "Numero di porzioni",
+                "analyze": "✨ Analizza ingredienti",
+                "spinner": "Sto calcolando il pasto…",
+                "total": "Totale ricetta",
+                "per_portion": "Per porzione",
+                "use": "↗️ Usa questi valori nel pasto",
+                "used": "Valori AI caricati nel pasto.",
+                "error": "Errore nell'analisi: {error}",
+            },
+            "English": {
+                "title": "✨ Calculate a meal from ingredients with AI",
+                "caption": "Enter ingredients and quantities: SanoSync estimates total and per-serving calories and macros.",
+                "ingredients": "Ingredients",
+                "placeholder": "E.g. 250g chicken, 120g rice, 200g courgette, 10g oil",
+                "portions": "Number of servings",
+                "analyze": "✨ Analyze ingredients",
+                "spinner": "Calculating the meal…",
+                "total": "Recipe total",
+                "per_portion": "Per serving",
+                "use": "↗️ Use these values for the meal",
+                "used": "AI values loaded into the meal.",
+                "error": "Analysis error: {error}",
+            },
+            "Nederlands": {
+                "title": "✨ Bereken een maaltijd uit ingrediënten met AI",
+                "caption": "Voer ingrediënten en hoeveelheden in: SanoSync schat totale en per-portie calorieën en macro's.",
+                "ingredients": "Ingrediënten",
+                "placeholder": "Bijv. 250g kip, 120g rijst, 200g courgette, 10g olie",
+                "portions": "Aantal porties",
+                "analyze": "✨ Ingrediënten analyseren",
+                "spinner": "Maaltijd berekenen…",
+                "total": "Totaal recept",
+                "per_portion": "Per portie",
+                "use": "↗️ Gebruik deze waarden voor de maaltijd",
+                "used": "AI-waarden in de maaltijd geladen.",
+                "error": "Analysefout: {error}",
+            },
+            "Français": {
+                "title": "✨ Calculer un repas à partir d'ingrédients avec l'IA",
+                "caption": "Saisissez ingrédients et quantités : SanoSync estime calories et macros totales et par portion.",
+                "ingredients": "Ingrédients",
+                "placeholder": "Ex. 250g poulet, 120g riz, 200g courgettes, 10g huile",
+                "portions": "Nombre de portions",
+                "analyze": "✨ Analyser les ingrédients",
+                "spinner": "Calcul du repas…",
+                "total": "Total de la recette",
+                "per_portion": "Par portion",
+                "use": "↗️ Utiliser ces valeurs pour le repas",
+                "used": "Valeurs IA chargées dans le repas.",
+                "error": "Erreur d'analyse : {error}",
+            },
+        }
+        _mai = _meal_ai_i18n.get(
+            current_lang,
+            _meal_ai_i18n["Italiano"],
+        )
+
+        with st.expander(_mai["title"], expanded=False):
+            st.caption(_mai["caption"])
+
+            _tab1_ai_text = st.text_area(
+                _mai["ingredients"],
+                key=f"tab1_ai_ingredient_text_{v}",
+                placeholder=_mai["placeholder"],
+                height=90,
+            )
+            _tab1_ai_portions = st.number_input(
+                _mai["portions"],
+                min_value=1.0,
+                max_value=20.0,
+                value=1.0,
+                step=1.0,
+                key=f"tab1_ai_portions_{v}",
+            )
+
+            if st.button(
+                _mai["analyze"],
+                use_container_width=True,
+                key=f"tab1_ai_analyze_{v}",
+            ):
+                if _tab1_ai_text.strip():
+                    try:
+                        with st.spinner(_mai["spinner"]):
+                            _tab1_parsed = (
+                                parse_recipe_ingredients_with_ai(
+                                    _tab1_ai_text,
+                                    current_lang,
+                                )
+                            )
+                        if _tab1_parsed:
+                            st.session_state[
+                                f"tab1_ai_result_{v}"
+                            ] = _tab1_parsed
+                            st.rerun()
+                    except Exception as exc:
+                        st.error(
+                            _mai["error"].format(error=exc)
+                        )
+
+            _tab1_result = st.session_state.get(
+                f"tab1_ai_result_{v}"
+            )
+            if _tab1_result:
+                _tw, _tt, _p100 = calculate_recipe_totals(
+                    _tab1_result
+                )
+                _parts = max(float(_tab1_ai_portions), 1.0)
+                _pp = {
+                    k: float(val) / _parts
+                    for k, val in _tt.items()
+                }
+
+                st.markdown(
+                    f"**{_mai['total']}:** "
+                    f"{_tt['calories']:.0f} kcal · "
+                    f"Pro {_tt['protein']:.1f} g · "
+                    f"Carbs {_tt['carbs']:.1f} g · "
+                    f"Fat {_tt['fat']:.1f} g"
+                )
+                st.markdown(
+                    f"**{_mai['per_portion']}:** "
+                    f"**{_pp['calories']:.0f} kcal** · "
+                    f"Pro {_pp['protein']:.1f} g · "
+                    f"Carbs {_pp['carbs']:.1f} g · "
+                    f"Fat {_pp['fat']:.1f} g"
+                )
+
+                if st.button(
+                    _mai["use"],
+                    use_container_width=True,
+                    key=f"tab1_ai_use_{v}",
+                ):
+                    # This button is rendered before the mode/nutrient widgets,
+                    # so these state values can safely be changed here.
+                    st.session_state["is_per_100g_val"] = False
+                    st.session_state["grams_val"] = 1.0
+                    st.session_state["base_cals"] = _pp["calories"]
+                    st.session_state["base_prot"] = _pp["protein"]
+                    st.session_state["base_carbs"] = _pp["carbs"]
+                    st.session_state["base_fat"] = _pp["fat"]
+                    st.session_state[f"mode_radio_{v}"] = t["per_portion"]
+                    st.session_state.pop(
+                        f"meal_kcal_{v}",
+                        None,
+                    )
+                    st.session_state.pop(
+                        f"meal_pro_{v}",
+                        None,
+                    )
+                    st.session_state.pop(
+                        f"meal_carbs_{v}",
+                        None,
+                    )
+                    st.session_state.pop(
+                        f"meal_fat_{v}",
+                        None,
+                    )
+                    st.success(_mai["used"])
+                    st.rerun()
 
         mode_options = [t["per_100g"], t["per_portion"]]
         default_index = 0 if st.session_state["is_per_100g_val"] else 1
@@ -7669,7 +7939,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Sto analizzando gli ingredienti…",
             "ingredient_ai_done": "✅ Ingredienti compilati automaticamente.",
             "ingredient_ai_empty": "Inserisci almeno un ingrediente.",
-            "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}",
+            "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}","creation_mode":"Come vuoi creare la ricetta?","mode_known":"🍳 So già cosa cucinare","mode_ai":"✨ Voglio un aiuto dall’AI","mode_known_help":"Scrivi gli ingredienti che hai deciso di usare: SanoSync calcolerà automaticamente kcal e macro.","mode_ai_help":"Descrivi i tuoi obiettivi e lascia che SanoSync proponga una ricetta completa.","ai_starting_ingredients":"✨ Ingredienti di partenza per l’AI (opzionale)","ai_starting_help":"Se li inserisci, l’AI li userà come base (modalità svuotafrigo) e aggiungerà solo ciò che serve.","ai_generated_loaded":"✅ Ricetta generata. Controlla ingredienti e valori prima di salvarla.",
         },
         "English": {
             "my": "👤 My recipes",
@@ -7695,7 +7965,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Analyzing ingredients…",
             "ingredient_ai_done": "✅ Ingredients filled automatically.",
             "ingredient_ai_empty": "Enter at least one ingredient.",
-            "ingredient_ai_error": "Ingredient analysis error: {error}",
+            "ingredient_ai_error": "Ingredient analysis error: {error}","creation_mode":"How do you want to create the recipe?","mode_known":"🍳 I already know what to cook","mode_ai":"✨ I want AI help","mode_known_help":"Enter the ingredients you have chosen: SanoSync will calculate calories and macros automatically.","mode_ai_help":"Set your targets and let SanoSync propose a complete recipe.","ai_starting_ingredients":"✨ Starting ingredients for AI (optional)","ai_starting_help":"If provided, AI will use them as the base (fridge-clear-out mode) and add only what is needed.","ai_generated_loaded":"✅ Recipe generated. Review ingredients and values before saving.",
         },
         "Nederlands": {
             "my": "👤 Mijn recepten",
@@ -7721,7 +7991,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Ingrediënten analyseren…",
             "ingredient_ai_done": "✅ Ingrediënten automatisch ingevuld.",
             "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
-            "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}",
+            "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ Recept gegenereerd. Controleer ingrediënten en waarden voor je opslaat.",
         },
         "Français": {
             "my": "👤 Mes recettes",
@@ -7747,7 +8017,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Analyse des ingrédients…",
             "ingredient_ai_done": "✅ Ingrédients remplis automatiquement.",
             "ingredient_ai_empty": "Saisissez au moins un ingrédient.",
-            "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}",
+            "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}","creation_mode":"Comment souhaitez-vous créer la recette ?","mode_known":"🍳 Je sais déjà quoi cuisiner","mode_ai":"✨ Je veux l’aide de l’IA","mode_known_help":"Saisissez les ingrédients choisis : SanoSync calculera automatiquement calories et macros.","mode_ai_help":"Définissez vos objectifs et laissez SanoSync proposer une recette complète.","ai_starting_ingredients":"✨ Ingrédients de départ pour l’IA (optionnel)","ai_starting_help":"Si vous les indiquez, l’IA les utilisera comme base (mode vide-frigo) et n’ajoutera que le nécessaire.","ai_generated_loaded":"✅ Recette générée. Vérifiez ingrédients et valeurs avant de l’enregistrer.",
         },
     }
     _rcu = _recipe_compact_i18n.get(
@@ -7939,360 +8209,532 @@ elif selected_page == t["t4"]:
 
     _air = _ai_recipe_i18n.get(current_lang, _ai_recipe_i18n["Italiano"])
 
+
+    # ------------------------------------------------------------------
+    # ➕ CREAZIONE RICETTA UNIFICATA
+    # ------------------------------------------------------------------
+
+    # Apply an AI-generated recipe BEFORE any builder widget is instantiated.
+    _pending_recipe = st.session_state.pop("_pending_ai_recipe_for_builder", None)
+    if _pending_recipe:
+        st.session_state["recipe_creation_mode"] = "known"
+        st.session_state["recipe_builder_ingredients"] = list(
+            _pending_recipe.get("ingredients") or []
+        )
+        st.session_state[f"recipe_builder_name_{v}"] = str(
+            _pending_recipe.get("name") or ""
+        )
+        st.session_state[f"recipe_builder_notes_{v}"] = _ai_recipe_notes(
+            _pending_recipe
+        )
+        st.session_state[f"recipe_servings_{v}"] = float(
+            _pending_recipe.get("servings") or 1.0
+        )
+
+        _pending_meal_type = _pending_recipe.get("meal_type") or "Cena"
+        if _pending_meal_type not in ["Colazione", "Pranzo", "Cena", "Snack"]:
+            _pending_meal_type = "Cena"
+        st.session_state[f"recipe_meal_type_{v}"] = _pending_meal_type
+        st.session_state[f"recipe_category_{v}"] = "Casa"
+        st.session_state[f"recipe_ai_ingredient_text_{v}"] = ", ".join(
+            f"{_safe_float(i.get('quantity_g')):g}g {i.get('name', '')}"
+            for i in (_pending_recipe.get("ingredients") or [])
+        )
+        st.session_state["_show_ai_recipe_loaded_message"] = True
+
     with st.container(border=True):
-        st.markdown(f"### {_rcu['generator']}")
-        st.caption(_rcu["generator_caption"])
+        st.markdown(_rcu["builder"])
 
-        _a1, _a2 = st.columns(2)
-        with _a1:
-            _ai_meal_type = st.selectbox(
-                _air["meal_type"],
-                ["Colazione", "Pranzo", "Cena", "Snack"],
-                key="ai_recipe_meal_type",
-                format_func=tr_meal_type,
+        _creation_mode = st.radio(
+            _rcu["creation_mode"],
+            ["known", "ai"],
+            horizontal=True,
+            key="recipe_creation_mode",
+            format_func=lambda x: (
+                _rcu["mode_known"] if x == "known" else _rcu["mode_ai"]
+            ),
+        )
+
+        if _creation_mode == "ai":
+            st.caption(_rcu["mode_ai_help"])
+
+            _ai1, _ai2 = st.columns(2)
+            with _ai1:
+                _ai_meal_type = st.selectbox(
+                    _air["meal_type"],
+                    ["Colazione", "Pranzo", "Cena", "Snack"],
+                    key="unified_ai_recipe_meal_type",
+                    format_func=tr_meal_type,
+                )
+            with _ai2:
+                _ai_servings = st.number_input(
+                    _air["servings"],
+                    min_value=1.0,
+                    max_value=20.0,
+                    value=2.0,
+                    step=1.0,
+                    key="unified_ai_recipe_servings",
+                )
+
+            _ai_restrictions = st.multiselect(
+                _air["restrictions"],
+                _air["restriction_options"],
+                key="unified_ai_recipe_restrictions",
             )
-        with _a2:
-            _ai_servings = st.number_input(
-                _air["servings"],
+
+            if "unified_ai_recipe_target_kcal" not in st.session_state:
+                st.session_state["unified_ai_recipe_target_kcal"] = 600.0
+            if "unified_ai_recipe_target_protein" not in st.session_state:
+                st.session_state["unified_ai_recipe_target_protein"] = 0.0
+
+            if st.button(
+                _air["today"],
+                key="unified_ai_recipe_use_today",
+                use_container_width=True,
+            ):
+                try:
+                    _today_str_ai = str(date.today())
+                    _meals_ai = (
+                        supabase.table("meals")
+                        .select("calories,protein")
+                        .eq("user_id", user_id)
+                        .eq("date", _today_str_ai)
+                        .execute().data
+                        or []
+                    )
+                    _acts_ai = (
+                        supabase.table("activities")
+                        .select("burned_calories")
+                        .eq("user_id", user_id)
+                        .eq("date", _today_str_ai)
+                        .execute().data
+                        or []
+                    )
+                    _eaten_ai = sum(
+                        _safe_float(x.get("calories")) for x in _meals_ai
+                    )
+                    _protein_ai = sum(
+                        _safe_float(x.get("protein")) for x in _meals_ai
+                    )
+                    _activity_ai = sum(
+                        _safe_float(x.get("burned_calories")) for x in _acts_ai
+                    )
+
+                    _maintenance_ai = max(
+                        0.0,
+                        _safe_float(user_bmr) + _activity_ai,
+                    )
+                    _target_intake_ai = max(
+                        0.0,
+                        _maintenance_ai
+                        - _safe_float(user_deficit_target_kcal),
+                    )
+                    _remaining_ai = max(
+                        100.0,
+                        _target_intake_ai - _eaten_ai,
+                    )
+
+                    st.session_state["unified_ai_recipe_target_kcal"] = float(
+                        round(_remaining_ai)
+                    )
+                    if (
+                        user_protein_goal_enabled
+                        and user_protein_goal_g > 0
+                    ):
+                        st.session_state[
+                            "unified_ai_recipe_target_protein"
+                        ] = float(
+                            max(
+                                0.0,
+                                round(user_protein_goal_g - _protein_ai),
+                            )
+                        )
+                    st.success(_air["today_done"])
+                    st.rerun()
+                except Exception as exc:
+                    print(f"AI recipe target lookup error: {exc}")
+
+            _b1, _b2, _b3 = st.columns(3)
+            with _b1:
+                _ai_target_kcal = st.number_input(
+                    _air["kcal"],
+                    min_value=100.0,
+                    max_value=3000.0,
+                    step=25.0,
+                    key="unified_ai_recipe_target_kcal",
+                )
+            with _b2:
+                _ai_target_protein = st.number_input(
+                    _air["protein"],
+                    min_value=0.0,
+                    max_value=250.0,
+                    step=5.0,
+                    key="unified_ai_recipe_target_protein",
+                    help="0 = optional",
+                )
+            with _b3:
+                _ai_macro_focus = st.selectbox(
+                    _air["macro"],
+                    _air["macro_options"],
+                    key="unified_ai_recipe_macro_focus",
+                )
+
+            _time_options = [10, 20, 30, 45, 60]
+            _c1, _c2 = st.columns(2)
+            with _c1:
+                _ai_total_minutes = st.selectbox(
+                    _air["total_time"],
+                    _time_options,
+                    index=2,
+                    key="unified_ai_recipe_total_time",
+                    format_func=lambda x: f"{x} min",
+                )
+            with _c2:
+                _ai_active_minutes = st.selectbox(
+                    _air["active_time"],
+                    [10, 15, 20, 30, 45],
+                    index=1,
+                    key="unified_ai_recipe_active_time",
+                    format_func=lambda x: f"{x} min",
+                )
+
+            _ai_equipment = st.multiselect(
+                _air["equipment"],
+                _air["equipment_options"],
+                default=_air["equipment_options"],
+                key="unified_ai_recipe_equipment",
+            )
+
+            _ai_available = st.text_area(
+                _rcu["ai_starting_ingredients"],
+                key="unified_ai_recipe_available",
+                help=_rcu["ai_starting_help"],
+                placeholder="pollo 250 g, zucchine 300 g, yogurt 150 g",
+                height=90,
+            )
+            _ai_avoid = st.text_input(
+                _air["avoid"],
+                key="unified_ai_recipe_avoid",
+                placeholder="cipolla, funghi...",
+            )
+
+            if st.button(
+                _air["generate"],
+                type="primary",
+                use_container_width=True,
+                key="unified_ai_recipe_generate",
+            ):
+                try:
+                    with st.spinner(_air["generating"]):
+                        _effective_ai_mode = (
+                            "fridge"
+                            if _ai_available.strip()
+                            else "generate"
+                        )
+                        _generated = generate_ai_recipe_with_groq(
+                            language=current_lang,
+                            mode=_effective_ai_mode,
+                            meal_type=_ai_meal_type,
+                            restrictions=_ai_restrictions,
+                            servings=_ai_servings,
+                            target_kcal=_ai_target_kcal,
+                            protein_target=_ai_target_protein,
+                            macro_focus=_ai_macro_focus,
+                            total_minutes=_ai_total_minutes,
+                            active_minutes=min(
+                                int(_ai_active_minutes),
+                                int(_ai_total_minutes),
+                            ),
+                            equipment=_ai_equipment,
+                            available_ingredients=_ai_available,
+                            avoid_ingredients=_ai_avoid,
+                        )
+
+                    st.session_state[
+                        "_pending_ai_recipe_for_builder"
+                    ] = _generated
+                    st.rerun()
+
+                except Exception as exc:
+                    st.error(_air["error"].format(error=exc))
+                    print(traceback.format_exc())
+
+        else:
+            st.caption(_rcu["mode_known_help"])
+
+            if st.session_state.pop(
+                "_show_ai_recipe_loaded_message",
+                False,
+            ):
+                st.success(_rcu["ai_generated_loaded"])
+
+            rc1, rc2 = st.columns(2)
+            with rc1:
+                recipe_meal_type = st.selectbox(
+                    t["meal_type_label"],
+                    ["Colazione", "Pranzo", "Cena", "Snack"],
+                    key=f"recipe_meal_type_{v}",
+                    format_func=tr_meal_type,
+                )
+            with rc2:
+                _recipe_categories_available = (
+                    MEAL_CATEGORIES
+                    if user_office_lunch_enabled
+                    else [
+                        c
+                        for c in MEAL_CATEGORIES
+                        if c != "Lavoro"
+                    ]
+                )
+                recipe_category = st.selectbox(
+                    t["category_label"],
+                    _recipe_categories_available,
+                    index=0,
+                    key=f"recipe_category_{v}",
+                    help=t["recipe_category_help"],
+                    format_func=tr_category,
+                )
+
+            r_name = st.text_input(
+                t["col_name"],
+                placeholder=t["recipe_name_placeholder"],
+                key=f"recipe_builder_name_{v}",
+            )
+            r_notes = st.text_area(
+                t["notes_optional"],
+                placeholder=t["notes_placeholder"],
+                key=f"recipe_builder_notes_{v}",
+                height=90,
+            )
+
+            recipe_photo = st.file_uploader(
+                t["recipe_photo"],
+                type=["jpg", "jpeg", "png", "webp"],
+                key=f"recipe_photo_{v}",
+                help=t["recipe_photo_help"],
+            )
+            if recipe_photo is not None:
+                st.image(
+                    recipe_photo,
+                    caption=r_name.strip() or None,
+                    width=260,
+                )
+
+            recipe_servings = st.number_input(
+                t["recipe_servings"],
                 min_value=1.0,
-                max_value=20.0,
-                value=2.0,
+                max_value=100.0,
+                value=4.0,
                 step=1.0,
-                key="ai_recipe_servings",
+                key=f"recipe_servings_{v}",
+                help=t["recipe_servings_help"],
             )
 
-        _ai_restrictions = st.multiselect(
-            _air["restrictions"],
-            _air["restriction_options"],
-            key="ai_recipe_restrictions",
-        )
+            _ingredient_free_text = st.text_area(
+                _rcu["ingredient_ai_label"],
+                key=f"recipe_ai_ingredient_text_{v}",
+                placeholder=_rcu["ingredient_ai_placeholder"],
+                help=_rcu["ingredient_ai_help"],
+                height=110,
+            )
 
-        # Initialize target fields before their widgets are created.
-        if "ai_recipe_target_kcal" not in st.session_state:
-            st.session_state["ai_recipe_target_kcal"] = 600.0
-        if "ai_recipe_target_protein" not in st.session_state:
-            st.session_state["ai_recipe_target_protein"] = 0.0
+            if st.button(
+                _rcu["ingredient_ai_button"],
+                use_container_width=True,
+                key=f"recipe_ai_parse_ingredients_{v}",
+            ):
+                if not _ingredient_free_text.strip():
+                    st.warning(_rcu["ingredient_ai_empty"])
+                else:
+                    try:
+                        with st.spinner(_rcu["ingredient_ai_spinner"]):
+                            _parsed_ingredients = (
+                                parse_recipe_ingredients_with_ai(
+                                    _ingredient_free_text,
+                                    current_lang,
+                                )
+                            )
 
-        if st.button(
-            _air["today"],
-            key="ai_recipe_use_today",
-            use_container_width=True,
-        ):
-            try:
-                _today_str_ai = str(date.today())
-                _meals_ai = (
-                    supabase.table("meals")
-                    .select("calories,protein")
-                    .eq("user_id", user_id)
-                    .eq("date", _today_str_ai)
-                    .execute().data
-                    or []
-                )
-                _acts_ai = (
-                    supabase.table("activities")
-                    .select("burned_calories")
-                    .eq("user_id", user_id)
-                    .eq("date", _today_str_ai)
-                    .execute().data
-                    or []
-                )
-                _eaten_ai = sum(_safe_float(x.get("calories")) for x in _meals_ai)
-                _protein_ai = sum(_safe_float(x.get("protein")) for x in _meals_ai)
-                _activity_ai = sum(_safe_float(x.get("burned_calories")) for x in _acts_ai)
+                        if not _parsed_ingredients:
+                            st.warning(_rcu["ingredient_ai_empty"])
+                        else:
+                            st.session_state[
+                                "recipe_builder_ingredients"
+                            ] = _parsed_ingredients
+                            st.success(_rcu["ingredient_ai_done"])
+                            st.rerun()
 
-                _maintenance_ai = max(
-                    0.0,
-                    _safe_float(user_bmr) + _activity_ai,
-                )
-                _target_intake_ai = max(
-                    0.0,
-                    _maintenance_ai - _safe_float(user_deficit_target_kcal),
-                )
-                _remaining_ai = max(
-                    100.0,
-                    _target_intake_ai - _eaten_ai,
-                )
+                    except Exception as exc:
+                        st.error(
+                            _rcu["ingredient_ai_error"].format(
+                                error=exc
+                            )
+                        )
+                        print(traceback.format_exc())
 
-                st.session_state["ai_recipe_target_kcal"] = float(
-                    round(_remaining_ai)
-                )
+            ingredients = st.session_state.get(
+                "recipe_builder_ingredients",
+                [],
+            )
 
-                if user_protein_goal_enabled and user_protein_goal_g > 0:
-                    st.session_state["ai_recipe_target_protein"] = float(
-                        max(0.0, round(user_protein_goal_g - _protein_ai))
+            if ingredients:
+                st.markdown(t["ingredients_title"])
+                rows = []
+                for idx, ing in enumerate(ingredients):
+                    ing_factor = (
+                        float(ing["quantity_g"]) / 100.0
                     )
-
-                st.success(_air["today_done"])
-            except Exception as exc:
-                print(f"AI recipe target lookup error: {exc}")
-
-        _b1, _b2, _b3 = st.columns(3)
-        with _b1:
-            _ai_target_kcal = st.number_input(
-                _air["kcal"],
-                min_value=100.0,
-                max_value=3000.0,
-                step=25.0,
-                key="ai_recipe_target_kcal",
-            )
-        with _b2:
-            _ai_target_protein = st.number_input(
-                _air["protein"],
-                min_value=0.0,
-                max_value=250.0,
-                step=5.0,
-                key="ai_recipe_target_protein",
-                help="0 = optional / no numeric target",
-            )
-        with _b3:
-            _ai_macro_focus = st.selectbox(
-                _air["macro"],
-                _air["macro_options"],
-                key="ai_recipe_macro_focus",
-            )
-
-        _time_options = [10, 20, 30, 45, 60]
-        _c1, _c2 = st.columns(2)
-        with _c1:
-            _ai_total_minutes = st.selectbox(
-                _air["total_time"],
-                _time_options,
-                index=2,
-                key="ai_recipe_total_time",
-                format_func=lambda x: f"{x} min",
-            )
-        with _c2:
-            _active_choices = [10, 15, 20, 30, 45]
-            _ai_active_minutes = st.selectbox(
-                _air["active_time"],
-                _active_choices,
-                index=1,
-                key="ai_recipe_active_time",
-                format_func=lambda x: f"{x} min",
-            )
-
-        _ai_equipment = st.multiselect(
-            _air["equipment"],
-            _air["equipment_options"],
-            default=_air["equipment_options"],
-            key="ai_recipe_equipment",
-        )
-
-        _ai_available = st.text_area(
-            _rcu["available"],
-            key="ai_recipe_available",
-            help=_rcu["available_help"],
-            placeholder="pollo 250 g, zucchine 300 g, yogurt 150 g",
-            height=90,
-        )
-        _ai_avoid = st.text_input(
-            _air["avoid"],
-            key="ai_recipe_avoid",
-            placeholder="cipolla, funghi...",
-        )
-
-        def _run_ai_recipe_generation():
-            # One generator only:
-            # ingredients supplied -> fridge-clear-out behaviour;
-            # no ingredients -> free recipe generation.
-            _effective_ai_mode = (
-                "fridge"
-                if _ai_available.strip()
-                else "generate"
-            )
-
-            try:
-                with st.spinner(_air["generating"]):
-                    _result = generate_ai_recipe_with_groq(
-                        language=current_lang,
-                        mode=_effective_ai_mode,
-                        meal_type=_ai_meal_type,
-                        restrictions=_ai_restrictions,
-                        servings=_ai_servings,
-                        target_kcal=_ai_target_kcal,
-                        protein_target=_ai_target_protein,
-                        macro_focus=_ai_macro_focus,
-                        total_minutes=_ai_total_minutes,
-                        active_minutes=min(
-                            int(_ai_active_minutes),
-                            int(_ai_total_minutes),
+                    rows.append({
+                        "#": idx + 1,
+                        t["ingredient_col"]: ing["name"],
+                        t["quantity_g"]: ing["quantity_g"],
+                        "Kcal": round(
+                            ing["calories_per_100g"] * ing_factor
                         ),
-                        equipment=_ai_equipment,
-                        available_ingredients=_ai_available,
-                        avoid_ingredients=_ai_avoid,
-                    )
-                    st.session_state["ai_recipe_result"] = _result
-                    st.session_state["ai_recipe_generation_id"] = (
-                        int(st.session_state.get("ai_recipe_generation_id", 0)) + 1
-                    )
-            except Exception as exc:
-                _available_debug = get_groq_available_model_ids()
-                st.error(_air["error"].format(error=exc))
-                if "model" in str(exc).lower():
-                    st.caption(
-                        "Modelli disponibili per questa chiave Groq: "
-                        + (", ".join(_available_debug) if _available_debug else "nessuno / lookup fallito")
-                    )
-                print(traceback.format_exc())
-
-        if st.button(
-            _air["generate"],
-            type="primary",
-            use_container_width=True,
-            key="ai_recipe_generate",
-        ):
-            _run_ai_recipe_generation()
-            st.rerun()
-
-        _ai_result = st.session_state.get("ai_recipe_result")
-
-        if _ai_result:
-            _nutr = _ai_result["nutrition_per_serving"]
-            _generated_kcal = _safe_float(_nutr.get("calories"))
-            _tolerance_low = float(_ai_target_kcal) * 0.90
-            _below_tolerance = _generated_kcal < _tolerance_low
-
-            st.divider()
-            st.markdown(f"## 🍽️ {html.escape(_ai_result['name'])}")
-            st.caption(
-                f"⏱️ {_air['time']}: {_ai_result['total_minutes']} min · "
-                f"{_ai_result['active_minutes']} min {_air['active']} · "
-                f"🍽️ {_ai_result['servings']:g}"
-            )
-
-            _n1, _n2, _n3, _n4 = st.columns(4)
-            _n1.metric("Kcal", int(round(_nutr["calories"])))
-            _n2.metric("Protein", f"{_nutr['protein']:.1f} g")
-            _n3.metric("Carbs", f"{_nutr['carbs']:.1f} g")
-            _n4.metric("Fat", f"{_nutr['fat']:.1f} g")
-            st.caption(_air["per_serving"])
-            st.caption(_air["ai_note"])
-
-            if (
-                _ai_result.get("target_not_reached")
-                or _below_tolerance
-            ):
-                st.warning(
-                    _ai_result.get("warning")
-                    or _air["warning_target"]
+                        "Pro": round(
+                            ing["protein_per_100g"] * ing_factor,
+                            1,
+                        ),
+                        "Carbs": round(
+                            ing["carbs_per_100g"] * ing_factor,
+                            1,
+                        ),
+                        "Fat": round(
+                            ing["fat_per_100g"] * ing_factor,
+                            1,
+                        ),
+                    })
+                st.dataframe(
+                    pd.DataFrame(rows),
+                    use_container_width=True,
+                    hide_index=True,
                 )
 
-            st.markdown(f"### 🥕 {_air['ingredients']}")
-            for _ing in _ai_result.get("ingredients", []):
+                remove_idx = st.selectbox(
+                    t["remove_ingredient"],
+                    [""] + [
+                        str(i + 1)
+                        for i in range(len(ingredients))
+                    ],
+                    key=f"remove_ingredient_{v}",
+                )
+                if remove_idx and st.button(
+                    t["remove_ingredient_btn"],
+                    key=f"remove_ingredient_btn_{v}",
+                ):
+                    del st.session_state[
+                        "recipe_builder_ingredients"
+                    ][int(remove_idx) - 1]
+                    st.rerun()
+
+                total_weight, totals, per100 = (
+                    calculate_recipe_totals(ingredients)
+                )
+
+                _servings_safe = max(
+                    float(recipe_servings),
+                    1.0,
+                )
+                _per_serving = {
+                    key: float(value) / _servings_safe
+                    for key, value in totals.items()
+                }
+                _serving_weight = (
+                    float(total_weight) / _servings_safe
+                )
+
                 st.markdown(
-                    f"- **{html.escape(str(_ing['name']))}** — "
-                    f"{_safe_float(_ing['quantity_g']):g} g"
+                    f"**{t['total_recipe']}:** "
+                    f"{total_weight:.0f} g · "
+                    f"**{totals['calories']:.0f} kcal** · "
+                    f"Pro {totals['protein']:.1f} g · "
+                    f"Carbs {totals['carbs']:.1f} g · "
+                    f"Fat {totals['fat']:.1f} g"
+                )
+                st.markdown(
+                    f"**{t['per_serving']}:** "
+                    f"**{_per_serving['calories']:.0f} kcal** · "
+                    f"Pro {_per_serving['protein']:.1f} g · "
+                    f"Carbs {_per_serving['carbs']:.1f} g · "
+                    f"Fat {_per_serving['fat']:.1f} g"
+                )
+                st.caption(
+                    t["serving_weight"].format(
+                        grams=f"{_serving_weight:.0f}"
+                    )
+                    + " · "
+                    + f"{t['per_100g_label']}: "
+                    f"{per100['calories']:.0f} kcal · "
+                    f"Pro {per100['protein']:.1f} g · "
+                    f"Carbs {per100['carbs']:.1f} g · "
+                    f"Fat {per100['fat']:.1f} g"
                 )
 
-            st.markdown(f"### 👩‍🍳 {_air['instructions']}")
-            for _step_no, _step in enumerate(
-                _ai_result.get("instructions", []),
-                start=1,
-            ):
-                st.markdown(f"{_step_no}. {html.escape(str(_step))}")
+                recipe_is_shared = st.checkbox(
+                    t["share_recipe"],
+                    value=False,
+                    key=f"recipe_share_{v}",
+                    help=t["share_help"],
+                )
 
-            _act1, _act2 = st.columns(2)
-            with _act1:
                 if st.button(
-                    _air["regenerate"],
+                    t["save_as_meal"],
                     use_container_width=True,
-                    key=f"ai_recipe_regenerate_{st.session_state.get('ai_recipe_generation_id', 0)}",
+                    key=f"save_recipe_builder_{v}",
                 ):
-                    _run_ai_recipe_generation()
-                    st.rerun()
+                    if not r_name.strip():
+                        st.warning(t["enter_name"])
+                    else:
+                        try:
+                            recipe_image_url = None
+                            if recipe_photo is not None:
+                                try:
+                                    recipe_image_url = (
+                                        upload_recipe_image(
+                                            recipe_photo
+                                        )
+                                    )
+                                except Exception as upload_exc:
+                                    st.error(
+                                        t[
+                                            "recipe_photo_error"
+                                        ].format(
+                                            error=upload_exc
+                                        )
+                                    )
+                                    st.stop()
 
-            with _act2:
-                if st.button(
-                    _air["edit"],
-                    use_container_width=True,
-                    key=f"ai_recipe_edit_{st.session_state.get('ai_recipe_generation_id', 0)}",
-                ):
-                    st.session_state["recipe_builder_ingredients"] = list(
-                        _ai_result.get("ingredients") or []
-                    )
-                    st.session_state[f"recipe_ai_ingredient_text_{v}"] = ", ".join(
-                        f"{_safe_float(i.get('quantity_g')):g}g {i.get('name', '')}"
-                        for i in (_ai_result.get("ingredients") or [])
-                    )
-                    st.session_state[f"recipe_builder_name_{v}"] = _ai_result["name"]
-                    st.session_state[f"recipe_builder_notes_{v}"] = _ai_recipe_notes(
-                        _ai_result
-                    )
-                    st.session_state[f"recipe_servings_{v}"] = float(
-                        _ai_result["servings"]
-                    )
-
-                    _meal_value = _ai_result.get("meal_type", _ai_meal_type)
-                    if _meal_value not in ["Colazione", "Pranzo", "Cena", "Snack"]:
-                        _meal_value = _ai_meal_type
-                    st.session_state[f"recipe_meal_type_{v}"] = _meal_value
-                    st.session_state[f"recipe_category_{v}"] = "Casa"
-                    st.success(_air["editable"])
-                    st.rerun()
-
-            _act3, _act4 = st.columns(2)
-            with _act3:
-                if st.button(
-                    _air["save"],
-                    use_container_width=True,
-                    key=f"ai_recipe_save_{st.session_state.get('ai_recipe_generation_id', 0)}",
-                ):
-                    try:
-                        _servings = max(
-                            1.0,
-                            float(_ai_result["servings"]),
-                        )
-                        insert_recipe_library(
-                            name=_ai_result["name"],
-                            meal_type=_ai_result.get("meal_type", _ai_meal_type),
-                            category="Casa",
-                            recipe_servings=_servings,
-                            calories=_nutr["calories"] * _servings,
-                            protein=_nutr["protein"] * _servings,
-                            carbs=_nutr["carbs"] * _servings,
-                            fat=_nutr["fat"] * _servings,
-                            notes=_ai_recipe_notes(_ai_result),
-                            ingredients_json=_ai_result["ingredients"],
-                            is_shared=False,
-                            image_url=None,
-                        )
-                        st.success(_air["saved"])
-                    except Exception as exc:
-                        st.error(str(exc))
-
-            with _act4:
-                if st.button(
-                    _air["insert"],
-                    use_container_width=True,
-                    key=f"ai_recipe_insert_{st.session_state.get('ai_recipe_generation_id', 0)}",
-                ):
-                    try:
-                        _display_name = f"{_ai_result['name']} (1.0 porz.)"
-                        insert_meal_with_base_data(
-                            log_date=date.today(),
-                            meal_type=_ai_result.get("meal_type", _ai_meal_type),
-                            display_name=_display_name,
-                            base_name=_ai_result["name"],
-                            quantity=1.0,
-                            is_per_100g=False,
-                            calories=_nutr["calories"],
-                            protein=_nutr["protein"],
-                            carbs=_nutr["carbs"],
-                            fat=_nutr["fat"],
-                            base_calories=_nutr["calories"],
-                            base_protein=_nutr["protein"],
-                            base_carbs=_nutr["carbs"],
-                            base_fat=_nutr["fat"],
-                            notes=_ai_recipe_notes(_ai_result),
-                            category="Casa",
-                            ingredients_json=_ai_result["ingredients"],
-                            recipe_servings=_ai_result["servings"],
-                        )
-                        refresh_daily_logs(date.today())
-                        st.success(_air["inserted"])
-                    except Exception as exc:
-                        st.error(str(exc))
-
+                            insert_recipe_library(
+                                name=r_name.strip(),
+                                meal_type=recipe_meal_type,
+                                category=recipe_category,
+                                recipe_servings=recipe_servings,
+                                calories=totals["calories"],
+                                protein=totals["protein"],
+                                carbs=totals["carbs"],
+                                fat=totals["fat"],
+                                notes=r_notes,
+                                ingredients_json=ingredients,
+                                is_shared=recipe_is_shared,
+                                image_url=recipe_image_url,
+                            )
+                            st.session_state[
+                                "recipe_builder_ingredients"
+                            ] = []
+                            st.session_state[
+                                "recipe_form_version"
+                            ] += 1
+                            st.success(t["composed_saved"])
+                            st.rerun()
+                        except Exception as e:
+                            st.error(
+                                "Impossibile salvare la ricetta "
+                                "nel catalogo. Verifica che la "
+                                "tabella recipe_library sia stata "
+                                "creata. Errore: " + str(e)
+                            )
+            else:
+                st.info(t["add_one_ingredient"])
 
 
     # ------------------------------------------------------------------
@@ -8595,218 +9037,6 @@ elif selected_page == t["t4"]:
                             )
         else:
             st.info(t["no_shared_recipes"])
-
-    with st.expander(_rcu["builder"], expanded=False):
-        rc1, rc2 = st.columns(2)
-        with rc1:
-            recipe_meal_type = st.selectbox(
-                t["meal_type_label"],
-                ["Colazione", "Pranzo", "Cena", "Snack"],
-                key=f"recipe_meal_type_{v}",
-                format_func=tr_meal_type,
-            )
-        with rc2:
-            _recipe_categories_available = MEAL_CATEGORIES if user_office_lunch_enabled else [c for c in MEAL_CATEGORIES if c != "Lavoro"]
-            recipe_category = st.selectbox(
-                t["category_label"],
-                _recipe_categories_available,
-                index=0,
-                key=f"recipe_category_{v}",
-                help=t["recipe_category_help"],
-                format_func=tr_category,
-            )
-
-        r_name = st.text_input(
-            t["col_name"],
-            placeholder=t["recipe_name_placeholder"],
-            key=f"recipe_builder_name_{v}",
-        )
-        r_notes = st.text_area(
-            t["notes_optional"],
-            placeholder=t["notes_placeholder"],
-            key=f"recipe_builder_notes_{v}",
-            height=90,
-        )
-
-        recipe_photo = st.file_uploader(
-            t["recipe_photo"],
-            type=["jpg", "jpeg", "png", "webp"],
-            key=f"recipe_photo_{v}",
-            help=t["recipe_photo_help"],
-        )
-
-        if recipe_photo is not None:
-            st.image(
-                recipe_photo,
-                caption=r_name.strip() or None,
-                width=260,
-            )
-
-        recipe_servings = st.number_input(
-            t["recipe_servings"],
-            min_value=1.0,
-            max_value=100.0,
-            value=4.0,
-            step=1.0,
-            key=f"recipe_servings_{v}",
-            help=t["recipe_servings_help"],
-        )
-
-        _ingredient_free_text = st.text_area(
-            _rcu["ingredient_ai_label"],
-            key=f"recipe_ai_ingredient_text_{v}",
-            placeholder=_rcu["ingredient_ai_placeholder"],
-            help=_rcu["ingredient_ai_help"],
-            height=110,
-        )
-
-        if st.button(
-            _rcu["ingredient_ai_button"],
-            use_container_width=True,
-            key=f"recipe_ai_parse_ingredients_{v}",
-        ):
-            if not _ingredient_free_text.strip():
-                st.warning(_rcu["ingredient_ai_empty"])
-            else:
-                try:
-                    with st.spinner(_rcu["ingredient_ai_spinner"]):
-                        _parsed_ingredients = parse_recipe_ingredients_with_ai(
-                            _ingredient_free_text,
-                            current_lang,
-                        )
-
-                    if not _parsed_ingredients:
-                        st.warning(_rcu["ingredient_ai_empty"])
-                    else:
-                        st.session_state["recipe_builder_ingredients"] = (
-                            _parsed_ingredients
-                        )
-                        st.success(_rcu["ingredient_ai_done"])
-                        st.rerun()
-
-                except Exception as exc:
-                    st.error(
-                        _rcu["ingredient_ai_error"].format(error=exc)
-                    )
-                    print(traceback.format_exc())
-
-        ingredients = st.session_state.get("recipe_builder_ingredients", [])
-
-        if ingredients:
-            st.markdown(t["ingredients_title"])
-            rows = []
-            for idx, ing in enumerate(ingredients):
-                ing_factor = float(ing["quantity_g"]) / 100.0
-                rows.append({
-                    "#": idx + 1,
-                    t["ingredient_col"]: ing["name"],
-                    t["quantity_g"]: ing["quantity_g"],
-                    "Kcal": round(ing["calories_per_100g"] * ing_factor),
-                    "Pro": round(ing["protein_per_100g"] * ing_factor, 1),
-                    "Carbs": round(ing["carbs_per_100g"] * ing_factor, 1),
-                    "Fat": round(ing["fat_per_100g"] * ing_factor, 1),
-                })
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-
-            remove_idx = st.selectbox(
-                t["remove_ingredient"],
-                [""] + [str(i + 1) for i in range(len(ingredients))],
-                key=f"remove_ingredient_{v}",
-            )
-            if remove_idx and st.button(
-                t["remove_ingredient_btn"],
-                key=f"remove_ingredient_btn_{v}",
-            ):
-                del st.session_state["recipe_builder_ingredients"][int(remove_idx) - 1]
-                st.rerun()
-
-            total_weight, totals, per100 = calculate_recipe_totals(ingredients)
-
-            _servings_safe = max(float(recipe_servings), 1.0)
-            _per_serving = {
-                key: float(value) / _servings_safe
-                for key, value in totals.items()
-            }
-            _serving_weight = float(total_weight) / _servings_safe
-
-            st.markdown(
-                f"**{t['total_recipe']}:** {total_weight:.0f} g · "
-                f"**{totals['calories']:.0f} kcal** · "
-                f"Pro {totals['protein']:.1f} g · "
-                f"Carbs {totals['carbs']:.1f} g · "
-                f"Fat {totals['fat']:.1f} g"
-            )
-            st.markdown(
-                f"**{t['per_serving']}:** "
-                f"**{_per_serving['calories']:.0f} kcal** · "
-                f"Pro {_per_serving['protein']:.1f} g · "
-                f"Carbs {_per_serving['carbs']:.1f} g · "
-                f"Fat {_per_serving['fat']:.1f} g"
-            )
-            st.caption(
-                t["serving_weight"].format(
-                    grams=f"{_serving_weight:.0f}"
-                )
-                + " · "
-                + f"{t['per_100g_label']}: {per100['calories']:.0f} kcal · "
-                + f"Pro {per100['protein']:.1f} g · "
-                + f"Carbs {per100['carbs']:.1f} g · "
-                + f"Fat {per100['fat']:.1f} g"
-            )
-
-            recipe_is_shared = st.checkbox(
-                t["share_recipe"],
-                value=False,
-                key=f"recipe_share_{v}",
-                help=t["share_help"],
-            )
-
-            if st.button(
-                t["save_as_meal"],
-                use_container_width=True,
-                key=f"save_recipe_builder_{v}",
-            ):
-                if not r_name.strip():
-                    st.warning(t["enter_name"])
-                else:
-                    try:
-                        recipe_image_url = None
-                        if recipe_photo is not None:
-                            try:
-                                recipe_image_url = upload_recipe_image(recipe_photo)
-                            except Exception as upload_exc:
-                                st.error(
-                                    t["recipe_photo_error"].format(
-                                        error=upload_exc
-                                    )
-                                )
-                                st.stop()
-
-                        insert_recipe_library(
-                            name=r_name.strip(),
-                            meal_type=recipe_meal_type,
-                            category=recipe_category,
-                            recipe_servings=recipe_servings,
-                            calories=totals["calories"],
-                            protein=totals["protein"],
-                            carbs=totals["carbs"],
-                            fat=totals["fat"],
-                            notes=r_notes,
-                            ingredients_json=ingredients,
-                            is_shared=recipe_is_shared,
-                            image_url=recipe_image_url,
-                        )
-                        st.session_state["recipe_builder_ingredients"] = []
-                        st.session_state["recipe_form_version"] += 1
-                        st.success(t["composed_saved"])
-                        st.rerun()
-                    except Exception as e:
-                        st.error(
-                            "Impossibile salvare la ricetta nel catalogo. "
-                            "Verifica che la tabella recipe_library sia stata creata. Errore: " + str(e)
-                        )
-        else:
-            st.info(t["add_one_ingredient"])
 
 # ==============================================================================
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
