@@ -11,8 +11,10 @@ from html import escape
 import uuid
 import base64
 import hashlib
+import secrets
 import io
 from pathlib import Path
+from urllib.parse import urlencode
 from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
@@ -1982,26 +1984,70 @@ def restore_and_verify_auth_session():
 
 
 AUTH_FLOW_STATE_KEY = "auth_flow_id"
+PKCE_COOKIE_PREFIX = "sanosync_pkce_"
+PKCE_COOKIE_MAX_AGE = 10 * 60  # 10 minutes; Supabase auth codes are short-lived.
 
 
-@st.cache_resource
-def get_auth_flow_client(flow_id: str):
+def _pkce_cookie_name(flow_id):
+    """Short, browser-safe cookie name unique to one OAuth attempt."""
+    digest = hashlib.sha256(str(flow_id).encode("utf-8")).hexdigest()[:24]
+    return f"{PKCE_COOKIE_PREFIX}{digest}"
+
+
+def _create_pkce_pair():
     """
-    Client Supabase dedicato al singolo flusso OAuth.
-    Importante: viene creato NORMALMENTE, senza ClientOptions/storage custom.
+    RFC 7636 verifier + S256 challenge.
+    token_urlsafe(64) gives a verifier comfortably inside the 43–128 char range.
     """
-    return create_client(
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_KEY"],
-    )
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
+    return verifier, challenge
 
 
-def _oauth_response_url(response):
-    if response is None:
-        return ""
-    if isinstance(response, dict):
-        return str(response.get("url") or "")
-    return str(getattr(response, "url", "") or "")
+def _store_pkce_verifier(flow_id, verifier):
+    """
+    Persist the verifier in the browser so it survives Google -> Streamlit.
+
+    session_state is retained as a same-session fallback, but the cookie is the
+    important part because a full OAuth redirect can create a fresh Streamlit run.
+    """
+    cookie_name = _pkce_cookie_name(flow_id)
+    st.session_state[f"_pkce_{flow_id}"] = verifier
+    _cookie_set(cookie_name, verifier, PKCE_COOKIE_MAX_AGE)
+
+
+def _read_pkce_verifier(flow_id):
+    cookie_name = _pkce_cookie_name(flow_id)
+
+    # On the callback request this is the most reliable source because the
+    # cookie arrived with the HTTP request.
+    try:
+        value = st.context.cookies.get(cookie_name)
+        if value:
+            return str(value).strip().strip('"')
+    except Exception:
+        pass
+
+    # CookieController fallback for normal Streamlit reruns.
+    try:
+        value = controller.get(cookie_name)
+        if value:
+            return str(value).strip().strip('"')
+    except Exception:
+        pass
+
+    # Same Streamlit-session fallback.
+    return st.session_state.get(f"_pkce_{flow_id}")
+
+
+def _remove_pkce_verifier(flow_id):
+    st.session_state.pop(f"_pkce_{flow_id}", None)
+    try:
+        _cookie_delete(_pkce_cookie_name(flow_id))
+    except Exception:
+        pass
 
 
 def get_public_app_url():
@@ -2027,11 +2073,14 @@ def get_public_app_url():
 
 def build_provider_login_url(provider):
     """
-    Genera URL OAuth separato per provider.
-    Ogni tentativo usa un proprio client/verifier PKCE.
+    Build a Supabase social-login URL using an explicit PKCE verifier.
+
+    This avoids relying on an in-memory supabase-py Auth client to retain the
+    code verifier across an external browser redirect.
     """
     flow_id = uuid.uuid4().hex
-    auth_client = get_auth_flow_client(flow_id)
+    verifier, challenge = _create_pkce_pair()
+    _store_pkce_verifier(flow_id, verifier)
 
     app_url = get_public_app_url().rstrip("/")
     redirect_to = (
@@ -2039,22 +2088,75 @@ def build_provider_login_url(provider):
         f"?auth_callback=1&auth_flow={flow_id}"
     )
 
-    response = auth_client.auth.sign_in_with_oauth(
-        {
-            "provider": provider,
-            "options": {
-                "redirect_to": redirect_to,
-            },
-        }
+    params = {
+        "provider": str(provider),
+        "redirect_to": redirect_to,
+        "code_challenge": challenge,
+        "code_challenge_method": "s256",
+    }
+
+    return (
+        f"{SUPABASE_URL}/auth/v1/authorize?"
+        + urlencode(params)
     )
 
-    return _oauth_response_url(response)
+
+def _exchange_pkce_code(auth_code, code_verifier):
+    """
+    Exchange the Supabase Auth code explicitly.
+
+    Supabase's PKCE token endpoint expects BOTH values in the JSON body.
+    """
+    token_url = f"{SUPABASE_URL}/auth/v1/token?grant_type=pkce"
+
+    response = requests.post(
+        token_url,
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        json={
+            "auth_code": str(auth_code),
+            "code_verifier": str(code_verifier),
+        },
+        timeout=20,
+    )
+
+    try:
+        payload = response.json()
+    except Exception:
+        payload = {}
+
+    if not response.ok:
+        detail = (
+            payload.get("msg")
+            or payload.get("message")
+            or payload.get("error_description")
+            or payload.get("error")
+            or response.text
+            or f"HTTP {response.status_code}"
+        )
+        raise RuntimeError(str(detail))
+
+    access_token = payload.get("access_token")
+    refresh_token = payload.get("refresh_token")
+
+    if not access_token or not refresh_token:
+        raise RuntimeError(
+            "Supabase non ha restituito access token e refresh token."
+        )
+
+    return access_token, refresh_token
 
 
 def handle_oauth_callback():
     """
-    Scambia il code PKCE e trasferisce esplicitamente la sessione
-    al client Supabase principale, come nell'app di riferimento.
+    Complete Google/Facebook OAuth without depending on Auth-client memory.
+
+    The verifier is retrieved from the short-lived browser cookie that was
+    created before leaving SanoSync.
     """
     code_param = st.query_params.get("code")
     flow_id = st.query_params.get("auth_flow")
@@ -2062,57 +2164,57 @@ def handle_oauth_callback():
     if not code_param or not flow_id:
         return False
 
+    flow_id = str(flow_id)
+    code_param = str(code_param)
+
     try:
-        # Fondamentale: recuperiamo lo STESSO client usato per iniziare
-        # questo specifico flusso OAuth/PKCE.
-        auth_client = get_auth_flow_client(str(flow_id))
+        verifier = _read_pkce_verifier(flow_id)
 
-        response = auth_client.auth.exchange_code_for_session(
-            {"auth_code": str(code_param)}
-        )
-
-        session = getattr(response, "session", None)
-        user_obj = getattr(response, "user", None)
-
-        if session is None:
-            session = auth_client.auth.get_session()
-
-        access_token = getattr(session, "access_token", None)
-        refresh_token = getattr(session, "refresh_token", None)
-
-        if not access_token or not refresh_token:
+        if not verifier:
             raise RuntimeError(
-                "Supabase non ha restituito una sessione OAuth valida."
+                "PKCE verifier non trovato nel browser. "
+                "Riprova il login Google dalla pagina di accesso."
             )
 
-        if user_obj is None:
-            verified = auth_client.auth.get_user(access_token)
-            user_obj = getattr(verified, "user", None)
+        access_token, refresh_token = _exchange_pkce_code(
+            code_param,
+            verifier,
+        )
 
-        # Passaggio esplicito dei token al client principale.
-        # È il punto importante della versione che funziona bene anche
-        # quando Streamlit ricrea la pagina dopo il redirect OAuth.
+        # Move the new session into the application's main Supabase client.
         main_response = supabase.auth.set_session(
             access_token,
             refresh_token,
         )
+
+        user_obj = getattr(main_response, "user", None)
+        if user_obj is None:
+            verified = supabase.auth.get_user(access_token)
+            user_obj = getattr(verified, "user", None)
 
         save_authenticated_session(
             main_response,
             fallback_user=user_obj,
         )
 
-        st.session_state[AUTH_FLOW_STATE_KEY] = str(flow_id)
+        st.session_state[AUTH_FLOW_STATE_KEY] = flow_id
+        _remove_pkce_verifier(flow_id)
 
+        # Only remove the one-time OAuth code AFTER a successful exchange.
         st.query_params.clear()
+        st.session_state.pop("auth_callback_error", None)
         st.rerun()
 
     except Exception as exc:
-        st.query_params.clear()
+        # Keep the diagnostic for the login page.
+        # We clear the callback URL so Streamlit does not repeatedly submit
+        # the same one-time auth code on every rerun.
         st.session_state["auth_callback_error"] = str(exc)
+        st.query_params.clear()
         return False
 
     return True
+
 
 def show_login_page():
     """
@@ -5657,6 +5759,130 @@ Return ONLY valid JSON with this exact structure:
     return _normalize_ai_recipe_result(data, servings)
 
 
+
+def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
+    """
+    Converts free text such as:
+      '250g pollo, 120g riso, 10g olio'
+    into recipe_builder_ingredients with estimated nutrition per 100 g.
+
+    Groq is deliberately the nutrition source for this workflow.
+    """
+    raw_text = str(ingredient_text or "").strip()
+    if not raw_text:
+        return []
+
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "GROQ_API_KEY non configurata nei Secrets di Streamlit."
+        )
+
+    language_name = {
+        "Italiano": "Italian",
+        "English": "English",
+        "Nederlands": "Dutch",
+        "Français": "French",
+    }.get(language, "Italian")
+
+    prompt = f"""
+Parse the following ingredient list for a recipe:
+
+{raw_text}
+
+Return ONLY valid JSON with this structure:
+{{
+  "ingredients": [
+    {{
+      "name": "ingredient name in {language_name}",
+      "quantity_g": 250,
+      "calories_per_100g": 165,
+      "protein_per_100g": 31,
+      "carbs_per_100g": 0,
+      "fat_per_100g": 3.6
+    }}
+  ]
+}}
+
+Rules:
+- preserve the quantities supplied by the user;
+- convert kg to g;
+- convert common kitchen quantities to reasonable gram estimates only when
+  the user did not provide grams (e.g. 1 egg, 1 tbsp oil);
+- use realistic average nutrition values per 100 g;
+- do not add ingredients that the user did not mention;
+- every numeric field must be a JSON number;
+- do not output markdown, reasoning, notes or <think> tags.
+""".strip()
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You convert recipe ingredient text into structured JSON. "
+                    "Return only JSON and never expose reasoning."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.15,
+        max_tokens=1600,
+        stream=False,
+    )
+
+    raw = str(response.choices[0].message.content or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
+    raw = re.sub(r"\s*```$", "", raw).strip()
+
+    data = json.loads(raw)
+    result = []
+
+    for item in data.get("ingredients") or []:
+        if not isinstance(item, dict):
+            continue
+
+        name = str(item.get("name") or "").strip()
+        quantity_g = max(0.0, _safe_float(item.get("quantity_g")))
+
+        if not name or quantity_g <= 0:
+            continue
+
+        result.append({
+            "name": name,
+            "quantity_g": quantity_g,
+            "calories_per_100g": max(
+                0.0,
+                _safe_float(item.get("calories_per_100g")),
+            ),
+            "protein_per_100g": max(
+                0.0,
+                _safe_float(item.get("protein_per_100g")),
+            ),
+            "carbs_per_100g": max(
+                0.0,
+                _safe_float(item.get("carbs_per_100g")),
+            ),
+            "fat_per_100g": max(
+                0.0,
+                _safe_float(item.get("fat_per_100g")),
+            ),
+            "source": "ai",
+        })
+
+    return result
+
+
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
 if selected_page == t["t1"]:
@@ -7413,11 +7639,121 @@ elif selected_page == t["t4"]:
         st.session_state["recipe_form_version"] = 0
     v = st.session_state["recipe_form_version"]
 
+    _recipe_compact_i18n = {
+        "Italiano": {
+            "my": "👤 Le mie ricette",
+            "shared": "🌍 Ricette condivise",
+            "generator": "✨ Generatore Ricetta AI",
+            "builder": "➕ Crea un pasto da ingredienti",
+            "generator_caption": (
+                "Imposta i tuoi obiettivi. Se inserisci ingredienti disponibili, "
+                "SanoSync li userà come base e aggiungerà solo ciò che serve per creare una ricetta sensata."
+            ),
+            "available": "Ingredienti che vuoi usare (opzionale)",
+            "available_help": (
+                "Se li inserisci, il generatore si comporta automaticamente come uno Svuotafrigo. "
+                "Indica anche le quantità quando le conosci."
+            ),
+            "ingredient_ai_label": "Ingredienti della ricetta",
+            "ingredient_ai_placeholder": "Es. 250g di pollo, 120g di riso, 200g di zucchine, 10g di olio",
+            "ingredient_ai_help": (
+                "Scrivi tutti gli ingredienti in un unico campo. L'AI stimerà automaticamente "
+                "kcal e macronutrienti e compilerà la tabella."
+            ),
+            "ingredient_ai_button": "✨ Analizza e compila ingredienti",
+            "ingredient_ai_spinner": "Sto analizzando gli ingredienti…",
+            "ingredient_ai_done": "✅ Ingredienti compilati automaticamente.",
+            "ingredient_ai_empty": "Inserisci almeno un ingrediente.",
+            "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}",
+        },
+        "English": {
+            "my": "👤 My recipes",
+            "shared": "🌍 Shared recipes",
+            "generator": "✨ AI Recipe Generator",
+            "builder": "➕ Create a meal from ingredients",
+            "generator_caption": (
+                "Set your targets. If you enter available ingredients, SanoSync will use them as the base "
+                "and add only what is needed to make a coherent recipe."
+            ),
+            "available": "Ingredients you want to use (optional)",
+            "available_help": (
+                "If you enter ingredients, the generator automatically works as a fridge clear-out. "
+                "Add quantities when you know them."
+            ),
+            "ingredient_ai_label": "Recipe ingredients",
+            "ingredient_ai_placeholder": "E.g. 250g chicken, 120g rice, 200g courgette, 10g oil",
+            "ingredient_ai_help": (
+                "Write all ingredients in one field. AI will estimate calories and macros "
+                "and fill the ingredient table automatically."
+            ),
+            "ingredient_ai_button": "✨ Analyze and fill ingredients",
+            "ingredient_ai_spinner": "Analyzing ingredients…",
+            "ingredient_ai_done": "✅ Ingredients filled automatically.",
+            "ingredient_ai_empty": "Enter at least one ingredient.",
+            "ingredient_ai_error": "Ingredient analysis error: {error}",
+        },
+        "Nederlands": {
+            "my": "👤 Mijn recepten",
+            "shared": "🌍 Gedeelde recepten",
+            "generator": "✨ AI-receptgenerator",
+            "builder": "➕ Maak een maaltijd van ingrediënten",
+            "generator_caption": (
+                "Stel je doelen in. Als je beschikbare ingrediënten invoert, gebruikt SanoSync die als basis "
+                "en voegt alleen toe wat nodig is voor een logisch recept."
+            ),
+            "available": "Ingrediënten die je wilt gebruiken (optioneel)",
+            "available_help": (
+                "Als je ingrediënten invoert, werkt de generator automatisch als koelkast-opmaker. "
+                "Voeg hoeveelheden toe als je die weet."
+            ),
+            "ingredient_ai_label": "Ingrediënten van het recept",
+            "ingredient_ai_placeholder": "Bijv. 250g kip, 120g rijst, 200g courgette, 10g olie",
+            "ingredient_ai_help": (
+                "Schrijf alle ingrediënten in één veld. AI schat calorieën en macro's "
+                "en vult de tabel automatisch."
+            ),
+            "ingredient_ai_button": "✨ Ingrediënten analyseren en invullen",
+            "ingredient_ai_spinner": "Ingrediënten analyseren…",
+            "ingredient_ai_done": "✅ Ingrediënten automatisch ingevuld.",
+            "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
+            "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}",
+        },
+        "Français": {
+            "my": "👤 Mes recettes",
+            "shared": "🌍 Recettes partagées",
+            "generator": "✨ Générateur de recette IA",
+            "builder": "➕ Créer un repas à partir d'ingrédients",
+            "generator_caption": (
+                "Définissez vos objectifs. Si vous indiquez des ingrédients disponibles, SanoSync les utilisera "
+                "comme base et n'ajoutera que ce qui est nécessaire pour obtenir une recette cohérente."
+            ),
+            "available": "Ingrédients que vous souhaitez utiliser (optionnel)",
+            "available_help": (
+                "Si vous renseignez des ingrédients, le générateur fonctionne automatiquement en mode vide-frigo. "
+                "Ajoutez les quantités lorsque vous les connaissez."
+            ),
+            "ingredient_ai_label": "Ingrédients de la recette",
+            "ingredient_ai_placeholder": "Ex. 250g de poulet, 120g de riz, 200g de courgettes, 10g d'huile",
+            "ingredient_ai_help": (
+                "Écrivez tous les ingrédients dans un seul champ. L'IA estimera calories et macros "
+                "et remplira automatiquement le tableau."
+            ),
+            "ingredient_ai_button": "✨ Analyser et remplir les ingrédients",
+            "ingredient_ai_spinner": "Analyse des ingrédients…",
+            "ingredient_ai_done": "✅ Ingrédients remplis automatiquement.",
+            "ingredient_ai_empty": "Saisissez au moins un ingrédient.",
+            "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}",
+        },
+    }
+    _rcu = _recipe_compact_i18n.get(
+        current_lang,
+        _recipe_compact_i18n["Italiano"],
+    )
+
     # ------------------------------------------------------------------
     # 👤 LE MIE RICETTE
     # ------------------------------------------------------------------
-    with st.container(border=True):
-        st.markdown(t["my_recipes"])
+    with st.expander(_rcu["my"], expanded=False):
 
         try:
             my_recipe_rows = (
@@ -7615,10 +7951,9 @@ elif selected_page == t["t4"]:
             st.info(t["no_my_recipes"])
 
     # ------------------------------------------------------------------
-    # 🌍 RICETTE CONDIVISE DAGLI ALTRI UTENTI
+    # 🌍 RICETTE CONDIVISE / PUBBLICHE
     # ------------------------------------------------------------------
-    with st.container(border=True):
-        st.markdown(t["shared_recipes"])
+    with st.expander(_rcu["shared"], expanded=False):
 
         try:
             shared_recipe_rows = (
@@ -7722,7 +8057,7 @@ elif selected_page == t["t4"]:
     _ai_recipe_i18n = {
         "Italiano": {
             "title": "✨ Generatore Ricetta AI",
-            "caption": "Genera una ricetta da zero oppure usa la modalità Svuotafrigo.",
+            "caption": "Genera una ricetta rispettando i tuoi obiettivi.",
             "mode": "Modalità",
             "mode_generate": "Genera ricetta",
             "mode_fridge": "Svuotafrigo",
@@ -7766,7 +8101,7 @@ elif selected_page == t["t4"]:
         },
         "English": {
             "title": "✨ AI Recipe Generator",
-            "caption": "Generate a recipe from scratch or use Fridge Clear-out mode.",
+            "caption": "Generate a recipe that matches your targets.",
             "mode": "Mode",
             "mode_generate": "Generate recipe",
             "mode_fridge": "Fridge clear-out",
@@ -7810,7 +8145,7 @@ elif selected_page == t["t4"]:
         },
         "Nederlands": {
             "title": "✨ AI-receptgenerator",
-            "caption": "Genereer een recept of gebruik de modus Koelkast leegmaken.",
+            "caption": "Genereer een recept dat bij je doelen past.",
             "mode": "Modus",
             "mode_generate": "Recept genereren",
             "mode_fridge": "Koelkast leegmaken",
@@ -7854,7 +8189,7 @@ elif selected_page == t["t4"]:
         },
         "Français": {
             "title": "✨ Générateur de recette IA",
-            "caption": "Générez une recette ou utilisez le mode Vide-frigo.",
+            "caption": "Générez une recette adaptée à vos objectifs.",
             "mode": "Mode",
             "mode_generate": "Générer une recette",
             "mode_fridge": "Vide-frigo",
@@ -7900,20 +8235,8 @@ elif selected_page == t["t4"]:
 
     _air = _ai_recipe_i18n.get(current_lang, _ai_recipe_i18n["Italiano"])
 
-    with st.container(border=True):
-        st.markdown(f"### {_air['title']}")
-        st.caption(_air["caption"])
-
-        _mode_options = ["generate", "fridge"]
-        _ai_mode = st.radio(
-            _air["mode"],
-            _mode_options,
-            horizontal=True,
-            key="ai_recipe_mode",
-            format_func=lambda x: (
-                _air["mode_generate"] if x == "generate" else _air["mode_fridge"]
-            ),
-        )
+    with st.expander(_rcu["generator"], expanded=False):
+        st.caption(_rcu["generator_caption"])
 
         _a1, _a2, _a3 = st.columns(3)
         with _a1:
@@ -8057,9 +8380,9 @@ elif selected_page == t["t4"]:
         )
 
         _ai_available = st.text_area(
-            _air["available"],
+            _rcu["available"],
             key="ai_recipe_available",
-            help=_air["available_help"],
+            help=_rcu["available_help"],
             placeholder="pollo 250 g, zucchine 300 g, yogurt 150 g",
             height=90,
         )
@@ -8070,15 +8393,20 @@ elif selected_page == t["t4"]:
         )
 
         def _run_ai_recipe_generation():
-            if _ai_mode == "fridge" and not _ai_available.strip():
-                st.warning(_air["fridge_required"])
-                return
+            # One generator only:
+            # ingredients supplied -> fridge-clear-out behaviour;
+            # no ingredients -> free recipe generation.
+            _effective_ai_mode = (
+                "fridge"
+                if _ai_available.strip()
+                else "generate"
+            )
 
             try:
                 with st.spinner(_air["generating"]):
                     _result = generate_ai_recipe_with_groq(
                         language=current_lang,
-                        mode=_ai_mode,
+                        mode=_effective_ai_mode,
                         meal_type=_ai_meal_type,
                         recipe_style=_ai_style,
                         restrictions=_ai_restrictions,
@@ -8178,6 +8506,10 @@ elif selected_page == t["t4"]:
                     st.session_state["recipe_builder_ingredients"] = list(
                         _ai_result.get("ingredients") or []
                     )
+                    st.session_state[f"recipe_ai_ingredient_text_{v}"] = ", ".join(
+                        f"{_safe_float(i.get('quantity_g')):g}g {i.get('name', '')}"
+                        for i in (_ai_result.get("ingredients") or [])
+                    )
                     st.session_state[f"recipe_builder_name_{v}"] = _ai_result["name"]
                     st.session_state[f"recipe_builder_notes_{v}"] = _ai_recipe_notes(
                         _ai_result
@@ -8258,9 +8590,7 @@ elif selected_page == t["t4"]:
                         st.error(str(exc))
 
 
-    with st.container(border=True):
-        st.markdown(t["create_meal_ingredients"])
-
+    with st.expander(_rcu["builder"], expanded=False):
         rc1, rc2 = st.columns(2)
         with rc1:
             recipe_meal_type = st.selectbox(
@@ -8316,89 +8646,43 @@ elif selected_page == t["t4"]:
             help=t["recipe_servings_help"],
         )
 
-        st.markdown(t["add_ingredient_title"])
-        source = st.radio(
-            t["ingredient_source"],
-            ["database", "manual"],
-            horizontal=True,
-            key=f"ingredient_source_{v}",
-            format_func=lambda x: t["db_off"] if x == "database" else t["manual_entry"],
-        )
-
-        ingredient_name = ""
-        base = {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
-
-        if source == "database":
-            iq = st.text_input(t["ingredient_search"], key=f"ingredient_search_{v}")
-            if st.button(t["search_ingredient"], key=f"ingredient_search_btn_{v}"):
-                if len(iq.strip()) >= 2 or iq.strip().isdigit():
-                    with st.spinner(t["searching_ingredient"]):
-                        st.session_state[f"ingredient_results_{v}"] = search_open_food_facts(iq)
-                    st.rerun()
-                else:
-                    st.warning(t["min_2_chars"])
-
-            results = st.session_state.get(f"ingredient_results_{v}", {})
-            if results:
-                sel = st.selectbox(
-                    t["results"],
-                    [""] + list(results),
-                    key=f"ingredient_result_select_{v}",
-                )
-                if sel:
-                    p_data = results[sel]
-                    ingredient_name = p_data.get("name", sel)
-                    base = {k: float(p_data.get(k, 0) or 0) for k in base}
-                    st.caption(
-                        f"{t['per_100g_label']}: {base['calories']:.0f} kcal · "
-                        f"Pro {base['protein']:.1f} g · Carbs {base['carbs']:.1f} g · Fat {base['fat']:.1f} g"
-                    )
-        else:
-            ingredient_name = st.text_input(
-                t["ingredient_name"],
-                key=f"manual_ingredient_name_{v}",
-            )
-            mc1, mc2, mc3, mc4 = st.columns(4)
-            base["calories"] = mc1.number_input(
-                "Kcal / 100g", min_value=0.0, step=1.0, key=f"manual_kcal_{v}"
-            )
-            base["protein"] = mc2.number_input(
-                "Pro / 100g", min_value=0.0, step=0.1, key=f"manual_pro_{v}"
-            )
-            base["carbs"] = mc3.number_input(
-                "Carbs / 100g", min_value=0.0, step=0.1, key=f"manual_carbs_{v}"
-            )
-            base["fat"] = mc4.number_input(
-                "Fat / 100g", min_value=0.0, step=0.1, key=f"manual_fat_{v}"
-            )
-
-        quantity = st.number_input(
-            t["ingredient_qty"],
-            min_value=0.1,
-            value=100.0,
-            step=1.0,
-            key=f"ingredient_qty_{v}",
+        _ingredient_free_text = st.text_area(
+            _rcu["ingredient_ai_label"],
+            key=f"recipe_ai_ingredient_text_{v}",
+            placeholder=_rcu["ingredient_ai_placeholder"],
+            help=_rcu["ingredient_ai_help"],
+            height=110,
         )
 
         if st.button(
-            t["add_ingredient"],
+            _rcu["ingredient_ai_button"],
             use_container_width=True,
-            key=f"add_ingredient_{v}",
+            key=f"recipe_ai_parse_ingredients_{v}",
         ):
-            if not ingredient_name.strip():
-                st.warning(t["select_or_enter_ingredient"])
+            if not _ingredient_free_text.strip():
+                st.warning(_rcu["ingredient_ai_empty"])
             else:
-                st.session_state["recipe_builder_ingredients"].append({
-                    "name": ingredient_name.strip(),
-                    "quantity_g": float(quantity),
-                    "calories_per_100g": float(base["calories"]),
-                    "protein_per_100g": float(base["protein"]),
-                    "carbs_per_100g": float(base["carbs"]),
-                    "fat_per_100g": float(base["fat"]),
-                    "source": source,
-                })
-                st.success(t["ingredient_added"].format(name=ingredient_name))
-                st.rerun()
+                try:
+                    with st.spinner(_rcu["ingredient_ai_spinner"]):
+                        _parsed_ingredients = parse_recipe_ingredients_with_ai(
+                            _ingredient_free_text,
+                            current_lang,
+                        )
+
+                    if not _parsed_ingredients:
+                        st.warning(_rcu["ingredient_ai_empty"])
+                    else:
+                        st.session_state["recipe_builder_ingredients"] = (
+                            _parsed_ingredients
+                        )
+                        st.success(_rcu["ingredient_ai_done"])
+                        st.rerun()
+
+                except Exception as exc:
+                    st.error(
+                        _rcu["ingredient_ai_error"].format(error=exc)
+                    )
+                    print(traceback.format_exc())
 
         ingredients = st.session_state.get("recipe_builder_ingredients", [])
 
