@@ -4700,15 +4700,28 @@ with st.sidebar:
         """
         <style>
         /* Direct profile + language controls */
+        .st-key-profile_direct_button,
+        .st-key-language_flag_popover {
+            overflow:visible !important;
+        }
+
+        .st-key-profile_direct_button {
+            margin-left:12px !important;
+        }
+
+        .st-key-language_flag_popover {
+            margin-left:8px !important;
+        }
+
         .st-key-profile_direct_button button,
         .st-key-language_flag_popover button {
-            width:44px !important;
-            min-width:44px !important;
-            height:44px !important;
-            min-height:44px !important;
+            width:46px !important;
+            min-width:46px !important;
+            height:46px !important;
+            min-height:46px !important;
             padding:0 !important;
-            border-radius:13px !important;
-            font-size:1.15rem !important;
+            border-radius:14px !important;
+            font-size:1.16rem !important;
             font-weight:900 !important;
             box-shadow:none !important;
         }
@@ -4786,7 +4799,7 @@ with st.sidebar:
     )
 
     _profile_col, _profile_gap, _language_col, _account_spacer = st.columns(
-        [0.72, 0.20, 0.72, 3.6],
+        [0.82, 0.34, 0.82, 3.35],
         gap="small",
         vertical_alignment="center",
     )
@@ -5904,11 +5917,22 @@ with st.sidebar:
     st.markdown(
         """
         <style>
-        /* ZERO MODE toggle label */
+        /* ZERO MODE toggle label — always readable on the dark sidebar. */
+        .st-key-zero_mode_sidebar_toggle label,
+        .st-key-zero_mode_sidebar_toggle label p,
+        .st-key-zero_mode_sidebar_toggle label span,
         div[data-testid="stSidebar"] [data-testid="stToggle"] label,
         div[data-testid="stSidebar"] [data-testid="stToggle"] label p,
         div[data-testid="stSidebar"] [data-testid="stToggle"] label span {
-            font-weight: 800 !important;
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+            font-weight:850 !important;
+            opacity:1 !important;
+        }
+
+        .st-key-zero_mode_sidebar_toggle {
+            margin-top:.25rem !important;
+            margin-bottom:.35rem !important;
         }
         </style>
         """,
@@ -6301,6 +6325,15 @@ with st.sidebar:
             [data-testid="stSidebar"] h4 {
                 color:#FFFFFF !important;
                 -webkit-text-fill-color:#FFFFFF !important;
+            }
+
+            /* Sidebar widget labels stay white even when Standard forces Light. */
+            [data-testid="stSidebar"] .st-key-zero_mode_sidebar_toggle *,
+            [data-testid="stSidebar"] .st-key-zero_mode_sidebar_toggle label,
+            [data-testid="stSidebar"] .st-key-zero_mode_sidebar_toggle p {
+                color:#FFFFFF !important;
+                -webkit-text-fill-color:#FFFFFF !important;
+                opacity:1 !important;
             }
 
             /* Main text must never inherit Streamlit Dark-mode white-on-dark assumptions. */
