@@ -6712,31 +6712,64 @@ elif selected_page == t["t4"]:
                                 r.get("_recipe_label") or r.get("name") or "Recipe",
                             )
 
-                            _photo_label = t["recipe_replace_photo"] if r.get("image_url") else t["recipe_add_photo"]
-                            _new_recipe_photo = st.file_uploader(
-                                _photo_label,
-                                type=["jpg", "jpeg", "png", "webp"],
-                                key=f"existing_recipe_photo_{r.get('id')}",
+                            _photo_label = (
+                                t["recipe_replace_photo"]
+                                if r.get("image_url")
+                                else t["recipe_add_photo"]
                             )
-                            if _new_recipe_photo is not None:
-                                if st.button(
-                                    t["recipe_photo_save"],
-                                    key=f"save_existing_recipe_photo_{r.get('id')}",
-                                    use_container_width=True,
-                                ):
-                                    try:
-                                        _new_url = upload_recipe_image(_new_recipe_photo)
-                                        (
-                                            supabase.table(RECIPE_LIBRARY_TABLE)
-                                            .update({"image_url": _new_url})
-                                            .eq("id", r["id"])
-                                            .eq("user_id", user_id)
-                                            .execute()
+
+                            _photo_toggle_key = f"show_recipe_photo_upload_{r.get('id')}"
+
+                            if st.button(
+                                _photo_label,
+                                key=f"toggle_recipe_photo_{r.get('id')}",
+                                use_container_width=True,
+                            ):
+                                st.session_state[_photo_toggle_key] = not st.session_state.get(
+                                    _photo_toggle_key,
+                                    False,
+                                )
+
+                            if st.session_state.get(_photo_toggle_key, False):
+                                with st.container(border=True):
+                                    _new_recipe_photo = st.file_uploader(
+                                        _photo_label,
+                                        type=["jpg", "jpeg", "png", "webp"],
+                                        key=f"existing_recipe_photo_{r.get('id')}",
+                                        label_visibility="collapsed",
+                                    )
+
+                                    if _new_recipe_photo is not None:
+                                        st.image(
+                                            _new_recipe_photo,
+                                            width=260,
                                         )
-                                        st.success(t["recipe_photo_saved"])
-                                        st.rerun()
-                                    except Exception as exc:
-                                        st.error(t["recipe_photo_error"].format(error=exc))
+
+                                        if st.button(
+                                            t["recipe_photo_save"],
+                                            key=f"save_existing_recipe_photo_{r.get('id')}",
+                                            use_container_width=True,
+                                        ):
+                                            try:
+                                                _new_url = upload_recipe_image(
+                                                    _new_recipe_photo
+                                                )
+                                                (
+                                                    supabase.table(RECIPE_LIBRARY_TABLE)
+                                                    .update({"image_url": _new_url})
+                                                    .eq("id", r["id"])
+                                                    .eq("user_id", user_id)
+                                                    .execute()
+                                                )
+                                                st.session_state[_photo_toggle_key] = False
+                                                st.success(t["recipe_photo_saved"])
+                                                st.rerun()
+                                            except Exception as exc:
+                                                st.error(
+                                                    t["recipe_photo_error"].format(
+                                                        error=exc
+                                                    )
+                                                )
 
                             st.markdown(f"### {html.escape(str(r['_recipe_label']))}")
 
