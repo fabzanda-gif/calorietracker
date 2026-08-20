@@ -3719,26 +3719,26 @@ with st.sidebar:
 
     _profile_menu_i18n = {
         "Italiano": {
-            "menu": "⚙️",
-            "settings": "⚙️ Impostazioni",
+            "menu": "👤",
+            "settings": "👤 Profilo",
             "language": "🌐 Lingua",
             "logout": "🚪 Esci",
         },
         "English": {
-            "menu": "⚙️",
-            "settings": "⚙️ Settings",
+            "menu": "👤",
+            "settings": "👤 Profile",
             "language": "🌐 Language",
             "logout": "🚪 Log out",
         },
         "Nederlands": {
-            "menu": "⚙️",
-            "settings": "⚙️ Instellingen",
+            "menu": "👤",
+            "settings": "👤 Profiel",
             "language": "🌐 Taal",
             "logout": "🚪 Uitloggen",
         },
         "Français": {
-            "menu": "⚙️",
-            "settings": "⚙️ Paramètres",
+            "menu": "👤",
+            "settings": "👤 Profil",
             "language": "🌐 Langue",
             "logout": "🚪 Se déconnecter",
         },
@@ -3863,21 +3863,6 @@ with st.sidebar:
         key="profile_menu_popover",
         help=_pm["settings"],
     ):
-        if st.button(
-            _pm["settings"],
-            key="profile_menu_settings",
-            use_container_width=True,
-        ):
-            # Sincronizza sempre la lingua della pagina Impostazioni
-            # con la lingua attualmente attiva nell'app.
-            # La pagina Impostazioni parte sempre dalla lingua corrente.
-            st.session_state.pop("settings_language_live", None)
-            st.session_state["settings_language_live"] = (
-                st.session_state.get("lang_selector", "Italiano")
-            )
-            st.session_state["show_personal_settings"] = True
-            st.rerun()
-
         _language_options = [
             "Italiano",
             "English",
@@ -3891,10 +3876,7 @@ with st.sidebar:
         if _current_menu_lang not in _language_options:
             _current_menu_lang = "Italiano"
 
-        # Quando siamo nella pagina Impostazioni, la lingua viene gestita
-        # esclusivamente dal selettore in cima a quella pagina. Evitiamo di
-        # renderizzare anche questo widget perché una sua key "vecchia"
-        # poteva riportare silenziosamente l'app all'italiano.
+        # Language first: it now reads as a menu preference, not a page title.
         if not st.session_state.get("show_personal_settings", False):
             _new_menu_lang = st.selectbox(
                 _pm["language"],
@@ -3908,6 +3890,18 @@ with st.sidebar:
                 st.session_state["lang_selector"] = _new_menu_lang
                 st.session_state["login_lang_selector"] = _new_menu_lang
                 st.rerun()
+
+        if st.button(
+            _pm["settings"],
+            key="profile_menu_settings",
+            use_container_width=True,
+        ):
+            st.session_state.pop("settings_language_live", None)
+            st.session_state["settings_language_live"] = (
+                st.session_state.get("lang_selector", "Italiano")
+            )
+            st.session_state["show_personal_settings"] = True
+            st.rerun()
 
         st.divider()
 
@@ -5168,10 +5162,10 @@ with st.sidebar:
 # ==============================================================================
 SETTINGS_I18N = {
     "Italiano": {
-        "title": "⚙️ Impostazioni personali",
-        "subtitle": "Gestisci i dati del tuo profilo SanoSync.",
+        "title": "👤 Profilo",
+        "subtitle": "Il tuo profilo SanoSync, preferenze e obiettivi.",
         "back": "← Torna all'app",
-        "account": "👤 Account e dati personali",
+        "account": "Dati personali",
         "email": "Email",
         "name": "Nome",
         "gender": "Genere",
@@ -5196,10 +5190,10 @@ SETTINGS_I18N = {
         "protein_g": "Goal proteico giornaliero (g)",
     },
     "English": {
-        "title": "⚙️ Personal settings",
-        "subtitle": "Manage your SanoSync profile information.",
+        "title": "👤 Profile",
+        "subtitle": "Your SanoSync profile, preferences and goals.",
         "back": "← Back to the app",
-        "account": "👤 Account and personal details",
+        "account": "Personal details",
         "email": "Email",
         "name": "Name",
         "gender": "Gender",
@@ -5224,10 +5218,10 @@ SETTINGS_I18N = {
         "protein_g": "Daily protein goal (g)",
     },
     "Nederlands": {
-        "title": "⚙️ Persoonlijke instellingen",
-        "subtitle": "Beheer je SanoSync-profielgegevens.",
+        "title": "👤 Profiel",
+        "subtitle": "Je SanoSync-profiel, voorkeuren en doelen.",
         "back": "← Terug naar de app",
-        "account": "👤 Account en persoonlijke gegevens",
+        "account": "Persoonlijke gegevens",
         "email": "E-mail",
         "name": "Naam",
         "gender": "Geslacht",
@@ -5252,10 +5246,10 @@ SETTINGS_I18N = {
         "protein_g": "Dagelijks eiwitdoel (g)",
     },
     "Français": {
-        "title": "⚙️ Paramètres personnels",
-        "subtitle": "Gérez les informations de votre profil SanoSync.",
+        "title": "👤 Profil",
+        "subtitle": "Votre profil SanoSync, vos préférences et vos objectifs.",
         "back": "← Retour à l'application",
-        "account": "👤 Compte et informations personnelles",
+        "account": "Informations personnelles",
         "email": "E-mail",
         "name": "Nom",
         "gender": "Sexe",
@@ -5318,7 +5312,67 @@ def render_personal_settings_page():
     st.session_state["login_lang_selector"] = new_language
 
     render_page_title_card(si["title"])
-    st.caption(si["subtitle"])
+
+    # CV-like identity header: Google/Facebook photo when available.
+    st.markdown(
+        """
+        <style>
+        .sano-profile-name {
+            font-size:clamp(1.55rem,3vw,2.15rem);
+            font-weight:950;
+            line-height:1.05;
+            color:#1A2942;
+            margin:0 0 .35rem 0;
+        }
+        .sano-profile-email {
+            font-size:.95rem;
+            color:#7B7E89;
+            font-weight:600;
+        }
+        .st-key-profile_identity_card {
+            border:1px solid rgba(255,139,139,.34);
+            border-radius:20px;
+            padding:18px 20px;
+            margin:.15rem 0 1rem 0;
+            background:
+                radial-gradient(circle at 96% 4%, rgba(255,139,139,.16), transparent 36%),
+                linear-gradient(145deg,#FFFFFF,#FFF8F8);
+            box-shadow:0 8px 24px rgba(23,42,70,.07);
+        }
+        .st-key-profile_identity_card [data-testid="stImage"] img {
+            border-radius:22px !important;
+            object-fit:cover !important;
+            aspect-ratio:1/1 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key="profile_identity_card"):
+        _pic_col, _identity_col = st.columns(
+            [1.1, 4.9],
+            gap="large",
+            vertical_alignment="center",
+        )
+        with _pic_col:
+            if logged_avatar:
+                st.image(logged_avatar, width=150)
+            else:
+                st.markdown(
+                    "<div style='font-size:5rem;text-align:center;'>👤</div>",
+                    unsafe_allow_html=True,
+                )
+        with _identity_col:
+            st.markdown(
+                f"<div class='sano-profile-name'>{html.escape(logged_name)}</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"<div class='sano-profile-email'>{html.escape(logged_email)}</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption(si["subtitle"])
 
     if st.button(si["back"], key="settings_back"):
         st.session_state["show_personal_settings"] = False
@@ -6765,6 +6819,28 @@ if selected_page == t["t1"]:
     ):
         st.session_state["meal_input_source"] = _input_source_options[0]
 
+    st.markdown(
+        """
+        <style>
+        .st-key-meal_input_source [role="radiogroup"] {
+            gap:.65rem !important;
+        }
+        .st-key-meal_input_source [role="radiogroup"] label {
+            border:1px solid rgba(255,139,139,.40);
+            border-radius:999px;
+            padding:.42rem .70rem;
+            background:rgba(255,255,255,.72);
+        }
+        .st-key-meal_input_source [role="radiogroup"] label:has(input:checked) {
+            background:#FFF0F0;
+            border-color:#FF8B8B;
+            box-shadow:0 3px 10px rgba(255,139,139,.13);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     input_source = st.radio(
         t["input_source_lbl"],
         _input_source_options,
@@ -7179,30 +7255,42 @@ if selected_page == t["t1"]:
         if _meal_type_key not in st.session_state:
             st.session_state[_meal_type_key] = _suggested_meal_type
 
-        m_type = st.selectbox(
-            t["meal"],
-            meal_options,
-            key=_meal_type_key,
-            format_func=tr_meal_type,
+        _meal_categories_available = (
+            MEAL_CATEGORIES
+            if user_office_lunch_enabled
+            else [c for c in MEAL_CATEGORIES if c != "Lavoro"]
         )
+        default_category = st.session_state.get(
+            "selected_source_category",
+            "Casa",
+        )
+        if default_category not in _meal_categories_available:
+            default_category = "Casa"
+
+        # Compact metadata row: on desktop these selectors no longer consume
+        # two full-width rows; on mobile Streamlit stacks them automatically.
+        _meal_meta_1, _meal_meta_2 = st.columns(2, gap="medium")
+        with _meal_meta_1:
+            m_type = st.selectbox(
+                t["meal"],
+                meal_options,
+                key=_meal_type_key,
+                format_func=tr_meal_type,
+            )
+        with _meal_meta_2:
+            meal_category = st.selectbox(
+                t["category_label"],
+                _meal_categories_available,
+                index=_meal_categories_available.index(default_category),
+                key=f"meal_category_{v}",
+                help=t["category_help"],
+                format_func=tr_category,
+            )
 
         name = st.text_input(
             t["meal_name"],
             value=st.session_state["m_name"],
             key=f"input_meal_name_{v}",
-        )
-
-        _meal_categories_available = MEAL_CATEGORIES if user_office_lunch_enabled else [c for c in MEAL_CATEGORIES if c != "Lavoro"]
-        default_category = st.session_state.get("selected_source_category", "Casa")
-        if default_category not in _meal_categories_available:
-            default_category = "Casa"
-        meal_category = st.selectbox(
-            t["category_label"],
-            _meal_categories_available,
-            index=_meal_categories_available.index(default_category),
-            key=f"meal_category_{v}",
-            help=t["category_help"],
-            format_func=tr_category,
         )
 
         # AI ingredient calculator replaces the old Notes field.
@@ -9777,40 +9865,60 @@ elif selected_page == t["t4"]:
                     format_func=tr_category,
                 )
 
-            r_name = st.text_input(
-                t["col_name"],
-                placeholder=t["recipe_name_placeholder"],
-                key=f"recipe_builder_name_{v}",
+            _recipe_name_col, _recipe_serv_col = st.columns(
+                [3.2, 1.0],
+                gap="medium",
+                vertical_alignment="bottom",
             )
-            r_notes = st.text_area(
-                t["notes_optional"],
-                placeholder=t["notes_placeholder"],
-                key=f"recipe_builder_notes_{v}",
-                height=90,
-            )
-
-            recipe_photo = st.file_uploader(
-                t["recipe_photo"],
-                type=["jpg", "jpeg", "png", "webp"],
-                key=f"recipe_photo_{v}",
-                help=t["recipe_photo_help"],
-            )
-            if recipe_photo is not None:
-                st.image(
-                    recipe_photo,
-                    caption=r_name.strip() or None,
-                    width=260,
+            with _recipe_name_col:
+                r_name = st.text_input(
+                    t["col_name"],
+                    placeholder=t["recipe_name_placeholder"],
+                    key=f"recipe_builder_name_{v}",
+                )
+            with _recipe_serv_col:
+                recipe_servings = st.number_input(
+                    t["recipe_servings"],
+                    min_value=1.0,
+                    max_value=100.0,
+                    value=4.0,
+                    step=1.0,
+                    key=f"recipe_servings_{v}",
+                    help=t["recipe_servings_help"],
                 )
 
-            recipe_servings = st.number_input(
-                t["recipe_servings"],
-                min_value=1.0,
-                max_value=100.0,
-                value=4.0,
-                step=1.0,
-                key=f"recipe_servings_{v}",
-                help=t["recipe_servings_help"],
-            )
+            _optional_details_labels = {
+                "Italiano": "▸ Dettagli opzionali · note e foto",
+                "English": "▸ Optional details · notes and photo",
+                "Nederlands": "▸ Optionele details · notities en foto",
+                "Français": "▸ Détails optionnels · notes et photo",
+            }
+            with st.expander(
+                _optional_details_labels.get(
+                    current_lang,
+                    _optional_details_labels["Italiano"],
+                ),
+                expanded=False,
+            ):
+                r_notes = st.text_area(
+                    t["notes_optional"],
+                    placeholder=t["notes_placeholder"],
+                    key=f"recipe_builder_notes_{v}",
+                    height=80,
+                )
+
+                recipe_photo = st.file_uploader(
+                    t["recipe_photo"],
+                    type=["jpg", "jpeg", "png", "webp"],
+                    key=f"recipe_photo_{v}",
+                    help=t["recipe_photo_help"],
+                )
+                if recipe_photo is not None:
+                    st.image(
+                        recipe_photo,
+                        caption=r_name.strip() or None,
+                        width=260,
+                    )
 
             _recipe_ai_text_key = f"recipe_ai_ingredient_text_{v}"
 
