@@ -246,8 +246,8 @@ import plotly.graph_objects as go
 # ==============================================================================
 ASSET_DIR = Path(__file__).resolve().parent
 APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
-ZERO_LOGO_FILE = ASSET_DIR / "ZeroMode.jpg"
-ZERO_LOGO_URL = "https://github.com/fabzanda-gif/calorietracker/blob/main/assets/ZeroMode.jpg"
+ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
+ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/ZeroMode.jpg"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
 WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
@@ -5845,11 +5845,25 @@ with st.sidebar:
         st.sidebar.image("logo2.png", use_container_width=True)
 
     _zero_toggle_i18n = {
-        "Italiano": "ZERO",
-        "English": "ZERO",
-        "Nederlands": "ZERO",
-        "Français": "ZERO",
+        "Italiano": "ZERO MODE",
+        "English": "ZERO MODE",
+        "Nederlands": "ZERO MODE",
+        "Français": "ZERO MODE",
     }
+
+    st.markdown(
+        """
+        <style>
+        /* ZERO MODE toggle label */
+        div[data-testid="stSidebar"] [data-testid="stToggle"] label,
+        div[data-testid="stSidebar"] [data-testid="stToggle"] label p,
+        div[data-testid="stSidebar"] [data-testid="stToggle"] label span {
+            font-weight: 800 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     _zero_widget_value = st.toggle(
         _zero_toggle_i18n.get(
