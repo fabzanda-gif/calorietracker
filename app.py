@@ -6016,29 +6016,35 @@ def render_subtle_voice_input(*, widget_key, target_key, language, error_label):
         """
         <style>
         div[class*="st-key-sanosync_voice_"] {
-            width: 52px !important;
-            max-width: 52px !important;
-            margin-left: auto !important;
-
-            /* Move the recorder fully inside the text-area footprint.
-               The previous value left the control hanging below the field. */
-            margin-top: -108px !important;
-            margin-right: 18px !important;
-            margin-bottom: 62px !important;
-
-            position: relative !important;
-            z-index: 5 !important;
+            width: 58px !important;
+            max-width: 58px !important;
+            margin: 0 !important;
         }
 
         div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] {
-            min-width: 48px !important;
-            width: 48px !important;
-            max-width: 48px !important;
+            width: 58px !important;
+            min-width: 58px !important;
+            max-width: 58px !important;
+            overflow: hidden !important;
         }
+
         div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] > div {
+            width: 58px !important;
+            min-width: 58px !important;
+            max-width: 58px !important;
+            min-height: 58px !important;
             padding: 0 !important;
-            min-height: 44px !important;
-            border-radius: 12px !important;
+            border-radius: 14px !important;
+            overflow: hidden !important;
+        }
+
+        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] button:not(:first-of-type) {
+            display: none !important;
+        }
+
+        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] svg {
+            width: 22px !important;
+            height: 22px !important;
         }
         </style>
         """,
@@ -6782,19 +6788,26 @@ if selected_page == t["t1"]:
         # The title is the field label itself (same size as the other form labels),
         # while the explanatory copy lives behind Streamlit's built-in ? tooltip.
         _tab1_ai_text_key = f"tab1_ai_ingredient_text_{v}"
-        _tab1_ai_text = st.text_area(
-            _mai["title"],
-            key=_tab1_ai_text_key,
-            placeholder=_mai["placeholder"],
-            help=_mai["caption"],
-            height=90,
+        _tab1_text_col, _tab1_mic_col = st.columns(
+            [12, 0.8],
+            gap="small",
+            vertical_alignment="bottom",
         )
-        render_subtle_voice_input(
-            widget_key=f"sanosync_voice_tab1_{v}",
-            target_key=_tab1_ai_text_key,
-            language=current_lang,
-            error_label=_mai["voice_error"],
-        )
+        with _tab1_text_col:
+            _tab1_ai_text = st.text_area(
+                _mai["title"],
+                key=_tab1_ai_text_key,
+                placeholder=_mai["placeholder"],
+                help=_mai["caption"],
+                height=90,
+            )
+        with _tab1_mic_col:
+            render_subtle_voice_input(
+                widget_key=f"sanosync_voice_tab1_{v}",
+                target_key=_tab1_ai_text_key,
+                language=current_lang,
+                error_label=_mai["voice_error"],
+            )
         _tab1_ai_text = str(
             st.session_state.get(_tab1_ai_text_key, "") or ""
         )
@@ -8886,19 +8899,26 @@ elif selected_page == t["t4"]:
             )
 
             _recipe_ai_text_key = f"recipe_ai_ingredient_text_{v}"
-            _ingredient_free_text = st.text_area(
-                _rcu["ingredient_ai_label"],
-                key=_recipe_ai_text_key,
-                placeholder=_rcu["ingredient_ai_placeholder"],
-                help=_rcu["ingredient_ai_help"],
-                height=110,
+            _recipe_text_col, _recipe_mic_col = st.columns(
+                [12, 0.8],
+                gap="small",
+                vertical_alignment="bottom",
             )
-            render_subtle_voice_input(
-                widget_key=f"sanosync_voice_recipe_{v}",
-                target_key=_recipe_ai_text_key,
-                language=current_lang,
-                error_label=_rcu["ingredient_voice_error"],
-            )
+            with _recipe_text_col:
+                _ingredient_free_text = st.text_area(
+                    _rcu["ingredient_ai_label"],
+                    key=_recipe_ai_text_key,
+                    placeholder=_rcu["ingredient_ai_placeholder"],
+                    help=_rcu["ingredient_ai_help"],
+                    height=110,
+                )
+            with _recipe_mic_col:
+                render_subtle_voice_input(
+                    widget_key=f"sanosync_voice_recipe_{v}",
+                    target_key=_recipe_ai_text_key,
+                    language=current_lang,
+                    error_label=_rcu["ingredient_voice_error"],
+                )
             _ingredient_free_text = str(
                 st.session_state.get(_recipe_ai_text_key, "") or ""
             )
