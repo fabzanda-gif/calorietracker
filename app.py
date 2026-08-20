@@ -246,8 +246,8 @@ import plotly.graph_objects as go
 # ==============================================================================
 ASSET_DIR = Path(__file__).resolve().parent
 APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
-ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
-ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/SanoSync_Zero.jpg"
+ZERO_LOGO_FILE = ASSET_DIR / "ZeroMode.jpg"
+ZERO_LOGO_URL = "https://github.com/fabzanda-gif/calorietracker/blob/main/assets/ZeroMode.jpg"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
 WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
