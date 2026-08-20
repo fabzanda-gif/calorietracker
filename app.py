@@ -5579,9 +5579,15 @@ def _ai_recipe_clean_json(raw):
 def _ai_recipe_notes(result):
     instructions = result.get("instructions") or []
     notes = str(result.get("notes") or "").strip()
+    description = str(result.get("description") or "").strip()
 
     lines = []
+    if description:
+        lines.append(description)
+
     if notes:
+        if lines:
+            lines.append("")
         lines.append(notes)
 
     if instructions:
@@ -5659,6 +5665,7 @@ def _normalize_ai_recipe_result(data, requested_servings):
             "fat": fat,
         },
         "ingredients": ingredients,
+        "description": str(data.get("description") or "").strip(),
         "instructions": [
             str(x).strip()
             for x in (data.get("instructions") or [])
@@ -5720,7 +5727,7 @@ Do not use markdown fences.
 Do not change the meaning or nutritional values unless needed to make the JSON syntactically valid.
 Keep exactly these top-level keys when present:
 name, meal_type, servings, total_minutes, active_minutes,
-nutrition_per_serving, ingredients, instructions, notes,
+nutrition_per_serving, ingredients, description, instructions, notes,
 target_not_reached, warning.
 
 RESPONSE TO REPAIR:
@@ -5746,6 +5753,134 @@ RESPONSE TO REPAIR:
 
     return _extract_json_object_tolerant(
         repaired.choices[0].message.content
+    )
+
+
+
+def regenerate_ai_recipe_if_empty(
+    *,
+    language,
+    mode,
+    meal_type,
+    restrictions,
+    servings,
+    target_kcal,
+    protein_target,
+    macro_focus,
+    total_minutes,
+    active_minutes,
+    equipment,
+    available_ingredients,
+    avoid_ingredients,
+):
+    """
+    Second-pass fallback used only when the first AI result has no valid ingredients.
+    Keeps the user's calorie target, but prioritizes a coherent recipe over strict ±10%.
+    """
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    model_id = resolve_groq_text_model()
+    language_name = _ai_recipe_language_name(language)
+
+    prompt = f"""
+Create ONE complete, realistic recipe.
+
+LANGUAGE: {language_name}
+MEAL TYPE: {meal_type}
+SERVINGS: {float(servings):g}
+REQUESTED CALORIES PER SERVING: {float(target_kcal):.0f} kcal
+PROTEIN TARGET PER SERVING: {float(protein_target or 0):.0f} g
+MACRO FOCUS: {macro_focus}
+RESTRICTIONS: {", ".join(restrictions) if restrictions else "none"}
+MAX TOTAL TIME: {total_minutes} min
+MAX ACTIVE TIME: {active_minutes} min
+EQUIPMENT: {", ".join(equipment) if equipment else "standard kitchen equipment"}
+AVAILABLE INGREDIENTS: {available_ingredients or "none specified"}
+INGREDIENTS TO AVOID: {avoid_ingredients or "none"}
+
+IMPORTANT:
+- The previous attempt failed because it returned no usable ingredients.
+- You MUST return at least 2 valid ingredients with positive quantity_g.
+- If the calorie target is unrealistically low, create the lightest coherent recipe you can.
+- In that case set target_not_reached=true and explain it briefly in warning.
+- Never return an empty ingredient list.
+- Nutrition is per serving.
+- Ingredients quantities are for the whole recipe.
+- Include description and detailed step-by-step instructions.
+
+Return ONLY valid JSON:
+{{
+  "name": "recipe name",
+  "meal_type": "{meal_type}",
+  "servings": {float(servings):g},
+  "total_minutes": 20,
+  "active_minutes": 10,
+  "nutrition_per_serving": {{
+    "calories": 250,
+    "protein": 25,
+    "carbs": 20,
+    "fat": 8
+  }},
+  "ingredients": [
+    {{
+      "name": "ingredient",
+      "quantity_g": 200,
+      "calories_per_100g": 100,
+      "protein_per_100g": 20,
+      "carbs_per_100g": 0,
+      "fat_per_100g": 2
+    }}
+  ],
+  "description": "short description",
+  "instructions": [
+    "step 1",
+    "step 2",
+    "step 3",
+    "step 4"
+  ],
+  "notes": "",
+  "target_not_reached": true,
+  "warning": "brief explanation if target was too low"
+}}
+""".strip()
+
+    response = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are SanoSync Recipe AI. "
+                    "Return only one valid JSON object. "
+                    "Never output reasoning or markdown."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.35,
+        max_tokens=2200,
+        stream=False,
+    )
+
+    raw = response.choices[0].message.content
+    try:
+        data = _extract_json_object_tolerant(raw)
+    except Exception:
+        data = _repair_recipe_json_with_groq(
+            client,
+            model_id,
+            raw,
+        )
+
+    return _normalize_ai_recipe_result(
+        data,
+        servings,
     )
 
 
@@ -5822,6 +5957,17 @@ TARGET CALORIES PER SERVING: {float(target_kcal):.0f} kcal
 CALORIE TOLERANCE: ±10%
 MACRO FOCUS: {macro_focus}
 {protein_instruction}
+
+LOW-CALORIE RULE:
+- if the requested calories are low, still return a complete and coherent recipe;
+- NEVER return an empty ingredient list;
+- prefer smaller quantities, leaner ingredients, vegetables, broth/water-based cooking,
+  and reduced added fats when appropriate;
+- do not try to force a recipe below a realistic minimum by omitting ingredients;
+- if the requested target is too low for the requested meal/constraints, return the
+  lightest coherent recipe you can make, set target_not_reached=true, and explain
+  briefly in warning;
+- target_not_reached is preferable to returning no ingredients.
 MAX TOTAL TIME: {total_minutes}
 MAX ACTIVE COOKING TIME: {active_minutes}
 AVAILABLE EQUIPMENT: {equipment_text}
@@ -5843,6 +5989,13 @@ TIME RULES:
 - total_minutes must not exceed the requested total time;
 - active_minutes must not exceed the requested active time;
 - active_minutes cannot exceed total_minutes.
+
+RECIPE CONTENT RULES:
+- include a useful description of the finished dish in 2 to 4 sentences;
+- instructions must be genuinely step-by-step and complete enough to cook the dish without guessing;
+- include cooking times, oven temperatures / heat levels, and key quantities in the relevant steps when useful;
+- instructions should usually contain at least 4 steps for a cooked meal, unless the recipe truly needs fewer;
+- do not merely repeat the ingredient list as instructions.
 
 JSON OUTPUT RULES:
 - output exactly one JSON object and nothing else;
@@ -5878,9 +6031,11 @@ Return ONLY valid JSON with this exact structure:
       "fat_per_100g": 3.6
     }}
   ],
+  "description": "2-4 sentence appetizing description of the dish, its texture/flavour and why it fits the requested targets",
   "instructions": [
-    "step one",
-    "step two"
+    "Step 1 with precise action, ingredient quantity when useful, heat/temperature and timing",
+    "Step 2 with precise action and timing",
+    "Continue until the dish is fully finished and ready to serve"
   ],
   "notes": "short optional serving or preparation note",
   "target_not_reached": false,
@@ -8530,8 +8685,8 @@ elif selected_page == t["t4"]:
     # Apply an AI-generated recipe BEFORE any builder widget is instantiated.
     _pending_recipe = st.session_state.pop("_pending_ai_recipe_for_builder", None)
     if _pending_recipe:
-        # Only switch to the manual/known mode when the user explicitly asks
-        # to edit/use the generated recipe.
+        # This block runs before the recipe_creation_mode radio is instantiated,
+        # so setting the widget key here is safe.
         st.session_state["recipe_creation_mode"] = "known"
         st.session_state["recipe_builder_ingredients"] = list(
             _pending_recipe.get("ingredients") or []
@@ -8556,6 +8711,14 @@ elif selected_page == t["t4"]:
             for i in (_pending_recipe.get("ingredients") or [])
         )
         st.session_state["_show_ai_recipe_loaded_message"] = True
+
+    # Apply pending mode changes BEFORE the radio widget is instantiated.
+    _pending_creation_mode = st.session_state.pop(
+        "_pending_recipe_creation_mode",
+        None,
+    )
+    if _pending_creation_mode in ("known", "ai"):
+        st.session_state["recipe_creation_mode"] = _pending_creation_mode
 
     with st.expander(_rcu["builder"], expanded=True):
         _creation_mode = st.radio(
@@ -8738,6 +8901,11 @@ elif selected_page == t["t4"]:
                 key="unified_ai_recipe_generate",
             ):
                 try:
+                    if float(_ai_target_kcal) < 200:
+                        st.info(
+                            "Target calorico molto basso: SanoSync AI proverà a creare comunque "
+                            "una ricetta completa e, se necessario, proporrà il minimo realistico."
+                        )
                     with st.spinner(_air["generating"]):
                         _effective_ai_mode = (
                             "fridge"
@@ -8764,15 +8932,36 @@ elif selected_page == t["t4"]:
                         )
 
                     if not (_generated.get("ingredients") or []):
+                        _generated = regenerate_ai_recipe_if_empty(
+                            language=current_lang,
+                            mode=_effective_ai_mode,
+                            meal_type=_ai_meal_type,
+                            restrictions=_ai_restrictions,
+                            servings=_ai_servings,
+                            target_kcal=_ai_target_kcal,
+                            protein_target=_ai_target_protein,
+                            macro_focus=_ai_macro_focus,
+                            total_minutes=_ai_total_minutes,
+                            active_minutes=min(
+                                int(_ai_active_minutes),
+                                int(_ai_total_minutes),
+                            ),
+                            equipment=_ai_equipment,
+                            available_ingredients=_ai_available,
+                            avoid_ingredients=_ai_avoid,
+                        )
+
+                    if not (_generated.get("ingredients") or []):
                         raise RuntimeError(
-                            "La ricetta generata non contiene ingredienti validi."
+                            "L'AI non è riuscita a costruire una ricetta coerente con questi vincoli. "
+                            "Prova ad aumentare leggermente le kcal oppure ridurre i vincoli."
                         )
 
                     st.session_state[
                         "unified_ai_recipe_result"
                     ] = _generated
                     st.session_state[
-                        "recipe_creation_mode"
+                        "_pending_recipe_creation_mode"
                     ] = "ai"
                     st.rerun()
 
@@ -8823,6 +9012,12 @@ elif selected_page == t["t4"]:
                     st.warning(
                         str(_ai_generated_result.get("warning"))
                     )
+
+                _ai_description = str(
+                    _ai_generated_result.get("description") or ""
+                ).strip()
+                if _ai_description:
+                    st.markdown(_ai_description)
 
                 st.markdown(f"**🥕 {_air['ingredients']}**")
                 for _ing in (
