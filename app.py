@@ -5372,6 +5372,291 @@ Every numeric field must contain a number, not a string.
     }
 
 
+
+# ==============================================================================
+# AI RECIPE GENERATOR — GROQ via OpenAI-compatible client
+# ==============================================================================
+AI_RECIPE_PANTRY_BASICS = [
+    "olio",
+    "sale",
+    "pepe",
+    "spezie",
+    "acqua",
+    "aglio",
+    "riso",
+    "pasta",
+]
+
+
+def _ai_recipe_language_name(lang):
+    return {
+        "Italiano": "Italian",
+        "English": "English",
+        "Nederlands": "Dutch",
+        "Français": "French",
+    }.get(lang, "Italian")
+
+
+def _ai_recipe_clean_json(raw):
+    raw = str(raw or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
+    raw = re.sub(r"\s*```$", "", raw).strip()
+    return json.loads(raw)
+
+
+def _ai_recipe_notes(result):
+    instructions = result.get("instructions") or []
+    notes = str(result.get("notes") or "").strip()
+
+    lines = []
+    if notes:
+        lines.append(notes)
+
+    if instructions:
+        lines.append("")
+        lines.append("Preparazione:")
+        for idx, step in enumerate(instructions, start=1):
+            lines.append(f"{idx}. {step}")
+
+    warning = str(result.get("warning") or "").strip()
+    if warning:
+        lines.append("")
+        lines.append(f"Nota AI: {warning}")
+
+    return "\n".join(lines).strip()
+
+
+def _normalize_ai_recipe_result(data, requested_servings):
+    """Normalize Groq JSON into recipe_library-compatible values."""
+    servings = max(
+        1.0,
+        _safe_float(data.get("servings")) or float(requested_servings or 1),
+    )
+
+    nutr = data.get("nutrition_per_serving") or {}
+    kcal = max(0.0, _safe_float(nutr.get("calories")))
+    protein = max(0.0, _safe_float(nutr.get("protein")))
+    carbs = max(0.0, _safe_float(nutr.get("carbs")))
+    fat = max(0.0, _safe_float(nutr.get("fat")))
+
+    ingredients = []
+    for item in (data.get("ingredients") or []):
+        if not isinstance(item, dict):
+            continue
+
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+
+        quantity_g = max(0.0, _safe_float(item.get("quantity_g")))
+        if quantity_g <= 0:
+            continue
+
+        ingredients.append({
+            "name": name,
+            "quantity_g": quantity_g,
+            "calories_per_100g": max(
+                0.0,
+                _safe_float(item.get("calories_per_100g")),
+            ),
+            "protein_per_100g": max(
+                0.0,
+                _safe_float(item.get("protein_per_100g")),
+            ),
+            "carbs_per_100g": max(
+                0.0,
+                _safe_float(item.get("carbs_per_100g")),
+            ),
+            "fat_per_100g": max(
+                0.0,
+                _safe_float(item.get("fat_per_100g")),
+            ),
+            "source": "ai",
+        })
+
+    return {
+        "name": str(data.get("name") or "Ricetta AI").strip(),
+        "meal_type": str(data.get("meal_type") or "Cena").strip(),
+        "servings": servings,
+        "total_minutes": max(0, int(round(_safe_float(data.get("total_minutes"))))),
+        "active_minutes": max(0, int(round(_safe_float(data.get("active_minutes"))))),
+        "nutrition_per_serving": {
+            "calories": kcal,
+            "protein": protein,
+            "carbs": carbs,
+            "fat": fat,
+        },
+        "ingredients": ingredients,
+        "instructions": [
+            str(x).strip()
+            for x in (data.get("instructions") or [])
+            if str(x).strip()
+        ],
+        "notes": str(data.get("notes") or "").strip(),
+        "target_not_reached": bool(data.get("target_not_reached", False)),
+        "warning": str(data.get("warning") or "").strip(),
+    }
+
+
+def generate_ai_recipe_with_groq(
+    *,
+    language,
+    mode,
+    meal_type,
+    recipe_style,
+    restrictions,
+    servings,
+    target_kcal,
+    protein_target,
+    macro_focus,
+    total_minutes,
+    active_minutes,
+    equipment,
+    available_ingredients,
+    avoid_ingredients,
+):
+    """
+    Groq creates the recipe AND estimates nutrition.
+    Open Food Facts is intentionally not used for this feature.
+    """
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
+
+    language_name = _ai_recipe_language_name(language)
+    pantry_text = ", ".join(AI_RECIPE_PANTRY_BASICS)
+    equipment_text = ", ".join(equipment) if equipment else "standard kitchen equipment"
+    restrictions_text = ", ".join(restrictions) if restrictions else "none"
+    protein_instruction = (
+        f"Try to provide at least {float(protein_target):.0f} g protein per serving."
+        if protein_target and float(protein_target) > 0
+        else "There is no numeric protein target."
+    )
+
+    if mode == "fridge":
+        ingredient_rule = f"""
+THIS IS A FRIDGE-CLEARING RECIPE.
+The user's available ingredients and quantities are:
+{available_ingredients or "No ingredients supplied"}
+
+Rules:
+- prioritize and use as much as reasonably useful of those ingredients;
+- NEVER exceed quantities explicitly supplied by the user;
+- you may add ONLY these pantry basics when needed to make a coherent meal:
+  {pantry_text};
+- do not add unrelated extra ingredients;
+- minimize waste;
+- if the available ingredients cannot reasonably reach the requested calorie
+  target within ±10%, produce the best coherent LOWER-calorie recipe instead,
+  set target_not_reached=true and explain it briefly in warning.
+"""
+    else:
+        ingredient_rule = f"""
+THIS IS A GENERAL RECIPE GENERATOR.
+Create a coherent recipe that respects the requested style and restrictions.
+You may choose appropriate ingredients freely.
+Common pantry basics available are: {pantry_text}.
+If the user listed ingredients, treat them as preferences:
+{available_ingredients or "None listed"}.
+"""
+
+    prompt = f"""
+Create ONE practical recipe.
+
+LANGUAGE FOR ALL USER-FACING TEXT: {language_name}
+MODE: {mode}
+MEAL TYPE: {meal_type}
+MAIN RECIPE TYPE: {recipe_style}
+DIETARY RESTRICTIONS: {restrictions_text}
+SERVINGS: {float(servings):g}
+TARGET CALORIES PER SERVING: {float(target_kcal):.0f} kcal
+CALORIE TOLERANCE: ±10%
+MACRO FOCUS: {macro_focus}
+{protein_instruction}
+MAX TOTAL TIME: {total_minutes}
+MAX ACTIVE COOKING TIME: {active_minutes}
+AVAILABLE EQUIPMENT: {equipment_text}
+INGREDIENTS TO AVOID: {avoid_ingredients or "None"}
+
+{ingredient_rule}
+
+NUTRITION RULES:
+- estimate calories and macros yourself;
+- nutrition_per_serving MUST represent one serving;
+- give realistic estimates rather than false precision;
+- all ingredients MUST include an estimated quantity in grams for the WHOLE recipe;
+- each ingredient MUST also contain estimated kcal/protein/carbs/fat per 100 g;
+- keep the recipe within ±10% of the calorie target whenever reasonably possible;
+- if the requested target cannot be achieved in fridge mode, LOWER calories instead
+  of inventing unavailable food, and set target_not_reached=true.
+
+TIME RULES:
+- total_minutes must not exceed the requested total time;
+- active_minutes must not exceed the requested active time;
+- active_minutes cannot exceed total_minutes.
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "name": "recipe name",
+  "meal_type": "{meal_type}",
+  "servings": {float(servings):g},
+  "total_minutes": 25,
+  "active_minutes": 15,
+  "nutrition_per_serving": {{
+    "calories": 600,
+    "protein": 40,
+    "carbs": 65,
+    "fat": 18
+  }},
+  "ingredients": [
+    {{
+      "name": "ingredient name",
+      "quantity_g": 250,
+      "calories_per_100g": 165,
+      "protein_per_100g": 31,
+      "carbs_per_100g": 0,
+      "fat_per_100g": 3.6
+    }}
+  ],
+  "instructions": [
+    "step one",
+    "step two"
+  ],
+  "notes": "short optional serving or preparation note",
+  "target_not_reached": false,
+  "warning": ""
+}}
+""".strip()
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are SanoSync Recipe AI. "
+                    "Return only the requested JSON. "
+                    "Never output reasoning, analysis, markdown or <think> tags."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.72,
+        max_tokens=2200,
+        stream=False,
+    )
+
+    raw = response.choices[0].message.content
+    data = _ai_recipe_clean_json(raw)
+    return _normalize_ai_recipe_result(data, servings)
+
+
 # 9. PAGE 1: MEAL LOGGING
 # ==============================================================================
 if selected_page == t["t1"]:
@@ -7430,6 +7715,548 @@ elif selected_page == t["t4"]:
                             )
         else:
             st.info(t["no_shared_recipes"])
+
+    # ------------------------------------------------------------------
+    # ✨ GENERATORE RICETTA AI
+    # ------------------------------------------------------------------
+    _ai_recipe_i18n = {
+        "Italiano": {
+            "title": "✨ Generatore Ricetta AI",
+            "caption": "Genera una ricetta da zero oppure usa la modalità Svuotafrigo.",
+            "mode": "Modalità",
+            "mode_generate": "Genera ricetta",
+            "mode_fridge": "Svuotafrigo",
+            "meal_type": "Tipo di pasto",
+            "style": "Tipo di ricetta",
+            "style_options": ["Carne", "Pesce", "Vegetariana", "Vegana"],
+            "restrictions": "Restrizioni",
+            "restriction_options": ["Gluten free", "Lactose free"],
+            "servings": "Porzioni",
+            "kcal": "Kcal desiderate per porzione",
+            "protein": "Proteine minime per porzione (g, opzionale)",
+            "macro": "Focus nutrizionale",
+            "macro_options": ["Nessuno", "Alte proteine", "Low carb", "Low fat"],
+            "total_time": "Tempo totale massimo",
+            "active_time": "Tempo attivo massimo",
+            "equipment": "Attrezzatura disponibile",
+            "equipment_options": ["Forno", "Air fryer", "Microonde", "Padella", "Pentola", "Blender"],
+            "available": "Ingredienti disponibili",
+            "available_help": "Inserisci anche le quantità quando le conosci, ad es. pollo 250 g, zucchine 300 g.",
+            "avoid": "Ingredienti da evitare",
+            "today": "🎯 Usa i miei target di oggi",
+            "today_done": "Target di oggi caricati.",
+            "generate": "✨ Genera ricetta",
+            "generating": "Sto creando la ricetta…",
+            "regenerate": "🔄 Genera un'altra",
+            "edit": "✏️ Modifica",
+            "save": "💾 Salva nelle mie ricette",
+            "insert": "🍽️ Inserisci oggi",
+            "saved": "✅ Ricetta salvata nelle tue ricette.",
+            "inserted": "✅ Ricetta inserita nel diario di oggi.",
+            "editable": "La ricetta è stata caricata nel form manuale qui sotto: puoi modificarla.",
+            "ai_note": "✨ Kcal e macronutrienti sono stime AI e possono essere modificati prima del salvataggio.",
+            "ingredients": "Ingredienti",
+            "instructions": "Preparazione",
+            "time": "Tempo",
+            "active": "attivi",
+            "per_serving": "per porzione",
+            "warning_target": "Con gli ingredienti disponibili la ricetta è sotto il target richiesto.",
+            "error": "Errore nella generazione della ricetta: {error}",
+            "fridge_required": "Per Svuotafrigo inserisci almeno un ingrediente disponibile.",
+        },
+        "English": {
+            "title": "✨ AI Recipe Generator",
+            "caption": "Generate a recipe from scratch or use Fridge Clear-out mode.",
+            "mode": "Mode",
+            "mode_generate": "Generate recipe",
+            "mode_fridge": "Fridge clear-out",
+            "meal_type": "Meal type",
+            "style": "Recipe type",
+            "style_options": ["Meat", "Fish", "Vegetarian", "Vegan"],
+            "restrictions": "Restrictions",
+            "restriction_options": ["Gluten free", "Lactose free"],
+            "servings": "Servings",
+            "kcal": "Target kcal per serving",
+            "protein": "Minimum protein per serving (g, optional)",
+            "macro": "Nutrition focus",
+            "macro_options": ["None", "High protein", "Low carb", "Low fat"],
+            "total_time": "Maximum total time",
+            "active_time": "Maximum active time",
+            "equipment": "Available equipment",
+            "equipment_options": ["Oven", "Air fryer", "Microwave", "Pan", "Pot", "Blender"],
+            "available": "Available ingredients",
+            "available_help": "Add quantities when known, e.g. chicken 250 g, courgette 300 g.",
+            "avoid": "Ingredients to avoid",
+            "today": "🎯 Use today's targets",
+            "today_done": "Today's targets loaded.",
+            "generate": "✨ Generate recipe",
+            "generating": "Creating your recipe…",
+            "regenerate": "🔄 Generate another",
+            "edit": "✏️ Edit",
+            "save": "💾 Save to my recipes",
+            "insert": "🍽️ Log today",
+            "saved": "✅ Recipe saved to your recipes.",
+            "inserted": "✅ Recipe added to today's log.",
+            "editable": "The recipe has been loaded into the manual form below so you can edit it.",
+            "ai_note": "✨ Calories and macros are AI estimates and can be edited before saving.",
+            "ingredients": "Ingredients",
+            "instructions": "Instructions",
+            "time": "Time",
+            "active": "active",
+            "per_serving": "per serving",
+            "warning_target": "With the available ingredients the recipe is below the requested target.",
+            "error": "Recipe generation error: {error}",
+            "fridge_required": "Add at least one available ingredient for Fridge clear-out mode.",
+        },
+        "Nederlands": {
+            "title": "✨ AI-receptgenerator",
+            "caption": "Genereer een recept of gebruik de modus Koelkast leegmaken.",
+            "mode": "Modus",
+            "mode_generate": "Recept genereren",
+            "mode_fridge": "Koelkast leegmaken",
+            "meal_type": "Maaltijdtype",
+            "style": "Type recept",
+            "style_options": ["Vlees", "Vis", "Vegetarisch", "Vegan"],
+            "restrictions": "Beperkingen",
+            "restriction_options": ["Glutenvrij", "Lactosevrij"],
+            "servings": "Porties",
+            "kcal": "Gewenste kcal per portie",
+            "protein": "Minimale eiwitten per portie (g, optioneel)",
+            "macro": "Voedingsfocus",
+            "macro_options": ["Geen", "Eiwitrijk", "Low carb", "Low fat"],
+            "total_time": "Maximale totale tijd",
+            "active_time": "Maximale actieve tijd",
+            "equipment": "Beschikbare apparatuur",
+            "equipment_options": ["Oven", "Air fryer", "Magnetron", "Koekenpan", "Pan", "Blender"],
+            "available": "Beschikbare ingrediënten",
+            "available_help": "Voeg hoeveelheden toe indien bekend, bv. kip 250 g, courgette 300 g.",
+            "avoid": "Te vermijden ingrediënten",
+            "today": "🎯 Gebruik mijn doelen van vandaag",
+            "today_done": "Doelen van vandaag geladen.",
+            "generate": "✨ Recept genereren",
+            "generating": "Recept wordt gemaakt…",
+            "regenerate": "🔄 Genereer een andere",
+            "edit": "✏️ Bewerken",
+            "save": "💾 Opslaan bij mijn recepten",
+            "insert": "🍽️ Vandaag registreren",
+            "saved": "✅ Recept opgeslagen bij je recepten.",
+            "inserted": "✅ Recept toegevoegd aan vandaag.",
+            "editable": "Het recept is in het handmatige formulier hieronder geladen en kan worden aangepast.",
+            "ai_note": "✨ Calorieën en macro's zijn AI-schattingen en kunnen voor het opslaan worden aangepast.",
+            "ingredients": "Ingrediënten",
+            "instructions": "Bereiding",
+            "time": "Tijd",
+            "active": "actief",
+            "per_serving": "per portie",
+            "warning_target": "Met de beschikbare ingrediënten ligt het recept onder het gevraagde doel.",
+            "error": "Fout bij het genereren van het recept: {error}",
+            "fridge_required": "Voeg minstens één beschikbaar ingrediënt toe voor Koelkast leegmaken.",
+        },
+        "Français": {
+            "title": "✨ Générateur de recette IA",
+            "caption": "Générez une recette ou utilisez le mode Vide-frigo.",
+            "mode": "Mode",
+            "mode_generate": "Générer une recette",
+            "mode_fridge": "Vide-frigo",
+            "meal_type": "Type de repas",
+            "style": "Type de recette",
+            "style_options": ["Viande", "Poisson", "Végétarienne", "Végane"],
+            "restrictions": "Restrictions",
+            "restriction_options": ["Sans gluten", "Sans lactose"],
+            "servings": "Portions",
+            "kcal": "Kcal souhaitées par portion",
+            "protein": "Protéines minimales par portion (g, optionnel)",
+            "macro": "Priorité nutritionnelle",
+            "macro_options": ["Aucune", "Riche en protéines", "Low carb", "Low fat"],
+            "total_time": "Temps total maximum",
+            "active_time": "Temps actif maximum",
+            "equipment": "Équipement disponible",
+            "equipment_options": ["Four", "Air fryer", "Micro-ondes", "Poêle", "Casserole", "Blender"],
+            "available": "Ingrédients disponibles",
+            "available_help": "Ajoutez les quantités si vous les connaissez, ex. poulet 250 g, courgettes 300 g.",
+            "avoid": "Ingrédients à éviter",
+            "today": "🎯 Utiliser mes objectifs du jour",
+            "today_done": "Objectifs du jour chargés.",
+            "generate": "✨ Générer la recette",
+            "generating": "Création de la recette…",
+            "regenerate": "🔄 Générer une autre",
+            "edit": "✏️ Modifier",
+            "save": "💾 Enregistrer dans mes recettes",
+            "insert": "🍽️ Enregistrer aujourd'hui",
+            "saved": "✅ Recette enregistrée dans vos recettes.",
+            "inserted": "✅ Recette ajoutée au journal d'aujourd'hui.",
+            "editable": "La recette a été chargée dans le formulaire manuel ci-dessous pour être modifiée.",
+            "ai_note": "✨ Les calories et macros sont des estimations IA et peuvent être modifiées avant l'enregistrement.",
+            "ingredients": "Ingrédients",
+            "instructions": "Préparation",
+            "time": "Temps",
+            "active": "actif",
+            "per_serving": "par portion",
+            "warning_target": "Avec les ingrédients disponibles, la recette est sous l'objectif demandé.",
+            "error": "Erreur lors de la génération : {error}",
+            "fridge_required": "Ajoutez au moins un ingrédient disponible pour le mode Vide-frigo.",
+        },
+    }
+
+    _air = _ai_recipe_i18n.get(current_lang, _ai_recipe_i18n["Italiano"])
+
+    with st.container(border=True):
+        st.markdown(f"### {_air['title']}")
+        st.caption(_air["caption"])
+
+        _mode_options = ["generate", "fridge"]
+        _ai_mode = st.radio(
+            _air["mode"],
+            _mode_options,
+            horizontal=True,
+            key="ai_recipe_mode",
+            format_func=lambda x: (
+                _air["mode_generate"] if x == "generate" else _air["mode_fridge"]
+            ),
+        )
+
+        _a1, _a2, _a3 = st.columns(3)
+        with _a1:
+            _ai_meal_type = st.selectbox(
+                _air["meal_type"],
+                ["Colazione", "Pranzo", "Cena", "Snack"],
+                key="ai_recipe_meal_type",
+                format_func=tr_meal_type,
+            )
+        with _a2:
+            _ai_style = st.selectbox(
+                _air["style"],
+                _air["style_options"],
+                key="ai_recipe_style",
+            )
+        with _a3:
+            _ai_servings = st.number_input(
+                _air["servings"],
+                min_value=1.0,
+                max_value=20.0,
+                value=2.0,
+                step=1.0,
+                key="ai_recipe_servings",
+            )
+
+        _ai_restrictions = st.multiselect(
+            _air["restrictions"],
+            _air["restriction_options"],
+            key="ai_recipe_restrictions",
+        )
+
+        # Initialize target fields before their widgets are created.
+        if "ai_recipe_target_kcal" not in st.session_state:
+            st.session_state["ai_recipe_target_kcal"] = 600.0
+        if "ai_recipe_target_protein" not in st.session_state:
+            st.session_state["ai_recipe_target_protein"] = 0.0
+
+        if st.button(
+            _air["today"],
+            key="ai_recipe_use_today",
+            use_container_width=True,
+        ):
+            try:
+                _today_str_ai = str(date.today())
+                _meals_ai = (
+                    supabase.table("meals")
+                    .select("calories,protein")
+                    .eq("user_id", user_id)
+                    .eq("date", _today_str_ai)
+                    .execute().data
+                    or []
+                )
+                _acts_ai = (
+                    supabase.table("activities")
+                    .select("burned_calories")
+                    .eq("user_id", user_id)
+                    .eq("date", _today_str_ai)
+                    .execute().data
+                    or []
+                )
+                _eaten_ai = sum(_safe_float(x.get("calories")) for x in _meals_ai)
+                _protein_ai = sum(_safe_float(x.get("protein")) for x in _meals_ai)
+                _activity_ai = sum(_safe_float(x.get("burned_calories")) for x in _acts_ai)
+
+                _maintenance_ai = max(
+                    0.0,
+                    _safe_float(user_bmr) + _activity_ai,
+                )
+                _target_intake_ai = max(
+                    0.0,
+                    _maintenance_ai - _safe_float(user_deficit_target_kcal),
+                )
+                _remaining_ai = max(
+                    100.0,
+                    _target_intake_ai - _eaten_ai,
+                )
+
+                st.session_state["ai_recipe_target_kcal"] = float(
+                    round(_remaining_ai)
+                )
+
+                if user_protein_goal_enabled and user_protein_goal_g > 0:
+                    st.session_state["ai_recipe_target_protein"] = float(
+                        max(0.0, round(user_protein_goal_g - _protein_ai))
+                    )
+
+                st.success(_air["today_done"])
+            except Exception as exc:
+                print(f"AI recipe target lookup error: {exc}")
+
+        _b1, _b2, _b3 = st.columns(3)
+        with _b1:
+            _ai_target_kcal = st.number_input(
+                _air["kcal"],
+                min_value=100.0,
+                max_value=3000.0,
+                step=25.0,
+                key="ai_recipe_target_kcal",
+            )
+        with _b2:
+            _ai_target_protein = st.number_input(
+                _air["protein"],
+                min_value=0.0,
+                max_value=250.0,
+                step=5.0,
+                key="ai_recipe_target_protein",
+                help="0 = optional / no numeric target",
+            )
+        with _b3:
+            _ai_macro_focus = st.selectbox(
+                _air["macro"],
+                _air["macro_options"],
+                key="ai_recipe_macro_focus",
+            )
+
+        _time_options = [10, 20, 30, 45, 60]
+        _c1, _c2 = st.columns(2)
+        with _c1:
+            _ai_total_minutes = st.selectbox(
+                _air["total_time"],
+                _time_options,
+                index=2,
+                key="ai_recipe_total_time",
+                format_func=lambda x: f"{x} min",
+            )
+        with _c2:
+            _active_choices = [10, 15, 20, 30, 45]
+            _ai_active_minutes = st.selectbox(
+                _air["active_time"],
+                _active_choices,
+                index=1,
+                key="ai_recipe_active_time",
+                format_func=lambda x: f"{x} min",
+            )
+
+        _ai_equipment = st.multiselect(
+            _air["equipment"],
+            _air["equipment_options"],
+            default=_air["equipment_options"],
+            key="ai_recipe_equipment",
+        )
+
+        _ai_available = st.text_area(
+            _air["available"],
+            key="ai_recipe_available",
+            help=_air["available_help"],
+            placeholder="pollo 250 g, zucchine 300 g, yogurt 150 g",
+            height=90,
+        )
+        _ai_avoid = st.text_input(
+            _air["avoid"],
+            key="ai_recipe_avoid",
+            placeholder="cipolla, funghi...",
+        )
+
+        def _run_ai_recipe_generation():
+            if _ai_mode == "fridge" and not _ai_available.strip():
+                st.warning(_air["fridge_required"])
+                return
+
+            try:
+                with st.spinner(_air["generating"]):
+                    _result = generate_ai_recipe_with_groq(
+                        language=current_lang,
+                        mode=_ai_mode,
+                        meal_type=_ai_meal_type,
+                        recipe_style=_ai_style,
+                        restrictions=_ai_restrictions,
+                        servings=_ai_servings,
+                        target_kcal=_ai_target_kcal,
+                        protein_target=_ai_target_protein,
+                        macro_focus=_ai_macro_focus,
+                        total_minutes=_ai_total_minutes,
+                        active_minutes=min(
+                            int(_ai_active_minutes),
+                            int(_ai_total_minutes),
+                        ),
+                        equipment=_ai_equipment,
+                        available_ingredients=_ai_available,
+                        avoid_ingredients=_ai_avoid,
+                    )
+                    st.session_state["ai_recipe_result"] = _result
+                    st.session_state["ai_recipe_generation_id"] = (
+                        int(st.session_state.get("ai_recipe_generation_id", 0)) + 1
+                    )
+            except Exception as exc:
+                st.error(_air["error"].format(error=exc))
+                print(traceback.format_exc())
+
+        if st.button(
+            _air["generate"],
+            type="primary",
+            use_container_width=True,
+            key="ai_recipe_generate",
+        ):
+            _run_ai_recipe_generation()
+            st.rerun()
+
+        _ai_result = st.session_state.get("ai_recipe_result")
+
+        if _ai_result:
+            _nutr = _ai_result["nutrition_per_serving"]
+            _generated_kcal = _safe_float(_nutr.get("calories"))
+            _tolerance_low = float(_ai_target_kcal) * 0.90
+            _below_tolerance = _generated_kcal < _tolerance_low
+
+            st.divider()
+            st.markdown(f"## 🍽️ {html.escape(_ai_result['name'])}")
+            st.caption(
+                f"⏱️ {_air['time']}: {_ai_result['total_minutes']} min · "
+                f"{_ai_result['active_minutes']} min {_air['active']} · "
+                f"🍽️ {_ai_result['servings']:g}"
+            )
+
+            _n1, _n2, _n3, _n4 = st.columns(4)
+            _n1.metric("Kcal", int(round(_nutr["calories"])))
+            _n2.metric("Protein", f"{_nutr['protein']:.1f} g")
+            _n3.metric("Carbs", f"{_nutr['carbs']:.1f} g")
+            _n4.metric("Fat", f"{_nutr['fat']:.1f} g")
+            st.caption(_air["per_serving"])
+            st.caption(_air["ai_note"])
+
+            if (
+                _ai_result.get("target_not_reached")
+                or _below_tolerance
+            ):
+                st.warning(
+                    _ai_result.get("warning")
+                    or _air["warning_target"]
+                )
+
+            st.markdown(f"### 🥕 {_air['ingredients']}")
+            for _ing in _ai_result.get("ingredients", []):
+                st.markdown(
+                    f"- **{html.escape(str(_ing['name']))}** — "
+                    f"{_safe_float(_ing['quantity_g']):g} g"
+                )
+
+            st.markdown(f"### 👩‍🍳 {_air['instructions']}")
+            for _step_no, _step in enumerate(
+                _ai_result.get("instructions", []),
+                start=1,
+            ):
+                st.markdown(f"{_step_no}. {html.escape(str(_step))}")
+
+            _act1, _act2 = st.columns(2)
+            with _act1:
+                if st.button(
+                    _air["regenerate"],
+                    use_container_width=True,
+                    key=f"ai_recipe_regenerate_{st.session_state.get('ai_recipe_generation_id', 0)}",
+                ):
+                    _run_ai_recipe_generation()
+                    st.rerun()
+
+            with _act2:
+                if st.button(
+                    _air["edit"],
+                    use_container_width=True,
+                    key=f"ai_recipe_edit_{st.session_state.get('ai_recipe_generation_id', 0)}",
+                ):
+                    st.session_state["recipe_builder_ingredients"] = list(
+                        _ai_result.get("ingredients") or []
+                    )
+                    st.session_state[f"recipe_builder_name_{v}"] = _ai_result["name"]
+                    st.session_state[f"recipe_builder_notes_{v}"] = _ai_recipe_notes(
+                        _ai_result
+                    )
+                    st.session_state[f"recipe_servings_{v}"] = float(
+                        _ai_result["servings"]
+                    )
+
+                    _meal_value = _ai_result.get("meal_type", _ai_meal_type)
+                    if _meal_value not in ["Colazione", "Pranzo", "Cena", "Snack"]:
+                        _meal_value = _ai_meal_type
+                    st.session_state[f"recipe_meal_type_{v}"] = _meal_value
+                    st.session_state[f"recipe_category_{v}"] = "Casa"
+                    st.success(_air["editable"])
+                    st.rerun()
+
+            _act3, _act4 = st.columns(2)
+            with _act3:
+                if st.button(
+                    _air["save"],
+                    use_container_width=True,
+                    key=f"ai_recipe_save_{st.session_state.get('ai_recipe_generation_id', 0)}",
+                ):
+                    try:
+                        _servings = max(
+                            1.0,
+                            float(_ai_result["servings"]),
+                        )
+                        insert_recipe_library(
+                            name=_ai_result["name"],
+                            meal_type=_ai_result.get("meal_type", _ai_meal_type),
+                            category="Casa",
+                            recipe_servings=_servings,
+                            calories=_nutr["calories"] * _servings,
+                            protein=_nutr["protein"] * _servings,
+                            carbs=_nutr["carbs"] * _servings,
+                            fat=_nutr["fat"] * _servings,
+                            notes=_ai_recipe_notes(_ai_result),
+                            ingredients_json=_ai_result["ingredients"],
+                            is_shared=False,
+                            image_url=None,
+                        )
+                        st.success(_air["saved"])
+                    except Exception as exc:
+                        st.error(str(exc))
+
+            with _act4:
+                if st.button(
+                    _air["insert"],
+                    use_container_width=True,
+                    key=f"ai_recipe_insert_{st.session_state.get('ai_recipe_generation_id', 0)}",
+                ):
+                    try:
+                        _display_name = f"{_ai_result['name']} (1.0 porz.)"
+                        insert_meal_with_base_data(
+                            log_date=date.today(),
+                            meal_type=_ai_result.get("meal_type", _ai_meal_type),
+                            display_name=_display_name,
+                            base_name=_ai_result["name"],
+                            quantity=1.0,
+                            is_per_100g=False,
+                            calories=_nutr["calories"],
+                            protein=_nutr["protein"],
+                            carbs=_nutr["carbs"],
+                            fat=_nutr["fat"],
+                            base_calories=_nutr["calories"],
+                            base_protein=_nutr["protein"],
+                            base_carbs=_nutr["carbs"],
+                            base_fat=_nutr["fat"],
+                            notes=_ai_recipe_notes(_ai_result),
+                            category="Casa",
+                            ingredients_json=_ai_result["ingredients"],
+                            recipe_servings=_ai_result["servings"],
+                        )
+                        refresh_daily_logs(date.today())
+                        st.success(_air["inserted"])
+                    except Exception as exc:
+                        st.error(str(exc))
+
 
     with st.container(border=True):
         st.markdown(t["create_meal_ingredients"])
