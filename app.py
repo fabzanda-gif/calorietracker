@@ -247,6 +247,7 @@ import plotly.graph_objects as go
 ASSET_DIR = Path(__file__).resolve().parent
 APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
 ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
+ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/SanoSync_Zero.jpg"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
 WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
@@ -471,7 +472,7 @@ st.markdown("""
             letter-spacing:-.035em;
             margin-bottom:10px;
         }
-        .sano-budget-value span { color:#FF9A9A !important; }
+        .sano-budget-value span { color:#FF332A !important; }
         .sano-budget-track {
             width:100%;
             height:9px;
@@ -483,7 +484,7 @@ st.markdown("""
         .sano-budget-fill {
             height:100%;
             border-radius:999px;
-            background:linear-gradient(90deg,#FF8B8B,#FFB0B0);
+            background:linear-gradient(90deg,#FF8B8B,#E6E6E6);
         }
         .sano-budget-meta {
             display:flex;
@@ -1597,6 +1598,33 @@ def render_sanosync_grid_table(
     if widths is None:
         widths = [1] * len(columns)
 
+    if is_zero_mode():
+        st.markdown(
+            """
+            <style>
+            div[class*="st-key-sanosync_grid_"] {
+                border:1px solid #A7A7A7 !important;
+                border-radius:14px !important;
+                overflow:hidden !important;
+                background:#090909 !important;
+                padding:.2rem .65rem .5rem .65rem !important;
+            }
+            div[class*="st-key-sanosync_grid_"] [data-testid="stHorizontalBlock"] {
+                border-bottom:1px solid rgba(210,210,210,.24) !important;
+                padding:.18rem 0 !important;
+            }
+            div[class*="st-key-sanosync_grid_"] [data-testid="stHorizontalBlock"]:last-child {
+                border-bottom:none !important;
+            }
+            div[class*="st-key-sanosync_grid_"] * {
+                color:#F5F5F5 !important;
+                -webkit-text-fill-color:#F5F5F5 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
     header_cols = st.columns(
         widths,
         gap="small",
@@ -1608,7 +1636,7 @@ def render_sanosync_grid_table(
             (
                 "<div style='"
                 f"font-weight:{header_weight};"
-                "color:#7b7e89;"
+                "color:" + ("#D8D8D8" if is_zero_mode() else "#7b7e89") + ";"
                 "padding:0.1rem 0 0.45rem 0;"
                 "white-space:nowrap;"
                 "'>"
@@ -3784,7 +3812,7 @@ if is_zero_mode():
     st.markdown(
         """
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cookie&family=Kanit:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Kanit:wght@400;500;600;700;800;900&display=swap');
 
         :root {
             --zero-bg: #050505;
@@ -3815,7 +3843,7 @@ if is_zero_mode():
         h1, h2, h3, h4,
         .sano-page-title,
         .sano-zero-wordmark {
-            font-family: 'Cookie', cursive !important;
+            font-family: 'Great Vibes', cursive !important;
             letter-spacing: 0 !important;
         }
 
@@ -3863,7 +3891,7 @@ if is_zero_mode():
         }
 
         .sano-page-kicker {
-            font-family: 'Cookie', cursive !important;
+            font-family: 'Great Vibes', cursive !important;
             font-size: 1.35rem !important;
             letter-spacing: .02em !important;
             color: #FF2A20 !important;
@@ -3984,7 +4012,7 @@ if is_zero_mode():
 
         /* ZERO wordmark */
         .sano-zero-wordmark {
-            font-family:'Cookie', cursive;
+            font-family:'Great Vibes', cursive;
             color:#FFFFFF !important;
             font-size:1.55rem;
             line-height:1;
@@ -4014,7 +4042,224 @@ if is_zero_mode():
 
         /* Dividers */
         hr {
-            border-color:#2A2A2A !important;
+            border-color:#4A4A4A !important;
+        }
+
+        /* ============================================================
+           ZERO MODE — HIGH CONTRAST PASS
+           ============================================================ */
+
+        /* Global text: no dark navy/grey leftovers on black. */
+        [data-testid="stAppViewContainer"],
+        [data-testid="stAppViewContainer"] p,
+        [data-testid="stAppViewContainer"] span,
+        [data-testid="stAppViewContainer"] label,
+        [data-testid="stAppViewContainer"] div,
+        [data-testid="stAppViewContainer"] small,
+        [data-testid="stAppViewContainer"] li {
+            color:#F2F2F2 !important;
+            -webkit-text-fill-color:#F2F2F2 !important;
+        }
+
+        [data-testid="stAppViewContainer"] [data-testid="stCaptionContainer"],
+        [data-testid="stAppViewContainer"] [data-testid="stCaptionContainer"] *,
+        [data-testid="stAppViewContainer"] .stCaption,
+        [data-testid="stAppViewContainer"] .stCaption * {
+            color:#BDBDBD !important;
+            -webkit-text-fill-color:#BDBDBD !important;
+        }
+
+        /* Streamlit bordered containers/cards: black + red, never white. */
+        [data-testid="stVerticalBlockBorderWrapper"],
+        [data-testid="stVerticalBlockBorderWrapper"] > div {
+            background:
+                radial-gradient(circle at 100% 0%, rgba(225,6,0,.15), transparent 34%),
+                linear-gradient(145deg,#111111 0%,#080808 100%) !important;
+            border-color:#B51A17 !important;
+        }
+
+        /* Explicit app cards that were still light. */
+        .sano-budget-card,
+        .sano-ai-coach-card,
+        .sano-profile-card,
+        .sano-profile-identity-card,
+        div[class*="st-key-profile_identity_card"],
+        div[class*="st-key-can_i_eat_spotlight"],
+        div[class*="st-key-ai_spotlight_"] {
+            background:
+                radial-gradient(circle at 96% 4%, rgba(225,6,0,.19), transparent 34%),
+                linear-gradient(145deg,#131313,#070707) !important;
+            border:1.5px solid #B51A17 !important;
+            color:#F7F7F7 !important;
+        }
+
+        /* Metric cards: fix the pale cards visible in overview/activity. */
+        [data-testid="stMetric"] {
+            background:
+                radial-gradient(circle at 96% 4%, rgba(225,6,0,.18), transparent 34%),
+                linear-gradient(145deg,#151515,#090909) !important;
+            border:1.5px solid #C91A16 !important;
+            box-shadow:0 10px 24px rgba(0,0,0,.32) !important;
+        }
+        [data-testid="stMetric"] label,
+        [data-testid="stMetric"] [data-testid="stMetricValue"],
+        [data-testid="stMetric"] [data-testid="stMetricDelta"],
+        [data-testid="stMetric"] * {
+            color:#F7F7F7 !important;
+            -webkit-text-fill-color:#F7F7F7 !important;
+        }
+
+        /* Inputs/selects: keep value readable. */
+        [data-baseweb="input"] > div,
+        [data-baseweb="select"] > div,
+        [data-baseweb="textarea"] > div,
+        input,
+        textarea {
+            background:#161616 !important;
+            border:1.25px solid #C4C4C4 !important;
+            color:#F6F6F6 !important;
+            caret-color:#FF2A20 !important;
+        }
+        input,
+        textarea,
+        [data-baseweb="select"] span {
+            color:#F6F6F6 !important;
+            -webkit-text-fill-color:#F6F6F6 !important;
+        }
+        input::placeholder,
+        textarea::placeholder {
+            color:#929292 !important;
+            -webkit-text-fill-color:#929292 !important;
+        }
+
+        /* Dropdown arrows / icons */
+        [data-baseweb="select"] svg,
+        [data-testid="stSelectbox"] svg,
+        [data-testid="stNumberInput"] svg {
+            fill:#F0F0F0 !important;
+            color:#F0F0F0 !important;
+        }
+
+        /* Number inputs */
+        [data-testid="stNumberInput"] button {
+            background:#1D1D1D !important;
+            border-color:#555555 !important;
+        }
+
+        /* Tables built with st.columns: light dividers and clear headers. */
+        div[class*="st-key-"] [data-testid="stHorizontalBlock"] {
+            border-color:rgba(220,220,220,.18) !important;
+        }
+
+        /* Dataframe/table components, when present */
+        [data-testid="stDataFrame"],
+        [data-testid="stTable"],
+        [data-testid="stDataFrame"] *,
+        [data-testid="stTable"] * {
+            color:#F4F4F4 !important;
+            -webkit-text-fill-color:#F4F4F4 !important;
+            border-color:#BDBDBD !important;
+        }
+
+        [data-testid="stDataFrame"] {
+            border:1px solid #AFAFAF !important;
+            border-radius:14px !important;
+            overflow:hidden !important;
+        }
+
+        /* Expander outlines */
+        [data-testid="stExpander"] {
+            background:#0C0C0C !important;
+            border:1px solid #626262 !important;
+            border-radius:14px !important;
+        }
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary * {
+            color:#F5F5F5 !important;
+            -webkit-text-fill-color:#F5F5F5 !important;
+        }
+
+        /* Radio / segmented options */
+        [role="radiogroup"] label {
+            background:#141414 !important;
+            border-color:#5A5A5A !important;
+            color:#F5F5F5 !important;
+        }
+        [role="radiogroup"] label:has(input:checked) {
+            background:#6F0705 !important;
+            border-color:#FF2A20 !important;
+        }
+
+        /* Headings: Great Vibes only for actual display titles, body stays Kanit. */
+        h1, h2, h3,
+        .sano-page-title,
+        .sano-zero-wordmark {
+            font-family:'Great Vibes', cursive !important;
+            font-weight:400 !important;
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+        }
+
+        h4, h5, h6,
+        p, span, label, div,
+        button, input, textarea, select {
+            font-family:'Kanit', sans-serif !important;
+        }
+
+        /* Hero typography */
+        .sano-page-title {
+            font-size:clamp(2.45rem,4.8vw,3.65rem) !important;
+            line-height:1.03 !important;
+        }
+        .sano-page-kicker {
+            font-family:'Kanit', sans-serif !important;
+            font-size:.78rem !important;
+            font-weight:900 !important;
+            letter-spacing:.18em !important;
+            color:#FF332A !important;
+            -webkit-text-fill-color:#FF332A !important;
+        }
+
+        /* Sidebar slogan: remove coral / pink. */
+        [data-testid="stSidebar"] .sano-sidebar-subtitle,
+        [data-testid="stSidebar"] .sidebar-subtitle,
+        [data-testid="stSidebar"] .subtitle,
+        [data-testid="stSidebar"] p {
+            color:#E6E6E6 !important;
+            -webkit-text-fill-color:#E6E6E6 !important;
+        }
+
+        /* Known exact slogan text is rendered in markdown in this app;
+           this catches the centered small copy under the logo. */
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+            color:#E6E6E6 !important;
+            -webkit-text-fill-color:#E6E6E6 !important;
+        }
+
+        /* Primary actions = red / white */
+        [data-testid="stAppViewContainer"] .stButton > button[kind="primary"],
+        [data-testid="stFormSubmitButton"] > button {
+            background:linear-gradient(135deg,#E10600,#9F0000) !important;
+            color:#FFFFFF !important;
+            border:1.5px solid #FF2A20 !important;
+        }
+
+        /* Plotly surrounding area */
+        [data-testid="stPlotlyChart"] {
+            background:#080808 !important;
+            border:1px solid #3B3B3B !important;
+            border-radius:16px !important;
+        }
+
+        /* Links */
+        a {
+            color:#FF4A42 !important;
+        }
+
+        @media (max-width:700px) {
+            .sano-page-title {
+                font-size:2.55rem !important;
+            }
         }
         </style>
         """,
@@ -5109,8 +5354,9 @@ def tr_activity_plan(value): return _tr_value(ACTIVITY_PLAN_KEYS, value)
 
 with st.sidebar:
     # --- LOGO / PERSONALITY MODE ---
-    if is_zero_mode() and ZERO_LOGO_FILE.exists():
-        st.sidebar.image(str(ZERO_LOGO_FILE), use_container_width=True)
+    if is_zero_mode():
+        # Use the dedicated ZERO logo from the repository.
+        st.sidebar.image(ZERO_LOGO_URL, use_container_width=True)
         st.markdown(
             '<div class="sano-zero-wordmark">SanoSync<span>ZERO MODE</span></div>',
             unsafe_allow_html=True,
