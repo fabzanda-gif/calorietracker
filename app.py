@@ -1712,7 +1712,7 @@ def show_login_page():
             "password": "Password",
             "password_min": "Password (min. 6 caratteri)",
             "login_btn": "Accedi",
-            "signup_btn": "Registrati","protein_goal_title":"Goal Proteico","protein_goal_enabled":"Vuoi impostare un goal proteico giornaliero?","protein_goal_no":"No","protein_goal_yes":"Sì","protein_goal_g":"Goal proteico giornaliero (g)",
+            "signup_btn": "Registrati","office_lunch_title":"Pranzo in ufficio","office_lunch_enabled":"Pranzi abitualmente in ufficio?","office_lunch_no":"No","office_lunch_yes":"Sì","protein_goal_title":"Goal Proteico","protein_goal_enabled":"Vuoi impostare un goal proteico giornaliero?","protein_goal_no":"No","protein_goal_yes":"Sì","protein_goal_g":"Goal proteico giornaliero (g)",
             "credentials_required": "Inserisci email e password.",
             "invalid_credentials": "Credenziali non valide.",
             "auth_error": "Errore durante l'autenticazione: {error}",
@@ -1757,7 +1757,7 @@ def show_login_page():
             "password": "Password",
             "password_min": "Password (min. 6 characters)",
             "login_btn": "Sign in",
-            "signup_btn": "Create account","protein_goal_title":"Protein Goal","protein_goal_enabled":"Set a daily protein goal?","protein_goal_no":"No","protein_goal_yes":"Yes","protein_goal_g":"Daily protein goal (g)",
+            "signup_btn": "Create account","office_lunch_title":"Office lunch","office_lunch_enabled":"Do you usually have lunch at the office?","office_lunch_no":"No","office_lunch_yes":"Yes","protein_goal_title":"Protein Goal","protein_goal_enabled":"Set a daily protein goal?","protein_goal_no":"No","protein_goal_yes":"Yes","protein_goal_g":"Daily protein goal (g)",
             "credentials_required": "Enter email and password.",
             "invalid_credentials": "Invalid credentials.",
             "auth_error": "Authentication error: {error}",
@@ -1802,7 +1802,7 @@ def show_login_page():
             "password": "Wachtwoord",
             "password_min": "Wachtwoord (min. 6 tekens)",
             "login_btn": "Inloggen",
-            "signup_btn": "Account aanmaken","protein_goal_title":"Eiwitdoel","protein_goal_enabled":"Een dagelijks eiwitdoel instellen?","protein_goal_no":"Nee","protein_goal_yes":"Ja","protein_goal_g":"Dagelijks eiwitdoel (g)",
+            "signup_btn": "Account aanmaken","office_lunch_title":"Lunch op kantoor","office_lunch_enabled":"Lunch je gewoonlijk op kantoor?","office_lunch_no":"Nee","office_lunch_yes":"Ja","protein_goal_title":"Eiwitdoel","protein_goal_enabled":"Een dagelijks eiwitdoel instellen?","protein_goal_no":"Nee","protein_goal_yes":"Ja","protein_goal_g":"Dagelijks eiwitdoel (g)",
             "credentials_required": "Voer e-mail en wachtwoord in.",
             "invalid_credentials": "Ongeldige inloggegevens.",
             "auth_error": "Authenticatiefout: {error}",
@@ -1847,7 +1847,7 @@ def show_login_page():
             "password": "Mot de passe",
             "password_min": "Mot de passe (min. 6 caractères)",
             "login_btn": "Se connecter",
-            "signup_btn": "Créer un compte","protein_goal_title":"Objectif protéique","protein_goal_enabled":"Définir un objectif quotidien de protéines ?","protein_goal_no":"Non","protein_goal_yes":"Oui","protein_goal_g":"Objectif quotidien de protéines (g)",
+            "signup_btn": "Créer un compte","office_lunch_title":"Déjeuner au bureau","office_lunch_enabled":"Déjeunez-vous habituellement au bureau ?","office_lunch_no":"Non","office_lunch_yes":"Oui","protein_goal_title":"Objectif protéique","protein_goal_enabled":"Définir un objectif quotidien de protéines ?","protein_goal_no":"Non","protein_goal_yes":"Oui","protein_goal_g":"Objectif quotidien de protéines (g)",
             "credentials_required": "Saisissez votre e-mail et votre mot de passe.",
             "invalid_credentials": "Identifiants invalides.",
             "auth_error": "Erreur d’authentification : {error}",
@@ -2320,6 +2320,16 @@ def show_login_page():
             key="signup_deficit_kcal",
         )
 
+        st.markdown(f"#### {lt['office_lunch_title']}")
+        office_lunch_choice = st.radio(
+            lt["office_lunch_enabled"],
+            [lt["office_lunch_no"], lt["office_lunch_yes"]],
+            horizontal=True,
+            index=0,
+            key="signup_office_lunch_enabled",
+        )
+        office_lunch_enabled_input = office_lunch_choice == lt["office_lunch_yes"]
+
         st.markdown(f"#### {lt['protein_goal_title']}")
         protein_goal_choice = st.radio(
             lt["protein_goal_enabled"],
@@ -2408,6 +2418,7 @@ def show_login_page():
                                     selected_deficit
                                 ),
                                 "deficit_plan": plan_to_save,
+                                "office_lunch_enabled": bool(office_lunch_enabled_input),
                                 "protein_goal_enabled": bool(protein_goal_enabled_input),
                                 "protein_goal_g": float(protein_goal_g_input) if protein_goal_enabled_input else None,
                             }
@@ -2490,6 +2501,7 @@ user_gender = u_meta.get("gender")
 user_birth_date = u_meta.get("birth_date")
 user_deficit_target_kcal = u_meta.get("deficit_target_kcal")
 user_deficit_plan = u_meta.get("deficit_plan")
+user_office_lunch_enabled = bool(u_meta.get("office_lunch_enabled", True))
 _PROTEIN_GOAL_SPECIAL_UID = "df879484-97d5-44fb-8b20-ecf8e4e2b3e3"
 user_protein_goal_enabled = bool(u_meta.get("protein_goal_enabled", False))
 user_protein_goal_g = _safe_float(u_meta.get("protein_goal_g"))
@@ -3187,7 +3199,7 @@ translations = {
         "tab1_title": "🍽️ Inserimento Cibo & Pasti",
         "input_source_lbl": "Fonte inserimento",
         "opt_off": "🔍 Cerca online (Open Food Facts)",
-        "opt_quick": "🍳 Immissione Rapida","quick_select_used":"Seleziona un alimento già utilizzato","quick_empty":"Nessun alimento ancora disponibile. Registra prima un pasto.","quick_load_error":"Errore nel caricamento delle immissioni rapide: {error}",
+        "opt_quick": "🍳 Immissione Rapida","quick_select_used":"Seleziona alimento o ricetta","quick_empty":"Nessun alimento ancora disponibile. Registra prima un pasto.","quick_load_error":"Errore nel caricamento delle immissioni rapide: {error}",
         "opt_scan": "📸 Foto AI",
         "scan_title": "📸 Foto AI",
         "scan_mode": "Sorgente immagine",
@@ -3289,7 +3301,7 @@ translations = {
         "tab1_title": "🍽️ Food & Meal Logging",
         "input_source_lbl": "Input source",
         "opt_off": "🔍 Search online (Open Food Facts)",
-        "opt_quick": "🍳 Quick Entry","quick_select_used":"Select a previously used food","quick_empty":"No foods available yet. Log a meal first.","quick_load_error":"Error loading quick entries: {error}",
+        "opt_quick": "🍳 Quick Entry","quick_select_used":"Select a food or recipe","quick_empty":"No foods available yet. Log a meal first.","quick_load_error":"Error loading quick entries: {error}",
         "opt_scan": "📸 AI Photo",
         "scan_title": "📸 AI Photo",
         "scan_mode": "Image source",
@@ -3391,7 +3403,7 @@ translations = {
         "tab1_title": "🍽️ Voeding & Maaltijden Invoeren",
         "input_source_lbl": "Invoerbron",
         "opt_off": "🔍 Online zoeken (Open Food Facts)",
-        "opt_quick": "🍳 Snelle Invoer","quick_select_used":"Selecteer een eerder gebruikt voedingsmiddel","quick_empty":"Nog geen voedingsmiddelen beschikbaar. Registreer eerst een maaltijd.","quick_load_error":"Fout bij het laden van snelle invoer: {error}",
+        "opt_quick": "🍳 Snelle Invoer","quick_select_used":"Selecteer een voedingsmiddel of recept","quick_empty":"Nog geen voedingsmiddelen beschikbaar. Registreer eerst een maaltijd.","quick_load_error":"Fout bij het laden van snelle invoer: {error}",
         "opt_scan": "📸 AI-foto",
         "scan_title": "📸 AI-foto",
         "scan_mode": "Afbeeldingsbron",
@@ -3530,7 +3542,7 @@ translations["Français"] = {
     "tab1_title": "🍽️ Saisie des aliments & repas",
     "input_source_lbl": "Source de saisie",
     "opt_off": "🔍 Rechercher en ligne (Open Food Facts)",
-    "opt_quick": "🍳 Saisie rapide","quick_select_used":"Sélectionnez un aliment déjà utilisé","quick_empty":"Aucun aliment disponible pour le moment. Enregistrez d’abord un repas.","quick_load_error":"Erreur lors du chargement des saisies rapides : {error}",
+    "opt_quick": "🍳 Saisie rapide","quick_select_used":"Sélectionnez un aliment ou une recette","quick_empty":"Aucun aliment disponible pour le moment. Enregistrez d’abord un repas.","quick_load_error":"Erreur lors du chargement des saisies rapides : {error}",
         "opt_scan": "📸 Photo IA",
         "scan_title": "📸 Photo IA",
         "scan_mode": "Source de l'image",
@@ -3671,7 +3683,7 @@ translations["Italiano"].update({
     "recipe_no_photo": "Nessuna foto",
     "recipe_show_ingredients": "🧾 Ingredienti",
     "recipe_no_ingredients": "Ingredienti non disponibili.",
-    "recipe_photo_error": "Impossibile caricare la foto: {error}",
+    "recipe_photo_error": "Impossibile caricare la foto: {error}","recipe_add_photo":"📷 Aggiungi immagine","recipe_replace_photo":"🖼️ Sostituisci immagine","recipe_photo_save":"💾 Salva immagine","recipe_photo_saved":"✅ Immagine ricetta aggiornata.",
     "recipe_servings": "🍽️ Porzioni previste",
     "recipe_servings_help": "Indica quante porzioni produce l'intera ricetta. Potrai poi registrare 0,5 / 1 / 1,5 porzioni e calorie e macro verranno calcolati automaticamente.",
     "per_serving": "Per porzione",
@@ -3731,7 +3743,7 @@ translations["English"].update({
     "recipe_no_photo": "No photo",
     "recipe_show_ingredients": "🧾 Ingredients",
     "recipe_no_ingredients": "Ingredients not available.",
-    "recipe_photo_error": "Could not upload the photo: {error}",
+    "recipe_photo_error": "Could not upload the photo: {error}","recipe_add_photo":"📷 Add image","recipe_replace_photo":"🖼️ Replace image","recipe_photo_save":"💾 Save image","recipe_photo_saved":"✅ Recipe image updated.",
     "recipe_servings": "🍽️ Expected servings",
     "recipe_servings_help": "Enter how many servings the whole recipe makes. You can later log 0.5 / 1 / 1.5 servings and calories/macros will scale automatically.",
     "per_serving": "Per serving",
@@ -3791,7 +3803,7 @@ translations["Nederlands"].update({
     "recipe_no_photo": "Geen foto",
     "recipe_show_ingredients": "🧾 Ingrediënten",
     "recipe_no_ingredients": "Ingrediënten niet beschikbaar.",
-    "recipe_photo_error": "Foto uploaden mislukt: {error}",
+    "recipe_photo_error": "Foto uploaden mislukt: {error}","recipe_add_photo":"📷 Afbeelding toevoegen","recipe_replace_photo":"🖼️ Afbeelding vervangen","recipe_photo_save":"💾 Afbeelding opslaan","recipe_photo_saved":"✅ Receptafbeelding bijgewerkt.",
     "recipe_servings": "🍽️ Verwachte porties",
     "recipe_servings_help": "Geef aan hoeveel porties het hele recept oplevert. Later kun je 0,5 / 1 / 1,5 porties registreren en calorieën/macro's worden automatisch aangepast.",
     "per_serving": "Per portie",
@@ -3851,7 +3863,7 @@ translations["Français"].update({
     "recipe_no_photo": "Aucune photo",
     "recipe_show_ingredients": "🧾 Ingrédients",
     "recipe_no_ingredients": "Ingrédients non disponibles.",
-    "recipe_photo_error": "Impossible d’importer la photo : {error}",
+    "recipe_photo_error": "Impossible d’importer la photo : {error}","recipe_add_photo":"📷 Ajouter une image","recipe_replace_photo":"🖼️ Remplacer l’image","recipe_photo_save":"💾 Enregistrer l’image","recipe_photo_saved":"✅ Image de la recette mise à jour.",
     "recipe_servings": "🍽️ Portions prévues",
     "recipe_servings_help": "Indiquez combien de portions produit la recette entière. Vous pourrez ensuite enregistrer 0,5 / 1 / 1,5 portion et les calories/macros seront ajustées automatiquement.",
     "per_serving": "Par portion",
@@ -4098,8 +4110,34 @@ with st.sidebar:
             st.session_state["show_personal_settings"] = False
             st.session_state.pop("settings_language_live", None)
             st.session_state.pop("profile_menu_language", None)
-
+            st.session_state["_collapse_sidebar_mobile_next_run"] = True
             st.rerun()
+
+    if st.session_state.pop("_collapse_sidebar_mobile_next_run", False):
+        st.components.v1.html(
+            """
+            <script>
+            (() => {
+              try {
+                const w = window.parent;
+                if (w.innerWidth > 800) return;
+                const d = w.document;
+                const selectors = [
+                  '[data-testid="stSidebarCollapseButton"] button',
+                  'button[aria-label="Close sidebar"]',
+                  'button[aria-label="Collapse sidebar"]'
+                ];
+                for (const sel of selectors) {
+                  const btn = d.querySelector(sel);
+                  if (btn) { setTimeout(() => btn.click(), 100); break; }
+                }
+              } catch (e) {}
+            })();
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
 
     selected_page_id = st.session_state.current_page_id
     selected_page = t[selected_page_id]
@@ -4239,7 +4277,7 @@ SETTINGS_I18N = {
         "saved": "✅ Impostazioni aggiornate.",
         "error": "Errore durante il salvataggio: {error}",
         "hint": "La foto profilo viene gestita dal provider di accesso (es. Google/Facebook).",
-        "protein_title": "🥩 Goal Proteico",
+        "office_title":"🏢 Pranzo in ufficio","office_enabled":"Mostra funzioni e pasti da ufficio?","office_no":"No","office_yes":"Sì","protein_title": "🥩 Goal Proteico",
         "protein_enabled": "Vuoi usare un goal proteico giornaliero?",
         "protein_no": "No",
         "protein_yes": "Sì",
@@ -4267,7 +4305,7 @@ SETTINGS_I18N = {
         "saved": "✅ Settings updated.",
         "error": "Error while saving: {error}",
         "hint": "Your profile picture is managed by your sign-in provider (e.g. Google/Facebook).",
-        "protein_title": "🥩 Protein Goal",
+        "office_title":"🏢 Office lunch","office_enabled":"Show office meal and planning features?","office_no":"No","office_yes":"Yes","protein_title": "🥩 Protein Goal",
         "protein_enabled": "Use a daily protein goal?",
         "protein_no": "No",
         "protein_yes": "Yes",
@@ -4295,7 +4333,7 @@ SETTINGS_I18N = {
         "saved": "✅ Instellingen bijgewerkt.",
         "error": "Fout bij opslaan: {error}",
         "hint": "Je profielfoto wordt beheerd door je inlogprovider (bijv. Google/Facebook).",
-        "protein_title": "🥩 Eiwitdoel",
+        "office_title":"🏢 Lunch op kantoor","office_enabled":"Kantoorfuncties en maaltijden tonen?","office_no":"Nee","office_yes":"Ja","protein_title": "🥩 Eiwitdoel",
         "protein_enabled": "Een dagelijks eiwitdoel gebruiken?",
         "protein_no": "Nee",
         "protein_yes": "Ja",
@@ -4323,7 +4361,7 @@ SETTINGS_I18N = {
         "saved": "✅ Paramètres mis à jour.",
         "error": "Erreur lors de l'enregistrement : {error}",
         "hint": "Votre photo de profil est gérée par votre fournisseur de connexion (ex. Google/Facebook).",
-        "protein_title": "🥩 Objectif protéique",
+        "office_title":"🏢 Déjeuner au bureau","office_enabled":"Afficher les fonctions et repas de bureau ?","office_no":"Non","office_yes":"Oui","protein_title": "🥩 Objectif protéique",
         "protein_enabled": "Utiliser un objectif quotidien de protéines ?",
         "protein_no": "Non",
         "protein_yes": "Oui",
@@ -4411,6 +4449,7 @@ def render_personal_settings_page():
         or deficit_preset_from_value(existing_deficit_value)
     )
 
+    existing_office_lunch_enabled = bool(metadata.get("office_lunch_enabled", True))
     existing_protein_enabled = bool(metadata.get("protein_goal_enabled", False))
     existing_protein_g = _safe_float(metadata.get("protein_goal_g"))
     if (
@@ -4530,6 +4569,21 @@ def render_personal_settings_page():
         )
 
     # ------------------------------------------------------------------
+    # PRANZO IN UFFICIO
+    # ------------------------------------------------------------------
+    with st.container(border=True):
+        st.markdown(f"### {si['office_title']}")
+        _office_options = [si["office_no"], si["office_yes"]]
+        new_office_choice = st.radio(
+            si["office_enabled"],
+            _office_options,
+            index=1 if existing_office_lunch_enabled else 0,
+            horizontal=True,
+            key="settings_office_lunch_enabled",
+        )
+        new_office_lunch_enabled = new_office_choice == si["office_yes"]
+
+    # ------------------------------------------------------------------
     # GOAL PROTEICO — SEMPRE ULTIMA SEZIONE
     # ------------------------------------------------------------------
     with st.container(border=True):
@@ -4600,6 +4654,7 @@ def render_personal_settings_page():
                 "deficit_target_kcal": int(new_deficit_kcal),
                 "deficit_plan": plan_to_save,
                 "preferred_language": new_language,
+                "office_lunch_enabled": bool(new_office_lunch_enabled),
                 "protein_goal_enabled": bool(new_protein_enabled),
                 "protein_goal_g": (
                     float(new_protein_g)
@@ -4866,7 +4921,6 @@ if selected_page == t["t1"]:
     _input_source_options = [
         t["opt_quick"],
         t["opt_off"],
-        recipe_source_label,
         t["opt_scan"],
     ]
 
@@ -4892,7 +4946,7 @@ if selected_page == t["t1"]:
 
     is_online = input_source == t["opt_off"]
     is_quick = input_source == t["opt_quick"]
-    is_recipe = input_source == recipe_source_label
+    is_recipe = False  # Ricette integrate in Immissione Rapida
     is_scan = input_source == t["opt_scan"]
     v = st.session_state["form_version"]
 
@@ -4997,19 +5051,50 @@ if selected_page == t["t1"]:
         elif is_quick:
             try:
                 quick_entries = get_quick_entries_from_meals()
-                if quick_entries:
-                    quick_by_label = {q["label"]: q for q in quick_entries}
+                recipe_rows = load_available_recipes()
+
+                if not user_office_lunch_enabled:
+                    quick_entries = [q for q in quick_entries if q.get("category", "Casa") != "Lavoro"]
+                    recipe_rows = [r for r in recipe_rows if r.get("category", "Casa") != "Lavoro"]
+
+                unified = {}
+                for q in quick_entries:
+                    unified[f"🕘 {q['label']}"] = ("history", q)
+
+                for r in recipe_rows:
+                    name = str(r.get("name") or "").strip()
+                    if not name:
+                        continue
+                    prefix = "🍲" if str(r.get("user_id")) == str(user_id) else "🌍"
+                    unified[f"{prefix} {name}"] = ("recipe", r)
+
+                if unified:
                     sel_quick = st.selectbox(
                         t["quick_select_used"],
-                        [""] + list(quick_by_label.keys()),
+                        [""] + list(unified.keys()),
                         key=f"quick_meal_select_{v}",
                     )
                     if sel_quick and sel_quick != st.session_state.get("last_selected"):
-                        q = quick_by_label[sel_quick]
-                        reset_or_update(
-                            q["name"], q["calories"], q["protein"], q["carbs"], q["fat"],
-                            sel_quick, q["default_quantity"], q["is_per_100g"], q.get("notes", ""), q.get("category", "Casa"),
-                        )
+                        source_type, item = unified[sel_quick]
+                        if source_type == "history":
+                            q = item
+                            reset_or_update(
+                                q["name"], q["calories"], q["protein"], q["carbs"], q["fat"],
+                                sel_quick, q["default_quantity"], q["is_per_100g"],
+                                q.get("notes", ""), q.get("category", "Casa"),
+                            )
+                        else:
+                            r = item
+                            servings = max(1.0, _safe_float(r.get("recipe_servings") or 1.0))
+                            reset_or_update(
+                                str(r.get("name") or ""),
+                                _safe_float(r.get("calories")) / servings,
+                                _safe_float(r.get("protein")) / servings,
+                                _safe_float(r.get("carbs")) / servings,
+                                _safe_float(r.get("fat")) / servings,
+                                sel_quick, 1.0, False,
+                                r.get("notes", ""), r.get("category", "Casa"),
+                            )
                         st.rerun()
                 else:
                     st.info(t["quick_empty"])
@@ -5311,13 +5396,14 @@ if selected_page == t["t1"]:
             key=f"input_meal_name_{v}",
         )
 
+        _meal_categories_available = MEAL_CATEGORIES if user_office_lunch_enabled else [c for c in MEAL_CATEGORIES if c != "Lavoro"]
         default_category = st.session_state.get("selected_source_category", "Casa")
-        if default_category not in MEAL_CATEGORIES:
+        if default_category not in _meal_categories_available:
             default_category = "Casa"
         meal_category = st.selectbox(
             t["category_label"],
-            MEAL_CATEGORIES,
-            index=MEAL_CATEGORIES.index(default_category),
+            _meal_categories_available,
+            index=_meal_categories_available.index(default_category),
             key=f"meal_category_{v}",
             help=t["category_help"],
             format_func=tr_category,
@@ -5653,7 +5739,11 @@ elif selected_page == t["t2"]:
             except Exception:
                 plan_log = []
 
-            day_types = ["Lavoro da casa", "Ufficio", "Giornata libera"]
+            day_types = (
+                ["Lavoro da casa", "Ufficio", "Giornata libera"]
+                if user_office_lunch_enabled
+                else ["Lavoro da casa", "Giornata libera"]
+            )
             activity_types = ["Riposo", "Moderatamente attiva", "Attiva"]
 
             default_day = saved_day_type or st.session_state.get("day_plan_type", "Lavoro da casa")
@@ -5740,7 +5830,7 @@ elif selected_page == t["t2"]:
                 else:
                     st.caption(t["no_dinner_near"])
 
-            elif day_type == "Ufficio":
+            elif user_office_lunch_enabled and day_type == "Ufficio":
                 fixed_kcal = 1260.0
                 dinner_target = max(0.0, daily_budget - fixed_kcal)
                 st.markdown(
@@ -5934,10 +6024,13 @@ elif selected_page == t["t2"]:
                         format_func=tr_meal_type,
                     )
                 with edit_col2:
+                    _edit_categories_available = MEAL_CATEGORIES if user_office_lunch_enabled else [c for c in MEAL_CATEGORIES if c != "Lavoro"]
+                    if current_category not in _edit_categories_available:
+                        current_category = "Casa"
                     new_meal_category = st.selectbox(
                         t["category_label"],
-                        MEAL_CATEGORIES,
-                        index=MEAL_CATEGORIES.index(current_category),
+                        _edit_categories_available,
+                        index=_edit_categories_available.index(current_category),
                         key=f"edit_meal_category_{selected_meal_id}_{summary_date}",
                         format_func=tr_category,
                     )
@@ -6619,6 +6712,32 @@ elif selected_page == t["t4"]:
                                 r.get("_recipe_label") or r.get("name") or "Recipe",
                             )
 
+                            _photo_label = t["recipe_replace_photo"] if r.get("image_url") else t["recipe_add_photo"]
+                            _new_recipe_photo = st.file_uploader(
+                                _photo_label,
+                                type=["jpg", "jpeg", "png", "webp"],
+                                key=f"existing_recipe_photo_{r.get('id')}",
+                            )
+                            if _new_recipe_photo is not None:
+                                if st.button(
+                                    t["recipe_photo_save"],
+                                    key=f"save_existing_recipe_photo_{r.get('id')}",
+                                    use_container_width=True,
+                                ):
+                                    try:
+                                        _new_url = upload_recipe_image(_new_recipe_photo)
+                                        (
+                                            supabase.table(RECIPE_LIBRARY_TABLE)
+                                            .update({"image_url": _new_url})
+                                            .eq("id", r["id"])
+                                            .eq("user_id", user_id)
+                                            .execute()
+                                        )
+                                        st.success(t["recipe_photo_saved"])
+                                        st.rerun()
+                                    except Exception as exc:
+                                        st.error(t["recipe_photo_error"].format(error=exc))
+
                             st.markdown(f"### {html.escape(str(r['_recipe_label']))}")
 
                             _share_label = (
@@ -6825,9 +6944,10 @@ elif selected_page == t["t4"]:
                 format_func=tr_meal_type,
             )
         with rc2:
+            _recipe_categories_available = MEAL_CATEGORIES if user_office_lunch_enabled else [c for c in MEAL_CATEGORIES if c != "Lavoro"]
             recipe_category = st.selectbox(
                 t["category_label"],
-                MEAL_CATEGORIES,
+                _recipe_categories_available,
                 index=0,
                 key=f"recipe_category_{v}",
                 help=t["recipe_category_help"],
