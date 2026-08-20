@@ -3553,7 +3553,21 @@ user_protein_goal_enabled = bool(u_meta.get("protein_goal_enabled", False))
 user_protein_goal_g = _safe_float(u_meta.get("protein_goal_g"))
 
 # ZERO is a personality/theme preference only: nutrition logic stays identical.
-user_zero_mode_enabled = bool(u_meta.get("zero_mode_enabled", False))
+# The Profile setting is the authoritative default for a new session.
+_preferred_app_mode = str(
+    u_meta.get("preferred_app_mode") or ""
+).strip().lower()
+
+if _preferred_app_mode == "zero":
+    user_zero_mode_enabled = True
+elif _preferred_app_mode == "standard":
+    user_zero_mode_enabled = False
+else:
+    # Backward compatibility for accounts created before this preference existed.
+    user_zero_mode_enabled = bool(
+        u_meta.get("zero_mode_enabled", False)
+    )
+
 if "zero_mode_enabled" not in st.session_state:
     st.session_state["zero_mode_enabled"] = user_zero_mode_enabled
 if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in u_meta:
@@ -6066,6 +6080,78 @@ with st.sidebar:
         ux = dict(ux)
         ux.update(_zc.get("ux", {}))
 
+    _display_mode_hint_i18n = {
+        "Italiano": {
+            "standard": "Meglio in light mode",
+            "zero": "Meglio in Dark Mode",
+        },
+        "English": {
+            "standard": "Best in light mode",
+            "zero": "Best in Dark Mode",
+        },
+        "Nederlands": {
+            "standard": "Het beste in light mode",
+            "zero": "Het beste in Dark Mode",
+        },
+        "Français": {
+            "standard": "Mieux en mode clair",
+            "zero": "Mieux en Dark Mode",
+        },
+    }
+
+    _display_mode_hint = _display_mode_hint_i18n.get(
+        current_lang,
+        _display_mode_hint_i18n["Italiano"],
+    )["zero" if is_zero_mode() else "standard"]
+
+    st.markdown(
+        f"""
+        <style>
+        .sanosync-display-mode-hint {{
+            position:fixed;
+            top:.78rem;
+            right:5.2rem;
+            z-index:999990;
+            padding:.34rem .62rem;
+            border-radius:999px;
+            font-family:'Kanit',sans-serif;
+            font-size:.72rem;
+            font-weight:700;
+            line-height:1;
+            white-space:nowrap;
+            pointer-events:none;
+            backdrop-filter:blur(10px);
+        }}
+
+        .sanosync-display-mode-hint.standard {{
+            color:#6C7180;
+            background:rgba(255,255,255,.82);
+            border:1px solid rgba(25,46,73,.11);
+        }}
+
+        .sanosync-display-mode-hint.zero {{
+            color:#EAEAEA;
+            background:rgba(7,7,7,.84);
+            border:1px solid rgba(225,6,0,.42);
+        }}
+
+        @media (max-width:700px) {{
+            .sanosync-display-mode-hint {{
+                top:.72rem;
+                right:4rem;
+                font-size:.62rem;
+                padding:.28rem .46rem;
+            }}
+        }}
+        </style>
+
+        <div class="sanosync-display-mode-hint {'zero' if is_zero_mode() else 'standard'}">
+            {html.escape(_display_mode_hint)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.markdown(
         f'<div style="text-align:center;color:#FFB4B4;font-weight:900;font-size:1rem;letter-spacing:.01em;margin:-.15rem 0 .55rem 0;">{html.escape(t["slogan"])}</div>',
         unsafe_allow_html=True,
@@ -6304,6 +6390,11 @@ SETTINGS_I18N = {
         "protein_no": "No",
         "protein_yes": "Sì",
         "protein_g": "Goal proteico giornaliero (g)",
+        "mode_title": "🎨 Modalità predefinita",
+        "mode_label": "Quale versione vuoi trovare attiva quando accedi?",
+        "mode_standard": "SanoSync Standard",
+        "mode_zero": "SanoSync ZERO MODE",
+        "mode_help": "La scelta viene salvata nel profilo. Il toggle nella sidebar può comunque cambiare modalità durante la sessione.",
     },
     "English": {
         "title": "👤 Profile",
@@ -6332,6 +6423,11 @@ SETTINGS_I18N = {
         "protein_no": "No",
         "protein_yes": "Yes",
         "protein_g": "Daily protein goal (g)",
+        "mode_title": "🎨 Default mode",
+        "mode_label": "Which version should be active when you sign in?",
+        "mode_standard": "SanoSync Standard",
+        "mode_zero": "SanoSync ZERO MODE",
+        "mode_help": "This choice is saved to your profile. You can still switch modes during a session from the sidebar toggle.",
     },
     "Nederlands": {
         "title": "👤 Profiel",
@@ -6360,6 +6456,11 @@ SETTINGS_I18N = {
         "protein_no": "Nee",
         "protein_yes": "Ja",
         "protein_g": "Dagelijks eiwitdoel (g)",
+        "mode_title": "🎨 Standaardmodus",
+        "mode_label": "Welke versie moet actief zijn wanneer je inlogt?",
+        "mode_standard": "SanoSync Standard",
+        "mode_zero": "SanoSync ZERO MODE",
+        "mode_help": "Deze keuze wordt in je profiel opgeslagen. Tijdens een sessie kun je nog steeds wisselen via de toggle in de zijbalk.",
     },
     "Français": {
         "title": "👤 Profil",
@@ -6388,6 +6489,11 @@ SETTINGS_I18N = {
         "protein_no": "Non",
         "protein_yes": "Oui",
         "protein_g": "Objectif quotidien de protéines (g)",
+        "mode_title": "🎨 Mode par défaut",
+        "mode_label": "Quelle version doit être active lorsque vous vous connectez ?",
+        "mode_standard": "SanoSync Standard",
+        "mode_zero": "SanoSync ZERO MODE",
+        "mode_help": "Ce choix est enregistré dans votre profil. Le bouton de la barre latérale permet toujours de changer de mode pendant la session.",
     },
 }
 
@@ -6532,6 +6638,16 @@ def render_personal_settings_page():
     )
 
     existing_office_lunch_enabled = bool(metadata.get("office_lunch_enabled", True))
+
+    existing_preferred_app_mode = str(
+        metadata.get("preferred_app_mode")
+        or ("zero" if is_zero_mode() else "standard")
+    ).strip().lower()
+    if existing_preferred_app_mode not in {"standard", "zero"}:
+        existing_preferred_app_mode = (
+            "zero" if is_zero_mode() else "standard"
+        )
+
     existing_protein_enabled = bool(metadata.get("protein_goal_enabled", False))
     existing_protein_g = _safe_float(metadata.get("protein_goal_g"))
     if (
@@ -6666,6 +6782,27 @@ def render_personal_settings_page():
         new_office_lunch_enabled = new_office_choice == si["office_yes"]
 
     # ------------------------------------------------------------------
+    # MODALITÀ PREDEFINITA
+    # ------------------------------------------------------------------
+    with st.container(border=True):
+        st.markdown(f"### {si['mode_title']}")
+
+        _mode_options = ["standard", "zero"]
+        new_preferred_app_mode = st.radio(
+            si["mode_label"],
+            _mode_options,
+            index=_mode_options.index(existing_preferred_app_mode),
+            horizontal=True,
+            format_func=lambda mode: (
+                si["mode_zero"]
+                if mode == "zero"
+                else si["mode_standard"]
+            ),
+            help=si["mode_help"],
+            key="settings_preferred_app_mode",
+        )
+
+    # ------------------------------------------------------------------
     # GOAL PROTEICO — SEMPRE ULTIMA SEZIONE
     # ------------------------------------------------------------------
     with st.container(border=True):
@@ -6742,6 +6879,11 @@ def render_personal_settings_page():
                 "deficit_target_kcal": int(new_deficit_kcal),
                 "deficit_plan": plan_to_save,
                 "preferred_language": new_language,
+                "preferred_app_mode": new_preferred_app_mode,
+                # Keep the legacy field aligned for older code paths.
+                "zero_mode_enabled": (
+                    new_preferred_app_mode == "zero"
+                ),
                 "office_lunch_enabled": bool(new_office_lunch_enabled),
                 "protein_goal_enabled": bool(new_protein_enabled),
                 "protein_goal_g": (
@@ -6766,6 +6908,13 @@ def render_personal_settings_page():
 
             if getattr(response, "user", None):
                 st.session_state["user"] = response.user
+
+            # Apply the chosen default immediately as well.
+            st.session_state["zero_mode_enabled"] = (
+                new_preferred_app_mode == "zero"
+            )
+            # Recreate the sidebar toggle on rerun using the selected mode.
+            st.session_state.pop("zero_mode_sidebar_toggle", None)
 
             st.session_state["lang_selector"] = new_language
             st.session_state["login_lang_selector"] = new_language
