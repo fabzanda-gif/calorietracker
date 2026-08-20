@@ -6563,14 +6563,14 @@ if selected_page == t["t1"]:
         # but remove the visible Notes widget from Tab 1.
         meal_notes = ""
 
-        # Always visible: this is a primary AI feature, not an optional dropdown.
-        st.markdown(_mai["title"])
-        st.caption(_mai["caption"])
-
+        # Always visible: AI is a primary input method.
+        # The title is the field label itself (same size as the other form labels),
+        # while the explanatory copy lives behind Streamlit's built-in ? tooltip.
         _tab1_ai_text = st.text_area(
-            _mai["ingredients"],
+            _mai["title"],
             key=f"tab1_ai_ingredient_text_{v}",
             placeholder=_mai["placeholder"],
+            help=_mai["caption"],
             height=90,
         )
 
@@ -7910,13 +7910,13 @@ elif selected_page == t["t4"]:
                 "Se li inserisci, il generatore si comporta automaticamente come uno Svuotafrigo. "
                 "Indica anche le quantità quando le conosci."
             ),
-            "ingredient_ai_label": "Ingredienti della ricetta",
+            "ingredient_ai_label": "✨ **SanoSync AI · Calcola da ingredienti**",
             "ingredient_ai_placeholder": "Es. 250g di pollo, 120g di riso, 200g di zucchine, 10g di olio",
             "ingredient_ai_help": (
-                "Scrivi tutti gli ingredienti in un unico campo. L'AI stimerà automaticamente "
-                "kcal e macronutrienti e compilerà la tabella."
+                "Scrivi liberamente gli ingredienti e le quantità. SanoSync AI riconosce gli alimenti "
+                "e stima automaticamente kcal e macronutrienti, compilando la tabella."
             ),
-            "ingredient_ai_button": "✨ Analizza e compila ingredienti",
+            "ingredient_ai_button": "✨ Analizza con SanoSync AI",
             "ingredient_ai_spinner": "Sto analizzando gli ingredienti…",
             "ingredient_ai_done": "✅ Ingredienti compilati automaticamente.",
             "ingredient_ai_empty": "Inserisci almeno un ingrediente.",
@@ -7936,13 +7936,13 @@ elif selected_page == t["t4"]:
                 "If you enter ingredients, the generator automatically works as a fridge clear-out. "
                 "Add quantities when you know them."
             ),
-            "ingredient_ai_label": "Recipe ingredients",
+            "ingredient_ai_label": "✨ **SanoSync AI · Calculate from ingredients**",
             "ingredient_ai_placeholder": "E.g. 250g chicken, 120g rice, 200g courgette, 10g oil",
             "ingredient_ai_help": (
-                "Write all ingredients in one field. AI will estimate calories and macros "
-                "and fill the ingredient table automatically."
+                "Enter ingredients and quantities freely. SanoSync AI recognizes the foods "
+                "and estimates calories and macros, then fills the table automatically."
             ),
-            "ingredient_ai_button": "✨ Analyze and fill ingredients",
+            "ingredient_ai_button": "✨ Analyze with SanoSync AI",
             "ingredient_ai_spinner": "Analyzing ingredients…",
             "ingredient_ai_done": "✅ Ingredients filled automatically.",
             "ingredient_ai_empty": "Enter at least one ingredient.",
@@ -7962,13 +7962,13 @@ elif selected_page == t["t4"]:
                 "Als je ingrediënten invoert, werkt de generator automatisch als koelkast-opmaker. "
                 "Voeg hoeveelheden toe als je die weet."
             ),
-            "ingredient_ai_label": "Ingrediënten van het recept",
+            "ingredient_ai_label": "✨ **SanoSync AI · Bereken uit ingrediënten**",
             "ingredient_ai_placeholder": "Bijv. 250g kip, 120g rijst, 200g courgette, 10g olie",
             "ingredient_ai_help": (
-                "Schrijf alle ingrediënten in één veld. AI schat calorieën en macro's "
-                "en vult de tabel automatisch."
+                "Voer ingrediënten en hoeveelheden vrij in. SanoSync AI herkent de voedingsmiddelen "
+                "en schat calorieën en macro's, waarna de tabel automatisch wordt ingevuld."
             ),
-            "ingredient_ai_button": "✨ Ingrediënten analyseren en invullen",
+            "ingredient_ai_button": "✨ Analyseer met SanoSync AI",
             "ingredient_ai_spinner": "Ingrediënten analyseren…",
             "ingredient_ai_done": "✅ Ingrediënten automatisch ingevuld.",
             "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
@@ -7988,13 +7988,13 @@ elif selected_page == t["t4"]:
                 "Si vous renseignez des ingrédients, le générateur fonctionne automatiquement en mode vide-frigo. "
                 "Ajoutez les quantités lorsque vous les connaissez."
             ),
-            "ingredient_ai_label": "Ingrédients de la recette",
+            "ingredient_ai_label": "✨ **SanoSync AI · Calculer à partir des ingrédients**",
             "ingredient_ai_placeholder": "Ex. 250g de poulet, 120g de riz, 200g de courgettes, 10g d'huile",
             "ingredient_ai_help": (
-                "Écrivez tous les ingrédients dans un seul champ. L'IA estimera calories et macros "
-                "et remplira automatiquement le tableau."
+                "Saisissez librement les ingrédients et les quantités. SanoSync AI reconnaît les aliments "
+                "et estime calories et macros, puis remplit automatiquement le tableau."
             ),
-            "ingredient_ai_button": "✨ Analyser et remplir les ingrédients",
+            "ingredient_ai_button": "✨ Analyser avec SanoSync AI",
             "ingredient_ai_spinner": "Analyse des ingrédients…",
             "ingredient_ai_done": "✅ Ingrédients remplis automatiquement.",
             "ingredient_ai_empty": "Saisissez au moins un ingrédient.",
@@ -8223,9 +8223,7 @@ elif selected_page == t["t4"]:
         )
         st.session_state["_show_ai_recipe_loaded_message"] = True
 
-    with st.container(border=True):
-        st.markdown(_rcu["builder"])
-
+    with st.expander(_rcu["builder"], expanded=True):
         _creation_mode = st.radio(
             _rcu["creation_mode"],
             ["known", "ai"],
@@ -8585,28 +8583,58 @@ elif selected_page == t["t4"]:
                             1,
                         ),
                     })
-                st.dataframe(
-                    pd.DataFrame(rows),
-                    use_container_width=True,
-                    hide_index=True,
+                # Interactive ingredient table.
+                # The old numeric # column + removal dropdown are replaced
+                # by a trash button directly on each ingredient row.
+                _hdr = st.columns(
+                    [0.55, 2.15, 1.25, 1.0, 1.0, 1.0, 1.0],
+                    gap="small",
                 )
+                _headers = [
+                    "",
+                    t["ingredient_col"],
+                    "Quantità (g)" if current_lang == "Italiano" else (
+                        "Quantity (g)" if current_lang == "English" else (
+                            "Hoeveelheid (g)" if current_lang == "Nederlands"
+                            else "Quantité (g)"
+                        )
+                    ),
+                    "Kcal",
+                    "Pro",
+                    "Carbs",
+                    "Fat",
+                ]
+                for _col, _label in zip(_hdr, _headers):
+                    _col.markdown(
+                        f"<div style='font-weight:600;color:#7b7e89;"
+                        f"padding:0.15rem 0 0.45rem 0'>{_label}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-                remove_idx = st.selectbox(
-                    t["remove_ingredient"],
-                    [""] + [
-                        str(i + 1)
-                        for i in range(len(ingredients))
-                    ],
-                    key=f"remove_ingredient_{v}",
-                )
-                if remove_idx and st.button(
-                    t["remove_ingredient_btn"],
-                    key=f"remove_ingredient_btn_{v}",
-                ):
-                    del st.session_state[
-                        "recipe_builder_ingredients"
-                    ][int(remove_idx) - 1]
-                    st.rerun()
+                for _idx, _row in enumerate(rows):
+                    _cols = st.columns(
+                        [0.55, 2.15, 1.25, 1.0, 1.0, 1.0, 1.0],
+                        gap="small",
+                        vertical_alignment="center",
+                    )
+
+                    if _cols[0].button(
+                        "🗑️",
+                        key=f"delete_recipe_ingredient_{v}_{_idx}",
+                        help=t["remove_ingredient"],
+                        use_container_width=True,
+                    ):
+                        del st.session_state[
+                            "recipe_builder_ingredients"
+                        ][_idx]
+                        st.rerun()
+
+                    _cols[1].write(_row.get(t["ingredient_col"], ""))
+                    _cols[2].write(_row.get("Quantità (g)", _row.get("Quantity (g)", _row.get("Hoeveelheid (g)", _row.get("Quantité (g)", "")))))
+                    _cols[3].write(_row.get("Kcal", ""))
+                    _cols[4].write(_row.get("Pro", ""))
+                    _cols[5].write(_row.get("Carbs", ""))
+                    _cols[6].write(_row.get("Fat", ""))
 
                 total_weight, totals, per100 = (
                     calculate_recipe_totals(ingredients)
