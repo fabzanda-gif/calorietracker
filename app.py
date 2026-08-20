@@ -6073,31 +6073,62 @@ def render_ai_ingredient_header(
     error_label,
 ):
     """
-    Compact inline header:
-    bold title + one tiny microphone button immediately after it.
-    The explanatory text is available as hover-help on the mic button.
+    Spacious, vertically centered AI header card.
+    Prevents the title/microphone row from looking cramped or clipped.
     """
-    _title_col, _mic_col, _spacer = st.columns(
-        [4.7, 0.42, 6.9],
-        gap="small",
-        vertical_alignment="center",
+    st.markdown(
+        """
+        <style>
+        div[class*="st-key-ai_header_wrap_"] {
+            border: 1px solid rgba(128,128,128,.22);
+            border-radius: 18px;
+            padding: 14px 16px 12px 16px;
+            margin: 4px 0 10px 0;
+            background: rgba(255,255,255,.16);
+        }
+        div[class*="st-key-ai_header_wrap_"] [data-testid="stMarkdownContainer"] p {
+            margin: 0 !important;
+        }
+        div[class*="st-key-ai_header_wrap_"] button {
+            min-height: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            width: 44px !important;
+            padding: 0 !important;
+            border-radius: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
-    with _title_col:
-        st.markdown(f"**{title}**")
-
-    with _mic_col:
-        render_subtle_voice_input(
-            widget_key=widget_key,
-            target_key=target_key,
-            language=language,
-            error_label=error_label,
+    with st.container(key=f"ai_header_wrap_{widget_key}"):
+        _title_col, _mic_col = st.columns(
+            [8.8, 1.2],
+            gap="small",
+            vertical_alignment="center",
         )
 
-    # Add the explanatory text as a subtle caption only while the recorder
-    # is open, otherwise keep the form visually clean.
-    if st.session_state.get(f"{widget_key}_open", False):
-        st.caption(help_text)
+        with _title_col:
+            st.markdown(
+                f"<div style='font-weight:800;line-height:1.25;"
+                f"font-size:1rem;padding:4px 0'>{title}</div>",
+                unsafe_allow_html=True,
+            )
+
+        with _mic_col:
+            render_subtle_voice_input(
+                widget_key=widget_key,
+                target_key=target_key,
+                language=language,
+                error_label=error_label,
+            )
+
+        if st.session_state.get(f"{widget_key}_open", False):
+            st.caption(help_text)
 
 
 
