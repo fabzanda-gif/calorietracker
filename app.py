@@ -5934,6 +5934,144 @@ Return ONLY valid JSON with this exact structure:
 
 
 
+
+def resolve_groq_whisper_model():
+    """Pick an audio transcription model available to this Groq API key."""
+    available = set(get_groq_available_model_ids())
+    preferred = [
+        "whisper-large-v3-turbo",
+        "whisper-large-v3",
+        "distil-whisper-large-v3-en",
+    ]
+    for model_id in preferred:
+        if model_id in available:
+            return model_id
+
+    whisper_models = [
+        m for m in sorted(available)
+        if "whisper" in m.lower()
+    ]
+    if whisper_models:
+        return whisper_models[0]
+
+    raise RuntimeError(
+        "Nessun modello Whisper disponibile per questa API key Groq."
+    )
+
+
+def transcribe_ingredient_audio_with_groq(audio_file, language="Italiano"):
+    """
+    Transcribe a Streamlit st.audio_input WAV recording through Groq Whisper.
+    The returned text is then used by the existing SanoSync ingredient parser.
+    """
+    if audio_file is None:
+        return ""
+
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "GROQ_API_KEY non configurata nei Secrets di Streamlit."
+        )
+
+    audio_bytes = audio_file.getvalue()
+    if not audio_bytes:
+        raise RuntimeError("La registrazione audio è vuota.")
+
+    lang_code = {
+        "Italiano": "it",
+        "English": "en",
+        "Nederlands": "nl",
+        "Français": "fr",
+    }.get(language)
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+
+    kwargs = {
+        "model": resolve_groq_whisper_model(),
+        "file": ("ingredients.wav", audio_bytes, "audio/wav"),
+        "response_format": "text",
+        "temperature": 0,
+    }
+    if lang_code:
+        kwargs["language"] = lang_code
+
+    result = client.audio.transcriptions.create(**kwargs)
+    if isinstance(result, str):
+        return result.strip()
+    return str(getattr(result, "text", "") or "").strip()
+
+
+def render_subtle_voice_input(*, widget_key, target_key, language, error_label):
+    """
+    Compact microphone control for SanoSync AI ingredient text areas.
+
+    Streamlit's audio recorder is kept deliberately tiny (56 px wide) and
+    visually aligned at the right edge of the ingredient input. When recording
+    completes, Whisper transcription is copied into the text-area session key.
+    """
+    st.markdown(
+        """
+        <style>
+        div[class*="st-key-sanosync_voice_"] {
+            width: 56px !important;
+            max-width: 56px !important;
+            margin-left: auto !important;
+            margin-top: -74px !important;
+            margin-right: 14px !important;
+            margin-bottom: 28px !important;
+            position: relative !important;
+            z-index: 5 !important;
+        }
+        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] {
+            min-width: 52px !important;
+            width: 52px !important;
+        }
+        div[class*="st-key-sanosync_voice_"] [data-testid="stAudioInput"] > div {
+            padding: 0 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    audio = st.audio_input(
+        "Microphone",
+        sample_rate=16000,
+        key=widget_key,
+        label_visibility="collapsed",
+        width=56,
+    )
+
+    if audio is not None:
+        audio_bytes = audio.getvalue()
+        audio_sig = hashlib.sha256(audio_bytes).hexdigest()
+        sig_key = f"{widget_key}_processed_sig"
+
+        if st.session_state.get(sig_key) != audio_sig:
+            try:
+                with st.spinner("🎙️"):
+                    transcript = transcribe_ingredient_audio_with_groq(
+                        audio,
+                        language,
+                    )
+                if transcript:
+                    existing = str(
+                        st.session_state.get(target_key, "") or ""
+                    ).strip()
+                    st.session_state[target_key] = (
+                        f"{existing}, {transcript}"
+                        if existing
+                        else transcript
+                    )
+                    st.session_state[sig_key] = audio_sig
+                    st.rerun()
+            except Exception as exc:
+                st.error(error_label.format(error=exc))
+
+
 def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
     """
     Converts free text such as:
@@ -6575,6 +6713,7 @@ if selected_page == t["t1"]:
                 "use": "↗️ Usa questi valori",
                 "used": "Valori AI caricati nel pasto.",
                 "error": "Errore nell'analisi: {error}",
+                "voice_error": "Impossibile trascrivere l’audio: {error}",
             },
             "English": {
                 "title": "✨ **SanoSync AI · Calculate from ingredients**",
@@ -6589,6 +6728,7 @@ if selected_page == t["t1"]:
                 "use": "↗️ Use these values",
                 "used": "AI values loaded into the meal.",
                 "error": "Analysis error: {error}",
+                "voice_error": "Could not transcribe the audio: {error}",
             },
             "Nederlands": {
                 "title": "✨ **SanoSync AI · Bereken uit ingrediënten**",
@@ -6603,6 +6743,7 @@ if selected_page == t["t1"]:
                 "use": "↗️ Gebruik deze waarden",
                 "used": "AI-waarden in de maaltijd geladen.",
                 "error": "Analysefout: {error}",
+                "voice_error": "Kon de audio niet transcriberen: {error}",
             },
             "Français": {
                 "title": "✨ **SanoSync AI · Calculer à partir des ingrédients**",
@@ -6617,6 +6758,7 @@ if selected_page == t["t1"]:
                 "use": "↗️ Utiliser ces valeurs",
                 "used": "Valeurs IA chargées dans le repas.",
                 "error": "Erreur d'analyse : {error}",
+                "voice_error": "Impossible de transcrire l’audio : {error}",
             },
         }
         _mai = _meal_ai_i18n.get(
@@ -6631,12 +6773,22 @@ if selected_page == t["t1"]:
         # Always visible: AI is a primary input method.
         # The title is the field label itself (same size as the other form labels),
         # while the explanatory copy lives behind Streamlit's built-in ? tooltip.
+        _tab1_ai_text_key = f"tab1_ai_ingredient_text_{v}"
         _tab1_ai_text = st.text_area(
             _mai["title"],
-            key=f"tab1_ai_ingredient_text_{v}",
+            key=_tab1_ai_text_key,
             placeholder=_mai["placeholder"],
             help=_mai["caption"],
             height=90,
+        )
+        render_subtle_voice_input(
+            widget_key=f"sanosync_voice_tab1_{v}",
+            target_key=_tab1_ai_text_key,
+            language=current_lang,
+            error_label=_mai["voice_error"],
+        )
+        _tab1_ai_text = str(
+            st.session_state.get(_tab1_ai_text_key, "") or ""
         )
 
         _tab1_ai_portions = st.number_input(
@@ -8032,7 +8184,8 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Sto analizzando gli ingredienti…",
             "ingredient_ai_done": "✅ Ingredienti compilati automaticamente.",
             "ingredient_ai_empty": "Inserisci almeno un ingrediente.",
-            "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}","creation_mode":"Come vuoi creare la ricetta?","mode_known":"🍳 So già cosa cucinare","mode_ai":"✨ Voglio un aiuto dall’AI","mode_known_help":"Scrivi gli ingredienti che hai deciso di usare: SanoSync calcolerà automaticamente kcal e macro.","mode_ai_help":"Descrivi i tuoi obiettivi e lascia che SanoSync proponga una ricetta completa.","ai_starting_ingredients":"✨ Ingredienti di partenza per l’AI (opzionale)","ai_starting_help":"Se li inserisci, l’AI li userà come base (modalità svuotafrigo) e aggiungerà solo ciò che serve.","ai_generated_loaded":"✅ Ricetta AI caricata in modifica. Controlla ingredienti e valori prima di salvarla.",
+            "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}",
+            "ingredient_voice_error": "Impossibile trascrivere l’audio: {error}","creation_mode":"Come vuoi creare la ricetta?","mode_known":"🍳 So già cosa cucinare","mode_ai":"✨ Voglio un aiuto dall’AI","mode_known_help":"Scrivi gli ingredienti che hai deciso di usare: SanoSync calcolerà automaticamente kcal e macro.","mode_ai_help":"Descrivi i tuoi obiettivi e lascia che SanoSync proponga una ricetta completa.","ai_starting_ingredients":"✨ Ingredienti di partenza per l’AI (opzionale)","ai_starting_help":"Se li inserisci, l’AI li userà come base (modalità svuotafrigo) e aggiungerà solo ciò che serve.","ai_generated_loaded":"✅ Ricetta AI caricata in modifica. Controlla ingredienti e valori prima di salvarla.",
         },
         "English": {
             "my": "👤 My recipes",
@@ -8058,7 +8211,8 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Analyzing ingredients…",
             "ingredient_ai_done": "✅ Ingredients filled automatically.",
             "ingredient_ai_empty": "Enter at least one ingredient.",
-            "ingredient_ai_error": "Ingredient analysis error: {error}","creation_mode":"How do you want to create the recipe?","mode_known":"🍳 I already know what to cook","mode_ai":"✨ I want AI help","mode_known_help":"Enter the ingredients you have chosen: SanoSync will calculate calories and macros automatically.","mode_ai_help":"Set your targets and let SanoSync propose a complete recipe.","ai_starting_ingredients":"✨ Starting ingredients for AI (optional)","ai_starting_help":"If provided, AI will use them as the base (fridge-clear-out mode) and add only what is needed.","ai_generated_loaded":"✅ AI recipe loaded for editing. Review ingredients and values before saving.",
+            "ingredient_ai_error": "Ingredient analysis error: {error}",
+            "ingredient_voice_error": "Could not transcribe the audio: {error}","creation_mode":"How do you want to create the recipe?","mode_known":"🍳 I already know what to cook","mode_ai":"✨ I want AI help","mode_known_help":"Enter the ingredients you have chosen: SanoSync will calculate calories and macros automatically.","mode_ai_help":"Set your targets and let SanoSync propose a complete recipe.","ai_starting_ingredients":"✨ Starting ingredients for AI (optional)","ai_starting_help":"If provided, AI will use them as the base (fridge-clear-out mode) and add only what is needed.","ai_generated_loaded":"✅ AI recipe loaded for editing. Review ingredients and values before saving.",
         },
         "Nederlands": {
             "my": "👤 Mijn recepten",
@@ -8084,7 +8238,8 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Ingrediënten analyseren…",
             "ingredient_ai_done": "✅ Ingrediënten automatisch ingevuld.",
             "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
-            "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ AI-recept geladen om te bewerken. Controleer ingrediënten en waarden voor je opslaat.",
+            "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}",
+            "ingredient_voice_error": "Kon de audio niet transcriberen: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ AI-recept geladen om te bewerken. Controleer ingrediënten en waarden voor je opslaat.",
         },
         "Français": {
             "my": "👤 Mes recettes",
@@ -8110,7 +8265,8 @@ elif selected_page == t["t4"]:
             "ingredient_ai_spinner": "Analyse des ingrédients…",
             "ingredient_ai_done": "✅ Ingrédients remplis automatiquement.",
             "ingredient_ai_empty": "Saisissez au moins un ingrédient.",
-            "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}","creation_mode":"Comment souhaitez-vous créer la recette ?","mode_known":"🍳 Je sais déjà quoi cuisiner","mode_ai":"✨ Je veux l’aide de l’IA","mode_known_help":"Saisissez les ingrédients choisis : SanoSync calculera automatiquement calories et macros.","mode_ai_help":"Définissez vos objectifs et laissez SanoSync proposer une recette complète.","ai_starting_ingredients":"✨ Ingrédients de départ pour l’IA (optionnel)","ai_starting_help":"Si vous les indiquez, l’IA les utilisera comme base (mode vide-frigo) et n’ajoutera que le nécessaire.","ai_generated_loaded":"✅ Recette IA chargée en modification. Vérifiez les ingrédients et valeurs avant l’enregistrement.",
+            "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}",
+            "ingredient_voice_error": "Impossible de transcrire l’audio : {error}","creation_mode":"Comment souhaitez-vous créer la recette ?","mode_known":"🍳 Je sais déjà quoi cuisiner","mode_ai":"✨ Je veux l’aide de l’IA","mode_known_help":"Saisissez les ingrédients choisis : SanoSync calculera automatiquement calories et macros.","mode_ai_help":"Définissez vos objectifs et laissez SanoSync proposer une recette complète.","ai_starting_ingredients":"✨ Ingrédients de départ pour l’IA (optionnel)","ai_starting_help":"Si vous les indiquez, l’IA les utilisera comme base (mode vide-frigo) et n’ajoutera que le nécessaire.","ai_generated_loaded":"✅ Recette IA chargée en modification. Vérifiez les ingrédients et valeurs avant l’enregistrement.",
         },
     }
     _rcu = _recipe_compact_i18n.get(
@@ -8721,12 +8877,22 @@ elif selected_page == t["t4"]:
                 help=t["recipe_servings_help"],
             )
 
+            _recipe_ai_text_key = f"recipe_ai_ingredient_text_{v}"
             _ingredient_free_text = st.text_area(
                 _rcu["ingredient_ai_label"],
-                key=f"recipe_ai_ingredient_text_{v}",
+                key=_recipe_ai_text_key,
                 placeholder=_rcu["ingredient_ai_placeholder"],
                 help=_rcu["ingredient_ai_help"],
                 height=110,
+            )
+            render_subtle_voice_input(
+                widget_key=f"sanosync_voice_recipe_{v}",
+                target_key=_recipe_ai_text_key,
+                language=current_lang,
+                error_label=_rcu["ingredient_voice_error"],
+            )
+            _ingredient_free_text = str(
+                st.session_state.get(_recipe_ai_text_key, "") or ""
             )
 
             if st.button(
