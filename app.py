@@ -665,63 +665,68 @@ def calculate_age(birth_date_value, on_date=None):
 
 
 DEFICIT_PRESETS = {
-    "custom": 0,
+    "maintenance": 0,
     "slow": 250,
     "medium": 500,
     "fast": 750,
+    "custom": 0,
 }
 
 DEFICIT_PRESET_LABELS = {
     "Italiano": {
+        "maintenance": "Mantenimento peso · 0 kcal",
         "custom": "Custom",
         "slow": "Lento · 250 kcal",
         "medium": "Medio · 500 kcal",
         "fast": "Veloce · 750 kcal",
         "title": "🎯 Obiettivo calorico",
-        "speed": "Velocità di dimagrimento",
+        "speed": "Obiettivo peso",
         "field": "Deficit kcal di base",
         "help": (
-            "Il preset imposta automaticamente il deficit. "
-            "Il valore sotto resta sempre modificabile manualmente."
+            "Scegli Mantenimento peso per usare un deficit di 0 kcal, "
+            "oppure un preset di dimagrimento. Il valore sotto resta sempre modificabile manualmente."
         ),
     },
     "English": {
+        "maintenance": "Weight maintenance · 0 kcal",
         "custom": "Custom",
         "slow": "Slow · 250 kcal",
         "medium": "Medium · 500 kcal",
         "fast": "Fast · 750 kcal",
         "title": "🎯 Calorie target",
-        "speed": "Weight-loss speed",
+        "speed": "Weight goal",
         "field": "Base calorie deficit",
         "help": (
-            "The preset automatically sets the deficit. "
-            "You can always edit the value below manually."
+            "Choose Weight maintenance for a 0 kcal deficit, "
+            "or select a weight-loss preset. You can always edit the value below manually."
         ),
     },
     "Nederlands": {
+        "maintenance": "Gewicht behouden · 0 kcal",
         "custom": "Aangepast",
         "slow": "Langzaam · 250 kcal",
         "medium": "Gemiddeld · 500 kcal",
         "fast": "Snel · 750 kcal",
         "title": "🎯 Caloriedoel",
-        "speed": "Snelheid van gewichtsverlies",
+        "speed": "Gewichtsdoel",
         "field": "Basis calorietekort",
         "help": (
-            "De voorinstelling vult het tekort automatisch in. "
-            "Je kunt de waarde hieronder altijd handmatig wijzigen."
+            "Kies Gewicht behouden voor een tekort van 0 kcal, "
+            "of selecteer een afvalpreset. Je kunt de waarde hieronder altijd handmatig wijzigen."
         ),
     },
     "Français": {
+        "maintenance": "Maintien du poids · 0 kcal",
         "custom": "Personnalisé",
         "slow": "Lent · 250 kcal",
         "medium": "Moyen · 500 kcal",
         "fast": "Rapide · 750 kcal",
         "title": "🎯 Objectif calorique",
-        "speed": "Vitesse de perte de poids",
+        "speed": "Objectif de poids",
         "field": "Déficit calorique de base",
         "help": (
-            "Le préréglage renseigne automatiquement le déficit. "
-            "Vous pouvez toujours modifier la valeur ci-dessous."
+            "Choisissez Maintien du poids pour un déficit de 0 kcal, "
+            "ou un préréglage de perte de poids. Vous pouvez toujours modifier la valeur ci-dessous."
         ),
     },
 }
@@ -745,6 +750,15 @@ def normalize_deficit_plan(value):
     """Compatibilità con valori salvati dalle versioni precedenti."""
     raw = str(value or "").strip().casefold()
 
+    if raw in {
+        "maintenance",
+        "mantenimento",
+        "mantenimento peso",
+        "weight maintenance",
+        "gewicht behouden",
+        "maintien du poids",
+    }:
+        return "maintenance"
     if raw in {"custom", "aangepast", "personnalisé", "personalizzato"}:
         return "custom"
     if raw in {"slow", "lento", "langzaam", "lent"} or "250" in raw:
@@ -762,7 +776,12 @@ def deficit_preset_from_value(value):
     except (TypeError, ValueError):
         return "custom"
 
+    if value == 0:
+        return "maintenance"
+
     for key, kcal in DEFICIT_PRESETS.items():
+        if key == "custom":
+            continue
         if kcal == value:
             return key
     return "custom"
@@ -2885,7 +2904,7 @@ def show_login_page():
         deficit_ui = DEFICIT_PRESET_LABELS[_ui_language()]
 
         if "signup_deficit_plan" not in st.session_state:
-            st.session_state["signup_deficit_plan"] = "custom"
+            st.session_state["signup_deficit_plan"] = "maintenance"
         else:
             st.session_state["signup_deficit_plan"] = normalize_deficit_plan(
                 st.session_state["signup_deficit_plan"]
