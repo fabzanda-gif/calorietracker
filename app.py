@@ -486,6 +486,36 @@ st.markdown("""
             border-radius:999px;
             background:linear-gradient(90deg,#FF8B8B,#E6E6E6);
         }
+
+/* STANDARD MODE — sidebar KPI cards */
+body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-budget-value,
+body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-budget-value span {
+    color:#FFFFFF !important;
+    -webkit-text-fill-color:#FFFFFF !important;
+}
+
+body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-budget-card .sano-budget-value strong,
+body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-budget-card .sano-budget-value b {
+    color:#FF8B8B !important;
+    -webkit-text-fill-color:#FF8B8B !important;
+}
+
+/* Make progress proportion visually obvious in Standard mode */
+body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-budget-track {
+    background:rgba(255,255,255,.88) !important;
+    border:1px solid rgba(255,255,255,.22) !important;
+}
+
+body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-budget-fill {
+    background:linear-gradient(90deg,#FF8B8B,#FFB4B4) !important;
+    min-width:3px;
+    box-shadow:0 0 0 1px rgba(255,139,139,.12) inset;
+}
+
+/* Protein card shares the same component */
+body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-protein-card .sano-budget-fill {
+    background:linear-gradient(90deg,#FF8B8B,#FFC1C1) !important;
+}
         .sano-budget-meta {
             display:flex;
             justify-content:space-between;
@@ -4451,6 +4481,33 @@ if is_zero_mode():
             fill:#F7F7F7 !important;
         }
 
+
+        /* ZERO MODE — force dropdown chevrons visible */
+        [data-testid="stSelectbox"] [data-baseweb="select"] svg,
+        [data-testid="stSelectbox"] [data-baseweb="select"] path,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] svg,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] path,
+        [data-baseweb="select"] svg,
+        [data-baseweb="select"] path {
+            color:#FFFFFF !important;
+            fill:#FFFFFF !important;
+            stroke:#FFFFFF !important;
+            opacity:1 !important;
+        }
+
+        [data-testid="stSelectbox"] [data-baseweb="select"] > div > div:last-child,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div:last-child {
+            background:#171717 !important;
+            color:#FFFFFF !important;
+            border-left:1px solid #3F3F3F !important;
+        }
+
+        [data-testid="stSelectbox"] [data-baseweb="select"] > div > div:last-child *,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div:last-child * {
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+        }
+
         /* Same treatment for multiselects. */
         [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
         [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div,
@@ -4728,8 +4785,8 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    _profile_col, _language_col, _account_spacer = st.columns(
-        [0.72, 0.72, 3.8],
+    _profile_col, _profile_gap, _language_col, _account_spacer = st.columns(
+        [0.72, 0.20, 0.72, 3.6],
         gap="small",
         vertical_alignment="center",
     )
