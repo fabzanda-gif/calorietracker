@@ -412,6 +412,41 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ------------------------------------------------------------------------------
+# STREAMLIT CHROME CLEANUP
+# The vertical three-dot control is Streamlit's native application menu,
+# not a SanoSync feature. In this custom full-screen UI it can be pushed outside
+# the viewport by Streamlit/browser layout, so we hide it entirely.
+# ------------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    /* Current + legacy Streamlit main menu selectors */
+    #MainMenu,
+    [data-testid="stMainMenu"],
+    [data-testid="stToolbar"] [aria-label="Main menu"],
+    [data-testid="stToolbar"] button[aria-label="Main menu"],
+    button[aria-label="Main menu"],
+    button[title="Main menu"] {
+        display:none !important;
+        visibility:hidden !important;
+        pointer-events:none !important;
+    }
+
+    /* Do NOT hide the sidebar collapse control. */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="collapsedControl"] {
+        display:flex !important;
+        visibility:visible !important;
+        pointer-events:auto !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+
 # ==============================================================================
 # STYLING CUSTOM (CSS) - CORRETTO PER LEGGIBILITÀ SIDEBAR
 # ==============================================================================
@@ -2464,6 +2499,147 @@ def insert_recipe_library(
         "image_url": str(image_url or "").strip() or None,
     }
     return supabase.table(RECIPE_LIBRARY_TABLE).insert(payload).execute()
+
+
+
+def _current_user_metadata():
+    """Return the freshest auth metadata available in this Streamlit session."""
+    session_user = st.session_state.get("user")
+    if session_user is not None:
+        meta = getattr(session_user, "user_metadata", None)
+        if isinstance(meta, dict):
+            return dict(meta)
+
+    try:
+        auth_user = supabase.auth.get_user()
+        obj = getattr(auth_user, "user", None)
+        meta = getattr(obj, "user_metadata", None)
+        if isinstance(meta, dict):
+            return dict(meta)
+    except Exception:
+        pass
+
+    return dict(u_meta or {})
+
+
+def get_default_breakfast_recipe_ids():
+    meta = _current_user_metadata()
+
+    def _id(key):
+        value = meta.get(key)
+        if value in (None, "", "None"):
+            return None
+        return str(value)
+
+    return {
+        "Casa": _id("default_breakfast_home_recipe_id"),
+        "Lavoro": _id("default_breakfast_work_recipe_id"),
+    }
+
+
+def set_default_breakfast_recipe(category, recipe_id):
+    """
+    Save a personal recipe as the user's default breakfast.
+    Uses auth metadata so recipe_library needs no schema change.
+    """
+    if category not in {"Casa", "Lavoro"}:
+        raise ValueError("Categoria colazione standard non valida.")
+
+    key = (
+        "default_breakfast_home_recipe_id"
+        if category == "Casa"
+        else "default_breakfast_work_recipe_id"
+    )
+
+    metadata = _current_user_metadata()
+    metadata[key] = str(recipe_id) if recipe_id is not None else None
+
+    response = supabase.auth.update_user(
+        {"data": metadata}
+    )
+    if getattr(response, "user", None):
+        st.session_state["user"] = response.user
+
+    return response
+
+
+def load_personal_recipe_by_id(recipe_id):
+    if recipe_id in (None, ""):
+        return None
+
+    try:
+        rows = (
+            supabase.table(RECIPE_LIBRARY_TABLE)
+            .select(
+                "id,user_id,name,meal_type,category,recipe_servings,"
+                "calories,protein,carbs,fat,notes,ingredients_json,"
+                "is_shared,image_url,created_at"
+            )
+            .eq("id", recipe_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute().data
+            or []
+        )
+        return rows[0] if rows else None
+    except Exception as exc:
+        print(f"Default breakfast recipe load error: {exc}")
+        return None
+
+
+def breakfast_already_logged(log_date):
+    try:
+        rows = (
+            supabase.table("meals")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("date", str(log_date))
+            .eq("meal_type", "Colazione")
+            .limit(1)
+            .execute().data
+            or []
+        )
+        return bool(rows)
+    except Exception as exc:
+        print(f"Breakfast logged check failed: {exc}")
+        return False
+
+
+def insert_default_breakfast_recipe(recipe_row, log_date, category):
+    """One-click logging of one serving of a saved default breakfast."""
+    servings = max(
+        1.0,
+        _safe_float(
+            recipe_row.get("recipe_servings") or 1.0
+        ),
+    )
+
+    calories = _safe_float(recipe_row.get("calories")) / servings
+    protein = _safe_float(recipe_row.get("protein")) / servings
+    carbs = _safe_float(recipe_row.get("carbs")) / servings
+    fat = _safe_float(recipe_row.get("fat")) / servings
+    name = str(recipe_row.get("name") or "Colazione").strip()
+
+    return insert_meal_with_base_data(
+        log_date=log_date,
+        meal_type="Colazione",
+        display_name=f"{name} (1.0 porz.)",
+        base_name=name,
+        quantity=1.0,
+        is_per_100g=False,
+        calories=calories,
+        protein=protein,
+        carbs=carbs,
+        fat=fat,
+        base_calories=calories,
+        base_protein=protein,
+        base_carbs=carbs,
+        base_fat=fat,
+        notes=recipe_row.get("notes", ""),
+        category=category,
+        ingredients_json=recipe_row.get("ingredients_json"),
+        recipe_servings=servings,
+    )
 
 
 def load_available_recipes():
@@ -8438,11 +8614,13 @@ def render_ai_spotlight_css():
 
 def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
     """
-    Converts free text such as:
-      '250g pollo, 120g riso, 10g olio'
-    into recipe_builder_ingredients with estimated nutrition per 100 g.
+    Convert free ingredient text into recipe_builder_ingredients.
 
-    Groq is deliberately the nutrition source for this workflow.
+    Groq occasionally rejects response_format=json_object before returning any
+    content (json_validate_failed). We therefore:
+      1. try strict JSON mode;
+      2. retry without response_format using an even simpler prompt;
+      3. extract the first JSON object from the model text.
     """
     raw_text = str(ingredient_text or "").strip()
     if not raw_text:
@@ -8461,34 +8639,38 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
         "Français": "French",
     }.get(language, "Italian")
 
-    prompt = f"""
-Parse the following ingredient list for a recipe:
-
-{raw_text}
-
-Return ONLY valid JSON with this structure:
-{{
+    schema_example = """
+{
   "ingredients": [
-    {{
-      "name": "ingredient name in {language_name}",
+    {
+      "name": "chicken breast",
       "quantity_g": 250,
       "calories_per_100g": 165,
       "protein_per_100g": 31,
       "carbs_per_100g": 0,
       "fat_per_100g": 3.6
-    }}
+    }
   ]
-}}
+}
+""".strip()
 
-Rules:
-- preserve the quantities supplied by the user;
-- convert kg to g;
-- convert common kitchen quantities to reasonable gram estimates only when
-  the user did not provide grams (e.g. 1 egg, 1 tbsp oil);
+    prompt = f"""
+Extract ONLY the ingredients explicitly present in this text:
+
+{raw_text}
+
+Return one JSON object matching this example:
+{schema_example}
+
+Requirements:
+- ingredient names must be in {language_name};
+- preserve user quantities;
+- kg -> g;
+- estimate grams for common units only when grams were not supplied;
 - use realistic average nutrition values per 100 g;
-- do not add ingredients that the user did not mention;
-- every numeric field must be a JSON number;
-- do not output markdown, reasoning, notes or <think> tags.
+- do NOT add ingredients;
+- every numeric value must be a JSON number;
+- no markdown, no prose, no reasoning.
 """.strip()
 
     client = OpenAI(
@@ -8496,65 +8678,156 @@ Rules:
         base_url="https://api.groq.com/openai/v1",
     )
 
-    response = client.chat.completions.create(
-        model=resolve_groq_text_model(),
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You convert recipe ingredient text into structured JSON. "
-                    "Return only JSON and never expose reasoning."
-                ),
-            },
-            {
-                "role": "user",
-                "content": prompt,
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.15,
-        max_tokens=1600,
-        stream=False,
-    )
+    def _extract_json_object(text):
+        cleaned = str(text or "").strip()
+        cleaned = re.sub(
+            r"^```(?:json)?\s*",
+            "",
+            cleaned,
+            flags=re.I,
+        )
+        cleaned = re.sub(r"\s*```$", "", cleaned).strip()
 
-    raw = str(response.choices[0].message.content or "").strip()
-    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
-    raw = re.sub(r"\s*```$", "", raw).strip()
+        try:
+            return json.loads(cleaned)
+        except Exception:
+            pass
 
-    data = json.loads(raw)
+        # Fallback for a model that wrapped the JSON in one sentence.
+        first = cleaned.find("{")
+        last = cleaned.rfind("}")
+        if first >= 0 and last > first:
+            return json.loads(cleaned[first:last + 1])
+
+        raise ValueError(
+            "La risposta AI non contiene un oggetto JSON leggibile."
+        )
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a food ingredient parser. "
+                "Return only a single valid JSON object. "
+                "Never expose reasoning."
+            ),
+        },
+        {"role": "user", "content": prompt},
+    ]
+
+    raw = None
+    first_error = None
+
+    # Attempt 1 — strict JSON mode.
+    try:
+        response = client.chat.completions.create(
+            model=resolve_groq_text_model(),
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0,
+            max_tokens=1800,
+            stream=False,
+        )
+        raw = response.choices[0].message.content
+    except Exception as exc:
+        first_error = exc
+
+    # Attempt 2 — Groq may reject JSON validation server-side.
+    if not raw:
+        retry_prompt = f"""
+Ingredient text:
+{raw_text}
+
+Output ONLY JSON. No code fence.
+
+Exact top-level shape:
+{{"ingredients":[{{"name":"...","quantity_g":100,"calories_per_100g":0,"protein_per_100g":0,"carbs_per_100g":0,"fat_per_100g":0}}]}}
+
+Names in {language_name}. Include only ingredients in the input.
+""".strip()
+
+        try:
+            response = client.chat.completions.create(
+                model=resolve_groq_text_model(),
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Return valid JSON only. "
+                            "Do not explain anything."
+                        ),
+                    },
+                    {"role": "user", "content": retry_prompt},
+                ],
+                temperature=0,
+                max_tokens=1800,
+                stream=False,
+            )
+            raw = response.choices[0].message.content
+        except Exception as retry_exc:
+            if first_error is not None:
+                raise RuntimeError(
+                    "SanoSync AI non è riuscita a strutturare gli "
+                    "ingredienti dopo due tentativi. "
+                    f"Primo errore: {first_error}. "
+                    f"Retry: {retry_exc}"
+                ) from retry_exc
+            raise
+
+    data = _extract_json_object(raw)
+    items = data.get("ingredients") or []
     result = []
 
-    for item in data.get("ingredients") or []:
+    for item in items:
         if not isinstance(item, dict):
             continue
 
         name = str(item.get("name") or "").strip()
-        quantity_g = max(0.0, _safe_float(item.get("quantity_g")))
+        quantity_g = max(
+            0.0,
+            _safe_float(item.get("quantity_g")),
+        )
 
         if not name or quantity_g <= 0:
             continue
 
-        result.append({
-            "name": name,
-            "quantity_g": quantity_g,
-            "calories_per_100g": max(
-                0.0,
-                _safe_float(item.get("calories_per_100g")),
-            ),
-            "protein_per_100g": max(
-                0.0,
-                _safe_float(item.get("protein_per_100g")),
-            ),
-            "carbs_per_100g": max(
-                0.0,
-                _safe_float(item.get("carbs_per_100g")),
-            ),
-            "fat_per_100g": max(
-                0.0,
-                _safe_float(item.get("fat_per_100g")),
-            ),
-            "source": "ai",
-        })
+        result.append(
+            {
+                "name": name,
+                "quantity_g": quantity_g,
+                "calories_per_100g": max(
+                    0.0,
+                    _safe_float(
+                        item.get("calories_per_100g")
+                    ),
+                ),
+                "protein_per_100g": max(
+                    0.0,
+                    _safe_float(
+                        item.get("protein_per_100g")
+                    ),
+                ),
+                "carbs_per_100g": max(
+                    0.0,
+                    _safe_float(
+                        item.get("carbs_per_100g")
+                    ),
+                ),
+                "fat_per_100g": max(
+                    0.0,
+                    _safe_float(
+                        item.get("fat_per_100g")
+                    ),
+                ),
+                "source": "ai",
+            }
+        )
+
+    if not result:
+        raise ValueError(
+            "SanoSync AI ha risposto, ma non ha restituito "
+            "ingredienti utilizzabili."
+        )
 
     return result
 
@@ -8896,6 +9169,113 @@ if selected_page == t["t1"]:
         # ------------------------------------------------------------------
         elif is_quick:
             try:
+                # ------------------------------------------------------
+                # Colazione standard — one-click, only if breakfast has
+                # not yet been logged on the selected date.
+                # ------------------------------------------------------
+                if not breakfast_already_logged(log_date):
+                    _default_ids = get_default_breakfast_recipe_ids()
+                    _default_breakfasts = []
+
+                    _home_recipe = load_personal_recipe_by_id(
+                        _default_ids.get("Casa")
+                    )
+                    if _home_recipe:
+                        _default_breakfasts.append(
+                            ("Casa", _home_recipe)
+                        )
+
+                    if user_office_lunch_enabled:
+                        _work_recipe = load_personal_recipe_by_id(
+                            _default_ids.get("Lavoro")
+                        )
+                        if _work_recipe:
+                            _default_breakfasts.append(
+                                ("Lavoro", _work_recipe)
+                            )
+
+                    if _default_breakfasts:
+                        _db_i18n = {
+                            "Italiano": {
+                                "title": "☕ Colazione standard",
+                                "home": "🏠 Colazione Casa",
+                                "work": "💼 Colazione Lavoro",
+                                "done": "Colazione inserita.",
+                            },
+                            "English": {
+                                "title": "☕ Default breakfast",
+                                "home": "🏠 Home breakfast",
+                                "work": "💼 Work breakfast",
+                                "done": "Breakfast logged.",
+                            },
+                            "Nederlands": {
+                                "title": "☕ Standaardontbijt",
+                                "home": "🏠 Ontbijt thuis",
+                                "work": "💼 Ontbijt werk",
+                                "done": "Ontbijt opgeslagen.",
+                            },
+                            "Français": {
+                                "title": "☕ Petit-déjeuner standard",
+                                "home": "🏠 Petit-déjeuner maison",
+                                "work": "💼 Petit-déjeuner travail",
+                                "done": "Petit-déjeuner enregistré.",
+                            },
+                        }.get(
+                            current_lang,
+                            {},
+                        )
+
+                        st.markdown(
+                            f"**{_db_i18n.get('title', '☕ Colazione standard')}**"
+                        )
+                        _db_cols = st.columns(
+                            len(_default_breakfasts)
+                        )
+
+                        for _db_col, (
+                            _db_category,
+                            _db_recipe,
+                        ) in zip(
+                            _db_cols,
+                            _default_breakfasts,
+                        ):
+                            _db_label = (
+                                _db_i18n.get("work")
+                                if _db_category == "Lavoro"
+                                else _db_i18n.get("home")
+                            )
+                            _db_label = (
+                                f"{_db_label} · "
+                                f"{str(_db_recipe.get('name') or '')}"
+                            )
+
+                            with _db_col:
+                                if st.button(
+                                    _db_label,
+                                    key=(
+                                        "quick_default_breakfast_"
+                                        f"{_db_category}_{v}"
+                                    ),
+                                    use_container_width=True,
+                                    type="primary",
+                                ):
+                                    insert_default_breakfast_recipe(
+                                        _db_recipe,
+                                        log_date,
+                                        _db_category,
+                                    )
+                                    queue_ui_sound("food_saved")
+                                    refresh_daily_logs(log_date)
+                                    st.success(
+                                        _db_i18n.get(
+                                            "done",
+                                            "Colazione inserita.",
+                                        )
+                                    )
+                                    st.rerun()
+
+                        st.divider()
+
                 quick_entries = get_quick_entries_from_meals()
                 recipe_rows = load_available_recipes()
 
@@ -12365,6 +12745,114 @@ elif selected_page == t["t4"]:
                                 r,
                                 f"my_recipe_{r.get('id')}",
                             )
+
+                            # ------------------------------------------
+                            # Colazione standard personale.
+                            # Only personal breakfast recipes can be
+                            # assigned. Work is hidden when Office mode
+                            # is disabled.
+                            # ------------------------------------------
+                            if str(r.get("meal_type")) == "Colazione":
+                                _default_breakfast_ids = (
+                                    get_default_breakfast_recipe_ids()
+                                )
+                                _recipe_id_str = str(r.get("id"))
+
+                                _default_i18n = {
+                                    "Italiano": {
+                                        "home_set": "🏠 Usa come Colazione Casa standard",
+                                        "home_active": "✅ Colazione Casa standard",
+                                        "work_set": "💼 Usa come Colazione Lavoro standard",
+                                        "work_active": "✅ Colazione Lavoro standard",
+                                        "remove": "Rimuovi standard",
+                                        "saved": "Colazione standard aggiornata.",
+                                    },
+                                    "English": {
+                                        "home_set": "🏠 Set as default Home breakfast",
+                                        "home_active": "✅ Default Home breakfast",
+                                        "work_set": "💼 Set as default Work breakfast",
+                                        "work_active": "✅ Default Work breakfast",
+                                        "remove": "Remove default",
+                                        "saved": "Default breakfast updated.",
+                                    },
+                                    "Nederlands": {
+                                        "home_set": "🏠 Instellen als standaardontbijt thuis",
+                                        "home_active": "✅ Standaardontbijt thuis",
+                                        "work_set": "💼 Instellen als standaardontbijt werk",
+                                        "work_active": "✅ Standaardontbijt werk",
+                                        "remove": "Standaard verwijderen",
+                                        "saved": "Standaardontbijt bijgewerkt.",
+                                    },
+                                    "Français": {
+                                        "home_set": "🏠 Définir comme petit-déjeuner maison",
+                                        "home_active": "✅ Petit-déjeuner maison par défaut",
+                                        "work_set": "💼 Définir comme petit-déjeuner travail",
+                                        "work_active": "✅ Petit-déjeuner travail par défaut",
+                                        "remove": "Retirer le défaut",
+                                        "saved": "Petit-déjeuner par défaut mis à jour.",
+                                    },
+                                }.get(current_lang, {})
+
+                                _eligible_default_categories = ["Casa"]
+                                if user_office_lunch_enabled:
+                                    _eligible_default_categories.append(
+                                        "Lavoro"
+                                    )
+
+                                for _default_category in (
+                                    _eligible_default_categories
+                                ):
+                                    _is_default = (
+                                        _default_breakfast_ids.get(
+                                            _default_category
+                                        )
+                                        == _recipe_id_str
+                                    )
+
+                                    if _default_category == "Casa":
+                                        _set_label = _default_i18n.get(
+                                            "home_active"
+                                            if _is_default
+                                            else "home_set",
+                                            "🏠 Colazione Casa",
+                                        )
+                                    else:
+                                        _set_label = _default_i18n.get(
+                                            "work_active"
+                                            if _is_default
+                                            else "work_set",
+                                            "💼 Colazione Lavoro",
+                                        )
+
+                                    _action_label = (
+                                        f"{_set_label} · "
+                                        f"{_default_i18n.get('remove', 'Rimuovi')}"
+                                        if _is_default
+                                        else _set_label
+                                    )
+
+                                    if st.button(
+                                        _action_label,
+                                        key=(
+                                            "default_breakfast_recipe_"
+                                            f"{r.get('id')}_"
+                                            f"{_default_category}"
+                                        ),
+                                        use_container_width=True,
+                                    ):
+                                        set_default_breakfast_recipe(
+                                            _default_category,
+                                            None
+                                            if _is_default
+                                            else r.get("id"),
+                                        )
+                                        st.success(
+                                            _default_i18n.get(
+                                                "saved",
+                                                "Colazione standard aggiornata.",
+                                            )
+                                        )
+                                        st.rerun()
 
             # Gestione condivisione delle ricette già esistenti.
             st.markdown(t["sharing_manage"])
