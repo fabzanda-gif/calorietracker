@@ -3983,11 +3983,15 @@ if is_zero_mode():
             font-family: initial !important;
         }
 
-        h1, h2, h3, h4,
         .sano-page-title,
         .sano-zero-wordmark {
-            font-family: 'Great Vibes', cursive !important;
-            letter-spacing: 0 !important;
+            font-family:'Great Vibes', cursive !important;
+            letter-spacing:0 !important;
+        }
+
+        h1, h2, h3, h4 {
+            font-family:'Kanit', sans-serif !important;
+            letter-spacing:0 !important;
         }
 
         [data-testid="stAppViewContainer"] {
@@ -4364,12 +4368,32 @@ if is_zero_mode():
             border-color:#FF2A20 !important;
         }
 
-        /* Headings: Great Vibes only for actual display titles, body stays Kanit. */
-        h1, h2, h3,
+        /* Great Vibes only for the main page/tab hero title. */
         .sano-page-title,
         .sano-zero-wordmark {
             font-family:'Great Vibes', cursive !important;
             font-weight:400 !important;
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+        }
+
+        /* Card and section names in ZERO use Kanit:
+           e.g. SanoSync AI · Posso mangiarlo?, Immissione Rapida, etc. */
+        h1, h2, h3, h4, h5, h6,
+        [data-testid="stVerticalBlockBorderWrapper"] h1,
+        [data-testid="stVerticalBlockBorderWrapper"] h2,
+        [data-testid="stVerticalBlockBorderWrapper"] h3,
+        [data-testid="stVerticalBlockBorderWrapper"] h4,
+        [data-testid="stExpander"] h1,
+        [data-testid="stExpander"] h2,
+        [data-testid="stExpander"] h3,
+        .sano-ai-coach-title,
+        .custom-card-title,
+        .sano-budget-title,
+        .sano-profile-name {
+            font-family:'Kanit', sans-serif !important;
+            font-weight:800 !important;
+            letter-spacing:0 !important;
             color:#FFFFFF !important;
             -webkit-text-fill-color:#FFFFFF !important;
         }
