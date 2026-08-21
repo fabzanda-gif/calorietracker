@@ -1042,8 +1042,21 @@ def calculate_bmr(weight, height, birth_date_value, gender):
 
     return int(round((10 * weight) + (6.25 * height) - (5 * age) - 161))
 
-def refresh_daily_logs(log_date):
-    pass
+def refresh_daily_logs(log_date=None):
+    """Invalidate only caches backed by user nutrition/activity data."""
+    for _name in (
+        "load_daily_meals_cached",
+        "load_daily_activities_cached",
+        "load_daily_log_cached",
+        "load_weight_history_cached",
+        "load_quick_meal_rows_cached",
+    ):
+        _fn = globals().get(_name)
+        if _fn is not None and hasattr(_fn, "clear"):
+            try:
+                _fn.clear()
+            except Exception as _exc:
+                print(f"Cache clear failed for {_name}: {_exc}")
 
 def _safe_float(value):
     try:
@@ -1052,6 +1065,132 @@ def _safe_float(value):
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+# ==============================================================================
+# CACHED USER-DATA READS
+# ==============================================================================
+# Streamlit reruns the full script after most interactions. These short-lived
+# caches centralise the hottest Supabase reads. Every cache key includes user_id.
+
+@st.cache_data(ttl=30, show_spinner=False)
+def load_daily_meals_cached(cache_user_id, cache_date):
+    try:
+        return (
+            supabase.table("meals")
+            .select(
+                "id,date,meal_type,name,base_name,quantity,is_per_100g,"
+                "base_calories,base_protein,base_carbs,base_fat,"
+                "calories,protein,carbs,fat,notes,category,"
+                "ingredients_json,recipe_servings,is_shared,image_url"
+            )
+            .eq("user_id", cache_user_id)
+            .eq("date", str(cache_date))
+            .execute().data
+            or []
+        )
+    except Exception:
+        return (
+            supabase.table("meals")
+            .select("id,date,meal_type,name,calories,protein,carbs,fat")
+            .eq("user_id", cache_user_id)
+            .eq("date", str(cache_date))
+            .execute().data
+            or []
+        )
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def load_daily_activities_cached(cache_user_id, cache_date):
+    return (
+        supabase.table("activities")
+        .select("id,date,activity_name,burned_calories")
+        .eq("user_id", cache_user_id)
+        .eq("date", str(cache_date))
+        .execute().data
+        or []
+    )
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def load_daily_log_cached(cache_user_id, cache_date):
+    try:
+        return (
+            supabase.table("daily_logs")
+            .select("id,date,weight,steps,day_type,activity_plan")
+            .eq("user_id", cache_user_id)
+            .eq("date", str(cache_date))
+            .execute().data
+            or []
+        )
+    except Exception:
+        return (
+            supabase.table("daily_logs")
+            .select("id,date,weight,steps")
+            .eq("user_id", cache_user_id)
+            .eq("date", str(cache_date))
+            .execute().data
+            or []
+        )
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def load_weight_history_cached(cache_user_id):
+    return (
+        supabase.table("daily_logs")
+        .select("weight,date")
+        .eq("user_id", cache_user_id)
+        .not_.is_("weight", "null")
+        .order("date", desc=False)
+        .execute().data
+        or []
+    )
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_quick_meal_rows_cached(cache_user_id):
+    try:
+        rows = (
+            supabase.table("meals")
+            .select(
+                "id,date,name,base_name,quantity,is_per_100g,"
+                "base_calories,base_protein,base_carbs,base_fat,"
+                "calories,protein,carbs,fat,notes,category,"
+                "ingredients_json,recipe_servings,is_shared,image_url"
+            )
+            .eq("user_id", cache_user_id)
+            .order("date", desc=True)
+            .execute().data
+            or []
+        )
+        return rows, True
+    except Exception:
+        rows = (
+            supabase.table("meals")
+            .select("id,date,name,calories,protein,carbs,fat")
+            .eq("user_id", cache_user_id)
+            .order("date", desc=True)
+            .execute().data
+            or []
+        )
+        return rows, False
+
+
+def get_daily_totals(target_date):
+    meals = load_daily_meals_cached(user_id, str(target_date))
+    activities = load_daily_activities_cached(user_id, str(target_date))
+    return {
+        "meals": meals,
+        "activities": activities,
+        "calories": sum(_safe_float(x.get("calories")) for x in meals),
+        "protein": sum(_safe_float(x.get("protein")) for x in meals),
+        "carbs": sum(_safe_float(x.get("carbs")) for x in meals),
+        "fat": sum(_safe_float(x.get("fat")) for x in meals),
+        "activity": sum(
+            _safe_float(x.get("burned_calories"))
+            for x in activities
+        ),
+    }
 
 
 
@@ -2054,13 +2193,9 @@ def suggest_next_meal_type(log_date=None):
     target_date = log_date or date.today()
 
     try:
-        rows = (
-            supabase.table("meals")
-            .select("meal_type")
-            .eq("user_id", user_id)
-            .eq("date", str(target_date))
-            .execute().data
-            or []
+        rows = load_daily_meals_cached(
+            user_id,
+            str(target_date),
         )
         logged = {
             str(row.get("meal_type") or "").strip().casefold()
@@ -2284,31 +2419,9 @@ def get_quick_entries_from_meals():
     per porzione. Le righe legacy senza questi campi rimangono utilizzabili
     come porzioni fisse usando i valori totali salvati nel meal.
     """
-    try:
-        rows = (
-            supabase.table("meals")
-            .select(
-                "id,date,name,base_name,quantity,is_per_100g,"
-                "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat,notes,category,ingredients_json,recipe_servings,is_shared,image_url"
-            )
-            .eq("user_id", user_id)
-            .order("date", desc=True)
-            .execute().data
-            or []
-        )
-        enhanced_schema = True
-    except Exception:
-        # Compatibilità temporanea prima della migrazione SQL.
-        rows = (
-            supabase.table("meals")
-            .select("id,date,name,calories,protein,carbs,fat")
-            .eq("user_id", user_id)
-            .order("date", desc=True)
-            .execute().data
-            or []
-        )
-        enhanced_schema = False
+    rows, enhanced_schema = load_quick_meal_rows_cached(
+        user_id
+    )
 
     quick = {}
     for row in rows:
@@ -2393,16 +2506,24 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
         ),
     }
     try:
-        return supabase.table("meals").insert(payload).execute()
+        _result = supabase.table("meals").insert(payload).execute()
+        refresh_daily_logs(log_date)
+        return _result
     except Exception as e:
-        # Fallback per consentire all'app di continuare a funzionare prima
-        # che venga applicata la migrazione dei campi base_*.
-        print(f"Inserimento meals con schema esteso fallito, fallback legacy: {e}")
+        print(
+            "Inserimento meals con schema esteso fallito, "
+            f"fallback legacy: {e}"
+        )
         legacy_payload = {
             k: payload[k]
-            for k in ("user_id", "date", "meal_type", "name", "calories", "protein", "carbs", "fat")
+            for k in (
+                "user_id", "date", "meal_type", "name",
+                "calories", "protein", "carbs", "fat",
+            )
         }
-        return supabase.table("meals").insert(legacy_payload).execute()
+        _result = supabase.table("meals").insert(legacy_payload).execute()
+        refresh_daily_logs(log_date)
+        return _result
 
 
 RECIPE_IMAGE_BUCKET = "recipe-images"
@@ -3945,19 +4066,9 @@ if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in u
 # Il BMR viene calcolato dinamicamente usando l'ultimo peso registrato.
 latest_weight_row = None
 try:
-    latest_weight_data = (
-        supabase.table("daily_logs")
-        .select("weight,date")
-        .eq("user_id", user_id)
-        .not_.is_("weight", "null")
-        .order("date", desc=True)
-        .limit(1)
-        .execute()
-        .data
-        or []
-    )
+    latest_weight_data = load_weight_history_cached(user_id)
     if latest_weight_data:
-        latest_weight_row = latest_weight_data[0]
+        latest_weight_row = latest_weight_data[-1]
 except Exception as e:
     print(f"Latest weight lookup error: {e}")
 
@@ -6918,31 +7029,11 @@ with st.sidebar:
 
     try:
         _today_str = str(date.today())
-        _today_meals = (
-            supabase.table("meals")
-            .select("calories,protein")
-            .eq("user_id", user_id)
-            .eq("date", _today_str)
-            .execute().data
-            or []
-        )
-        _today_acts = (
-            supabase.table("activities")
-            .select("burned_calories")
-            .eq("user_id", user_id)
-            .eq("date", _today_str)
-            .execute().data
-            or []
-        )
-
-        _today_eaten = sum(
-            _safe_float(row.get("calories"))
-            for row in _today_meals
-        )
-        _today_activity = sum(
-            _safe_float(row.get("burned_calories"))
-            for row in _today_acts
-        )
+        _today_totals = get_daily_totals(_today_str)
+        _today_meals = _today_totals["meals"]
+        _today_acts = _today_totals["activities"]
+        _today_eaten = _today_totals["calories"]
+        _today_activity = _today_totals["activity"]
 
         _end_day_budget = max(
             0.0,
@@ -8959,35 +9050,12 @@ if selected_page == t["t1"]:
                         with st.spinner(_cie_thinking):
                             _today_str = str(date.today())
 
-                            _cie_meals = (
-                                supabase.table("meals")
-                                .select("calories,protein")
-                                .eq("user_id", user_id)
-                                .eq("date", _today_str)
-                                .execute().data
-                                or []
-                            )
-                            _cie_activities = (
-                                supabase.table("activities")
-                                .select("burned_calories")
-                                .eq("user_id", user_id)
-                                .eq("date", _today_str)
-                                .execute().data
-                                or []
-                            )
-
-                            _cie_calories_eaten = sum(
-                                _safe_float(row.get("calories"))
-                                for row in _cie_meals
-                            )
-                            _cie_protein_eaten = sum(
-                                _safe_float(row.get("protein"))
-                                for row in _cie_meals
-                            )
-                            _cie_activity_burn = sum(
-                                _safe_float(row.get("burned_calories"))
-                                for row in _cie_activities
-                            )
+                            _cie_totals = get_daily_totals(_today_str)
+                            _cie_meals = _cie_totals["meals"]
+                            _cie_activities = _cie_totals["activities"]
+                            _cie_calories_eaten = _cie_totals["calories"]
+                            _cie_protein_eaten = _cie_totals["protein"]
+                            _cie_activity_burn = _cie_totals["activity"]
 
                             # Full-day BMR + today's logged activity.
                             _cie_maintenance_budget = max(
@@ -10011,10 +10079,10 @@ elif selected_page == t["t2"]:
     )
 
     try:
-        daily_log_res = supabase.table("daily_logs").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
-        meals_data = supabase.table("meals").select("*").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
-        raw_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(summary_date)).eq("user_id", user_id).execute().data or []
-        all_weight_logs = supabase.table("daily_logs").select("weight, date").eq("user_id", user_id).not_.is_("weight", "null").order("date", desc=False).execute().data or []
+        daily_log_res = load_daily_log_cached(user_id, str(summary_date))
+        meals_data = load_daily_meals_cached(user_id, str(summary_date))
+        raw_activities = load_daily_activities_cached(user_id, str(summary_date))
+        all_weight_logs = load_weight_history_cached(user_id)
     except Exception as e:
         st.error(t["load_data_error"].format(error=e))
         daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
@@ -10210,6 +10278,7 @@ elif selected_page == t["t2"]:
                         supabase.table("daily_logs").update(payload_plan).eq("id", existing[0]["id"]).execute()
                     else:
                         supabase.table("daily_logs").insert({"user_id": user_id, "date": str(plan_date), **payload_plan}).execute()
+                    refresh_daily_logs(plan_date)
                     play_hidden_local_audio(resolve_ui_sound("day_plan_saved"))
                     st.success(t["plan_saved"].format(date=plan_date.strftime("%d/%m/%Y")))
                 except Exception:
@@ -10994,6 +11063,7 @@ elif selected_page == t["t3"]:
                     elif sound_to_play is not None:
                         st.session_state["pending_weight_sound"] = str(sound_to_play)
 
+                    refresh_daily_logs(w_date)
                     st.success(t["weight_saved"])
                     st.rerun()
 
@@ -11882,31 +11952,12 @@ elif selected_page == t["t4"]:
             ):
                 try:
                     _today_str_ai = str(date.today())
-                    _meals_ai = (
-                        supabase.table("meals")
-                        .select("calories,protein")
-                        .eq("user_id", user_id)
-                        .eq("date", _today_str_ai)
-                        .execute().data
-                        or []
-                    )
-                    _acts_ai = (
-                        supabase.table("activities")
-                        .select("burned_calories")
-                        .eq("user_id", user_id)
-                        .eq("date", _today_str_ai)
-                        .execute().data
-                        or []
-                    )
-                    _eaten_ai = sum(
-                        _safe_float(x.get("calories")) for x in _meals_ai
-                    )
-                    _protein_ai = sum(
-                        _safe_float(x.get("protein")) for x in _meals_ai
-                    )
-                    _activity_ai = sum(
-                        _safe_float(x.get("burned_calories")) for x in _acts_ai
-                    )
+                    _today_ai_totals = get_daily_totals(_today_str_ai)
+                    _meals_ai = _today_ai_totals["meals"]
+                    _acts_ai = _today_ai_totals["activities"]
+                    _eaten_ai = _today_ai_totals["calories"]
+                    _protein_ai = _today_ai_totals["protein"]
+                    _activity_ai = _today_ai_totals["activity"]
 
                     _maintenance_ai = max(
                         0.0,
@@ -13043,11 +13094,13 @@ elif selected_page == t["t5"]:
     act_date = st.date_input(t["act_date"], value=date.today())
     
     try:
-        existing_log = supabase.table("daily_logs").select("steps").eq("date", str(act_date)).eq("user_id", user_id).execute().data
-        day_steps = existing_log[0].get("steps", 0) if existing_log and existing_log[0].get("steps") else 0
-        
-        # Recuperiamo anche le attività registrate per questa data per la logica intelligente
-        day_activities = supabase.table("activities").select("activity_name, burned_calories").eq("date", str(act_date)).eq("user_id", user_id).execute().data or []
+        existing_log = load_daily_log_cached(user_id, str(act_date))
+        day_steps = (
+            existing_log[0].get("steps", 0)
+            if existing_log and existing_log[0].get("steps")
+            else 0
+        )
+        day_activities = load_daily_activities_cached(user_id, str(act_date))
     except Exception:
         day_steps = 0
         day_activities = []
