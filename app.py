@@ -749,6 +749,42 @@ body:not(:has(.st-key-zero_mode_sidebar_toggle input:checked)) .sano-protein-car
             color: #1A2942 !important;
         }
 
+
+        /* ZERO MODE — the activity submit button must not inherit
+           the Standard white/coral treatment above. */
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-activity_add_submit button,
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-activity_add_submit div[data-testid="stFormSubmitButton"] > button {
+            background:
+                linear-gradient(135deg,#E10600,#A90000) !important;
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+            border:1.5px solid #FF3028 !important;
+            border-radius:11px !important;
+            font-weight:800 !important;
+            box-shadow:0 5px 14px rgba(225,6,0,.18) !important;
+        }
+
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-activity_add_submit button *,
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-activity_add_submit div[data-testid="stFormSubmitButton"] > button * {
+            color:#FFFFFF !important;
+            -webkit-text-fill-color:#FFFFFF !important;
+        }
+
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-activity_add_submit button:hover,
+        body:has(.st-key-zero_mode_sidebar_toggle input:checked)
+        .st-key-activity_add_submit div[data-testid="stFormSubmitButton"] > button:hover {
+            background:
+                linear-gradient(135deg,#F20A03,#C10000) !important;
+            border-color:#FF4A42 !important;
+            color:#FFFFFF !important;
+            transform:translateY(-1px);
+        }
+
         /* Metric Cards */
         [data-testid="stMetric"] {
             background-color: #FFFFFF;
