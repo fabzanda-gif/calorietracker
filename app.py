@@ -11936,34 +11936,22 @@ elif selected_page == t["t4"]:
 
             if ingredients:
                 st.markdown(t["ingredients_title"])
-                rows = []
-                for idx, ing in enumerate(ingredients):
-                    ing_factor = (
-                        float(ing["quantity_g"]) / 100.0
-                    )
-                    rows.append({
-                        "#": idx + 1,
-                        t["ingredient_col"]: ing["name"],
-                        t["quantity_g"]: ing["quantity_g"],
-                        "Kcal": round(
-                            ing["calories_per_100g"] * ing_factor
-                        ),
-                        "Pro": round(
-                            ing["protein_per_100g"] * ing_factor,
-                            1,
-                        ),
-                        "Carbs": round(
-                            ing["carbs_per_100g"] * ing_factor,
-                            1,
-                        ),
-                        "Fat": round(
-                            ing["fat_per_100g"] * ing_factor,
-                            1,
-                        ),
-                    })
-                # Interactive ingredient table.
-                # The old numeric # column + removal dropdown are replaced
-                # by a trash button directly on each ingredient row.
+
+                _edit_help = {
+                    "Italiano": "I valori stimati da SanoSync AI sono modificabili prima del salvataggio.",
+                    "English": "Values estimated by SanoSync AI can be edited before saving.",
+                    "Nederlands": "De door SanoSync AI geschatte waarden kunnen vóór het opslaan worden aangepast.",
+                    "Français": "Les valeurs estimées par SanoSync AI peuvent être modifiées avant l’enregistrement.",
+                }.get(
+                    current_lang,
+                    "I valori stimati da SanoSync AI sono modificabili prima del salvataggio.",
+                )
+                st.caption(_edit_help)
+
+                # Interactive and editable ingredient table.
+                # Kcal/macros shown here are totals for the selected quantity.
+                # When edited, we convert them back to per-100g values so all
+                # existing recipe calculations continue to work unchanged.
                 _hdr = st.columns(
                     [0.55, 2.15, 1.25, 1.0, 1.0, 1.0, 1.0],
                     gap="small",
@@ -11989,30 +11977,121 @@ elif selected_page == t["t4"]:
                         unsafe_allow_html=True,
                     )
 
-                for _idx, _row in enumerate(rows):
+                _edited_ingredients = []
+
+                for _idx, _ing in enumerate(ingredients):
+                    _qty = max(
+                        float(_ing.get("quantity_g", 0) or 0),
+                        0.0,
+                    )
+                    _factor = _qty / 100.0
+
+                    _current_kcal = (
+                        float(_ing.get("calories_per_100g", 0) or 0)
+                        * _factor
+                    )
+                    _current_pro = (
+                        float(_ing.get("protein_per_100g", 0) or 0)
+                        * _factor
+                    )
+                    _current_carbs = (
+                        float(_ing.get("carbs_per_100g", 0) or 0)
+                        * _factor
+                    )
+                    _current_fat = (
+                        float(_ing.get("fat_per_100g", 0) or 0)
+                        * _factor
+                    )
+
                     _cols = st.columns(
                         [0.55, 2.15, 1.25, 1.0, 1.0, 1.0, 1.0],
                         gap="small",
                         vertical_alignment="center",
                     )
 
-                    if _cols[0].button(
+                    _delete = _cols[0].button(
                         "🗑️",
                         key=f"delete_recipe_ingredient_{v}_{_idx}",
                         help=t["remove_ingredient"],
                         use_container_width=True,
-                    ):
-                        del st.session_state[
-                            "recipe_builder_ingredients"
-                        ][_idx]
-                        st.rerun()
+                    )
 
-                    _cols[1].write(_row.get(t["ingredient_col"], ""))
-                    _cols[2].write(_row.get("Quantità (g)", _row.get("Quantity (g)", _row.get("Hoeveelheid (g)", _row.get("Quantité (g)", "")))))
-                    _cols[3].write(_row.get("Kcal", ""))
-                    _cols[4].write(_row.get("Pro", ""))
-                    _cols[5].write(_row.get("Carbs", ""))
-                    _cols[6].write(_row.get("Fat", ""))
+                    _cols[1].write(str(_ing.get("name", "")))
+
+                    _new_qty = _cols[2].number_input(
+                        _headers[2],
+                        min_value=0.0,
+                        value=float(_qty),
+                        step=1.0,
+                        key=f"edit_recipe_qty_{v}_{_idx}",
+                        label_visibility="collapsed",
+                    )
+                    _new_kcal = _cols[3].number_input(
+                        "Kcal",
+                        min_value=0.0,
+                        value=float(round(_current_kcal, 1)),
+                        step=1.0,
+                        key=f"edit_recipe_kcal_{v}_{_idx}",
+                        label_visibility="collapsed",
+                    )
+                    _new_pro = _cols[4].number_input(
+                        "Pro",
+                        min_value=0.0,
+                        value=float(round(_current_pro, 1)),
+                        step=0.1,
+                        key=f"edit_recipe_pro_{v}_{_idx}",
+                        label_visibility="collapsed",
+                    )
+                    _new_carbs = _cols[5].number_input(
+                        "Carbs",
+                        min_value=0.0,
+                        value=float(round(_current_carbs, 1)),
+                        step=0.1,
+                        key=f"edit_recipe_carbs_{v}_{_idx}",
+                        label_visibility="collapsed",
+                    )
+                    _new_fat = _cols[6].number_input(
+                        "Fat",
+                        min_value=0.0,
+                        value=float(round(_current_fat, 1)),
+                        step=0.1,
+                        key=f"edit_recipe_fat_{v}_{_idx}",
+                        label_visibility="collapsed",
+                    )
+
+                    if _delete:
+                        continue
+
+                    _new_ing = dict(_ing)
+                    _new_ing["quantity_g"] = float(_new_qty)
+
+                    if float(_new_qty) > 0:
+                        _to_100g = 100.0 / float(_new_qty)
+                        _new_ing["calories_per_100g"] = (
+                            float(_new_kcal) * _to_100g
+                        )
+                        _new_ing["protein_per_100g"] = (
+                            float(_new_pro) * _to_100g
+                        )
+                        _new_ing["carbs_per_100g"] = (
+                            float(_new_carbs) * _to_100g
+                        )
+                        _new_ing["fat_per_100g"] = (
+                            float(_new_fat) * _to_100g
+                        )
+                    else:
+                        _new_ing["calories_per_100g"] = 0.0
+                        _new_ing["protein_per_100g"] = 0.0
+                        _new_ing["carbs_per_100g"] = 0.0
+                        _new_ing["fat_per_100g"] = 0.0
+
+                    _edited_ingredients.append(_new_ing)
+
+                # Keep the edited values as the authoritative recipe data.
+                st.session_state[
+                    "recipe_builder_ingredients"
+                ] = _edited_ingredients
+                ingredients = _edited_ingredients
 
                 total_weight, totals, per100 = (
                     calculate_recipe_totals(ingredients)
