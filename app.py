@@ -4358,6 +4358,47 @@ if profile_incomplete:
 
 
 # ==============================================================================
+# APPEARANCE HINT
+# ==============================================================================
+# The native Streamlit menu remains available at the top-right, while this
+# reminds users which appearance best matches the selected SanoSync personality.
+_mode_hint_text = (
+    "Better in dark mode" if is_zero_mode() else "Better in light mode"
+)
+_mode_hint_color = "#F2F2F2" if is_zero_mode() else "#4B5563"
+
+st.markdown(
+    f"""
+    <style>
+    .sanosync-mode-hint {{
+        position: fixed;
+        top: 0.82rem;
+        right: 4.25rem;
+        z-index: 999990;
+        font-family: 'Kanit', 'Hanken Grotesk', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+        color: {_mode_hint_color};
+        opacity: 0.88;
+        pointer-events: none;
+    }}
+    @media (max-width: 700px) {{
+        .sanosync-mode-hint {{
+            top: 0.9rem;
+            right: 3.65rem;
+            font-size: 0.66rem;
+        }}
+    }}
+    </style>
+    <div class="sanosync-mode-hint">{_mode_hint_text}</div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ==============================================================================
 # ZERO MODE — VISUAL THEME
 # ==============================================================================
 if is_zero_mode():
