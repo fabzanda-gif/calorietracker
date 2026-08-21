@@ -298,60 +298,18 @@ STANDARD_SOUND_EVENTS = {
 }
 
 # --- ZERO ---
-# Intentionally abrasive / cynical sound pack supplied for ZERO MODE.
-ZERO_SOUND_1 = ASSET_DIR / "assets/sounds/nobody-cares-fat-kid.mp3"
-ZERO_SOUND_2 = ASSET_DIR / "assets/sounds/calli-nobody-cares_IV7JVvH.mp3"
-ZERO_SOUND_3 = ASSET_DIR / "assets/sounds/blech-nobody-cares-about-you.mp3"
-ZERO_SOUND_4 = ASSET_DIR / "assets/sounds/nobody-cares-nobody_ijk3VYu.mp3"
-ZERO_SOUND_5 = ASSET_DIR / "assets/sounds/nobody-cares-pipsqueak.mp3"
-ZERO_SOUND_6 = ASSET_DIR / "assets/sounds/nobody-cares-sean.mp3"
-
-ZERO_SOUND_EVENTS = {
-    "weight_big_loss": ZERO_SOUND_6,
-    "weight_small_loss": ZERO_SOUND_5,
-    "weight_gain": ZERO_SOUND_1,
-
-    "food_saved": ZERO_SOUND_5,
-    "food_updated": ZERO_SOUND_4,
-    "food_deleted": ZERO_SOUND_3,
-
-    "recipe_saved": ZERO_SOUND_6,
-    "recipe_deleted": ZERO_SOUND_3,
-    "recipe_shared": ZERO_SOUND_4,
-    "recipe_unshared": ZERO_SOUND_2,
-    "recipe_photo_saved": ZERO_SOUND_6,
-
-    "ai_food_fit_answer": ZERO_SOUND_2,
-    "ai_ingredients_analyzed": ZERO_SOUND_4,
-    "ai_recipe_generated": ZERO_SOUND_6,
-    "photo_ai_analyzed": ZERO_SOUND_2,
-    "online_food_selected": ZERO_SOUND_5,
-
-    "activity_saved": ZERO_SOUND_4,
-    "activity_deleted": ZERO_SOUND_3,
-    "steps_saved": ZERO_SOUND_5,
-    "day_plan_saved": ZERO_SOUND_6,
-    "profile_saved": ZERO_SOUND_2,
-    "target_changed": ZERO_SOUND_4,
-}
+# ZERO now deliberately uses the same sound language as Standard.
+ZERO_SOUND_EVENTS = dict(STANDARD_SOUND_EVENTS)
 
 
 def resolve_ui_sound(event_name, *, zero_mode=None):
-    """Return the local MP3 path for a semantic UI event."""
-    # Mode-switch sounds are intentionally fixed by request.
-    if event_name in {"zero_mode_on", "zero_mode_off"}:
-        return STANDARD_SOUND_EVENTS.get(event_name)
+    """
+    Return the local MP3 path for a semantic UI event.
 
-    if zero_mode is None:
-        try:
-            zero_mode = is_zero_mode()
-        except Exception:
-            zero_mode = bool(
-                st.session_state.get("zero_mode_enabled", False)
-            )
-
-    registry = ZERO_SOUND_EVENTS if zero_mode else STANDARD_SOUND_EVENTS
-    return registry.get(event_name)
+    Standard and ZERO intentionally share the same sound pack.
+    `zero_mode` is retained for backward compatibility with existing calls.
+    """
+    return STANDARD_SOUND_EVENTS.get(event_name)
 
 
 def queue_ui_sound(event_name, *, zero_mode=None):
@@ -413,27 +371,48 @@ st.set_page_config(
 )
 
 # ------------------------------------------------------------------------------
-# STREAMLIT CHROME CLEANUP
-# The vertical three-dot control is Streamlit's native application menu,
-# not a SanoSync feature. In this custom full-screen UI it can be pushed outside
-# the viewport by Streamlit/browser layout, so we hide it entirely.
+# STREAMLIT CHROME
+# Keep Streamlit's native top-right Main Menu available: it contains the useful
+# Settings -> Appearance selector (Light / Dark / System).
+#
+# The vertical "More options" button appearing inside/alongside the sidebar is
+# unrelated to SanoSync navigation and its popup is clipped by our custom
+# sidebar layout, so only that control is hidden.
 # ------------------------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Current + legacy Streamlit main menu selectors */
-    #MainMenu,
-    [data-testid="stMainMenu"],
-    [data-testid="stToolbar"] [aria-label="Main menu"],
-    [data-testid="stToolbar"] button[aria-label="Main menu"],
-    button[aria-label="Main menu"],
-    button[title="Main menu"] {
+    /* Sidebar-only overflow / "More options" control. */
+    [data-testid="stSidebar"] button[aria-label="More options"],
+    [data-testid="stSidebar"] button[title="More options"],
+    [data-testid="stSidebar"] [aria-label="More options"],
+    [data-testid="stSidebar"] [title="More options"],
+    section[data-testid="stSidebar"] button[aria-label="More options"],
+    section[data-testid="stSidebar"] button[title="More options"] {
+        display:none !important;
+        visibility:hidden !important;
+        pointer-events:none !important;
+        width:0 !important;
+        min-width:0 !important;
+        height:0 !important;
+        min-height:0 !important;
+        margin:0 !important;
+        padding:0 !important;
+        overflow:hidden !important;
+    }
+
+    /* Streamlit has used a few different DOM wrappers for this overflow
+       control. Catch the sidebar-local vertical-ellipsis button without
+       touching the app-wide Main Menu in the header. */
+    [data-testid="stSidebar"] button:has(svg[aria-label="More options"]),
+    [data-testid="stSidebar"] button:has([data-icon="more-vertical"]),
+    [data-testid="stSidebar"] button:has([data-icon="ellipsis-vertical"]) {
         display:none !important;
         visibility:hidden !important;
         pointer-events:none !important;
     }
 
-    /* Do NOT hide the sidebar collapse control. */
+    /* Sidebar collapse/open remains available. */
     [data-testid="stSidebarCollapseButton"],
     [data-testid="collapsedControl"] {
         display:flex !important;
@@ -6650,8 +6629,9 @@ with st.sidebar:
 
     # ------------------------------------------------------------------
     # FORCED APP APPEARANCE
-    # Standard is always rendered as Light; ZERO is always rendered as Black.
-    # This deliberately ignores Streamlit's native light/dark appearance.
+    # SanoSync content remains Standard=Light and ZERO=Black.
+    # Streamlit's native Appearance menu is still available in the top-right
+    # Main Menu for browser/chrome preferences and troubleshooting.
     # ------------------------------------------------------------------
     if is_zero_mode():
         st.markdown(
