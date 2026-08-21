@@ -254,37 +254,122 @@ WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_eff
 WEIGHT_SOUND_GAIN = ASSET_DIR / "assets/sounds/sonicded.mp3"
 
 
-# Central registry for UI sounds. Add downloaded MyInstants MP3 files under
-# assets/sounds/ and map them here. None = action currently has no sound.
-SOUND_EVENTS = {
+# Central sound packs.
+# Files are expected under assets/sounds/ in the GitHub repository.
+
+# --- STANDARD ---
+STD_SOUND_FOOD = ASSET_DIR / "assets/sounds/super-mario-coin-sound.mp3"
+STD_SOUND_RECIPE = ASSET_DIR / "assets/sounds/pokemon-red_blue_yellow-item-found-sound-effect.mp3"
+STD_SOUND_AI = ASSET_DIR / "assets/sounds/nintendo-game-boy-startup.mp3"
+STD_SOUND_GENERIC_SAVE = ASSET_DIR / "assets/sounds/coin_1.mp3"
+STD_SOUND_ZERO_ON = ASSET_DIR / "assets/sounds/kodred (1).mp3"
+
+STANDARD_SOUND_EVENTS = {
     "weight_big_loss": WEIGHT_SOUND_BIG_LOSS,
     "weight_small_loss": WEIGHT_SOUND_SMALL_LOSS,
     "weight_gain": WEIGHT_SOUND_GAIN,
-    "food_saved": None,
-    "food_deleted": None,
-    "food_updated": None,
-    "recipe_saved": None,
-    "recipe_deleted": None,
-    "recipe_shared": None,
-    "recipe_unshared": None,
-    "ai_food_fit_answer": None,
-    "ai_ingredients_analyzed": None,
-    "ai_recipe_generated": None,
-    "photo_ai_analyzed": None,
-    "online_food_selected": None,
-    "activity_saved": None,
-    "activity_deleted": None,
-    "steps_saved": None,
-    "day_plan_saved": None,
-    "profile_saved": None,
-    "target_changed": None,
-    "zero_mode_on": None,
-    "zero_mode_off": None,
-    "language_changed": None,
-    "login_success": None,
-    "logout": None,
-    "error": None,
+
+    "food_saved": STD_SOUND_FOOD,
+    "food_deleted": STD_SOUND_FOOD,
+    "food_updated": STD_SOUND_FOOD,
+
+    "recipe_saved": STD_SOUND_RECIPE,
+    "recipe_deleted": STD_SOUND_RECIPE,
+    "recipe_shared": STD_SOUND_RECIPE,
+    "recipe_unshared": STD_SOUND_RECIPE,
+    "recipe_photo_saved": STD_SOUND_RECIPE,
+
+    "ai_food_fit_answer": STD_SOUND_AI,
+    "ai_ingredients_analyzed": STD_SOUND_AI,
+    "ai_recipe_generated": STD_SOUND_AI,
+    "photo_ai_analyzed": STD_SOUND_AI,
+    "online_food_selected": STD_SOUND_AI,
+
+    "activity_saved": STD_SOUND_GENERIC_SAVE,
+    "activity_deleted": STD_SOUND_GENERIC_SAVE,
+    "steps_saved": STD_SOUND_GENERIC_SAVE,
+    "day_plan_saved": STD_SOUND_GENERIC_SAVE,
+    "profile_saved": STD_SOUND_GENERIC_SAVE,
+    "target_changed": STD_SOUND_GENERIC_SAVE,
+
+    # Requested explicitly.
+    "zero_mode_on": STD_SOUND_ZERO_ON,
+    "zero_mode_off": STD_SOUND_GENERIC_SAVE,
 }
+
+# --- ZERO ---
+# Intentionally abrasive / cynical sound pack supplied for ZERO MODE.
+ZERO_SOUND_1 = ASSET_DIR / "assets/sounds/nobody-cares-fat-kid.mp3"
+ZERO_SOUND_2 = ASSET_DIR / "assets/sounds/calli-nobody-cares_IV7JVvH.mp3"
+ZERO_SOUND_3 = ASSET_DIR / "assets/sounds/blech-nobody-cares-about-you.mp3"
+ZERO_SOUND_4 = ASSET_DIR / "assets/sounds/nobody-cares-nobody_ijk3VYu.mp3"
+ZERO_SOUND_5 = ASSET_DIR / "assets/sounds/nobody-cares-pipsqueak.mp3"
+ZERO_SOUND_6 = ASSET_DIR / "assets/sounds/nobody-cares-sean.mp3"
+
+ZERO_SOUND_EVENTS = {
+    "weight_big_loss": ZERO_SOUND_6,
+    "weight_small_loss": ZERO_SOUND_5,
+    "weight_gain": ZERO_SOUND_1,
+
+    "food_saved": ZERO_SOUND_5,
+    "food_updated": ZERO_SOUND_4,
+    "food_deleted": ZERO_SOUND_3,
+
+    "recipe_saved": ZERO_SOUND_6,
+    "recipe_deleted": ZERO_SOUND_3,
+    "recipe_shared": ZERO_SOUND_4,
+    "recipe_unshared": ZERO_SOUND_2,
+    "recipe_photo_saved": ZERO_SOUND_6,
+
+    "ai_food_fit_answer": ZERO_SOUND_2,
+    "ai_ingredients_analyzed": ZERO_SOUND_4,
+    "ai_recipe_generated": ZERO_SOUND_6,
+    "photo_ai_analyzed": ZERO_SOUND_2,
+    "online_food_selected": ZERO_SOUND_5,
+
+    "activity_saved": ZERO_SOUND_4,
+    "activity_deleted": ZERO_SOUND_3,
+    "steps_saved": ZERO_SOUND_5,
+    "day_plan_saved": ZERO_SOUND_6,
+    "profile_saved": ZERO_SOUND_2,
+    "target_changed": ZERO_SOUND_4,
+}
+
+
+def resolve_ui_sound(event_name, *, zero_mode=None):
+    """Return the local MP3 path for a semantic UI event."""
+    # Mode-switch sounds are intentionally fixed by request.
+    if event_name in {"zero_mode_on", "zero_mode_off"}:
+        return STANDARD_SOUND_EVENTS.get(event_name)
+
+    if zero_mode is None:
+        try:
+            zero_mode = is_zero_mode()
+        except Exception:
+            zero_mode = bool(
+                st.session_state.get("zero_mode_enabled", False)
+            )
+
+    registry = ZERO_SOUND_EVENTS if zero_mode else STANDARD_SOUND_EVENTS
+    return registry.get(event_name)
+
+
+def queue_ui_sound(event_name, *, zero_mode=None):
+    """Queue a sound so it survives st.rerun()."""
+    sound_path = resolve_ui_sound(
+        event_name,
+        zero_mode=zero_mode,
+    )
+    if sound_path is not None:
+        st.session_state["pending_ui_sound"] = str(sound_path)
+
+
+def render_pending_ui_sound():
+    """Play one queued UI sound exactly once."""
+    pending = st.session_state.pop("pending_ui_sound", None)
+    if pending:
+        play_hidden_local_audio(pending)
+
 
 
 def play_hidden_local_audio(audio_path):
@@ -5996,6 +6081,17 @@ with st.sidebar:
             margin-top:.25rem !important;
             margin-bottom:.35rem !important;
         }
+
+        /* Sidebar help icon must remain visible on the dark sidebar. */
+        [data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"],
+        [data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] *,
+        [data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] svg,
+        [data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] path {
+            color:#FFFFFF !important;
+            fill:#FFFFFF !important;
+            stroke:#FFFFFF !important;
+            opacity:1 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -6029,6 +6125,10 @@ with st.sidebar:
             if getattr(_zero_update, "user", None):
                 st.session_state["user"] = _zero_update.user
 
+            queue_ui_sound(
+                "zero_mode_on" if _zero_widget_value else "zero_mode_off",
+                zero_mode=False,
+            )
             st.session_state["zero_mode_enabled"] = bool(
                 _zero_widget_value
             )
@@ -6037,6 +6137,8 @@ with st.sidebar:
             st.rerun()
         except Exception as exc:
             st.error(f"ZERO mode: {exc}")
+
+    render_pending_ui_sound()
 
     if "lang_selector" not in st.session_state:
         st.session_state["lang_selector"] = "Italiano"
@@ -7277,6 +7379,7 @@ def render_personal_settings_page():
             st.session_state["lang_selector"] = new_language
             st.session_state["login_lang_selector"] = new_language
 
+            queue_ui_sound("profile_saved")
             st.success(si["saved"])
             st.session_state["show_personal_settings"] = False
             st.session_state.pop("settings_language_live", None)
@@ -8599,6 +8702,7 @@ if selected_page == t["t1"]:
                         st.session_state[
                             "can_i_eat_result"
                         ] = _can_i_eat_result
+                        queue_ui_sound("ai_food_fit_answer")
                     except Exception as exc:
                         st.error(
                             _cie["error"].format(error=exc)
@@ -8912,6 +9016,7 @@ if selected_page == t["t1"]:
                             "Casa",
                         )
                         st.session_state["ai_photo_analysis_done"] = True
+                        queue_ui_sound("photo_ai_analyzed")
                         st.rerun()
 
                     except Exception as e:
@@ -9257,6 +9362,7 @@ if selected_page == t["t1"]:
                         st.session_state[
                             f"tab1_ai_result_{v}"
                         ] = _tab1_parsed
+                        queue_ui_sound("ai_ingredients_analyzed")
                         st.rerun()
                 except Exception as exc:
                     st.error(_mai["error"].format(error=exc))
@@ -9462,6 +9568,7 @@ if selected_page == t["t1"]:
                     # automatico alla prima sorgente di inserimento.
                     clear_meal_entry_after_save()
 
+                    queue_ui_sound("food_saved")
                     st.success(f"{t['inserted']}: {meal_display_name} ({cals_in} kcal)")
                     st.rerun()
                 except Exception as e:
@@ -9687,6 +9794,7 @@ elif selected_page == t["t2"]:
                         supabase.table("daily_logs").update(payload_plan).eq("id", existing[0]["id"]).execute()
                     else:
                         supabase.table("daily_logs").insert({"user_id": user_id, "date": str(plan_date), **payload_plan}).execute()
+                    play_hidden_local_audio(resolve_ui_sound("day_plan_saved"))
                     st.success(t["plan_saved"].format(date=plan_date.strftime("%d/%m/%Y")))
                 except Exception:
                     st.info(t["plan_persistence_note"])
@@ -9951,6 +10059,7 @@ elif selected_page == t["t2"]:
                             user_id,
                         ).execute()
                         refresh_daily_logs(summary_date)
+                        queue_ui_sound("food_deleted")
                         st.rerun()
                     except Exception as exc:
                         st.error(
@@ -10109,6 +10218,7 @@ elif selected_page == t["t2"]:
 
                         refresh_daily_logs(summary_date)
 
+                        queue_ui_sound("food_updated")
                         st.success(t["meal_updated"].format(meal=tr_meal_type(new_meal_type), category=tr_category(new_meal_category), qty=f"{new_quantity:g}", unit=quantity_unit))
                         st.rerun()
 
@@ -10123,6 +10233,7 @@ elif selected_page == t["t2"]:
                     if st.button(t["del_meal_btn"], key=f"delete_meal_{selected_meal_id}_{summary_date}", use_container_width=True):
                         try:
                             supabase.table("meals").delete().eq("id", selected_meal_id).eq("user_id", user_id).execute()
+                            queue_ui_sound("food_deleted")
                             st.success(t["meal_del_success"])
                             st.rerun()
                         except Exception as e:
@@ -10451,7 +10562,20 @@ elif selected_page == t["t3"]:
                     if getattr(_weight_auth_response, "user", None):
                         st.session_state["user"] = _weight_auth_response.user
 
-                    if sound_to_play is not None:
+                    if is_zero_mode():
+                        _weight_event = (
+                            "weight_big_loss"
+                            if previous_weight is not None
+                            and float(w) <= float(previous_weight) - 1.0
+                            else (
+                                "weight_small_loss"
+                                if previous_weight is not None
+                                and float(w) < float(previous_weight)
+                                else "weight_gain"
+                            )
+                        )
+                        queue_ui_sound(_weight_event)
+                    elif sound_to_play is not None:
                         st.session_state["pending_weight_sound"] = str(sound_to_play)
 
                     st.success(t["weight_saved"])
@@ -11535,6 +11659,7 @@ elif selected_page == t["t4"]:
                     st.session_state[
                         "_pending_recipe_creation_mode"
                     ] = "ai"
+                    queue_ui_sound("ai_recipe_generated")
                     st.rerun()
 
                 except Exception as exc:
@@ -11792,6 +11917,7 @@ elif selected_page == t["t4"]:
                             st.session_state[
                                 "recipe_builder_ingredients"
                             ] = _parsed_ingredients
+                            queue_ui_sound("ai_ingredients_analyzed")
                             st.success(_rcu["ingredient_ai_done"])
                             st.rerun()
 
@@ -11985,6 +12111,7 @@ elif selected_page == t["t4"]:
                             st.session_state[
                                 "recipe_form_version"
                             ] += 1
+                            queue_ui_sound("recipe_saved")
                             st.success(t["composed_saved"])
                             st.rerun()
                         except Exception as e:
@@ -12097,6 +12224,7 @@ elif selected_page == t["t4"]:
                                                     .execute()
                                                 )
                                                 st.session_state[_photo_toggle_key] = False
+                                                queue_ui_sound("recipe_photo_saved")
                                                 st.success(t["recipe_photo_saved"])
                                                 st.rerun()
                                             except Exception as exc:
@@ -12190,6 +12318,11 @@ elif selected_page == t["t4"]:
                         .eq("id", selected_recipe_row["id"])
                         .eq("user_id", user_id)
                         .execute()
+                    )
+                    queue_ui_sound(
+                        "recipe_shared"
+                        if bool(new_share_state)
+                        else "recipe_unshared"
                     )
                     st.success(t["sharing_updated"])
                     st.rerun()
@@ -12456,6 +12589,7 @@ elif selected_page == t["t5"]:
                     
                     refresh_daily_logs(act_date)
                     
+                    queue_ui_sound("steps_saved")
                     st.toast(ux["steps_updated_toast"].format(kcal=estim_cals), icon="👣")
                     st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)")
                     st.rerun()
@@ -12492,6 +12626,7 @@ elif selected_page == t["t5"]:
 
                     refresh_daily_logs(act_date)
                     
+                    queue_ui_sound("activity_saved")
                     st.toast(ux["bike_added"].format(minutes=bike_min, activity=translate_activity_display(act_label, current_lang), kcal=estim_cals), icon="🚲")
                     st.success(ux["bike_added"].format(minutes=bike_min, activity=translate_activity_display(act_label, current_lang), kcal=estim_cals))
                     st.rerun()
@@ -12544,6 +12679,7 @@ elif selected_page == t["t5"]:
                     refresh_daily_logs(act_date)
                     
                     # Usiamo st.success e st.toast per garantire il feedback visivo immediato
+                    queue_ui_sound("activity_saved")
                     st.toast(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals), icon="🎯")
                     st.success(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals))
                     st.rerun()
