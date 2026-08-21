@@ -254,26 +254,60 @@ WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_eff
 WEIGHT_SOUND_GAIN = ASSET_DIR / "assets/sounds/sonicded.mp3"
 
 
+# Central registry for UI sounds. Add downloaded MyInstants MP3 files under
+# assets/sounds/ and map them here. None = action currently has no sound.
+SOUND_EVENTS = {
+    "weight_big_loss": WEIGHT_SOUND_BIG_LOSS,
+    "weight_small_loss": WEIGHT_SOUND_SMALL_LOSS,
+    "weight_gain": WEIGHT_SOUND_GAIN,
+    "food_saved": None,
+    "food_deleted": None,
+    "food_updated": None,
+    "recipe_saved": None,
+    "recipe_deleted": None,
+    "recipe_shared": None,
+    "recipe_unshared": None,
+    "ai_food_fit_answer": None,
+    "ai_ingredients_analyzed": None,
+    "ai_recipe_generated": None,
+    "photo_ai_analyzed": None,
+    "online_food_selected": None,
+    "activity_saved": None,
+    "activity_deleted": None,
+    "steps_saved": None,
+    "day_plan_saved": None,
+    "profile_saved": None,
+    "target_changed": None,
+    "zero_mode_on": None,
+    "zero_mode_off": None,
+    "language_changed": None,
+    "login_success": None,
+    "logout": None,
+    "error": None,
+}
+
+
 def play_hidden_local_audio(audio_path):
-    """Riproduce un MP3 locale senza mostrare un player nella UI."""
+    """Riproduce un MP3 locale dopo un'azione utente, senza dipendere da un iframe custom."""
     try:
         audio_path = Path(audio_path)
         if not audio_path.exists():
-            st.warning(f"File audio non trovato: {audio_path.name}")
-            return
+            print(f"SanoSync sound missing: {audio_path}")
+            return False
 
-        audio_b64 = base64.b64encode(audio_path.read_bytes()).decode("ascii")
-        components.html(
-            f"""
-            <audio autoplay>
-                <source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg">
-            </audio>
-            """,
-            height=0,
-            width=0,
+        # Native Streamlit audio is more robust than an injected zero-size iframe.
+        # Modern browsers may still block autoplay until the user has interacted
+        # with the page; our current sounds are queued by an explicit save action.
+        st.audio(
+            audio_path.read_bytes(),
+            format="audio/mpeg",
+            autoplay=True,
+            width=1,
         )
+        return True
     except Exception as e:
-        print(f"Weight sound error: {e}")
+        print(f"SanoSync sound error: {e}")
+        return False
 
 
 def render_pending_weight_sound():
@@ -4046,7 +4080,7 @@ if is_zero_mode():
         }
 
         .sano-page-kicker::after {
-            content: " Zero";
+            content: " ZERO";
         }
 
         .sano-page-title {
@@ -5438,6 +5472,7 @@ ZERO_COPY = {
     "Italiano": {
         "t": {
             "slogan": "Tutto sotto controllo, secondo le informazioni gentilmente autocertificate.",
+            "morning_plan": 'Buongiorno. Tipo di giornata e attività prevista: vediamo quanto della pianificazione sopravvive al contatto con la realtà.',
             "no_food_data": "Nessun dato alimentare. Prendiamo atto di questa versione della giornata.",
             "no_composed_recipes": "Nessuna ricetta composta. La cucina non ha ancora depositato documentazione.",
             "no_my_recipes": "Nessuna ricetta personale. Per ora il fascicolo culinario è vuoto.",
@@ -5489,6 +5524,7 @@ ZERO_COPY = {
     "English": {
         "t": {
             "slogan": "Everything under control, according to the information kindly self-certified.",
+            "morning_plan": 'Good morning. Day type and expected activity: let’s see how much of the plan survives contact with reality.',
             "no_food_data": "No food data. We acknowledge this version of the day.",
             "no_composed_recipes": "No composed recipes. The kitchen has filed no paperwork yet.",
             "no_my_recipes": "No personal recipes. The culinary file remains empty for now.",
@@ -5540,6 +5576,7 @@ ZERO_COPY = {
     "Nederlands": {
         "t": {
             "slogan": "Alles onder controle, volgens de vriendelijk zelfgecertificeerde informatie.",
+            "morning_plan": 'Goedemorgen. Type dag en verwachte activiteit: eens kijken hoeveel van de planning het contact met de werkelijkheid overleeft.',
             "no_food_data": "Geen voedingsgegevens. We nemen kennis van deze versie van de dag.",
             "no_composed_recipes": "Geen samengestelde recepten. De keuken heeft nog geen dossier ingediend.",
             "no_my_recipes": "Nog geen eigen recepten. Het culinaire dossier blijft voorlopig leeg.",
@@ -5591,6 +5628,7 @@ ZERO_COPY = {
     "Français": {
         "t": {
             "slogan": "Tout est sous contrôle, selon les informations aimablement auto-certifiées.",
+            "morning_plan": 'Bonjour. Type de journée et activité prévue : voyons ce que la planification survivra au contact de la réalité.',
             "no_food_data": "Aucune donnée alimentaire. Nous prenons acte de cette version de la journée.",
             "no_composed_recipes": "Aucune recette composée. La cuisine n'a encore déposé aucun dossier.",
             "no_my_recipes": "Aucune recette personnelle. Le dossier culinaire reste vide pour l'instant.",
