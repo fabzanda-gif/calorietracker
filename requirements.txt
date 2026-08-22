@@ -5,3 +5,5 @@ supabase
 requests
 streamlit-cookies-controller
 openai
+fastapi
+uvicorn
