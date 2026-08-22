@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,30 +19,22 @@ def get_meals_for_date(
     user_id: str = Query(
         ...,
         min_length=1,
-        description=(
-            "TEMPORARY development parameter. "
-            "It will be replaced by authenticated-user resolution."
-        ),
+        description="Temporary development user ID",
     ),
     repo: MealsRepository = Depends(get_meals_repository),
 ):
-    """
-    First real SanoSync API endpoint.
-
-    Development only:
-    `user_id` is explicit for now so we can verify repository/API wiring
-    before migrating authentication.
-    """
     try:
         meals = repo.list_for_date_compatible(
             user_id=user_id,
             log_date=meal_date,
         )
+
         return {
             "date": str(meal_date),
             "count": len(meals),
             "items": meals,
         }
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=502,
