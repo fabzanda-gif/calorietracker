@@ -5,15 +5,16 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from backend.api.dependencies import CurrentUser, get_current_user
+from backend.api.dependencies import (
+    CurrentUser,
+    get_activities_repository,
+    get_current_user,
+)
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 
 
-router = APIRouter(
-    prefix="/activities",
-    tags=["activities"],
-)
+router = APIRouter(prefix="/activities", tags=["activities"])
 
 
 class ActivityCreate(BaseModel):
@@ -27,24 +28,6 @@ class ActivityUpdate(BaseModel):
     burned_calories: int | None = Field(default=None, ge=0)
 
 
-def get_activities_repository(
-    current_user: CurrentUser = Depends(get_current_user),
-) -> ActivitiesRepository:
-    """
-    Build an authenticated Supabase client for activity queries.
-
-    We reuse the authenticated token already resolved by get_current_user.
-    """
-    from backend.api.dependencies import _supabase_settings
-    from supabase import create_client
-
-    url, key = _supabase_settings()
-    client = create_client(url, key)
-    client.postgrest.auth(current_user.access_token)
-
-    return ActivitiesRepository(client)
-
-
 @router.get("/{activity_date}")
 def get_activities_for_date(
     activity_date: date,
@@ -52,17 +35,12 @@ def get_activities_for_date(
     repo: ActivitiesRepository = Depends(get_activities_repository),
 ):
     try:
-        rows = repo.list_for_date(
-            user_id=current_user.id,
-            log_date=activity_date,
-        )
-
+        rows = repo.list_for_date(current_user.id, activity_date)
         return {
             "date": str(activity_date),
             "count": len(rows),
             "items": rows,
         }
-
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -82,12 +60,10 @@ def create_activity(
 
     try:
         item = repo.create(payload)
-
         return {
             "created": True,
             "item": item if item is not None else payload,
         }
-
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -116,12 +92,7 @@ def update_activity(
             user_id=current_user.id,
             payload=payload,
         )
-
-        return {
-            "updated": True,
-            "item": item,
-        }
-
+        return {"updated": True, "item": item}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -136,16 +107,8 @@ def delete_activity(
     repo: ActivitiesRepository = Depends(get_activities_repository),
 ):
     try:
-        repo.delete(
-            activity_id=activity_id,
-            user_id=current_user.id,
-        )
-
-        return {
-            "deleted": True,
-            "id": activity_id,
-        }
-
+        repo.delete(activity_id=activity_id, user_id=current_user.id)
+        return {"deleted": True, "id": activity_id}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
