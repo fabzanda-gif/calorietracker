@@ -10949,26 +10949,90 @@ elif selected_page == t["t3"]:
     # Se un peso è appena stato salvato, riproduci il relativo feedback sonoro.
     render_pending_weight_sound()
 
-    with st.container(border=True):
-        st.markdown(t["weight_manage"])
-        logs_all = list(
-            reversed(weight_repo.history(user_id))
+    # ------------------------------------------------------------------
+    # GESTIONE PESO — hierarchy:
+    # 1. primary action: register today's/new weight
+    # 2. secondary action: history/edit/delete, collapsed by default
+    # 3. target weight, compact
+    # ------------------------------------------------------------------
+    logs_all = list(
+        reversed(weight_repo.history(user_id))
+    )
+    edit_options = {
+        str(r["id"]): (
+            f"{r['date']} · {float(r['weight']):.1f} kg"
         )
-        edit_options = {str(r["id"]): f"{r['date']} · {float(r['weight']):.1f} kg" for r in logs_all}
+        for r in logs_all
+    }
 
-        c1, c2 = st.columns(2)
-        with c1:
-            _latest_weight_default = (
-                float(logs_all[0]["weight"])
-                if logs_all and logs_all[0].get("weight") is not None
-                else (
-                    float(user_current_weight)
-                    if user_current_weight is not None
-                    else 80.0
-                )
+    _latest_weight_default = (
+        float(logs_all[0]["weight"])
+        if logs_all
+        and logs_all[0].get("weight") is not None
+        else (
+            float(user_current_weight)
+            if user_current_weight is not None
+            else 80.0
+        )
+    )
+
+    if "new_weight_value" not in st.session_state:
+        st.session_state["new_weight_value"] = _latest_weight_default
+
+    _weight_ui = {
+        "Italiano": {
+            "register_title": "⚖️ Registra peso",
+            "register_caption": "Aggiungi una nuova misurazione. Il valore predefinito è l’ultimo peso registrato.",
+            "history_title": "🕘 Storico e modifica",
+            "history_caption": "Correggi o elimina una misurazione già registrata.",
+            "target_title": "🎯 Obiettivo peso",
+            "target_caption": "Il target viene usato nelle proiezioni e nel calcolo del mantenimento.",
+        },
+        "English": {
+            "register_title": "⚖️ Log weight",
+            "register_caption": "Add a new measurement. The default value is your latest recorded weight.",
+            "history_title": "🕘 History & edit",
+            "history_caption": "Correct or remove an existing measurement.",
+            "target_title": "🎯 Target weight",
+            "target_caption": "Your target is used for projections and maintenance calculations.",
+        },
+        "Nederlands": {
+            "register_title": "⚖️ Gewicht registreren",
+            "register_caption": "Voeg een nieuwe meting toe. Standaard staat je laatst geregistreerde gewicht ingevuld.",
+            "history_title": "🕘 Geschiedenis en bewerken",
+            "history_caption": "Corrigeer of verwijder een bestaande meting.",
+            "target_title": "🎯 Doelgewicht",
+            "target_caption": "Het doel wordt gebruikt voor prognoses en onderhoudsberekeningen.",
+        },
+        "Français": {
+            "register_title": "⚖️ Enregistrer le poids",
+            "register_caption": "Ajoutez une nouvelle mesure. La valeur par défaut est votre dernier poids enregistré.",
+            "history_title": "🕘 Historique et modification",
+            "history_caption": "Corrigez ou supprimez une mesure existante.",
+            "target_title": "🎯 Poids cible",
+            "target_caption": "La cible est utilisée pour les projections et le calcul du maintien.",
+        },
+    }.get(current_lang, {})
+
+    # PRIMARY ACTION ---------------------------------------------------------
+    with st.container(border=True):
+        st.markdown(
+            f"### {_weight_ui.get('register_title', '⚖️ Registra peso')}"
+        )
+        st.caption(
+            _weight_ui.get(
+                "register_caption",
+                "Aggiungi una nuova misurazione.",
             )
-            if "new_weight_value" not in st.session_state:
-                st.session_state["new_weight_value"] = _latest_weight_default
+        )
+
+        _new_w_col, _new_date_col, _save_col = st.columns(
+            [1.0, 1.0, 0.75],
+            gap="medium",
+            vertical_alignment="bottom",
+        )
+
+        with _new_w_col:
             w = st.number_input(
                 t["new_weight"],
                 min_value=20.0,
@@ -10976,41 +11040,60 @@ elif selected_page == t["t3"]:
                 step=0.1,
                 key="new_weight_value",
             )
-            w_date = st.date_input(t["weight_date"], value=date.today(), key="new_weight_date")
-            if st.button(t["save_weight_ui"], use_container_width=True):
+
+        with _new_date_col:
+            w_date = st.date_input(
+                t["weight_date"],
+                value=date.today(),
+                key="new_weight_date",
+            )
+
+        with _save_col:
+            if st.button(
+                t["save_weight_ui"],
+                use_container_width=True,
+                type="primary",
+                key="save_new_weight_primary",
+            ):
                 try:
-                    # Cerchiamo il peso cronologicamente precedente alla data
-                    # che stiamo registrando. Un eventuale peso già presente
-                    # nello stesso giorno non viene usato come confronto.
                     previous_rows = []
                     for row in logs_all:
                         try:
-                            row_date = pd.to_datetime(row.get("date")).date()
-                            if row_date < w_date and row.get("weight") is not None:
-                                previous_rows.append((row_date, float(row["weight"])))
+                            row_date = pd.to_datetime(
+                                row.get("date")
+                            ).date()
+                            if (
+                                row_date < w_date
+                                and row.get("weight") is not None
+                            ):
+                                previous_rows.append(
+                                    (
+                                        row_date,
+                                        float(row["weight"]),
+                                    )
+                                )
                         except Exception:
                             continue
 
                     previous_weight = None
                     if previous_rows:
-                        previous_rows.sort(key=lambda item: item[0], reverse=True)
+                        previous_rows.sort(
+                            key=lambda item: item[0],
+                            reverse=True,
+                        )
                         previous_weight = previous_rows[0][1]
 
-                    # Decidiamo il suono PRIMA del salvataggio, ma lo accodiamo
-                    # solo dopo che Supabase conferma il successo.
                     sound_to_play = None
                     if previous_weight is not None:
-                        delta_weight = float(w) - float(previous_weight)
+                        delta_weight = (
+                            float(w)
+                            - float(previous_weight)
+                        )
 
-                        # Perdita > 0.5 kg
                         if delta_weight < -0.5:
                             sound_to_play = WEIGHT_SOUND_BIG_LOSS
-
-                        # Perdita da 0.5 kg fino a peso invariato incluso
                         elif delta_weight <= 0:
                             sound_to_play = WEIGHT_SOUND_SMALL_LOSS
-
-                        # Aumento di peso
                         else:
                             sound_to_play = WEIGHT_SOUND_GAIN
 
@@ -11020,7 +11103,6 @@ elif selected_page == t["t3"]:
                         weight=float(w),
                     )
 
-                    # Keep auth metadata aligned with the latest entered weight.
                     _weight_metadata = dict(
                         getattr(
                             st.session_state.get("user"),
@@ -11029,117 +11111,290 @@ elif selected_page == t["t3"]:
                         )
                         or {}
                     )
-                    _weight_metadata["current_weight"] = float(w)
+                    _weight_metadata[
+                        "current_weight"
+                    ] = float(w)
 
                     _target_for_maintenance = _safe_float(
-                        _weight_metadata.get("target_weight")
+                        _weight_metadata.get(
+                            "target_weight"
+                        )
                         or user_target_weight
                     )
                     if (
                         _target_for_maintenance > 0
-                        and abs(float(w) - _target_for_maintenance) <= 0.05
+                        and abs(
+                            float(w)
+                            - _target_for_maintenance
+                        )
+                        <= 0.05
                     ):
-                        _weight_metadata["deficit_target_kcal"] = 0
-                        _weight_metadata["deficit_plan"] = "maintenance"
+                        _weight_metadata[
+                            "deficit_target_kcal"
+                        ] = 0
+                        _weight_metadata[
+                            "deficit_plan"
+                        ] = "maintenance"
 
-                    _weight_auth_response = supabase.auth.update_user(
-                        {"data": _weight_metadata}
+                    _weight_auth_response = (
+                        supabase.auth.update_user(
+                            {"data": _weight_metadata}
+                        )
                     )
-                    if getattr(_weight_auth_response, "user", None):
-                        st.session_state["user"] = _weight_auth_response.user
+                    if getattr(
+                        _weight_auth_response,
+                        "user",
+                        None,
+                    ):
+                        st.session_state[
+                            "user"
+                        ] = _weight_auth_response.user
 
                     if is_zero_mode():
                         _weight_event = (
                             "weight_big_loss"
-                            if previous_weight is not None
-                            and float(w) <= float(previous_weight) - 1.0
+                            if (
+                                previous_weight is not None
+                                and float(w)
+                                <= float(previous_weight) - 1.0
+                            )
                             else (
                                 "weight_small_loss"
-                                if previous_weight is not None
-                                and float(w) < float(previous_weight)
+                                if (
+                                    previous_weight is not None
+                                    and float(w)
+                                    < float(previous_weight)
+                                )
                                 else "weight_gain"
                             )
                         )
                         queue_ui_sound(_weight_event)
                     elif sound_to_play is not None:
-                        st.session_state["pending_weight_sound"] = str(sound_to_play)
+                        st.session_state[
+                            "pending_weight_sound"
+                        ] = str(sound_to_play)
 
                     refresh_daily_logs(w_date)
                     st.success(t["weight_saved"])
                     st.rerun()
 
                 except Exception as e:
-                    st.error(f"Errore nel salvataggio del peso: {e}")
+                    st.error(
+                        f"Errore nel salvataggio del peso: {e}"
+                    )
 
-        with c2:
+    # SECONDARY ACTION -------------------------------------------------------
+    with st.expander(
+        _weight_ui.get(
+            "history_title",
+            "🕘 Storico e modifica",
+        ),
+        expanded=False,
+    ):
+        st.caption(
+            _weight_ui.get(
+                "history_caption",
+                "Correggi o elimina una misurazione.",
+            )
+        )
+
+        if not logs_all:
+            st.info(t.get("no_data", "Nessun dato disponibile."))
+        else:
             selected_weight_id = st.selectbox(
                 t["weight_edit_select"],
                 [""] + list(edit_options),
-                format_func=lambda x: t["weight_select_placeholder"] if x == "" else edit_options[x],
+                format_func=lambda x: (
+                    t["weight_select_placeholder"]
+                    if x == ""
+                    else edit_options[x]
+                ),
                 key="weight_edit_selector",
             )
+
             if selected_weight_id:
-                selected_row = next(r for r in logs_all if str(r["id"]) == selected_weight_id)
-                ew1, ew2 = st.columns(2)
-                with ew1:
-                    edited_date = st.date_input(t["date_label"], value=pd.to_datetime(selected_row["date"]).date(), key=f"edit_weight_date_{selected_weight_id}")
-                with ew2:
-                    edited_weight = st.number_input(t["weight_value"], value=float(selected_row["weight"]), min_value=20.0, max_value=300.0, step=0.1, key=f"edit_weight_value_{selected_weight_id}")
-                b1, b2 = st.columns(2)
-                with b1:
-                    if st.button(t["edit_weight"], use_container_width=True, key=f"update_weight_{selected_weight_id}"):
+                selected_row = next(
+                    r
+                    for r in logs_all
+                    if str(r["id"]) == selected_weight_id
+                )
+
+                _edit_date_col, _edit_weight_col = st.columns(
+                    2,
+                    gap="medium",
+                )
+                with _edit_date_col:
+                    edited_date = st.date_input(
+                        t["date_label"],
+                        value=pd.to_datetime(
+                            selected_row["date"]
+                        ).date(),
+                        key=(
+                            "edit_weight_date_"
+                            f"{selected_weight_id}"
+                        ),
+                    )
+                with _edit_weight_col:
+                    edited_weight = st.number_input(
+                        t["weight_value"],
+                        value=float(
+                            selected_row["weight"]
+                        ),
+                        min_value=20.0,
+                        max_value=300.0,
+                        step=0.1,
+                        key=(
+                            "edit_weight_value_"
+                            f"{selected_weight_id}"
+                        ),
+                    )
+
+                _update_col, _delete_col = st.columns(
+                    [1, 1],
+                    gap="medium",
+                )
+
+                with _update_col:
+                    if st.button(
+                        t["edit_weight"],
+                        use_container_width=True,
+                        key=(
+                            "update_weight_"
+                            f"{selected_weight_id}"
+                        ),
+                    ):
                         try:
-                            if str(edited_date) != str(selected_row["date"]):
+                            if (
+                                str(edited_date)
+                                != str(
+                                    selected_row["date"]
+                                )
+                            ):
                                 weight_repo.move_weight(
-                                    row_id=selected_row["id"],
+                                    row_id=selected_row[
+                                        "id"
+                                    ],
                                     user_id=user_id,
                                     new_date=edited_date,
-                                    weight=float(edited_weight),
+                                    weight=float(
+                                        edited_weight
+                                    ),
                                 )
                             else:
                                 weight_repo.update_weight(
-                                    row_id=selected_row["id"],
+                                    row_id=selected_row[
+                                        "id"
+                                    ],
                                     user_id=user_id,
-                                    weight=float(edited_weight),
+                                    weight=float(
+                                        edited_weight
+                                    ),
                                 )
 
-                            refresh_daily_logs(edited_date)
-                            st.success(t["weight_edited"])
+                            refresh_daily_logs(
+                                edited_date
+                            )
+                            st.success(
+                                t["weight_edited"]
+                            )
                             st.rerun()
                         except Exception as e:
-                            st.error(t["weight_edit_error"].format(error=e))
-                with b2:
-                    if st.button(t["delete_weight"], use_container_width=True, key=f"delete_weight_{selected_weight_id}"):
+                            st.error(
+                                t[
+                                    "weight_edit_error"
+                                ].format(error=e)
+                            )
+
+                with _delete_col:
+                    if st.button(
+                        t["delete_weight"],
+                        use_container_width=True,
+                        key=(
+                            "delete_weight_"
+                            f"{selected_weight_id}"
+                        ),
+                    ):
                         try:
-                            # Do not delete the daily_log row: steps and
-                            # planning may live in the same record.
                             weight_repo.delete_weight(
-                                row_id=selected_row["id"],
+                                row_id=selected_row[
+                                    "id"
+                                ],
                                 user_id=user_id,
                             )
-                            refresh_daily_logs(selected_row["date"])
-                            st.success(t["weight_deleted"])
+                            refresh_daily_logs(
+                                selected_row["date"]
+                            )
+                            st.success(
+                                t["weight_deleted"]
+                            )
                             st.rerun()
                         except Exception as e:
-                            st.error(t["weight_delete_error"].format(error=e))
+                            st.error(
+                                t[
+                                    "weight_delete_error"
+                                ].format(error=e)
+                            )
 
+    # TARGET -----------------------------------------------------------------
     with st.container(border=True):
-        st.markdown(f"#### {t['update_target']}")
-        new_target = st.number_input(
-            t["target_weight_label"],
-            value=float(user_target_weight) if user_target_weight else 75.0,
-            min_value=20.0, max_value=300.0, step=0.5,
-            key="weight_target_edit",
+        _target_title_col, _target_input_col, _target_save_col = st.columns(
+            [1.45, 0.9, 0.75],
+            gap="medium",
+            vertical_alignment="bottom",
         )
-        if st.button(t["save_target"], use_container_width=True):
-            try:
-                res = supabase.auth.update_user({"data": {"target_weight": float(new_target)}})
-                if res.user:
-                    st.session_state["user"] = res.user
-                st.success(t["target_updated"])
-                st.rerun()
-            except Exception as e:
-                st.error(f"Errore: {e}")
+
+        with _target_title_col:
+            st.markdown(
+                f"### {_weight_ui.get('target_title', '🎯 Obiettivo peso')}"
+            )
+            st.caption(
+                _weight_ui.get(
+                    "target_caption",
+                    "Target usato per le proiezioni.",
+                )
+            )
+
+        with _target_input_col:
+            new_target = st.number_input(
+                t["target_weight_label"],
+                value=(
+                    float(user_target_weight)
+                    if user_target_weight
+                    else 75.0
+                ),
+                min_value=20.0,
+                max_value=300.0,
+                step=0.5,
+                key="weight_target_edit",
+            )
+
+        with _target_save_col:
+            if st.button(
+                t["save_target"],
+                use_container_width=True,
+                key="save_weight_target_compact",
+            ):
+                try:
+                    res = supabase.auth.update_user(
+                        {
+                            "data": {
+                                "target_weight": float(
+                                    new_target
+                                )
+                            }
+                        }
+                    )
+                    if res.user:
+                        st.session_state[
+                            "user"
+                        ] = res.user
+
+                    st.success(
+                        t["target_updated"]
+                    )
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Errore: {e}")
 
     # ------------------------------------------------------------------
     # KPI ULTIMI 30 GIORNI
