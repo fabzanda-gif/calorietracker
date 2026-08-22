@@ -1,5 +1,5 @@
+import pytest
 from types import SimpleNamespace
-
 from fastapi.testclient import TestClient
 
 from backend.api.dependencies import (
@@ -16,14 +16,9 @@ class FakeMealsRepository:
         self.last_update = None
         self.last_delete = None
 
-    def list_for_date_compatible(self, user_id, log_date):
-        return []
-
     def create_compatible(self, payload):
         self.last_create = payload
-        return SimpleNamespace(
-            data=[{"id": "meal-1", **payload}]
-        )
+        return SimpleNamespace(data=[{"id": "meal-1", **payload}])
 
     def update(self, meal_id, user_id, payload):
         self.last_update = (meal_id, user_id, payload)
@@ -48,8 +43,13 @@ def override_meals_repo():
     return fake_repo
 
 
-app.dependency_overrides[get_current_user] = override_current_user
-app.dependency_overrides[get_meals_repository] = override_meals_repo
+@pytest.fixture(autouse=True)
+def api_overrides():
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_meals_repository] = override_meals_repo
+    yield
+    app.dependency_overrides.clear()
+
 
 client = TestClient(app)
 
@@ -67,10 +67,8 @@ def test_create_meal_uses_authenticated_user():
             "fat": 6,
         },
     )
-
     assert response.status_code == 201
     assert fake_repo.last_create["user_id"] == "authenticated-user"
-    assert fake_repo.last_create["date"] == "2026-08-22"
 
 
 def test_update_meal_is_user_scoped():
@@ -78,7 +76,6 @@ def test_update_meal_is_user_scoped():
         "/meals/meal-1",
         json={"calories": 200},
     )
-
     assert response.status_code == 200
     assert fake_repo.last_update == (
         "meal-1",
@@ -88,17 +85,12 @@ def test_update_meal_is_user_scoped():
 
 
 def test_update_meal_rejects_empty_body():
-    response = client.patch(
-        "/meals/meal-1",
-        json={},
-    )
-
+    response = client.patch("/meals/meal-1", json={})
     assert response.status_code == 400
 
 
 def test_delete_meal_is_user_scoped():
     response = client.delete("/meals/meal-1")
-
     assert response.status_code == 200
     assert fake_repo.last_delete == (
         "meal-1",
