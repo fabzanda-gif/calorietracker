@@ -30,7 +30,7 @@ def get_weight_repository(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> WeightRepository:
     """
-    Build an authenticated Supabase client for weight queries.
+    Create an authenticated Supabase client for weight queries.
     """
     from backend.api.dependencies import _supabase_settings
     from supabase import create_client
@@ -120,8 +120,6 @@ def update_weight(
         )
 
     try:
-        # If date changes, move the weight safely without deleting the
-        # daily_logs row that may also contain steps/planning.
         if payload.date is not None:
             if payload.weight is None:
                 raise HTTPException(
@@ -135,6 +133,7 @@ def update_weight(
                 new_date=payload.date,
                 weight=payload.weight,
             )
+
         else:
             item = repo.update_weight(
                 row_id=row_id,
