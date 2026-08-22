@@ -19,6 +19,7 @@ from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
 from openai import OpenAI
+from backend.repositories.weight import WeightRepository
 
 # ------------------------------------------------------------------
 # Fotocamera posteriore per Foto AI
@@ -10939,6 +10940,10 @@ elif selected_page == t["t2"]:
 # 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
 # ==============================================================================
 elif selected_page == t["t3"]:
+    # First domain wired to the extracted Supabase repository layer.
+    # UI/business behaviour remains in Streamlit for now; only DB access moves.
+    weight_repo = WeightRepository(supabase)
+
     render_page_title_card(t["weight_tracking"])
 
     # Se un peso è appena stato salvato, riproduci il relativo feedback sonoro.
@@ -10946,9 +10951,8 @@ elif selected_page == t["t3"]:
 
     with st.container(border=True):
         st.markdown(t["weight_manage"])
-        logs_all = (
-            supabase.table("daily_logs").select("id, date, weight").eq("user_id", user_id)
-            .not_.is_("weight", "null").order("date", desc=True).execute().data or []
+        logs_all = list(
+            reversed(weight_repo.history(user_id))
         )
         edit_options = {str(r["id"]): f"{r['date']} · {float(r['weight']):.1f} kg" for r in logs_all}
 
@@ -11010,14 +11014,11 @@ elif selected_page == t["t3"]:
                         else:
                             sound_to_play = WEIGHT_SOUND_GAIN
 
-                    supabase.table("daily_logs").upsert(
-                        {
-                            "user_id": user_id,
-                            "date": str(w_date),
-                            "weight": float(w),
-                        },
-                        on_conflict="user_id,date",
-                    ).execute()
+                    weight_repo.save(
+                        user_id=user_id,
+                        log_date=w_date,
+                        weight=float(w),
+                    )
 
                     # Keep auth metadata aligned with the latest entered weight.
                     _weight_metadata = dict(
@@ -11089,13 +11090,20 @@ elif selected_page == t["t3"]:
                     if st.button(t["edit_weight"], use_container_width=True, key=f"update_weight_{selected_weight_id}"):
                         try:
                             if str(edited_date) != str(selected_row["date"]):
-                                supabase.table("daily_logs").delete().eq("id", selected_row["id"]).eq("user_id", user_id).execute()
-                                supabase.table("daily_logs").upsert(
-                                    {"user_id": user_id, "date": str(edited_date), "weight": float(edited_weight)},
-                                    on_conflict="user_id,date",
-                                ).execute()
+                                weight_repo.move_weight(
+                                    row_id=selected_row["id"],
+                                    user_id=user_id,
+                                    new_date=edited_date,
+                                    weight=float(edited_weight),
+                                )
                             else:
-                                supabase.table("daily_logs").update({"weight": float(edited_weight)}).eq("id", selected_row["id"]).eq("user_id", user_id).execute()
+                                weight_repo.update_weight(
+                                    row_id=selected_row["id"],
+                                    user_id=user_id,
+                                    weight=float(edited_weight),
+                                )
+
+                            refresh_daily_logs(edited_date)
                             st.success(t["weight_edited"])
                             st.rerun()
                         except Exception as e:
@@ -11103,10 +11111,13 @@ elif selected_page == t["t3"]:
                 with b2:
                     if st.button(t["delete_weight"], use_container_width=True, key=f"delete_weight_{selected_weight_id}"):
                         try:
-                            # Non cancelliamo l'intera riga se contiene passi o piano giornata:
-                            # azzeriamo solo weight. Se la riga ha solo il peso, Supabase
-                            # conserverà una riga innocua con weight NULL.
-                            supabase.table("daily_logs").update({"weight": None}).eq("id", selected_row["id"]).eq("user_id", user_id).execute()
+                            # Do not delete the daily_log row: steps and
+                            # planning may live in the same record.
+                            weight_repo.delete_weight(
+                                row_id=selected_row["id"],
+                                user_id=user_id,
+                            )
+                            refresh_daily_logs(selected_row["date"])
                             st.success(t["weight_deleted"])
                             st.rerun()
                         except Exception as e:
