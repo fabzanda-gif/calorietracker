@@ -23,6 +23,28 @@ class ActivitiesRepository(BaseRepository):
                 f"Unable to load activities for {log_date}: {exc}"
             ) from exc
 
+    def list_date_range(
+        self,
+        user_id: str,
+        start_date: Any,
+        end_date: Any,
+    ) -> list[dict]:
+        try:
+            response = (
+                self.table
+                .select("id,user_id,date,activity_name,burned_calories")
+                .eq("user_id", user_id)
+                .gte("date", str(start_date))
+                .lte("date", str(end_date))
+                .order("date")
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load activities from {start_date} to {end_date}: {exc}"
+            ) from exc
+
     def get_named_for_date(
         self,
         user_id: str,
