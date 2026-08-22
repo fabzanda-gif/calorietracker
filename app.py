@@ -1189,6 +1189,33 @@ def delete_meal_via_api(meal_id, access_token):
     return True
 
 
+def fetch_daily_activities_from_api(cache_user_id, cache_date, access_token):
+    """
+    Transitional read used by load_daily_activities_cached.
+
+    cache_user_id remains part of the function signature only to keep cache
+    isolation explicit. FastAPI derives the authenticated user from the
+    Bearer token.
+    """
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/activities/{cache_date}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    payload = response.json()
+    return payload.get("items") or []
+
+
 # ==============================================================================
 # CACHED USER-DATA READS
 # ==============================================================================
@@ -1209,14 +1236,15 @@ def load_daily_meals_cached(
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def load_daily_activities_cached(cache_user_id, cache_date):
-    return (
-        supabase.table("activities")
-        .select("id,date,activity_name,burned_calories")
-        .eq("user_id", cache_user_id)
-        .eq("date", str(cache_date))
-        .execute().data
-        or []
+def load_daily_activities_cached(
+    cache_user_id,
+    cache_date,
+    access_token,
+):
+    return fetch_daily_activities_from_api(
+        cache_user_id,
+        cache_date,
+        access_token,
     )
 
 
@@ -1249,7 +1277,11 @@ def get_daily_totals(target_date):
         str(target_date),
         st.session_state.get("auth_access_token"),
     )
-    activities = load_daily_activities_cached(user_id, str(target_date))
+    activities = load_daily_activities_cached(
+        user_id,
+        str(target_date),
+        st.session_state.get("auth_access_token"),
+    )
     return {
         "meals": meals,
         "activities": activities,
@@ -10122,7 +10154,11 @@ elif selected_page == t["t2"]:
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
-        raw_activities = load_daily_activities_cached(user_id, str(summary_date))
+        raw_activities = load_daily_activities_cached(
+            user_id,
+            str(summary_date),
+            st.session_state.get("auth_access_token"),
+        )
         all_weight_logs = load_weight_history_cached(user_id)
     except Exception as e:
         st.error(t["load_data_error"].format(error=e))
