@@ -2856,6 +2856,7 @@ def save_authenticated_session(response, fallback_user=None):
         raise RuntimeError("Supabase non ha restituito l'utente autenticato.")
 
     st.session_state["auth_access_token"] = access_token
+    st.write("ACCESS TOKEN:", st.session_state.get("auth_access_token"))
     st.session_state["auth_refresh_token"] = refresh_token
     st.session_state["user"] = user_obj
 
