@@ -4372,23 +4372,28 @@ st.markdown(
     <style>
     .sanosync-mode-hint {{
         position: fixed;
-        top: 0.82rem;
-        right: 4.25rem;
-        z-index: 999990;
+        top: 3.45rem;
+        right: 1.1rem;
+        z-index: 999900;
         font-family: 'Kanit', 'Hanken Grotesk', sans-serif;
-        font-size: 0.78rem;
+        font-size: 0.68rem;
         font-weight: 600;
         line-height: 1;
         white-space: nowrap;
         color: {_mode_hint_color};
-        opacity: 0.88;
+        opacity: 0.72;
         pointer-events: none;
+        padding: 0.24rem 0.42rem;
+        border-radius: 999px;
+        background: rgba(127,127,127,.08);
+        backdrop-filter: blur(6px);
     }}
     @media (max-width: 700px) {{
         .sanosync-mode-hint {{
-            top: 0.9rem;
-            right: 3.65rem;
-            font-size: 0.66rem;
+            top: 3.15rem;
+            right: 0.75rem;
+            font-size: 0.60rem;
+            padding: 0.20rem 0.36rem;
         }}
     }}
     </style>
@@ -5470,7 +5475,8 @@ translations = {
         "add_act_btn": "💾 Aggiungi",
         "tab1_title": "🍽️ Inserimento Cibo & Pasti",
         "input_source_lbl": "Fonte inserimento",
-        "opt_off": "🔍 Cerca online (Open Food Facts)",
+        "opt_ai": "✨ AI",
+        "opt_off": "🔍 OpenFood Database",
         "opt_quick": "🍳 Immissione Rapida","quick_select_used":"Seleziona alimento o ricetta","quick_empty":"Nessun alimento ancora disponibile. Registra prima un pasto.","quick_load_error":"Errore nel caricamento delle immissioni rapide: {error}",
         "opt_scan": "📸 Foto AI",
         "scan_title": "📸 Foto AI",
@@ -5572,7 +5578,8 @@ translations = {
         "add_act_btn": "💾 Add",
         "tab1_title": "🍽️ Food & Meal Logging",
         "input_source_lbl": "Input source",
-        "opt_off": "🔍 Search online (Open Food Facts)",
+        "opt_ai": "✨ AI",
+        "opt_off": "🔍 OpenFood Database",
         "opt_quick": "🍳 Quick Entry","quick_select_used":"Select a food or recipe","quick_empty":"No foods available yet. Log a meal first.","quick_load_error":"Error loading quick entries: {error}",
         "opt_scan": "📸 AI Photo",
         "scan_title": "📸 AI Photo",
@@ -5674,7 +5681,8 @@ translations = {
         "add_act_btn": "💾 Toevoegen",
         "tab1_title": "🍽️ Voeding & Maaltijden Invoeren",
         "input_source_lbl": "Invoerbron",
-        "opt_off": "🔍 Online zoeken (Open Food Facts)",
+        "opt_ai": "✨ AI",
+        "opt_off": "🔍 OpenFood Database",
         "opt_quick": "🍳 Snelle Invoer","quick_select_used":"Selecteer een voedingsmiddel of recept","quick_empty":"Nog geen voedingsmiddelen beschikbaar. Registreer eerst een maaltijd.","quick_load_error":"Fout bij het laden van snelle invoer: {error}",
         "opt_scan": "📸 AI-foto",
         "scan_title": "📸 AI-foto",
@@ -5813,7 +5821,8 @@ translations["Français"] = {
     "add_act_btn": "💾 Ajouter",
     "tab1_title": "🍽️ Saisie des aliments & repas",
     "input_source_lbl": "Source de saisie",
-    "opt_off": "🔍 Rechercher en ligne (Open Food Facts)",
+    "opt_ai": "✨ AI",
+        "opt_off": "🔍 OpenFood Database",
     "opt_quick": "🍳 Saisie rapide","quick_select_used":"Sélectionnez un aliment ou une recette","quick_empty":"Aucun aliment disponible pour le moment. Enregistrez d’abord un repas.","quick_load_error":"Erreur lors du chargement des saisies rapides : {error}",
         "opt_scan": "📸 Photo IA",
         "scan_title": "📸 Photo IA",
@@ -9141,9 +9150,10 @@ if selected_page == t["t1"]:
     }.get(current_lang, "🍲 Ricette")
 
     _input_source_options = [
+        t["opt_ai"],
         t["opt_quick"],
-        t["opt_off"],
         t["opt_scan"],
+        t["opt_off"],
     ]
 
     # Se il pasto precedente è stato salvato, il reset della sorgente viene
@@ -9188,10 +9198,11 @@ if selected_page == t["t1"]:
         key="meal_input_source",
     )
 
-    is_online = input_source == t["opt_off"]
+    is_ai = input_source == t["opt_ai"]
     is_quick = input_source == t["opt_quick"]
-    is_recipe = False  # Ricette integrate in Immissione Rapida
     is_scan = input_source == t["opt_scan"]
+    is_online = input_source == t["opt_off"]
+    is_recipe = False  # Ricette integrate in Immissione Rapida
     v = st.session_state["form_version"]
 
     if "base_cals" not in st.session_state:
@@ -9251,14 +9262,156 @@ if selected_page == t["t1"]:
 
     # --------------------------------------------------------------
     # METODO DI INSERIMENTO
-    # Card comune per Quick Entry / Open Food Facts / Ricette / Foto AI
+    # Card sorgente: AI / Immissione Rapida / Foto / OpenFood Database
     # --------------------------------------------------------------
     with st.container(border=True):
         st.markdown(f"### {input_source}")
+
         # ------------------------------------------------------------------
-        # A. Open Food Facts
+        # A. SanoSync AI — free ingredient description
         # ------------------------------------------------------------------
-        if is_online:
+        if is_ai:
+            _meal_ai_i18n = {
+                "Italiano": {
+                    "caption": "Scrivi cosa hai mangiato. SanoSync AI riconosce ingredienti e quantità; nome, kcal e macro vengono compilati automaticamente.",
+                    "placeholder": "Es. 250g pollo, 120g riso, 200g zucchine, 10g olio",
+                    "portions": "Porzioni",
+                    "analyze": "✨ Calcola con SanoSync AI",
+                    "spinner": "SanoSync AI sta ricostruendo il pasto…",
+                    "error": "Errore nell'analisi: {error}",
+                    "voice_error": "Impossibile trascrivere l’audio: {error}",
+                    "default_name": "Pasto AI",
+                },
+                "English": {
+                    "caption": "Describe what you ate. SanoSync AI recognizes ingredients and quantities; name, calories and macros are filled in automatically.",
+                    "placeholder": "E.g. 250g chicken, 120g rice, 200g courgette, 10g oil",
+                    "portions": "Servings",
+                    "analyze": "✨ Calculate with SanoSync AI",
+                    "spinner": "SanoSync AI is reconstructing the meal…",
+                    "error": "Analysis error: {error}",
+                    "voice_error": "Could not transcribe the audio: {error}",
+                    "default_name": "AI meal",
+                },
+                "Nederlands": {
+                    "caption": "Beschrijf wat je hebt gegeten. SanoSync AI herkent ingrediënten en hoeveelheden; naam, calorieën en macro's worden automatisch ingevuld.",
+                    "placeholder": "Bijv. 250g kip, 120g rijst, 200g courgette, 10g olie",
+                    "portions": "Porties",
+                    "analyze": "✨ Bereken met SanoSync AI",
+                    "spinner": "SanoSync AI reconstrueert de maaltijd…",
+                    "error": "Analysefout: {error}",
+                    "voice_error": "Kon de audio niet transcriberen: {error}",
+                    "default_name": "AI-maaltijd",
+                },
+                "Français": {
+                    "caption": "Décrivez ce que vous avez mangé. SanoSync AI reconnaît les ingrédients et les quantités ; le nom, les calories et les macros sont remplis automatiquement.",
+                    "placeholder": "Ex. 250g poulet, 120g riz, 200g courgettes, 10g huile",
+                    "portions": "Portions",
+                    "analyze": "✨ Calculer avec SanoSync AI",
+                    "spinner": "SanoSync AI reconstruit le repas…",
+                    "error": "Erreur d'analyse : {error}",
+                    "voice_error": "Impossible de transcrire l’audio : {error}",
+                    "default_name": "Repas IA",
+                },
+            }
+            _mai = _meal_ai_i18n.get(
+                current_lang,
+                _meal_ai_i18n["Italiano"],
+            )
+
+            st.caption(_mai["caption"])
+
+            _tab1_ai_text_key = f"tab1_ai_ingredient_text_{v}"
+            render_ai_spotlight_css()
+
+            with st.container(key=f"ai_spotlight_tab1_{v}"):
+                render_ai_ingredient_header(
+                    title="SanoSync AI",
+                    help_text=_mai["caption"],
+                    widget_key=f"sanosync_voice_tab1_{v}",
+                    target_key=_tab1_ai_text_key,
+                    language=current_lang,
+                    error_label=_mai["voice_error"],
+                )
+                _tab1_ai_text = st.text_area(
+                    "SanoSync AI",
+                    key=_tab1_ai_text_key,
+                    placeholder=_mai["placeholder"],
+                    height=88,
+                    label_visibility="collapsed",
+                )
+
+            _ai_col1, _ai_col2 = st.columns([1, 2])
+            with _ai_col1:
+                _tab1_ai_portions = st.number_input(
+                    _mai["portions"],
+                    min_value=1.0,
+                    max_value=20.0,
+                    value=1.0,
+                    step=1.0,
+                    key=f"tab1_ai_portions_{v}",
+                )
+            with _ai_col2:
+                st.write("")
+                st.write("")
+                _run_tab1_ai = st.button(
+                    _mai["analyze"],
+                    use_container_width=True,
+                    type="primary",
+                    key=f"tab1_ai_analyze_{v}",
+                )
+
+            if _run_tab1_ai and str(_tab1_ai_text or "").strip():
+                try:
+                    with st.spinner(_mai["spinner"]):
+                        _parsed = parse_recipe_ingredients_with_ai(
+                            _tab1_ai_text,
+                            current_lang,
+                        )
+
+                    if _parsed:
+                        _tw, _totals, _p100 = calculate_recipe_totals(
+                            _parsed
+                        )
+                        _parts = max(float(_tab1_ai_portions), 1.0)
+                        _per_portion = {
+                            k: float(val) / _parts
+                            for k, val in _totals.items()
+                        }
+
+                        # Generate a compact, editable meal name from the parsed food.
+                        _ingredient_names = [
+                            str(x.get("name") or "").strip()
+                            for x in _parsed
+                            if str(x.get("name") or "").strip()
+                        ]
+                        _auto_name = ", ".join(_ingredient_names[:3])
+                        if len(_ingredient_names) > 3:
+                            _auto_name += "…"
+                        if not _auto_name:
+                            _auto_name = _mai["default_name"]
+
+                        reset_or_update(
+                            name=_auto_name,
+                            cals=_per_portion["calories"],
+                            prot=_per_portion["protein"],
+                            carbs=_per_portion["carbs"],
+                            fat=_per_portion["fat"],
+                            selected=f"ai:{_tab1_ai_text}",
+                            grams=1.0,
+                            is_100g=False,
+                        )
+                        st.session_state[
+                            f"tab1_ai_result_{v}"
+                        ] = _parsed
+                        queue_ui_sound("ai_ingredients_analyzed")
+                        st.rerun()
+                except Exception as exc:
+                    st.error(_mai["error"].format(error=exc))
+
+        # ------------------------------------------------------------------
+        # B. Open Food Facts
+        # ------------------------------------------------------------------
+        elif is_online:
             search_q = st.text_input(t["search_food"])
             if st.button(t["search_btn"]):
                 if len(search_q.strip()) >= 2 or search_q.strip().isdigit():
@@ -9741,183 +9894,9 @@ if selected_page == t["t1"]:
             key=f"input_meal_name_{v}",
         )
 
-        # AI ingredient calculator replaces the old Notes field.
-        _meal_ai_i18n = {
-            "Italiano": {
-                "title": "✨ **SanoSync AI · Calcola da ingredienti**",
-                "caption": "Scrivi liberamente cosa hai mangiato o cosa vuoi mangiare. L’AI riconosce ingredienti e quantità e calcola kcal e macro.",
-                "ingredients": "Ingredienti / descrizione del pasto",
-                "placeholder": "Es. 250g pollo, 120g riso, 200g zucchine, 10g olio",
-                "portions": "Porzioni",
-                "analyze": "✨ Analizza con SanoSync AI",
-                "spinner": "SanoSync AI sta calcolando il pasto…",
-                "total": "Totale",
-                "per_portion": "Per porzione",
-                "use": "↗️ Usa questi valori",
-                "used": "Valori AI caricati nel pasto.",
-                "error": "Errore nell'analisi: {error}",
-                "voice_error": "Impossibile trascrivere l’audio: {error}",
-            },
-            "English": {
-                "title": "✨ **SanoSync AI · Calculate from ingredients**",
-                "caption": "Describe what you ate or want to eat. AI recognizes ingredients and quantities and calculates calories and macros.",
-                "ingredients": "Ingredients / meal description",
-                "placeholder": "E.g. 250g chicken, 120g rice, 200g courgette, 10g oil",
-                "portions": "Servings",
-                "analyze": "✨ Analyze with SanoSync AI",
-                "spinner": "SanoSync AI is calculating the meal…",
-                "total": "Total",
-                "per_portion": "Per serving",
-                "use": "↗️ Use these values",
-                "used": "AI values loaded into the meal.",
-                "error": "Analysis error: {error}",
-                "voice_error": "Could not transcribe the audio: {error}",
-            },
-            "Nederlands": {
-                "title": "✨ **SanoSync AI · Bereken uit ingrediënten**",
-                "caption": "Beschrijf wat je hebt gegeten of wilt eten. AI herkent ingrediënten en hoeveelheden en berekent calorieën en macro's.",
-                "ingredients": "Ingrediënten / beschrijving maaltijd",
-                "placeholder": "Bijv. 250g kip, 120g rijst, 200g courgette, 10g olie",
-                "portions": "Porties",
-                "analyze": "✨ Analyseer met SanoSync AI",
-                "spinner": "SanoSync AI berekent de maaltijd…",
-                "total": "Totaal",
-                "per_portion": "Per portie",
-                "use": "↗️ Gebruik deze waarden",
-                "used": "AI-waarden in de maaltijd geladen.",
-                "error": "Analysefout: {error}",
-                "voice_error": "Kon de audio niet transcriberen: {error}",
-            },
-            "Français": {
-                "title": "✨ **SanoSync AI · Calculer à partir des ingrédients**",
-                "caption": "Décrivez ce que vous avez mangé ou souhaitez manger. L’IA reconnaît ingrédients et quantités et calcule calories et macros.",
-                "ingredients": "Ingrédients / description du repas",
-                "placeholder": "Ex. 250g poulet, 120g riz, 200g courgettes, 10g huile",
-                "portions": "Portions",
-                "analyze": "✨ Analyser avec SanoSync AI",
-                "spinner": "SanoSync AI calcule le repas…",
-                "total": "Total",
-                "per_portion": "Par portion",
-                "use": "↗️ Utiliser ces valeurs",
-                "used": "Valeurs IA chargées dans le repas.",
-                "error": "Erreur d'analyse : {error}",
-                "voice_error": "Impossible de transcrire l’audio : {error}",
-            },
-        }
-        _mai = _meal_ai_i18n.get(
-            current_lang,
-            _meal_ai_i18n["Italiano"],
-        )
-
-        # Keep notes internally available for existing DB insert logic,
-        # but remove the visible Notes widget from Tab 1.
+        # Notes remain internally available for the existing DB schema.
+        # AI input now lives exclusively in the top source selector.
         meal_notes = ""
-
-        # Always visible: AI is a primary input method.
-        # The title is the field label itself (same size as the other form labels),
-        # while the explanatory copy lives behind Streamlit's built-in ? tooltip.
-        _tab1_ai_text_key = f"tab1_ai_ingredient_text_{v}"
-
-        render_ai_spotlight_css()
-
-        with st.container(key=f"ai_spotlight_tab1_{v}"):
-            render_ai_ingredient_header(
-                title=_mai["title"].replace("**", ""),
-                help_text=_mai["caption"],
-                widget_key=f"sanosync_voice_tab1_{v}",
-                target_key=_tab1_ai_text_key,
-                language=current_lang,
-                error_label=_mai["voice_error"],
-            )
-
-            _tab1_ai_text = st.text_area(
-                "SanoSync AI",
-                key=_tab1_ai_text_key,
-                placeholder=_mai["placeholder"],
-                height=90,
-                label_visibility="collapsed",
-                help=_mai["caption"],
-            )
-        _tab1_ai_text = str(
-            st.session_state.get(_tab1_ai_text_key, "") or ""
-        )
-
-        _tab1_ai_portions = st.number_input(
-            _mai["portions"],
-            min_value=1.0,
-            max_value=20.0,
-            value=1.0,
-            step=1.0,
-            key=f"tab1_ai_portions_{v}",
-        )
-
-        if st.button(
-            _mai["analyze"],
-            use_container_width=True,
-            key=f"tab1_ai_analyze_{v}",
-        ):
-            if _tab1_ai_text.strip():
-                try:
-                    with st.spinner(_mai["spinner"]):
-                        _tab1_parsed = parse_recipe_ingredients_with_ai(
-                            _tab1_ai_text,
-                            current_lang,
-                        )
-                    if _tab1_parsed:
-                        st.session_state[
-                            f"tab1_ai_result_{v}"
-                        ] = _tab1_parsed
-                        queue_ui_sound("ai_ingredients_analyzed")
-                        st.rerun()
-                except Exception as exc:
-                    st.error(_mai["error"].format(error=exc))
-
-        _tab1_result = st.session_state.get(
-            f"tab1_ai_result_{v}"
-        )
-        if _tab1_result:
-            _tw, _tt, _p100 = calculate_recipe_totals(
-                _tab1_result
-            )
-            _parts = max(float(_tab1_ai_portions), 1.0)
-            _pp = {
-                k: float(val) / _parts
-                for k, val in _tt.items()
-            }
-
-            st.markdown(
-                f"**{_mai['total']}:** "
-                f"{_tt['calories']:.0f} kcal · "
-                f"Pro {_tt['protein']:.1f} g · "
-                f"Carbs {_tt['carbs']:.1f} g · "
-                f"Fat {_tt['fat']:.1f} g"
-            )
-            st.markdown(
-                f"**{_mai['per_portion']}:** "
-                f"**{_pp['calories']:.0f} kcal** · "
-                f"Pro {_pp['protein']:.1f} g · "
-                f"Carbs {_pp['carbs']:.1f} g · "
-                f"Fat {_pp['fat']:.1f} g"
-            )
-
-            if st.button(
-                _mai["use"],
-                use_container_width=True,
-                key=f"tab1_ai_use_{v}",
-            ):
-                st.session_state["is_per_100g_val"] = False
-                st.session_state["grams_val"] = 1.0
-                st.session_state["base_cals"] = _pp["calories"]
-                st.session_state["base_prot"] = _pp["protein"]
-                st.session_state["base_carbs"] = _pp["carbs"]
-                st.session_state["base_fat"] = _pp["fat"]
-                st.session_state[f"mode_radio_{v}"] = t["per_portion"]
-                st.session_state.pop(f"meal_kcal_{v}", None)
-                st.session_state.pop(f"meal_pro_{v}", None)
-                st.session_state.pop(f"meal_carbs_{v}", None)
-                st.session_state.pop(f"meal_fat_{v}", None)
-                st.success(_mai["used"])
-                st.rerun()
 
         mode_options = [t["per_100g"], t["per_portion"]]
         default_index = 0 if st.session_state["is_per_100g_val"] else 1
@@ -11603,7 +11582,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_done": "✅ Ingredienti compilati automaticamente.",
             "ingredient_ai_empty": "Inserisci almeno un ingrediente.",
             "ingredient_ai_error": "Errore durante l'analisi degli ingredienti: {error}",
-            "ingredient_voice_error": "Impossibile trascrivere l’audio: {error}","creation_mode":"Come vuoi creare la ricetta?","mode_known":"🍳 So già cosa cucinare","mode_ai":"✨ Voglio un aiuto dall’AI","mode_known_help":"Scrivi gli ingredienti che hai deciso di usare: SanoSync calcolerà automaticamente kcal e macro.","mode_ai_help":"Descrivi i tuoi obiettivi e lascia che SanoSync proponga una ricetta completa.","ai_starting_ingredients":"✨ Ingredienti di partenza per l’AI (opzionale)","ai_starting_help":"Se li inserisci, l’AI li userà come base (modalità svuotafrigo) e aggiungerà solo ciò che serve.","ai_generated_loaded":"✅ Ricetta AI caricata in modifica. Controlla ingredienti e valori prima di salvarla.",
+            "ingredient_voice_error": "Impossibile trascrivere l’audio: {error}","creation_mode":"Come vuoi creare la ricetta?","mode_known":"🍳 So già cosa cucinare","mode_ai":"✨ Voglio un aiuto dall’AI","ingredient_entry_mode":"Come vuoi inserire gli ingredienti?","ingredient_entry_manual":"✍️ Manualmente","ingredient_entry_ai":"✨ Con SanoSync AI","manual_add":"➕ Aggiungi ingrediente","manual_name":"Ingrediente","manual_qty":"Quantità (g)","manual_kcal":"Kcal","manual_pro":"Pro","manual_carbs":"Carbs","manual_fat":"Fat","mode_known_help":"Scrivi gli ingredienti che hai deciso di usare: SanoSync calcolerà automaticamente kcal e macro.","mode_ai_help":"Descrivi i tuoi obiettivi e lascia che SanoSync proponga una ricetta completa.","ai_starting_ingredients":"✨ Ingredienti di partenza per l’AI (opzionale)","ai_starting_help":"Se li inserisci, l’AI li userà come base (modalità svuotafrigo) e aggiungerà solo ciò che serve.","ai_generated_loaded":"✅ Ricetta AI caricata in modifica. Controlla ingredienti e valori prima di salvarla.",
         },
         "English": {
             "my": "👤 My recipes",
@@ -11630,7 +11609,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_done": "✅ Ingredients filled automatically.",
             "ingredient_ai_empty": "Enter at least one ingredient.",
             "ingredient_ai_error": "Ingredient analysis error: {error}",
-            "ingredient_voice_error": "Could not transcribe the audio: {error}","creation_mode":"How do you want to create the recipe?","mode_known":"🍳 I already know what to cook","mode_ai":"✨ I want AI help","mode_known_help":"Enter the ingredients you have chosen: SanoSync will calculate calories and macros automatically.","mode_ai_help":"Set your targets and let SanoSync propose a complete recipe.","ai_starting_ingredients":"✨ Starting ingredients for AI (optional)","ai_starting_help":"If provided, AI will use them as the base (fridge-clear-out mode) and add only what is needed.","ai_generated_loaded":"✅ AI recipe loaded for editing. Review ingredients and values before saving.",
+            "ingredient_voice_error": "Could not transcribe the audio: {error}","creation_mode":"How do you want to create the recipe?","mode_known":"🍳 I already know what to cook","mode_ai":"✨ I want AI help","ingredient_entry_mode":"How do you want to enter ingredients?","ingredient_entry_manual":"✍️ Manually","ingredient_entry_ai":"✨ With SanoSync AI","manual_add":"➕ Add ingredient","manual_name":"Ingredient","manual_qty":"Quantity (g)","manual_kcal":"Kcal","manual_pro":"Protein","manual_carbs":"Carbs","manual_fat":"Fat","mode_known_help":"Enter the ingredients you have chosen: SanoSync will calculate calories and macros automatically.","mode_ai_help":"Set your targets and let SanoSync propose a complete recipe.","ai_starting_ingredients":"✨ Starting ingredients for AI (optional)","ai_starting_help":"If provided, AI will use them as the base (fridge-clear-out mode) and add only what is needed.","ai_generated_loaded":"✅ AI recipe loaded for editing. Review ingredients and values before saving.",
         },
         "Nederlands": {
             "my": "👤 Mijn recepten",
@@ -11657,7 +11636,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_done": "✅ Ingrediënten automatisch ingevuld.",
             "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
             "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}",
-            "ingredient_voice_error": "Kon de audio niet transcriberen: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ AI-recept geladen om te bewerken. Controleer ingrediënten en waarden voor je opslaat.",
+            "ingredient_voice_error": "Kon de audio niet transcriberen: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","ingredient_entry_mode":"Hoe wil je ingrediënten invoeren?","ingredient_entry_manual":"✍️ Handmatig","ingredient_entry_ai":"✨ Met SanoSync AI","manual_add":"➕ Ingrediënt toevoegen","manual_name":"Ingrediënt","manual_qty":"Hoeveelheid (g)","manual_kcal":"Kcal","manual_pro":"Eiwit","manual_carbs":"Koolh.","manual_fat":"Vet","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ AI-recept geladen om te bewerken. Controleer ingrediënten en waarden voor je opslaat.",
         },
         "Français": {
             "my": "👤 Mes recettes",
@@ -11684,7 +11663,7 @@ elif selected_page == t["t4"]:
             "ingredient_ai_done": "✅ Ingrédients remplis automatiquement.",
             "ingredient_ai_empty": "Saisissez au moins un ingrédient.",
             "ingredient_ai_error": "Erreur d'analyse des ingrédients : {error}",
-            "ingredient_voice_error": "Impossible de transcrire l’audio : {error}","creation_mode":"Comment souhaitez-vous créer la recette ?","mode_known":"🍳 Je sais déjà quoi cuisiner","mode_ai":"✨ Je veux l’aide de l’IA","mode_known_help":"Saisissez les ingrédients choisis : SanoSync calculera automatiquement calories et macros.","mode_ai_help":"Définissez vos objectifs et laissez SanoSync proposer une recette complète.","ai_starting_ingredients":"✨ Ingrédients de départ pour l’IA (optionnel)","ai_starting_help":"Si vous les indiquez, l’IA les utilisera comme base (mode vide-frigo) et n’ajoutera que le nécessaire.","ai_generated_loaded":"✅ Recette IA chargée en modification. Vérifiez les ingrédients et valeurs avant l’enregistrement.",
+            "ingredient_voice_error": "Impossible de transcrire l’audio : {error}","creation_mode":"Comment souhaitez-vous créer la recette ?","mode_known":"🍳 Je sais déjà quoi cuisiner","mode_ai":"✨ Je veux l’aide de l’IA","ingredient_entry_mode":"Comment souhaitez-vous saisir les ingrédients ?","ingredient_entry_manual":"✍️ Manuellement","ingredient_entry_ai":"✨ Avec SanoSync AI","manual_add":"➕ Ajouter un ingrédient","manual_name":"Ingrédient","manual_qty":"Quantité (g)","manual_kcal":"Kcal","manual_pro":"Prot.","manual_carbs":"Gluc.","manual_fat":"Lip.","mode_known_help":"Saisissez les ingrédients choisis : SanoSync calculera automatiquement calories et macros.","mode_ai_help":"Définissez vos objectifs et laissez SanoSync proposer une recette complète.","ai_starting_ingredients":"✨ Ingrédients de départ pour l’IA (optionnel)","ai_starting_help":"Si vous les indiquez, l’IA les utilisera comme base (mode vide-frigo) et n’ajoutera que le nécessaire.","ai_generated_loaded":"✅ Recette IA chargée en modification. Vérifiez les ingrédients et valeurs avant l’enregistrement.",
         },
     }
     _rcu = _recipe_compact_i18n.get(
@@ -12356,66 +12335,167 @@ elif selected_page == t["t4"]:
                         width=260,
                     )
 
-            _recipe_ai_text_key = f"recipe_ai_ingredient_text_{v}"
-
-            render_ai_spotlight_css()
-
-            with st.container(key=f"ai_spotlight_recipe_{v}"):
-                render_ai_ingredient_header(
-                    title=_rcu["ingredient_ai_label"].replace("**", ""),
-                    help_text=_rcu["ingredient_ai_help"],
-                    widget_key=f"sanosync_voice_recipe_{v}",
-                    target_key=_recipe_ai_text_key,
-                    language=current_lang,
-                    error_label=_rcu["ingredient_voice_error"],
-                )
-
-                _ingredient_free_text = st.text_area(
-                    "SanoSync AI",
-                    key=_recipe_ai_text_key,
-                    placeholder=_rcu["ingredient_ai_placeholder"],
-                    height=110,
-                    label_visibility="collapsed",
-                    help=_rcu["ingredient_ai_help"],
-                )
-            _ingredient_free_text = str(
-                st.session_state.get(_recipe_ai_text_key, "") or ""
+            _ingredient_entry_mode = st.radio(
+                _rcu["ingredient_entry_mode"],
+                ["manual", "ai"],
+                horizontal=True,
+                key=f"recipe_ingredient_entry_mode_{v}",
+                format_func=lambda x: (
+                    _rcu["ingredient_entry_manual"]
+                    if x == "manual"
+                    else _rcu["ingredient_entry_ai"]
+                ),
             )
 
-            if st.button(
-                _rcu["ingredient_ai_button"],
-                use_container_width=True,
-                key=f"recipe_ai_parse_ingredients_{v}",
-            ):
-                if not _ingredient_free_text.strip():
-                    st.warning(_rcu["ingredient_ai_empty"])
-                else:
-                    try:
-                        with st.spinner(_rcu["ingredient_ai_spinner"]):
-                            _parsed_ingredients = (
-                                parse_recipe_ingredients_with_ai(
-                                    _ingredient_free_text,
-                                    current_lang,
+            if _ingredient_entry_mode == "ai":
+                _recipe_ai_text_key = f"recipe_ai_ingredient_text_{v}"
+
+                render_ai_spotlight_css()
+
+                with st.container(key=f"ai_spotlight_recipe_{v}"):
+                    render_ai_ingredient_header(
+                        title=_rcu["ingredient_ai_label"].replace("**", ""),
+                        help_text=_rcu["ingredient_ai_help"],
+                        widget_key=f"sanosync_voice_recipe_{v}",
+                        target_key=_recipe_ai_text_key,
+                        language=current_lang,
+                        error_label=_rcu["ingredient_voice_error"],
+                    )
+
+                    _ingredient_free_text = st.text_area(
+                        "SanoSync AI",
+                        key=_recipe_ai_text_key,
+                        placeholder=_rcu["ingredient_ai_placeholder"],
+                        height=100,
+                        label_visibility="collapsed",
+                        help=_rcu["ingredient_ai_help"],
+                    )
+
+                if st.button(
+                    _rcu["ingredient_ai_button"],
+                    use_container_width=True,
+                    key=f"recipe_ai_parse_ingredients_{v}",
+                ):
+                    if not str(_ingredient_free_text or "").strip():
+                        st.warning(_rcu["ingredient_ai_empty"])
+                    else:
+                        try:
+                            with st.spinner(_rcu["ingredient_ai_spinner"]):
+                                _parsed_ingredients = (
+                                    parse_recipe_ingredients_with_ai(
+                                        _ingredient_free_text,
+                                        current_lang,
+                                    )
+                                )
+
+                            if not _parsed_ingredients:
+                                st.warning(_rcu["ingredient_ai_empty"])
+                            else:
+                                st.session_state[
+                                    "recipe_builder_ingredients"
+                                ] = _parsed_ingredients
+                                queue_ui_sound("ai_ingredients_analyzed")
+                                st.success(_rcu["ingredient_ai_done"])
+                                st.rerun()
+
+                        except Exception as exc:
+                            st.error(
+                                _rcu["ingredient_ai_error"].format(
+                                    error=exc
                                 )
                             )
+                            print(traceback.format_exc())
 
-                        if not _parsed_ingredients:
-                            st.warning(_rcu["ingredient_ai_empty"])
-                        else:
-                            st.session_state[
-                                "recipe_builder_ingredients"
-                            ] = _parsed_ingredients
-                            queue_ui_sound("ai_ingredients_analyzed")
-                            st.success(_rcu["ingredient_ai_done"])
-                            st.rerun()
+            else:
+                # Manual ingredient entry. Nutrient values refer to the
+                # entered quantity; internally they are converted to /100 g
+                # so existing recipe calculations remain unchanged.
+                _manual_cols_1 = st.columns([2.2, 1.1, 1.0], gap="small")
+                with _manual_cols_1[0]:
+                    _manual_name = st.text_input(
+                        _rcu["manual_name"],
+                        key=f"manual_recipe_ing_name_{v}",
+                    )
+                with _manual_cols_1[1]:
+                    _manual_qty = st.number_input(
+                        _rcu["manual_qty"],
+                        min_value=0.0,
+                        value=100.0,
+                        step=1.0,
+                        key=f"manual_recipe_ing_qty_{v}",
+                    )
+                with _manual_cols_1[2]:
+                    _manual_kcal = st.number_input(
+                        _rcu["manual_kcal"],
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        key=f"manual_recipe_ing_kcal_{v}",
+                    )
 
-                    except Exception as exc:
-                        st.error(
-                            _rcu["ingredient_ai_error"].format(
-                                error=exc
+                _manual_cols_2 = st.columns(3, gap="small")
+                with _manual_cols_2[0]:
+                    _manual_pro = st.number_input(
+                        _rcu["manual_pro"],
+                        min_value=0.0,
+                        value=0.0,
+                        step=0.1,
+                        key=f"manual_recipe_ing_pro_{v}",
+                    )
+                with _manual_cols_2[1]:
+                    _manual_carbs = st.number_input(
+                        _rcu["manual_carbs"],
+                        min_value=0.0,
+                        value=0.0,
+                        step=0.1,
+                        key=f"manual_recipe_ing_carbs_{v}",
+                    )
+                with _manual_cols_2[2]:
+                    _manual_fat = st.number_input(
+                        _rcu["manual_fat"],
+                        min_value=0.0,
+                        value=0.0,
+                        step=0.1,
+                        key=f"manual_recipe_ing_fat_{v}",
+                    )
+
+                if st.button(
+                    _rcu["manual_add"],
+                    use_container_width=True,
+                    key=f"manual_recipe_ing_add_{v}",
+                ):
+                    if str(_manual_name or "").strip() and _manual_qty > 0:
+                        _factor_100 = 100.0 / float(_manual_qty)
+                        _manual_item = {
+                            "name": str(_manual_name).strip(),
+                            "quantity_g": float(_manual_qty),
+                            "calories_per_100g": float(_manual_kcal) * _factor_100,
+                            "protein_per_100g": float(_manual_pro) * _factor_100,
+                            "carbs_per_100g": float(_manual_carbs) * _factor_100,
+                            "fat_per_100g": float(_manual_fat) * _factor_100,
+                            "source": "manual",
+                        }
+                        _existing_manual = list(
+                            st.session_state.get(
+                                "recipe_builder_ingredients",
+                                [],
                             )
                         )
-                        print(traceback.format_exc())
+                        _existing_manual.append(_manual_item)
+                        st.session_state[
+                            "recipe_builder_ingredients"
+                        ] = _existing_manual
+
+                        # Clear only the manual-add widgets on the next run.
+                        for _manual_key in (
+                            f"manual_recipe_ing_name_{v}",
+                            f"manual_recipe_ing_kcal_{v}",
+                            f"manual_recipe_ing_pro_{v}",
+                            f"manual_recipe_ing_carbs_{v}",
+                            f"manual_recipe_ing_fat_{v}",
+                        ):
+                            st.session_state.pop(_manual_key, None)
+                        st.rerun()
 
             ingredients = st.session_state.get(
                 "recipe_builder_ingredients",
