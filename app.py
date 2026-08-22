@@ -20,6 +20,7 @@ from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
 from openai import OpenAI
 from backend.repositories.weight import WeightRepository
+from backend.repositories.activities import ActivitiesRepository
 
 # ------------------------------------------------------------------
 # Fotocamera posteriore per Foto AI
@@ -13457,6 +13458,8 @@ elif selected_page == t["t4"]:
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
 # ==============================================================================
 elif selected_page == t["t5"]:
+    activities_repo = ActivitiesRepository(supabase)
+
     render_page_title_card(t["register_activity"])
     act_date = st.date_input(t["act_date"], value=date.today())
     
@@ -13467,7 +13470,13 @@ elif selected_page == t["t5"]:
             if existing_log and existing_log[0].get("steps")
             else 0
         )
-        day_activities = load_daily_activities_cached(user_id, str(act_date))
+        day_activities = activities_repo.list_for_date(
+
+            user_id,
+
+            act_date,
+
+        )
     except Exception:
         day_steps = 0
         day_activities = []
@@ -13603,12 +13612,22 @@ elif selected_page == t["t5"]:
                     )
                     estim_cals = 0 if has_step_conflict else int(new_steps * 0.04)
                     
-                    existing_act = supabase.table("activities").select("id").eq("user_id", user_id).eq("date", str(act_date)).eq("activity_name", "Passi (Stima)").execute().data
+                    activities_repo.upsert_named_for_date(
+
                     
-                    if existing_act:
-                        supabase.table("activities").update({"burned_calories": estim_cals}).eq("id", existing_act[0]["id"]).execute()
-                    else:
-                        supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": "Passi (Stima)", "burned_calories": estim_cals}).execute()
+                        user_id=user_id,
+
+                    
+                        log_date=act_date,
+
+                    
+                        activity_name="Passi (Stima)",
+
+                    
+                        burned_calories=estim_cals,
+
+                    
+                    )
                     
                     refresh_daily_logs(act_date)
                     
@@ -13642,7 +13661,28 @@ elif selected_page == t["t5"]:
                         estim_cals = int(bike_min * 8)  # Stima Bici normale: ~8 kcal/min
                         act_label = "Bici"
                         
-                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": act_label, "burned_calories": estim_cals}).execute()
+                    activities_repo.create(
+
+                        
+                        {
+
+                        
+                            "user_id": user_id,
+
+                        
+                            "date": str(act_date),
+
+                        
+                            "activity_name": act_label,
+
+                        
+                            "burned_calories": estim_cals,
+
+                        
+                        }
+
+                        
+                    )
                     
                     # Bici/E-Bike è compatibile con i passi:
                     # NON azzeriamo le kcal attribuite ai passi.
@@ -13679,25 +13719,37 @@ elif selected_page == t["t5"]:
                 )
                 if submitted_act:
                     # Inseriamo l'attività
-                    supabase.table("activities").insert({"user_id": user_id, "date": str(act_date), "activity_name": extra_act, "burned_calories": int(extra_cals)}).execute()
+                    activities_repo.create(
+
+                        {
+
+                            "user_id": user_id,
+
+                            "date": str(act_date),
+
+                            "activity_name": extra_act,
+
+                            "burned_calories": int(extra_cals),
+
+                        }
+
+                    )
                     
                     # Padel e Corsa sono incompatibili con le kcal dei passi,
                     # perché i passi di quelle attività sarebbero già compresi.
                     # Palestra/Nuoto/Altro restano invece cumulabili con i passi.
                     if str(extra_act).strip().casefold() in {"padel", "corsa", "running"}:
-                        passi_act = (
-                            supabase.table("activities")
-                            .select("id")
-                            .eq("user_id", user_id)
-                            .eq("date", str(act_date))
-                            .eq("activity_name", "Passi (Stima)")
-                            .execute()
-                            .data
+                        activities_repo.set_named_calories(
+
+                            user_id=user_id,
+
+                            log_date=act_date,
+
+                            activity_name="Passi (Stima)",
+
+                            burned_calories=0,
+
                         )
-                        if passi_act:
-                            supabase.table("activities").update(
-                                {"burned_calories": 0}
-                            ).eq("id", passi_act[0]["id"]).execute()
 
                     refresh_daily_logs(act_date)
                     
