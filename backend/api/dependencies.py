@@ -1,3 +1,4 @@
+cat > backend/api/dependencies.py <<'PY'
 from __future__ import annotations
 
 import os
@@ -22,13 +23,17 @@ class CurrentUser:
 
 def _supabase_settings() -> tuple[str, str]:
     url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+    key = (
+        os.getenv("SUPABASE_ANON_KEY")
+        or os.getenv("SUPABASE_KEY")
+    )
 
     if not url or not key:
         raise RuntimeError(
             "Missing SUPABASE_URL and SUPABASE_ANON_KEY "
             "(or SUPABASE_KEY) environment variables."
         )
+
     return url, key
 
 
@@ -43,6 +48,8 @@ def get_current_user(
         bearer_scheme
     ),
 ) -> CurrentUser:
+    # IMPORTANT:
+    # Check the Bearer token BEFORE creating a Supabase client.
     if credentials is None or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,8 +92,13 @@ def get_authenticated_supabase(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Client:
     url, key = _supabase_settings()
+
     client = create_client(url, key)
+
+    # Send the authenticated user's JWT with PostgREST queries,
+    # allowing Supabase RLS policies based on auth.uid().
     client.postgrest.auth(current_user.access_token)
+
     return client
 
 
@@ -94,3 +106,4 @@ def get_meals_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> MealsRepository:
     return MealsRepository(supabase)
+PY
