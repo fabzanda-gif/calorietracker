@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from backend.api.dependencies import (
@@ -69,6 +69,97 @@ class MealUpdate(BaseModel):
     recipe_servings: float | None = None
     is_shared: bool | None = None
     image_url: str | None = None
+
+
+# ------------------------------------------------------------------
+# Historical/list endpoints.
+# IMPORTANT: keep these BEFORE /{meal_date}, otherwise strings such as
+# "history" or "range" could be interpreted as the dynamic date route.
+# ------------------------------------------------------------------
+
+@router.get("/history")
+def get_meal_history(
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: MealsRepository = Depends(get_meals_repository),
+):
+    try:
+        meals = repo.list_history_compatible(current_user.id)
+
+        return {
+            "count": len(meals),
+            "items": meals,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/range")
+def get_meals_for_range(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: MealsRepository = Depends(get_meals_repository),
+):
+    if end_date < start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_date must be on or after start_date",
+        )
+
+    try:
+        meals = repo.list_date_range(
+            user_id=current_user.id,
+            start_date=start_date,
+            end_date=end_date,
+            columns=(
+                "id,date,meal_type,name,base_name,quantity,is_per_100g,"
+                "base_calories,base_protein,base_carbs,base_fat,"
+                "calories,protein,carbs,fat,notes,category,"
+                "ingredients_json,recipe_servings,is_shared,image_url"
+            ),
+        )
+
+        return {
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+            "count": len(meals),
+            "items": meals,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/by-type/{meal_type}")
+def get_meals_by_type(
+    meal_type: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: MealsRepository = Depends(get_meals_repository),
+):
+    try:
+        meals = repo.list_by_meal_type_compatible(
+            current_user.id,
+            meal_type,
+        )
+
+        return {
+            "meal_type": meal_type,
+            "count": len(meals),
+            "items": meals,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/{meal_date}")
