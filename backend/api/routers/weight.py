@@ -1,95 +1,40 @@
 from __future__ import annotations
 
-from datetime import date
-from typing import Any
+from datetime import date as Date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
-    get_meals_repository,
+    get_weight_repository,
 )
 from backend.repositories.base import RepositoryError
-from backend.repositories.meals import MealsRepository
+from backend.repositories.weight import WeightRepository
 
 
-router = APIRouter(prefix="/meals", tags=["meals"])
+router = APIRouter(prefix="/weight", tags=["weight"])
 
 
-class MealCreate(BaseModel):
-    date: date
-    meal_type: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-
-    calories: float = 0
-    protein: float = 0
-    carbs: float = 0
-    fat: float = 0
-
-    base_name: str | None = None
-    quantity: float | None = None
-    is_per_100g: bool | None = None
-
-    base_calories: float | None = None
-    base_protein: float | None = None
-    base_carbs: float | None = None
-    base_fat: float | None = None
-
-    notes: str | None = None
-    category: str | None = None
-    ingredients_json: Any | None = None
-    recipe_servings: float | None = None
-    is_shared: bool | None = None
-    image_url: str | None = None
+class WeightCreate(BaseModel):
+    date: Date
+    weight: float = Field(gt=0)
 
 
-class MealUpdate(BaseModel):
-    meal_type: str | None = None
-    name: str | None = None
-
-    calories: float | None = None
-    protein: float | None = None
-    carbs: float | None = None
-    fat: float | None = None
-
-    base_name: str | None = None
-    quantity: float | None = None
-    is_per_100g: bool | None = None
-
-    base_calories: float | None = None
-    base_protein: float | None = None
-    base_carbs: float | None = None
-    base_fat: float | None = None
-
-    notes: str | None = None
-    category: str | None = None
-    ingredients_json: Any | None = None
-    recipe_servings: float | None = None
-    is_shared: bool | None = None
-    image_url: str | None = None
+class WeightUpdate(BaseModel):
+    date: Date | None = None
+    weight: float | None = Field(default=None, gt=0)
 
 
-# ------------------------------------------------------------------
-# Historical/list endpoints.
-# IMPORTANT: keep these BEFORE /{meal_date}, otherwise strings such as
-# "history" or "range" could be interpreted as the dynamic date route.
-# ------------------------------------------------------------------
-
-@router.get("/history")
-def get_meal_history(
+@router.get("")
+def get_weight_history(
     current_user: CurrentUser = Depends(get_current_user),
-    repo: MealsRepository = Depends(get_meals_repository),
+    repo: WeightRepository = Depends(get_weight_repository),
 ):
     try:
-        meals = repo.list_history_compatible(current_user.id)
-
-        return {
-            "count": len(meals),
-            "items": meals,
-        }
-
+        rows = repo.history(current_user.id)
+        return {"count": len(rows), "items": rows}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -97,89 +42,13 @@ def get_meal_history(
         ) from exc
 
 
-@router.get("/range")
-def get_meals_for_range(
-    start_date: date = Query(...),
-    end_date: date = Query(...),
+@router.get("/latest")
+def get_latest_weight(
     current_user: CurrentUser = Depends(get_current_user),
-    repo: MealsRepository = Depends(get_meals_repository),
-):
-    if end_date < start_date:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="end_date must be on or after start_date",
-        )
-
-    try:
-        meals = repo.list_date_range(
-            user_id=current_user.id,
-            start_date=start_date,
-            end_date=end_date,
-            columns=(
-                "id,date,meal_type,name,base_name,quantity,is_per_100g,"
-                "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat,notes,category,"
-                "ingredients_json,recipe_servings,is_shared,image_url"
-            ),
-        )
-
-        return {
-            "start_date": str(start_date),
-            "end_date": str(end_date),
-            "count": len(meals),
-            "items": meals,
-        }
-
-    except RepositoryError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
-        ) from exc
-
-
-@router.get("/by-type/{meal_type}")
-def get_meals_by_type(
-    meal_type: str,
-    current_user: CurrentUser = Depends(get_current_user),
-    repo: MealsRepository = Depends(get_meals_repository),
+    repo: WeightRepository = Depends(get_weight_repository),
 ):
     try:
-        meals = repo.list_by_meal_type_compatible(
-            current_user.id,
-            meal_type,
-        )
-
-        return {
-            "meal_type": meal_type,
-            "count": len(meals),
-            "items": meals,
-        }
-
-    except RepositoryError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
-        ) from exc
-
-
-@router.get("/{meal_date}")
-def get_meals_for_date(
-    meal_date: date,
-    current_user: CurrentUser = Depends(get_current_user),
-    repo: MealsRepository = Depends(get_meals_repository),
-):
-    try:
-        meals = repo.list_for_date_compatible(
-            user_id=current_user.id,
-            log_date=meal_date,
-        )
-
-        return {
-            "date": str(meal_date),
-            "count": len(meals),
-            "items": meals,
-        }
-
+        return {"item": repo.latest(current_user.id)}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -188,30 +57,18 @@ def get_meals_for_date(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_meal(
-    meal: MealCreate,
+def create_weight(
+    payload: WeightCreate,
     current_user: CurrentUser = Depends(get_current_user),
-    repo: MealsRepository = Depends(get_meals_repository),
+    repo: WeightRepository = Depends(get_weight_repository),
 ):
-    """
-    Create a meal for the authenticated user.
-
-    `user_id` is never accepted from the client: FastAPI adds it from
-    the authenticated Supabase session.
-    """
-    payload = meal.model_dump(exclude_none=True)
-    payload["date"] = str(payload["date"])
-    payload["user_id"] = current_user.id
-
     try:
-        response = repo.create_compatible(payload)
-        rows = getattr(response, "data", None) or []
-
-        return {
-            "created": True,
-            "item": rows[0] if rows else payload,
-        }
-
+        item = repo.save(
+            user_id=current_user.id,
+            log_date=payload.date,
+            weight=payload.weight,
+        )
+        return {"created": True, "item": item}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -219,36 +76,43 @@ def create_meal(
         ) from exc
 
 
-@router.patch("/{meal_id}")
-def update_meal(
-    meal_id: str,
-    changes: MealUpdate,
+@router.patch("/{row_id}")
+def update_weight(
+    row_id: str,
+    payload: WeightUpdate,
     current_user: CurrentUser = Depends(get_current_user),
-    repo: MealsRepository = Depends(get_meals_repository),
+    repo: WeightRepository = Depends(get_weight_repository),
 ):
-    """
-    Update only fields explicitly supplied by the client.
-    """
-    payload = changes.model_dump(exclude_unset=True)
-
-    if not payload:
+    if payload.weight is None and payload.date is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No fields supplied",
         )
 
     try:
-        item = repo.update(
-            meal_id=meal_id,
-            user_id=current_user.id,
-            payload=payload,
-        )
+        if payload.date is not None:
+            if payload.weight is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Weight is required when changing date",
+                )
+            item = repo.move_weight(
+                row_id=row_id,
+                user_id=current_user.id,
+                new_date=payload.date,
+                weight=payload.weight,
+            )
+        else:
+            item = repo.update_weight(
+                row_id=row_id,
+                user_id=current_user.id,
+                weight=payload.weight,
+            )
 
-        return {
-            "updated": True,
-            "item": item,
-        }
+        return {"updated": True, "item": item}
 
+    except HTTPException:
+        raise
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -256,26 +120,15 @@ def update_meal(
         ) from exc
 
 
-@router.delete(
-    "/{meal_id}",
-    status_code=status.HTTP_200_OK,
-)
-def delete_meal(
-    meal_id: str,
+@router.delete("/{row_id}")
+def delete_weight(
+    row_id: str,
     current_user: CurrentUser = Depends(get_current_user),
-    repo: MealsRepository = Depends(get_meals_repository),
+    repo: WeightRepository = Depends(get_weight_repository),
 ):
     try:
-        repo.delete(
-            meal_id=meal_id,
-            user_id=current_user.id,
-        )
-
-        return {
-            "deleted": True,
-            "id": meal_id,
-        }
-
+        item = repo.delete_weight(row_id=row_id, user_id=current_user.id)
+        return {"deleted": True, "id": row_id, "item": item}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
