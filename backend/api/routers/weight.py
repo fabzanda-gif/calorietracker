@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as Date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -17,12 +17,12 @@ router = APIRouter(
 
 
 class WeightCreate(BaseModel):
-    date: date
+    date: Date
     weight: float = Field(gt=0)
 
 
 class WeightUpdate(BaseModel):
-    date: date | None = None
+    date: Date | None = None
     weight: float | None = Field(default=None, gt=0)
 
 
