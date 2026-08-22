@@ -20,7 +20,6 @@ from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
 from openai import OpenAI
-from backend.repositories.meals import MealsRepository
 
 # ------------------------------------------------------------------
 # Fotocamera posteriore per Foto AI
@@ -1212,6 +1211,90 @@ def fetch_daily_activities_from_api(cache_user_id, cache_date, access_token):
     return payload.get("items") or []
 
 
+def fetch_meal_history_from_api(access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/meals/history",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
+def fetch_meals_range_from_api(start_date, end_date, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/meals/range",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        params={
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
+def fetch_meals_by_type_from_api(meal_type, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/meals/by-type/{meal_type}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
+def fetch_activities_range_from_api(start_date, end_date, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/activities/range",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        params={
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
 def create_activity_via_api(payload, access_token):
     if not access_token:
         raise RuntimeError(
@@ -1715,10 +1798,8 @@ def load_weight_history_cached(cache_user_id, access_token):
 
 @st.cache_data(ttl=60, show_spinner=False)
 def load_quick_meal_rows_cached(cache_user_id):
-    # Transitional historical read.
-    # The current Meals API exposes daily CRUD but no history/range endpoint yet.
-    return MealsRepository(supabase).list_history_compatible(
-        cache_user_id
+    return fetch_meal_history_from_api(
+        st.session_state.get("auth_access_token")
     )
 
 
@@ -2769,9 +2850,9 @@ def suggest_next_meal_type(log_date=None):
 
 def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
     """Trova il meal replicabile più vicino al target rispettando contesto e categoria."""
-    rows = MealsRepository(supabase).list_by_meal_type_compatible(
-        user_id,
+    rows = fetch_meals_by_type_from_api(
         meal_type,
+        st.session_state.get("auth_access_token"),
     )
 
     allowed = set(allowed_categories or MEAL_CATEGORIES)
@@ -10276,17 +10357,8 @@ if selected_page == t["t1"]:
         # ------------------------------------------------------------------
         elif is_recipe:
             try:
-                recipe_rows = (
-                    supabase.table("meals")
-                    .select(
-                        "id,date,name,base_name,quantity,is_per_100g,"
-                        "base_calories,base_protein,base_carbs,base_fat,"
-                        "calories,protein,carbs,fat,notes,category,ingredients_json"
-                    )
-                    .eq("user_id", user_id)
-                    .order("date", desc=True)
-                    .execute().data
-                    or []
+                recipe_rows = fetch_meal_history_from_api(
+                    st.session_state.get("auth_access_token")
                 )
 
                 recipes_dict = {}
@@ -12278,16 +12350,15 @@ elif selected_page == t["t3"]:
             month_end.date(),
             st.session_state.get("auth_access_token"),
         )
-        month_meals_rows = MealsRepository(supabase).list_date_range(
-            user_id=user_id,
-            start_date=month_start.date(),
-            end_date=month_end.date(),
-            columns="date,calories",
+        month_meals_rows = fetch_meals_range_from_api(
+            month_start.date(),
+            month_end.date(),
+            st.session_state.get("auth_access_token"),
         )
-        month_acts_rows = (
-            supabase.table("activities").select("date, burned_calories").eq("user_id", user_id)
-            .gte("date", str(month_start.date())).lte("date", str(month_end.date()))
-            .execute().data or []
+        month_acts_rows = fetch_activities_range_from_api(
+            month_start.date(),
+            month_end.date(),
+            st.session_state.get("auth_access_token"),
         )
 
         mw = pd.DataFrame(month_weights_rows)
@@ -12442,16 +12513,15 @@ elif selected_page == t["t3"]:
                 chart_end.date(),
                 st.session_state.get("auth_access_token"),
             )
-            meals_rows = MealsRepository(supabase).list_date_range(
-                user_id=user_id,
-                start_date=chart_start.date(),
-                end_date=chart_end.date(),
-                columns="date,meal_type,name,calories,protein,carbs,fat",
+            meals_rows = fetch_meals_range_from_api(
+                chart_start.date(),
+                chart_end.date(),
+                st.session_state.get("auth_access_token"),
             )
-            acts_rows = (
-                supabase.table("activities").select("date, activity_name, burned_calories")
-                .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date()))
-                .execute().data or []
+            acts_rows = fetch_activities_range_from_api(
+                chart_start.date(),
+                chart_end.date(),
+                st.session_state.get("auth_access_token"),
             )
 
             df_weight = pd.DataFrame(logs)
