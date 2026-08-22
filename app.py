@@ -1216,6 +1216,112 @@ def fetch_daily_activities_from_api(cache_user_id, cache_date, access_token):
     return payload.get("items") or []
 
 
+def create_activity_via_api(payload, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    api_payload = dict(payload)
+    api_payload.pop("user_id", None)
+
+    response = requests.post(
+        f"{get_api_base_url()}/activities",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=api_payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def update_activity_via_api(activity_id, payload, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.patch(
+        f"{get_api_base_url()}/activities/{activity_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def delete_activity_via_api(activity_id, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.delete(
+        f"{get_api_base_url()}/activities/{activity_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return True
+
+
+def upsert_named_activity_via_api(
+    *,
+    cache_user_id,
+    log_date,
+    activity_name,
+    burned_calories,
+    access_token,
+):
+    rows = fetch_daily_activities_from_api(
+        cache_user_id,
+        str(log_date),
+        access_token,
+    )
+
+    existing = next(
+        (
+            row for row in rows
+            if str(row.get("activity_name") or "").strip().casefold()
+            == str(activity_name).strip().casefold()
+        ),
+        None,
+    )
+
+    payload = {
+        "date": str(log_date),
+        "activity_name": activity_name,
+        "burned_calories": int(burned_calories),
+    }
+
+    if existing and existing.get("id"):
+        return update_activity_via_api(
+            existing["id"],
+            payload,
+            access_token,
+        )
+
+    return create_activity_via_api(
+        payload,
+        access_token,
+    )
+
+
 # ==============================================================================
 # CACHED USER-DATA READS
 # ==============================================================================
@@ -13865,8 +13971,6 @@ elif selected_page == t["t4"]:
 # 13. PAGE 5: ACTIVITY & STEPS LOGGING
 # ==============================================================================
 elif selected_page == t["t5"]:
-    activities_repo = ActivitiesRepository(supabase)
-
     render_page_title_card(t["register_activity"])
     act_date = st.date_input(t["act_date"], value=date.today())
     
@@ -13877,12 +13981,10 @@ elif selected_page == t["t5"]:
             if existing_log and existing_log[0].get("steps")
             else 0
         )
-        day_activities = activities_repo.list_for_date(
-
+        day_activities = load_daily_activities_cached(
             user_id,
-
-            act_date,
-
+            str(act_date),
+            st.session_state.get("auth_access_token"),
         )
     except Exception:
         day_steps = 0
@@ -14020,21 +14122,12 @@ elif selected_page == t["t5"]:
                     )
                     estim_cals = 0 if has_step_conflict else int(new_steps * 0.04)
                     
-                    activities_repo.upsert_named_for_date(
-
-                    
-                        user_id=user_id,
-
-                    
+                    upsert_named_activity_via_api(
+                        cache_user_id=user_id,
                         log_date=act_date,
-
-                    
                         activity_name="Passi (Stima)",
-
-                    
                         burned_calories=estim_cals,
-
-                    
+                        access_token=st.session_state.get("auth_access_token"),
                     )
                     
                     refresh_daily_logs(act_date)
@@ -14069,27 +14162,13 @@ elif selected_page == t["t5"]:
                         estim_cals = int(bike_min * 8)  # Stima Bici normale: ~8 kcal/min
                         act_label = "Bici"
                         
-                    activities_repo.create(
-
-                        
+                    create_activity_via_api(
                         {
-
-                        
-                            "user_id": user_id,
-
-                        
                             "date": str(act_date),
-
-                        
                             "activity_name": act_label,
-
-                        
                             "burned_calories": estim_cals,
-
-                        
-                        }
-
-                        
+                        },
+                        st.session_state.get("auth_access_token"),
                     )
                     
                     # Bici/E-Bike è compatibile con i passi:
@@ -14127,36 +14206,25 @@ elif selected_page == t["t5"]:
                 )
                 if submitted_act:
                     # Inseriamo l'attività
-                    activities_repo.create(
-
+                    create_activity_via_api(
                         {
-
-                            "user_id": user_id,
-
                             "date": str(act_date),
-
                             "activity_name": extra_act,
-
                             "burned_calories": int(extra_cals),
-
-                        }
-
+                        },
+                        st.session_state.get("auth_access_token"),
                     )
                     
                     # Padel e Corsa sono incompatibili con le kcal dei passi,
                     # perché i passi di quelle attività sarebbero già compresi.
                     # Palestra/Nuoto/Altro restano invece cumulabili con i passi.
                     if str(extra_act).strip().casefold() in {"padel", "corsa", "running"}:
-                        activities_repo.set_named_calories(
-
-                            user_id=user_id,
-
+                        upsert_named_activity_via_api(
+                            cache_user_id=user_id,
                             log_date=act_date,
-
                             activity_name="Passi (Stima)",
-
                             burned_calories=0,
-
+                            access_token=st.session_state.get("auth_access_token"),
                         )
 
                     refresh_daily_logs(act_date)
