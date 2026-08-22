@@ -10959,10 +10959,10 @@ elif selected_page == t["t2"]:
                         if selected_meal.get("quantity") is not None:
                             update_payload["quantity"] = new_quantity
 
-                        MealsRepository(supabase).update(
-                            meal_id=selected_meal_id,
-                            user_id=user_id,
-                            payload=update_payload,
+                        update_meal_via_api(
+                            selected_meal_id,
+                            update_payload,
+                            st.session_state.get("auth_access_token"),
                         )
 
                         refresh_daily_logs(summary_date)
