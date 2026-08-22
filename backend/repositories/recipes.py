@@ -5,91 +5,156 @@ from typing import Any
 from .base import BaseRepository, RepositoryError
 
 
-MEAL_COLUMNS = (
-    "id,user_id,date,meal_type,name,base_name,quantity,is_per_100g,"
-    "base_calories,base_protein,base_carbs,base_fat,"
-    "calories,protein,carbs,fat,notes,category,"
-    "ingredients_json,recipe_servings,is_shared,image_url"
+RECIPE_COLUMNS = (
+    "id,user_id,name,meal_type,category,recipe_servings,"
+    "calories,protein,carbs,fat,notes,ingredients_json,"
+    "is_shared,image_url,created_at"
 )
 
 
-class MealsRepository(BaseRepository):
-    table_name = "meals"
+class RecipesRepository(BaseRepository):
+    table_name = "recipe_library"
 
-    def list_for_date(self, user_id: str, log_date: Any) -> list[dict]:
+    def list_personal(self, user_id: str) -> list[dict]:
         try:
             response = (
                 self.table
-                .select(MEAL_COLUMNS)
+                .select(RECIPE_COLUMNS)
                 .eq("user_id", user_id)
-                .eq("date", str(log_date))
+                .order("created_at", desc=True)
                 .execute()
             )
             return self._data(response)
         except Exception as exc:
             raise RepositoryError(
-                f"Unable to load meals for {log_date}: {exc}"
+                f"Unable to load personal recipes: {exc}"
             ) from exc
 
-    def list_history(self, user_id: str) -> list[dict]:
+    def list_shared(
+        self,
+        exclude_user_id: str | None = None,
+    ) -> list[dict]:
+        try:
+            query = (
+                self.table
+                .select(RECIPE_COLUMNS)
+                .eq("is_shared", True)
+            )
+            if exclude_user_id:
+                query = query.neq(
+                    "user_id",
+                    exclude_user_id,
+                )
+            response = query.order(
+                "created_at",
+                desc=True,
+            ).execute()
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load shared recipes: {exc}"
+            ) from exc
+
+    def list_available(self, user_id: str) -> list[dict]:
         try:
             response = (
                 self.table
-                .select(MEAL_COLUMNS)
-                .eq("user_id", user_id)
-                .order("date", desc=True)
+                .select(RECIPE_COLUMNS)
+                .or_(
+                    f"user_id.eq.{user_id},"
+                    "is_shared.eq.true"
+                )
+                .order("created_at", desc=True)
                 .execute()
             )
             return self._data(response)
         except Exception as exc:
             raise RepositoryError(
-                f"Unable to load meal history: {exc}"
+                f"Unable to load available recipes: {exc}"
             ) from exc
 
-    def breakfast_exists(self, user_id: str, log_date: Any) -> bool:
+    def get_personal_by_id(
+        self,
+        recipe_id: Any,
+        user_id: str,
+    ) -> dict | None:
         try:
             response = (
                 self.table
-                .select("id")
+                .select(RECIPE_COLUMNS)
+                .eq("id", recipe_id)
                 .eq("user_id", user_id)
-                .eq("date", str(log_date))
-                .eq("meal_type", "Colazione")
                 .limit(1)
                 .execute()
             )
-            return bool(self._data(response))
-        except Exception as exc:
-            raise RepositoryError(
-                f"Unable to check breakfast: {exc}"
-            ) from exc
-
-    def create(self, payload: dict) -> dict | None:
-        try:
-            response = self.table.insert(payload).execute()
             rows = self._data(response)
             return rows[0] if rows else None
         except Exception as exc:
-            raise RepositoryError(f"Unable to create meal: {exc}") from exc
+            raise RepositoryError(
+                f"Unable to load recipe: {exc}"
+            ) from exc
 
-    def update(self, meal_id: Any, user_id: str, payload: dict) -> dict | None:
+    def create_response(self, payload: dict):
+        try:
+            return self.table.insert(payload).execute()
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to create recipe: {exc}"
+            ) from exc
+
+    def create(self, payload: dict) -> dict | None:
+        response = self.create_response(payload)
+        rows = self._data(response)
+        return rows[0] if rows else None
+
+    def update(
+        self,
+        recipe_id: Any,
+        user_id: str,
+        payload: dict,
+    ) -> dict | None:
         try:
             response = (
                 self.table
                 .update(payload)
-                .eq("id", meal_id)
+                .eq("id", recipe_id)
                 .eq("user_id", user_id)
                 .execute()
             )
             rows = self._data(response)
             return rows[0] if rows else None
         except Exception as exc:
-            raise RepositoryError(f"Unable to update meal: {exc}") from exc
+            raise RepositoryError(
+                f"Unable to update recipe: {exc}"
+            ) from exc
 
-    def delete(self, meal_id: Any, user_id: str) -> bool:
+    def set_shared(
+        self,
+        recipe_id: Any,
+        user_id: str,
+        is_shared: bool,
+    ) -> dict | None:
+        return self.update(
+            recipe_id=recipe_id,
+            user_id=user_id,
+            payload={"is_shared": bool(is_shared)},
+        )
+
+    def delete(
+        self,
+        recipe_id: Any,
+        user_id: str,
+    ) -> bool:
         try:
-            self.table.delete().eq("id", meal_id).eq(
-                "user_id", user_id
-            ).execute()
+            (
+                self.table
+                .delete()
+                .eq("id", recipe_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
             return True
         except Exception as exc:
-            raise RepositoryError(f"Unable to delete meal: {exc}") from exc
+            raise RepositoryError(
+                f"Unable to delete recipe: {exc}"
+            ) from exc
