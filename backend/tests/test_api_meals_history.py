@@ -1,11 +1,10 @@
-from backend.api.main import app
+from backend.api.routers.meals import router as meals_router
 
 
 def test_meals_history_routes_are_registered():
     paths = {
         route.path
-        for route in app.routes
-        if getattr(route, "path", "").startswith("/meals")
+        for route in meals_router.routes
     }
 
     assert "/meals/history" in paths
