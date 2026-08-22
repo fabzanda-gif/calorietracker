@@ -23,6 +23,7 @@ from backend.repositories.weight import WeightRepository
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
+from backend.repositories.daily_logs import DailyLogsRepository
 
 # ------------------------------------------------------------------
 # Fotocamera posteriore per Foto AI
@@ -1078,36 +1079,17 @@ def load_daily_activities_cached(cache_user_id, cache_date):
 
 @st.cache_data(ttl=30, show_spinner=False)
 def load_daily_log_cached(cache_user_id, cache_date):
-    try:
-        return (
-            supabase.table("daily_logs")
-            .select("id,date,weight,steps,day_type,activity_plan")
-            .eq("user_id", cache_user_id)
-            .eq("date", str(cache_date))
-            .execute().data
-            or []
-        )
-    except Exception:
-        return (
-            supabase.table("daily_logs")
-            .select("id,date,weight,steps")
-            .eq("user_id", cache_user_id)
-            .eq("date", str(cache_date))
-            .execute().data
-            or []
-        )
+    row = DailyLogsRepository(supabase).get_for_date_compatible(
+        cache_user_id,
+        cache_date,
+    )
+    return [row] if row else []
 
 
 @st.cache_data(ttl=90, show_spinner=False)
 def load_weight_history_cached(cache_user_id):
-    return (
-        supabase.table("daily_logs")
-        .select("weight,date")
-        .eq("user_id", cache_user_id)
-        .not_.is_("weight", "null")
-        .order("date", desc=False)
-        .execute().data
-        or []
+    return DailyLogsRepository(supabase).list_weight_history(
+        cache_user_id
     )
 
 
@@ -4245,14 +4227,11 @@ if profile_incomplete:
 
                 # Salviamo anche il peso nello storico: da questo momento il BMR
                 # seguirà automaticamente l'ultimo peso registrato.
-                supabase.table("daily_logs").upsert(
-                    {
-                        "user_id": user_id,
-                        "date": str(date.today()),
-                        "weight": float(w_val),
-                    },
-                    on_conflict="user_id,date",
-                ).execute()
+                DailyLogsRepository(supabase).upsert_for_date(
+                    user_id=user_id,
+                    log_date=date.today(),
+                    values={"weight": float(w_val)},
+                )
 
                 if hasattr(res, "user") and res.user:
                     st.session_state["user"] = res.user
@@ -7602,14 +7581,11 @@ def render_personal_settings_page():
                 "data": updated_metadata
             })
 
-            supabase.table("daily_logs").upsert(
-                {
-                    "user_id": user_id,
-                    "date": str(date.today()),
-                    "weight": float(new_current_weight),
-                },
-                on_conflict="user_id,date",
-            ).execute()
+            DailyLogsRepository(supabase).upsert_for_date(
+                user_id=user_id,
+                log_date=date.today(),
+                values={"weight": float(new_current_weight)},
+            )
 
             if getattr(response, "user", None):
                 st.session_state["user"] = response.user
@@ -10151,10 +10127,13 @@ elif selected_page == t["t2"]:
             saved_day_type = None
             saved_activity = None
             try:
-                plan_log = (
-                    supabase.table("daily_logs").select("id,day_type,activity_plan")
-                    .eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
+                _plan_row = DailyLogsRepository(
+                    supabase
+                ).get_for_date_compatible(
+                    user_id,
+                    plan_date,
                 )
+                plan_log = [_plan_row] if _plan_row else []
                 if plan_log:
                     saved_day_type = plan_log[0].get("day_type")
                     saved_activity = plan_log[0].get("activity_plan")
@@ -10184,12 +10163,17 @@ elif selected_page == t["t2"]:
 
             if st.button(t["save_day_plan"], key="save_day_plan", use_container_width=True):
                 try:
-                    existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
-                    payload_plan = {"day_type": day_type, "activity_plan": activity_plan}
-                    if existing:
-                        supabase.table("daily_logs").update(payload_plan).eq("id", existing[0]["id"]).execute()
-                    else:
-                        supabase.table("daily_logs").insert({"user_id": user_id, "date": str(plan_date), **payload_plan}).execute()
+                    payload_plan = {
+                        "day_type": day_type,
+                        "activity_plan": activity_plan,
+                    }
+                    DailyLogsRepository(
+                        supabase
+                    ).upsert_for_date(
+                        user_id=user_id,
+                        log_date=plan_date,
+                        values=payload_plan,
+                    )
                     refresh_daily_logs(plan_date)
                     play_hidden_local_audio(resolve_ui_sound("day_plan_saved"))
                     st.success(t["plan_saved"].format(date=plan_date.strftime("%d/%m/%Y")))
@@ -11030,52 +11014,34 @@ elif selected_page == t["t2"]:
                     )
 
                     with st.container(border=True):
+                        # Keep the HTML flush-left. Markdown treats HTML
+                        # indented by 4+ spaces as a code block on some mobile
+                        # Streamlit/browser combinations.
+                        _activity_mobile_html = (
+                            '<div style="display:flex;align-items:flex-start;'
+                            'justify-content:space-between;gap:.75rem;">'
+                            '<div style="min-width:0;">'
+                            '<div style="font-size:1.05rem;font-weight:800;'
+                            'line-height:1.2;margin-bottom:.22rem;">'
+                            f'{_act_icon} {html.escape(_act_name)}'
+                            '</div>'
+                            '<div style="opacity:.64;font-size:.78rem;">'
+                            f'{html.escape(_act_meta)}'
+                            '</div>'
+                            '</div>'
+                            '<div style="flex:0 0 auto;text-align:right;'
+                            'font-size:1.25rem;font-weight:850;line-height:1.05;'
+                            'white-space:nowrap;">'
+                            f'{_act_kcal}'
+                            '<span style="display:block;margin-top:.18rem;'
+                            'font-size:.68rem;font-weight:600;opacity:.62;">'
+                            'kcal'
+                            '</span>'
+                            '</div>'
+                            '</div>'
+                        )
                         st.markdown(
-                            f"""
-                            <div style="
-                                display:flex;
-                                align-items:flex-start;
-                                justify-content:space-between;
-                                gap:.75rem;
-                            ">
-                                <div style="min-width:0;">
-                                    <div style="
-                                        font-size:1.05rem;
-                                        font-weight:800;
-                                        line-height:1.2;
-                                        margin-bottom:.22rem;
-                                    ">
-                                        {_act_icon} {html.escape(_act_name)}
-                                    </div>
-                                    <div style="
-                                        opacity:.64;
-                                        font-size:.78rem;
-                                    ">
-                                        {html.escape(_act_meta)}
-                                    </div>
-                                </div>
-
-                                <div style="
-                                    flex:0 0 auto;
-                                    text-align:right;
-                                    font-size:1.25rem;
-                                    font-weight:850;
-                                    line-height:1.05;
-                                    white-space:nowrap;
-                                ">
-                                    {_act_kcal}
-                                    <span style="
-                                        display:block;
-                                        margin-top:.18rem;
-                                        font-size:.68rem;
-                                        font-weight:600;
-                                        opacity:.62;
-                                    ">
-                                        kcal
-                                    </span>
-                                </div>
-                            </div>
-                            """,
+                            _activity_mobile_html,
                             unsafe_allow_html=True,
                         )
 
@@ -11663,10 +11629,12 @@ elif selected_page == t["t3"]:
         month_end = pd.Timestamp(date.today())
         month_start = month_end - pd.Timedelta(days=29)
 
-        month_weights_rows = (
-            supabase.table("daily_logs").select("date, weight").eq("user_id", user_id)
-            .gte("date", str(month_start.date())).lte("date", str(month_end.date()))
-            .not_.is_("weight", "null").order("date", desc=False).execute().data or []
+        month_weights_rows = DailyLogsRepository(
+            supabase
+        ).list_weight_range(
+            user_id=user_id,
+            start_date=month_start.date(),
+            end_date=month_end.date(),
         )
         month_meals_rows = MealsRepository(supabase).list_date_range(
             user_id=user_id,
@@ -11826,10 +11794,12 @@ elif selected_page == t["t3"]:
             chart_start = chart_end - pd.Timedelta(days=selected_days - 1)
             timeline_dates = pd.date_range(chart_start, chart_end, freq="D")
 
-            logs = (
-                supabase.table("daily_logs").select("date, weight").eq("user_id", user_id)
-                .gte("date", str(chart_start.date())).lte("date", str(chart_end.date()))
-                .not_.is_("weight", "null").order("date", desc=False).execute().data or []
+            logs = DailyLogsRepository(
+                supabase
+            ).list_weight_range(
+                user_id=user_id,
+                start_date=chart_start.date(),
+                end_date=chart_end.date(),
             )
             meals_rows = MealsRepository(supabase).list_date_range(
                 user_id=user_id,
@@ -13841,12 +13811,13 @@ elif selected_page == t["t5"]:
             new_steps = st.number_input(ux["total_steps"], value=int(day_steps), min_value=0, step=500)
             if st.button(t["update_steps"], use_container_width=True):
                 try:
-                    existing = supabase.table("daily_logs").select("id").eq("user_id", user_id).eq("date", str(act_date)).execute().data
-                    
-                    if existing:
-                        supabase.table("daily_logs").update({"steps": int(new_steps)}).eq("user_id", user_id).eq("date", str(act_date)).execute()
-                    else:
-                        supabase.table("daily_logs").insert({"user_id": user_id, "date": str(act_date), "steps": int(new_steps)}).execute()
+                    DailyLogsRepository(
+                        supabase
+                    ).upsert_for_date(
+                        user_id=user_id,
+                        log_date=act_date,
+                        values={"steps": int(new_steps)},
+                    )
                     
                     # I passi sono incompatibili SOLO con attività che già
                     # incorporano gli stessi passi/spostamenti: Padel e Corsa.
