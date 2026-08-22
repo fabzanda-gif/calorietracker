@@ -10354,7 +10354,7 @@ elif selected_page == t["t2"]:
             daily_budget = float(user_bmr) + activity_bonus
 
             try:
-                plan_meals = load_daily_meals_cached((
+                plan_meals = load_daily_meals_cached(
                     user_id,
                     str(plan_date),
                     st.session_state.get("auth_access_token"),
