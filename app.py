@@ -2856,7 +2856,6 @@ def save_authenticated_session(response, fallback_user=None):
         raise RuntimeError("Supabase non ha restituito l'utente autenticato.")
 
     st.session_state["auth_access_token"] = access_token
-    st.write("ACCESS TOKEN:", st.session_state.get("auth_access_token"))
     st.session_state["auth_refresh_token"] = refresh_token
     st.session_state["user"] = user_obj
 
@@ -3870,9 +3869,6 @@ if st.session_state.get("user") is None:
 user = st.session_state["user"]
 user_id = user.id
 u_meta = user.user_metadata or {}
-st.write("ACCESS TOKEN:", st.session_state.get("auth_access_token"))
-
-
 def get_logged_user_identity(user_obj):
     """Nome, email e avatar dai metadata Supabase (Google incluso)."""
     metadata = getattr(user_obj, "user_metadata", None) or {}
@@ -14140,4 +14136,3 @@ def _zero_mode_component_visual_fixes():
         """,
         unsafe_allow_html=True,
     )
-
