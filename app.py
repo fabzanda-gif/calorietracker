@@ -10272,9 +10272,10 @@ elif selected_page == t["t2"]:
             daily_budget = float(user_bmr) + activity_bonus
 
             try:
-                plan_meals = MealsRepository(supabase).list_for_date_compatible(
+                plan_meals = load_daily_meals_cached((
                     user_id,
-                    plan_date,
+                    str(plan_date),
+                    st.session_state.get("auth_access_token"),
                 )
             except Exception:
                 plan_meals = []
