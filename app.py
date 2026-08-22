@@ -1187,24 +1187,6 @@ def delete_meal_via_api(meal_id, access_token):
 
     response.raise_for_status()
     return True
-    """
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/meals/{cache_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    payload = response.json()
-    return payload.get("items") or []
 
 
 # ==============================================================================
