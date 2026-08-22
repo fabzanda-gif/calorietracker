@@ -10610,9 +10610,9 @@ elif selected_page == t["t2"]:
                         use_container_width=True,
                     ):
                         try:
-                            MealsRepository(supabase).delete(
+                            delete_meal_via_api(
                                 _meal_raw.get("id"),
-                                user_id,
+                                st.session_state.get("auth_access_token"),
                             )
                             refresh_daily_logs(summary_date)
                             queue_ui_sound("food_deleted")
@@ -10809,9 +10809,9 @@ elif selected_page == t["t2"]:
                             use_container_width=True,
                         ):
                             try:
-                                MealsRepository(supabase).delete(
+                                delete_meal_via_api(
                                     _meal_raw.get("id"),
-                                    user_id,
+                                    st.session_state.get("auth_access_token"),
                                 )
                                 refresh_daily_logs(summary_date)
                                 queue_ui_sound("food_deleted")
@@ -10981,9 +10981,9 @@ elif selected_page == t["t2"]:
                 with delete_col2:
                     if st.button(t["del_meal_btn"], key=f"delete_meal_{selected_meal_id}_{summary_date}", use_container_width=True):
                         try:
-                            MealsRepository(supabase).delete(
+                            delete_meal_via_api(
                                 selected_meal_id,
-                                user_id,
+                                st.session_state.get("auth_access_token"),
                             )
                             queue_ui_sound("food_deleted")
                             st.success(t["meal_del_success"])
