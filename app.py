@@ -3870,6 +3870,7 @@ if st.session_state.get("user") is None:
 user = st.session_state["user"]
 user_id = user.id
 u_meta = user.user_metadata or {}
+st.write("ACCESS TOKEN:", st.session_state.get("auth_access_token"))
 
 
 def get_logged_user_identity(user_obj):
