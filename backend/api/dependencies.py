@@ -1,4 +1,3 @@
-cat > backend/api/dependencies.py <<'PY'
 from __future__ import annotations
 
 import os
@@ -48,8 +47,9 @@ def get_current_user(
         bearer_scheme
     ),
 ) -> CurrentUser:
-    # IMPORTANT:
-    # Check the Bearer token BEFORE creating a Supabase client.
+    # Check the Bearer token before creating the Supabase client.
+    # This allows unauthenticated requests to correctly return 401
+    # even when Supabase environment variables are not configured.
     if credentials is None or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -95,8 +95,9 @@ def get_authenticated_supabase(
 
     client = create_client(url, key)
 
-    # Send the authenticated user's JWT with PostgREST queries,
-    # allowing Supabase RLS policies based on auth.uid().
+    # Send the authenticated user's JWT to PostgREST.
+    # This allows Supabase RLS policies using auth.uid()
+    # to recognize the logged-in user.
     client.postgrest.auth(current_user.access_token)
 
     return client
@@ -106,4 +107,3 @@ def get_meals_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> MealsRepository:
     return MealsRepository(supabase)
-PY
