@@ -10404,63 +10404,306 @@ elif selected_page == t["t2"]:
                     ),
                 })
 
-            # Logged foods in the same clean grid style, with a direct
-            # trash action on each row.
-            _logged_header = st.columns(
-                [0.50, 1.05, 1.05, 2.35, 0.82, 0.90, 1.0, 0.82],
-                gap="small",
-                vertical_alignment="center",
-            )
-            _logged_labels = [
-                "",
-                t["col_meal"],
-                t["col_category"],
-                t["col_name"],
-                "Kcal",
-                "Pro (g)",
-                "Carbs (g)",
-                "Fat (g)",
-            ]
-            for _col, _label in zip(_logged_header, _logged_labels):
-                _col.markdown(
-                    f"<div style='font-weight:700;color:#7b7e89;"
-                    f"padding:0.1rem 0 0.45rem 0'>{html.escape(str(_label))}</div>",
-                    unsafe_allow_html=True,
-                )
+            # --------------------------------------------------------------
+            # Responsive logged foods
+            # Desktop/tablet: keep the compact grid.
+            # Mobile: switch to one card per meal so headers and values do not
+            # collapse into two unrelated vertical stacks.
+            # --------------------------------------------------------------
+            st.markdown(
+                """
+                <style>
+                /* Desktop is the default. */
+                .st-key-logged_meals_desktop {
+                    display:block;
+                }
+                .st-key-logged_meals_mobile {
+                    display:none;
+                }
 
-            for _meal_raw, _meal_display in zip(meals_with_id, _meal_rows):
-                _cols = st.columns(
+                @media (max-width: 768px) {
+                    .st-key-logged_meals_desktop {
+                        display:none !important;
+                    }
+                    .st-key-logged_meals_mobile {
+                        display:block !important;
+                    }
+
+                    .st-key-logged_meals_mobile
+                    [data-testid="stVerticalBlockBorderWrapper"] {
+                        border-radius:16px !important;
+                    }
+
+                    .st-key-logged_meals_mobile
+                    div[data-testid="stButton"] > button {
+                        min-height:2.45rem !important;
+                    }
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # DESKTOP -------------------------------------------------------
+            with st.container(key="logged_meals_desktop"):
+                _logged_header = st.columns(
                     [0.50, 1.05, 1.05, 2.35, 0.82, 0.90, 1.0, 0.82],
                     gap="small",
                     vertical_alignment="center",
                 )
-
-                if _cols[0].button(
-                    "🗑️",
-                    key=f"delete_logged_meal_{_meal_raw.get('id')}_{summary_date}",
-                    help=t["del_meal_btn"],
-                    use_container_width=True,
+                _logged_labels = [
+                    "",
+                    t["col_meal"],
+                    t["col_category"],
+                    t["col_name"],
+                    "Kcal",
+                    "Pro (g)",
+                    "Carbs (g)",
+                    "Fat (g)",
+                ]
+                for _col, _label in zip(
+                    _logged_header,
+                    _logged_labels,
                 ):
-                    try:
-                        MealsRepository(supabase).delete(
-                            _meal_raw.get("id"),
-                            user_id,
+                    _col.markdown(
+                        "<div style='font-weight:700;color:#7b7e89;"
+                        "padding:0.1rem 0 0.45rem 0'>"
+                        f"{html.escape(str(_label))}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                for _meal_raw, _meal_display in zip(
+                    meals_with_id,
+                    _meal_rows,
+                ):
+                    _cols = st.columns(
+                        [0.50, 1.05, 1.05, 2.35, 0.82, 0.90, 1.0, 0.82],
+                        gap="small",
+                        vertical_alignment="center",
+                    )
+
+                    if _cols[0].button(
+                        "🗑️",
+                        key=(
+                            "delete_logged_meal_"
+                            f"{_meal_raw.get('id')}_{summary_date}"
+                        ),
+                        help=t["del_meal_btn"],
+                        use_container_width=True,
+                    ):
+                        try:
+                            MealsRepository(supabase).delete(
+                                _meal_raw.get("id"),
+                                user_id,
+                            )
+                            refresh_daily_logs(summary_date)
+                            queue_ui_sound("food_deleted")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(
+                                t["delete_meal_error"].format(
+                                    error=exc
+                                )
+                            )
+
+                    _cols[1].write(_meal_display["meal"])
+                    _cols[2].write(_meal_display["category"])
+                    _cols[3].write(_meal_display["name"])
+                    _cols[4].write(_meal_display["kcal"])
+                    _cols[5].write(_meal_display["protein"])
+                    _cols[6].write(_meal_display["carbs"])
+                    _cols[7].write(_meal_display["fat"])
+
+            # MOBILE --------------------------------------------------------
+            _mobile_meal_labels = {
+                "Italiano": {
+                    "protein": "Proteine",
+                    "carbs": "Carboidrati",
+                    "fat": "Grassi",
+                    "delete": "Elimina",
+                },
+                "English": {
+                    "protein": "Protein",
+                    "carbs": "Carbs",
+                    "fat": "Fat",
+                    "delete": "Delete",
+                },
+                "Nederlands": {
+                    "protein": "Eiwit",
+                    "carbs": "Koolh.",
+                    "fat": "Vet",
+                    "delete": "Verwijderen",
+                },
+                "Français": {
+                    "protein": "Protéines",
+                    "carbs": "Glucides",
+                    "fat": "Lipides",
+                    "delete": "Supprimer",
+                },
+            }.get(
+                current_lang,
+                {
+                    "protein": "Protein",
+                    "carbs": "Carbs",
+                    "fat": "Fat",
+                    "delete": "Delete",
+                },
+            )
+
+            with st.container(key="logged_meals_mobile"):
+                for _mobile_idx, (
+                    _meal_raw,
+                    _meal_display,
+                ) in enumerate(
+                    zip(meals_with_id, _meal_rows)
+                ):
+                    with st.container(border=True):
+                        _mobile_name = html.escape(
+                            str(_meal_display["name"] or "-")
                         )
-                        refresh_daily_logs(summary_date)
-                        queue_ui_sound("food_deleted")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(
-                            t["delete_meal_error"].format(error=exc)
+                        _mobile_meal = html.escape(
+                            str(_meal_display["meal"] or "-")
+                        )
+                        _mobile_category = html.escape(
+                            str(_meal_display["category"] or "-")
                         )
 
-                _cols[1].write(_meal_display["meal"])
-                _cols[2].write(_meal_display["category"])
-                _cols[3].write(_meal_display["name"])
-                _cols[4].write(_meal_display["kcal"])
-                _cols[5].write(_meal_display["protein"])
-                _cols[6].write(_meal_display["carbs"])
-                _cols[7].write(_meal_display["fat"])
+                        st.markdown(
+                            f"""
+                            <div style="
+                                font-size:1.08rem;
+                                font-weight:800;
+                                line-height:1.22;
+                                margin-bottom:0.18rem;
+                            ">
+                                {_mobile_name}
+                            </div>
+                            <div style="
+                                opacity:.68;
+                                font-size:.86rem;
+                                margin-bottom:.7rem;
+                            ">
+                                {_mobile_meal} · {_mobile_category}
+                            </div>
+                            <div style="
+                                font-size:1.38rem;
+                                font-weight:850;
+                                line-height:1;
+                                margin-bottom:.8rem;
+                            ">
+                                {_meal_display["kcal"]} kcal
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                        _m_pro, _m_carbs, _m_fat = st.columns(
+                            3,
+                            gap="small",
+                        )
+
+                        with _m_pro:
+                            st.markdown(
+                                f"""
+                                <div style="
+                                    text-align:center;
+                                    border:1px solid rgba(127,127,127,.18);
+                                    border-radius:10px;
+                                    padding:.45rem .2rem;
+                                ">
+                                    <div style="
+                                        font-size:.72rem;
+                                        opacity:.68;
+                                    ">
+                                        {html.escape(_mobile_meal_labels["protein"])}
+                                    </div>
+                                    <div style="
+                                        font-weight:800;
+                                        font-size:.95rem;
+                                    ">
+                                        {_meal_display["protein"]} g
+                                    </div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+
+                        with _m_carbs:
+                            st.markdown(
+                                f"""
+                                <div style="
+                                    text-align:center;
+                                    border:1px solid rgba(127,127,127,.18);
+                                    border-radius:10px;
+                                    padding:.45rem .2rem;
+                                ">
+                                    <div style="
+                                        font-size:.72rem;
+                                        opacity:.68;
+                                    ">
+                                        {html.escape(_mobile_meal_labels["carbs"])}
+                                    </div>
+                                    <div style="
+                                        font-weight:800;
+                                        font-size:.95rem;
+                                    ">
+                                        {_meal_display["carbs"]} g
+                                    </div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+
+                        with _m_fat:
+                            st.markdown(
+                                f"""
+                                <div style="
+                                    text-align:center;
+                                    border:1px solid rgba(127,127,127,.18);
+                                    border-radius:10px;
+                                    padding:.45rem .2rem;
+                                ">
+                                    <div style="
+                                        font-size:.72rem;
+                                        opacity:.68;
+                                    ">
+                                        {html.escape(_mobile_meal_labels["fat"])}
+                                    </div>
+                                    <div style="
+                                        font-weight:800;
+                                        font-size:.95rem;
+                                    ">
+                                        {_meal_display["fat"]} g
+                                    </div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+
+                        if st.button(
+                            "🗑️ " + _mobile_meal_labels["delete"],
+                            key=(
+                                "mobile_delete_logged_meal_"
+                                f"{_meal_raw.get('id')}_"
+                                f"{summary_date}_{_mobile_idx}"
+                            ),
+                            help=t["del_meal_btn"],
+                            use_container_width=True,
+                        ):
+                            try:
+                                MealsRepository(supabase).delete(
+                                    _meal_raw.get("id"),
+                                    user_id,
+                                )
+                                refresh_daily_logs(summary_date)
+                                queue_ui_sound("food_deleted")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(
+                                    t["delete_meal_error"].format(
+                                        error=exc
+                                    )
+                                )
 
             meal_by_id = {m["id"]: m for m in meals_with_id}
             meal_options = {
