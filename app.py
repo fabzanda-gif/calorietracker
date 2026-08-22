@@ -21,6 +21,7 @@ from streamlit_cookies_controller import CookieController
 from openai import OpenAI
 from backend.repositories.weight import WeightRepository
 from backend.repositories.activities import ActivitiesRepository
+from backend.repositories.meals import MealsRepository
 
 # ------------------------------------------------------------------
 # Fotocamera posteriore per Foto AI
@@ -1056,29 +1057,10 @@ def _safe_float(value):
 
 @st.cache_data(ttl=30, show_spinner=False)
 def load_daily_meals_cached(cache_user_id, cache_date):
-    try:
-        return (
-            supabase.table("meals")
-            .select(
-                "id,date,meal_type,name,base_name,quantity,is_per_100g,"
-                "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat,notes,category,"
-                "ingredients_json,recipe_servings,is_shared,image_url"
-            )
-            .eq("user_id", cache_user_id)
-            .eq("date", str(cache_date))
-            .execute().data
-            or []
-        )
-    except Exception:
-        return (
-            supabase.table("meals")
-            .select("id,date,meal_type,name,calories,protein,carbs,fat")
-            .eq("user_id", cache_user_id)
-            .eq("date", str(cache_date))
-            .execute().data
-            or []
-        )
+    return MealsRepository(supabase).list_for_date_compatible(
+        cache_user_id,
+        cache_date,
+    )
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -1130,31 +1112,9 @@ def load_weight_history_cached(cache_user_id):
 
 @st.cache_data(ttl=60, show_spinner=False)
 def load_quick_meal_rows_cached(cache_user_id):
-    try:
-        rows = (
-            supabase.table("meals")
-            .select(
-                "id,date,name,base_name,quantity,is_per_100g,"
-                "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat,notes,category,"
-                "ingredients_json,recipe_servings,is_shared,image_url"
-            )
-            .eq("user_id", cache_user_id)
-            .order("date", desc=True)
-            .execute().data
-            or []
-        )
-        return rows, True
-    except Exception:
-        rows = (
-            supabase.table("meals")
-            .select("id,date,name,calories,protein,carbs,fat")
-            .eq("user_id", cache_user_id)
-            .order("date", desc=True)
-            .execute().data
-            or []
-        )
-        return rows, False
+    return MealsRepository(supabase).list_history_compatible(
+        cache_user_id
+    )
 
 
 def get_daily_totals(target_date):
@@ -2195,24 +2155,10 @@ def suggest_next_meal_type(log_date=None):
 
 def closest_logged_meal(meal_type, target_calories, allowed_categories=None):
     """Trova il meal replicabile più vicino al target rispettando contesto e categoria."""
-    try:
-        rows = (
-            supabase.table("meals")
-            .select("id,date,meal_type,name,base_name,calories,notes,category")
-            .eq("user_id", user_id)
-            .eq("meal_type", meal_type)
-            .execute().data
-            or []
-        )
-    except Exception:
-        rows = (
-            supabase.table("meals")
-            .select("id,date,meal_type,name,base_name,calories,notes")
-            .eq("user_id", user_id)
-            .eq("meal_type", meal_type)
-            .execute().data
-            or []
-        )
+    rows = MealsRepository(supabase).list_by_meal_type_compatible(
+        user_id,
+        meal_type,
+    )
 
     allowed = set(allowed_categories or MEAL_CATEGORIES)
     candidates = []
@@ -2486,25 +2432,9 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
             else None
         ),
     }
-    try:
-        _result = supabase.table("meals").insert(payload).execute()
-        refresh_daily_logs(log_date)
-        return _result
-    except Exception as e:
-        print(
-            "Inserimento meals con schema esteso fallito, "
-            f"fallback legacy: {e}"
-        )
-        legacy_payload = {
-            k: payload[k]
-            for k in (
-                "user_id", "date", "meal_type", "name",
-                "calories", "protein", "carbs", "fat",
-            )
-        }
-        _result = supabase.table("meals").insert(legacy_payload).execute()
-        refresh_daily_logs(log_date)
-        return _result
+    _result = MealsRepository(supabase).create_compatible(payload)
+    refresh_daily_logs(log_date)
+    return _result
 
 
 RECIPE_IMAGE_BUCKET = "recipe-images"
@@ -10292,10 +10222,9 @@ elif selected_page == t["t2"]:
             daily_budget = float(user_bmr) + activity_bonus
 
             try:
-                plan_meals = (
-                    supabase.table("meals")
-                    .select("meal_type,calories,category,name,base_name")
-                    .eq("user_id", user_id).eq("date", str(plan_date)).execute().data or []
+                plan_meals = MealsRepository(supabase).list_for_date_compatible(
+                    user_id,
+                    plan_date,
                 )
             except Exception:
                 plan_meals = []
@@ -10447,32 +10376,7 @@ elif selected_page == t["t2"]:
     with st.container(border=True):
         st.markdown(f"### {t['logged_foods']}")
         if meals_data:
-            try:
-                meals_with_id = (
-                    supabase.table("meals")
-                    .select(
-                        "id,meal_type,name,base_name,quantity,is_per_100g,"
-                        "base_calories,base_protein,base_carbs,base_fat,"
-                        "calories,protein,carbs,fat,notes,category"
-                    )
-                    .eq("date", str(summary_date))
-                    .eq("user_id", user_id)
-                    .execute()
-                    .data
-                    or []
-                )
-            except Exception:
-                # Compatibilità con eventuali righe/schema legacy.
-                meals_with_id = (
-                    supabase.table("meals")
-                    .select("id,meal_type,name,calories,protein,carbs,fat")
-                    .eq("date", str(summary_date))
-                    .eq("user_id", user_id)
-                    .execute()
-                    .data
-                    or []
-                )
-
+            meals_with_id = meals_data
             _meal_rows = []
             for _meal_row in meals_with_id:
                 _meal_rows.append({
@@ -10538,13 +10442,10 @@ elif selected_page == t["t2"]:
                     use_container_width=True,
                 ):
                     try:
-                        supabase.table("meals").delete().eq(
-                            "id",
+                        MealsRepository(supabase).delete(
                             _meal_raw.get("id"),
-                        ).eq(
-                            "user_id",
                             user_id,
-                        ).execute()
+                        )
                         refresh_daily_logs(summary_date)
                         queue_ui_sound("food_deleted")
                         st.rerun()
@@ -10697,11 +10598,11 @@ elif selected_page == t["t2"]:
                         if selected_meal.get("quantity") is not None:
                             update_payload["quantity"] = new_quantity
 
-                        supabase.table("meals").update(
-                            update_payload
-                        ).eq("id", selected_meal_id).eq(
-                            "user_id", user_id
-                        ).execute()
+                        MealsRepository(supabase).update(
+                            meal_id=selected_meal_id,
+                            user_id=user_id,
+                            payload=update_payload,
+                        )
 
                         refresh_daily_logs(summary_date)
 
@@ -10719,7 +10620,10 @@ elif selected_page == t["t2"]:
                 with delete_col2:
                     if st.button(t["del_meal_btn"], key=f"delete_meal_{selected_meal_id}_{summary_date}", use_container_width=True):
                         try:
-                            supabase.table("meals").delete().eq("id", selected_meal_id).eq("user_id", user_id).execute()
+                            MealsRepository(supabase).delete(
+                                selected_meal_id,
+                                user_id,
+                            )
                             queue_ui_sound("food_deleted")
                             st.success(t["meal_del_success"])
                             st.rerun()
@@ -11409,10 +11313,11 @@ elif selected_page == t["t3"]:
             .gte("date", str(month_start.date())).lte("date", str(month_end.date()))
             .not_.is_("weight", "null").order("date", desc=False).execute().data or []
         )
-        month_meals_rows = (
-            supabase.table("meals").select("date, calories").eq("user_id", user_id)
-            .gte("date", str(month_start.date())).lte("date", str(month_end.date()))
-            .execute().data or []
+        month_meals_rows = MealsRepository(supabase).list_date_range(
+            user_id=user_id,
+            start_date=month_start.date(),
+            end_date=month_end.date(),
+            columns="date,calories",
         )
         month_acts_rows = (
             supabase.table("activities").select("date, burned_calories").eq("user_id", user_id)
@@ -11571,10 +11476,11 @@ elif selected_page == t["t3"]:
                 .gte("date", str(chart_start.date())).lte("date", str(chart_end.date()))
                 .not_.is_("weight", "null").order("date", desc=False).execute().data or []
             )
-            meals_rows = (
-                supabase.table("meals").select("date, meal_type, name, calories, protein, carbs, fat")
-                .eq("user_id", user_id).gte("date", str(chart_start.date())).lte("date", str(chart_end.date()))
-                .execute().data or []
+            meals_rows = MealsRepository(supabase).list_date_range(
+                user_id=user_id,
+                start_date=chart_start.date(),
+                end_date=chart_end.date(),
+                columns="date,meal_type,name,calories,protein,carbs,fat",
             )
             acts_rows = (
                 supabase.table("activities").select("date, activity_name, burned_calories")
