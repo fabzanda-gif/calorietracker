@@ -23,7 +23,6 @@ from openai import OpenAI
 from backend.repositories.weight import WeightRepository
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.meals import MealsRepository
-from backend.repositories.recipes import RecipesRepository
 from backend.repositories.daily_logs import DailyLogsRepository
 
 # ------------------------------------------------------------------
@@ -1497,6 +1496,174 @@ def weight_rows_for_range(cache_user_id, start_date, end_date, access_token):
         row for row in rows
         if start_s <= str(row.get("date") or "") <= end_s
     ]
+
+
+
+def fetch_personal_recipes_from_api(access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/recipes",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
+def fetch_available_recipes_from_api(access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/recipes/available",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
+def fetch_shared_recipes_from_api(access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/recipes/shared",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
+def fetch_recipe_by_id_from_api(recipe_id, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/recipes/{recipe_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    if response.status_code == 404:
+        return None
+
+    response.raise_for_status()
+    return _api_payload_item(response.json()) or response.json()
+
+
+def create_recipe_via_api(payload, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    api_payload = dict(payload)
+    api_payload.pop("user_id", None)
+
+    response = requests.post(
+        f"{get_api_base_url()}/recipes",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=api_payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_item(response.json()) or response.json()
+
+
+def update_recipe_via_api(recipe_id, payload, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    api_payload = dict(payload)
+    api_payload.pop("user_id", None)
+
+    response = requests.patch(
+        f"{get_api_base_url()}/recipes/{recipe_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=api_payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_item(response.json()) or response.json()
+
+
+def set_recipe_sharing_via_api(recipe_id, is_shared, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.patch(
+        f"{get_api_base_url()}/recipes/{recipe_id}/sharing",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json={"is_shared": bool(is_shared)},
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_item(response.json()) or response.json()
+
+
+def delete_recipe_via_api(recipe_id, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.delete(
+        f"{get_api_base_url()}/recipes/{recipe_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return True
 
 
 # ==============================================================================
@@ -3017,7 +3184,10 @@ def insert_recipe_library(
         "is_shared": bool(is_shared),
         "image_url": str(image_url or "").strip() or None,
     }
-    return RecipesRepository(supabase).create_response(payload)
+    return create_recipe_via_api(
+        payload,
+        st.session_state.get("auth_access_token"),
+    )
 
 
 
@@ -3087,9 +3257,9 @@ def load_personal_recipe_by_id(recipe_id):
         return None
 
     try:
-        return RecipesRepository(supabase).get_personal_by_id(
-            recipe_id=recipe_id,
-            user_id=user_id,
+        return fetch_recipe_by_id_from_api(
+            recipe_id,
+            st.session_state.get("auth_access_token"),
         )
     except Exception as exc:
         print(f"Default breakfast recipe load error: {exc}")
@@ -3158,7 +3328,9 @@ def load_available_recipes():
     - quelle condivise dagli altri utenti
     Le proprie hanno precedenza in caso di stesso nome.
     """
-    rows = RecipesRepository(supabase).list_available(user_id)
+    rows = fetch_available_recipes_from_api(
+        st.session_state.get("auth_access_token")
+    )
 
     result = {}
     for row in rows:
@@ -13747,9 +13919,9 @@ elif selected_page == t["t4"]:
     with st.expander(_rcu["my"], expanded=False):
 
         try:
-            my_recipe_rows = RecipesRepository(
-                supabase
-            ).list_personal(user_id)
+            my_recipe_rows = fetch_personal_recipes_from_api(
+                st.session_state.get("auth_access_token")
+            )
         except Exception as exc:
             my_recipe_rows = []
             print(f"Errore caricamento ricette personali: {exc}")
@@ -13825,14 +13997,10 @@ elif selected_page == t["t4"]:
                                                 _new_url = upload_recipe_image(
                                                     _new_recipe_photo
                                                 )
-                                                RecipesRepository(
-                                                    supabase
-                                                ).update(
-                                                    recipe_id=r["id"],
-                                                    user_id=user_id,
-                                                    payload={
-                                                        "image_url": _new_url
-                                                    },
+                                                update_recipe_via_api(
+                                                    r["id"],
+                                                    {"image_url": _new_url},
+                                                    st.session_state.get("auth_access_token"),
                                                 )
                                                 st.session_state[_photo_toggle_key] = False
                                                 queue_ui_sound("recipe_photo_saved")
@@ -14031,10 +14199,10 @@ elif selected_page == t["t4"]:
                 use_container_width=True,
             ):
                 try:
-                    RecipesRepository(supabase).set_shared(
-                        recipe_id=selected_recipe_row["id"],
-                        user_id=user_id,
-                        is_shared=bool(new_share_state),
+                    set_recipe_sharing_via_api(
+                        selected_recipe_row["id"],
+                        bool(new_share_state),
+                        st.session_state.get("auth_access_token"),
                     )
                     queue_ui_sound(
                         "recipe_shared"
@@ -14054,9 +14222,9 @@ elif selected_page == t["t4"]:
     with st.expander(_rcu["shared"], expanded=False):
 
         try:
-            shared_recipe_rows = RecipesRepository(
-                supabase
-            ).list_shared()
+            shared_recipe_rows = fetch_shared_recipes_from_api(
+                st.session_state.get("auth_access_token")
+            )
         except Exception as exc:
             shared_recipe_rows = []
             print(f"Errore caricamento ricette condivise: {exc}")
