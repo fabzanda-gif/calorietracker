@@ -1,1 +1,287 @@
+from __future__ import annotations
 
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+
+from backend.api.dependencies import CurrentUser, get_current_user
+from backend.repositories.base import RepositoryError
+from backend.repositories.recipes import RecipesRepository
+
+
+router = APIRouter(
+    prefix="/recipes",
+    tags=["recipes"],
+)
+
+
+class RecipeCreate(BaseModel):
+    name: str = Field(min_length=1)
+    meal_type: str | None = None
+    category: str | None = None
+    recipe_servings: float | None = Field(default=None, gt=0)
+
+    calories: float = 0
+    protein: float = 0
+    carbs: float = 0
+    fat: float = 0
+
+    notes: str | None = None
+    ingredients_json: Any | None = None
+    is_shared: bool = False
+    image_url: str | None = None
+
+
+class RecipeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    meal_type: str | None = None
+    category: str | None = None
+    recipe_servings: float | None = Field(default=None, gt=0)
+
+    calories: float | None = None
+    protein: float | None = None
+    carbs: float | None = None
+    fat: float | None = None
+
+    notes: str | None = None
+    ingredients_json: Any | None = None
+    image_url: str | None = None
+
+
+class RecipeShareUpdate(BaseModel):
+    is_shared: bool
+
+
+def get_recipes_repository(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> RecipesRepository:
+    """
+    Create an authenticated Supabase client for recipe queries.
+    """
+    from backend.api.dependencies import _supabase_settings
+    from supabase import create_client
+
+    url, key = _supabase_settings()
+    client = create_client(url, key)
+    client.postgrest.auth(current_user.access_token)
+
+    return RecipesRepository(client)
+
+
+@router.get("")
+def get_personal_recipes(
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    try:
+        items = repo.list_personal(current_user.id)
+
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/available")
+def get_available_recipes(
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    """
+    Recipes the authenticated user may use:
+    personal recipes plus recipes shared by other users.
+    """
+    try:
+        items = repo.list_available(current_user.id)
+
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/shared")
+def get_shared_recipes(
+    exclude_mine: bool = Query(default=False),
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    try:
+        items = repo.list_shared(
+            exclude_user_id=(
+                current_user.id
+                if exclude_mine
+                else None
+            )
+        )
+
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/{recipe_id}")
+def get_recipe(
+    recipe_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    """
+    Fetch one personal recipe by ID.
+
+    Shared recipe discovery is handled by /recipes/available and
+    /recipes/shared.
+    """
+    try:
+        item = repo.get_personal_by_id(
+            recipe_id=recipe_id,
+            user_id=current_user.id,
+        )
+
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recipe not found",
+            )
+
+        return {
+            "item": item,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_recipe(
+    recipe: RecipeCreate,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    payload = recipe.model_dump(exclude_none=True)
+    payload["user_id"] = current_user.id
+
+    try:
+        item = repo.create(payload)
+
+        return {
+            "created": True,
+            "item": item if item is not None else payload,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch("/{recipe_id}")
+def update_recipe(
+    recipe_id: str,
+    changes: RecipeUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    payload = changes.model_dump(exclude_unset=True)
+
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields supplied",
+        )
+
+    try:
+        item = repo.update(
+            recipe_id=recipe_id,
+            user_id=current_user.id,
+            payload=payload,
+        )
+
+        return {
+            "updated": True,
+            "item": item,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch("/{recipe_id}/sharing")
+def update_recipe_sharing(
+    recipe_id: str,
+    sharing: RecipeShareUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    try:
+        item = repo.set_shared(
+            recipe_id=recipe_id,
+            user_id=current_user.id,
+            is_shared=sharing.is_shared,
+        )
+
+        return {
+            "updated": True,
+            "is_shared": sharing.is_shared,
+            "item": item,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete("/{recipe_id}")
+def delete_recipe(
+    recipe_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+):
+    try:
+        repo.delete(
+            recipe_id=recipe_id,
+            user_id=current_user.id,
+        )
+
+        return {
+            "deleted": True,
+            "id": recipe_id,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
