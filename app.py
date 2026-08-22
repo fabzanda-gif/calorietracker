@@ -2563,7 +2563,10 @@ def insert_meal_with_base_data(*, log_date, meal_type, display_name, base_name,
             else None
         ),
     }
-    _result = MealsRepository(supabase).create_compatible(payload)
+    _result = create_meal_via_api(
+    payload,
+    st.session_state.get("auth_access_token"),
+)
     refresh_daily_logs(log_date)
     return _result
 
