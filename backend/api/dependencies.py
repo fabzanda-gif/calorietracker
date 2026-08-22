@@ -39,8 +39,9 @@ def get_supabase_client() -> Client:
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    supabase: Client = Depends(get_supabase_client),
+    credentials: HTTPAuthorizationCredentials | None = Depends(
+        bearer_scheme
+    ),
 ) -> CurrentUser:
     if credentials is None or not credentials.credentials:
         raise HTTPException(
@@ -50,18 +51,28 @@ def get_current_user(
         )
 
     token = credentials.credentials
+
     try:
+        supabase = get_supabase_client()
+
         response = supabase.auth.get_user(token)
         user = getattr(response, "user", None)
+
         if user is None or not getattr(user, "id", None):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return CurrentUser(id=str(user.id), access_token=token)
+
+        return CurrentUser(
+            id=str(user.id),
+            access_token=token,
+        )
+
     except HTTPException:
         raise
+
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
