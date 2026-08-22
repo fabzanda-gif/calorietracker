@@ -1125,6 +1125,88 @@ def fetch_daily_meals_from_api(cache_user_id, cache_date, access_token):
     return payload.get("items") or []
 
 
+def create_meal_via_api(payload, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    api_payload = dict(payload)
+    api_payload.pop("user_id", None)
+
+    response = requests.post(
+        f"{get_api_base_url()}/meals",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=api_payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def update_meal_via_api(meal_id, payload, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.patch(
+        f"{get_api_base_url()}/meals/{meal_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def delete_meal_via_api(meal_id, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.delete(
+        f"{get_api_base_url()}/meals/{meal_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return True
+    """
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/meals/{cache_date}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    payload = response.json()
+    return payload.get("items") or []
+
+
 # ==============================================================================
 # CACHED USER-DATA READS
 # ==============================================================================
