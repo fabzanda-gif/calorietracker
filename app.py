@@ -22,6 +22,7 @@ from openai import OpenAI
 from backend.repositories.weight import WeightRepository
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.meals import MealsRepository
+from backend.repositories.recipes import RecipesRepository
 
 # ------------------------------------------------------------------
 # Fotocamera posteriore per Foto AI
@@ -2566,7 +2567,7 @@ def insert_recipe_library(
         "is_shared": bool(is_shared),
         "image_url": str(image_url or "").strip() or None,
     }
-    return supabase.table(RECIPE_LIBRARY_TABLE).insert(payload).execute()
+    return RecipesRepository(supabase).create_response(payload)
 
 
 
@@ -2636,20 +2637,10 @@ def load_personal_recipe_by_id(recipe_id):
         return None
 
     try:
-        rows = (
-            supabase.table(RECIPE_LIBRARY_TABLE)
-            .select(
-                "id,user_id,name,meal_type,category,recipe_servings,"
-                "calories,protein,carbs,fat,notes,ingredients_json,"
-                "is_shared,image_url,created_at"
-            )
-            .eq("id", recipe_id)
-            .eq("user_id", user_id)
-            .limit(1)
-            .execute().data
-            or []
+        return RecipesRepository(supabase).get_personal_by_id(
+            recipe_id=recipe_id,
+            user_id=user_id,
         )
-        return rows[0] if rows else None
     except Exception as exc:
         print(f"Default breakfast recipe load error: {exc}")
         return None
@@ -2717,18 +2708,7 @@ def load_available_recipes():
     - quelle condivise dagli altri utenti
     Le proprie hanno precedenza in caso di stesso nome.
     """
-    rows = (
-        supabase.table(RECIPE_LIBRARY_TABLE)
-        .select(
-            "id,user_id,name,meal_type,category,recipe_servings,"
-            "calories,protein,carbs,fat,notes,ingredients_json,"
-            "is_shared,image_url,created_at"
-        )
-        .or_(f"user_id.eq.{user_id},is_shared.eq.true")
-        .order("created_at", desc=True)
-        .execute().data
-        or []
-    )
+    rows = RecipesRepository(supabase).list_available(user_id)
 
     result = {}
     for row in rows:
@@ -10958,14 +10938,146 @@ elif selected_page == t["t2"]:
                     )),
                 })
 
-            render_sanosync_grid_table(
-                rows_acts,
-                [
-                    ("activity", t["col_activity"]),
-                    ("burned", t["col_burned"]),
-                ],
-                widths=[2.5, 1.0],
+            # ----------------------------------------------------------
+            # Responsive activity summary
+            # Desktop/tablet keeps the compact grid; mobile uses the same
+            # card hierarchy adopted for "Cibi inseriti".
+            # ----------------------------------------------------------
+            st.markdown(
+                """
+                <style>
+                .st-key-overview_activity_desktop {
+                    display:block;
+                }
+                .st-key-overview_activity_mobile {
+                    display:none;
+                }
+
+                @media (max-width: 768px) {
+                    .st-key-overview_activity_desktop {
+                        display:none !important;
+                    }
+                    .st-key-overview_activity_mobile {
+                        display:block !important;
+                    }
+
+                    .st-key-overview_activity_mobile
+                    [data-testid="stVerticalBlockBorderWrapper"] {
+                        border-radius:16px !important;
+                    }
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
             )
+
+            # DESKTOP / TABLET --------------------------------------------
+            with st.container(key="overview_activity_desktop"):
+                render_sanosync_grid_table(
+                    rows_acts,
+                    [
+                        ("activity", t["col_activity"]),
+                        ("burned", t["col_burned"]),
+                    ],
+                    widths=[2.5, 1.0],
+                )
+
+            # MOBILE ------------------------------------------------------
+            _mobile_activity_i18n = {
+                "Italiano": {
+                    "kcal": "kcal bruciate",
+                    "base": "Metabolismo di base",
+                },
+                "English": {
+                    "kcal": "kcal burned",
+                    "base": "Basal metabolism",
+                },
+                "Nederlands": {
+                    "kcal": "kcal verbrand",
+                    "base": "Basale stofwisseling",
+                },
+                "Français": {
+                    "kcal": "kcal brûlées",
+                    "base": "Métabolisme de base",
+                },
+            }.get(
+                current_lang,
+                {
+                    "kcal": "kcal burned",
+                    "base": "Basal metabolism",
+                },
+            )
+
+            with st.container(key="overview_activity_mobile"):
+                for _act_idx, _act_row in enumerate(rows_acts):
+                    _act_name = str(
+                        _act_row.get("activity") or "-"
+                    )
+                    _act_kcal = int(
+                        round(
+                            _safe_float(
+                                _act_row.get("burned")
+                            )
+                        )
+                    )
+
+                    _is_bmr = _act_idx == 0
+                    _act_icon = "🔥" if not _is_bmr else "⚙️"
+                    _act_meta = (
+                        _mobile_activity_i18n["base"]
+                        if _is_bmr
+                        else _mobile_activity_i18n["kcal"]
+                    )
+
+                    with st.container(border=True):
+                        st.markdown(
+                            f"""
+                            <div style="
+                                display:flex;
+                                align-items:flex-start;
+                                justify-content:space-between;
+                                gap:.75rem;
+                            ">
+                                <div style="min-width:0;">
+                                    <div style="
+                                        font-size:1.05rem;
+                                        font-weight:800;
+                                        line-height:1.2;
+                                        margin-bottom:.22rem;
+                                    ">
+                                        {_act_icon} {html.escape(_act_name)}
+                                    </div>
+                                    <div style="
+                                        opacity:.64;
+                                        font-size:.78rem;
+                                    ">
+                                        {html.escape(_act_meta)}
+                                    </div>
+                                </div>
+
+                                <div style="
+                                    flex:0 0 auto;
+                                    text-align:right;
+                                    font-size:1.25rem;
+                                    font-weight:850;
+                                    line-height:1.05;
+                                    white-space:nowrap;
+                                ">
+                                    {_act_kcal}
+                                    <span style="
+                                        display:block;
+                                        margin-top:.18rem;
+                                        font-size:.68rem;
+                                        font-weight:600;
+                                        opacity:.62;
+                                    ">
+                                        kcal
+                                    </span>
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
 
     with _chart_col:
         with st.container(border=True):
@@ -13194,16 +13306,9 @@ elif selected_page == t["t4"]:
     with st.expander(_rcu["my"], expanded=False):
 
         try:
-            my_recipe_rows = (
-                supabase.table(RECIPE_LIBRARY_TABLE)
-                .select(
-                    "id,user_id,name,meal_type,category,recipe_servings,""calories,protein,carbs,fat,notes,ingredients_json,""is_shared,image_url,created_at"
-                )
-                .eq("user_id", user_id)
-                .order("created_at", desc=True)
-                .execute().data
-                or []
-            )
+            my_recipe_rows = RecipesRepository(
+                supabase
+            ).list_personal(user_id)
         except Exception as exc:
             my_recipe_rows = []
             print(f"Errore caricamento ricette personali: {exc}")
@@ -13279,12 +13384,14 @@ elif selected_page == t["t4"]:
                                                 _new_url = upload_recipe_image(
                                                     _new_recipe_photo
                                                 )
-                                                (
-                                                    supabase.table(RECIPE_LIBRARY_TABLE)
-                                                    .update({"image_url": _new_url})
-                                                    .eq("id", r["id"])
-                                                    .eq("user_id", user_id)
-                                                    .execute()
+                                                RecipesRepository(
+                                                    supabase
+                                                ).update(
+                                                    recipe_id=r["id"],
+                                                    user_id=user_id,
+                                                    payload={
+                                                        "image_url": _new_url
+                                                    },
                                                 )
                                                 st.session_state[_photo_toggle_key] = False
                                                 queue_ui_sound("recipe_photo_saved")
@@ -13483,12 +13590,10 @@ elif selected_page == t["t4"]:
                 use_container_width=True,
             ):
                 try:
-                    (
-                        supabase.table(RECIPE_LIBRARY_TABLE)
-                        .update({"is_shared": bool(new_share_state)})
-                        .eq("id", selected_recipe_row["id"])
-                        .eq("user_id", user_id)
-                        .execute()
+                    RecipesRepository(supabase).set_shared(
+                        recipe_id=selected_recipe_row["id"],
+                        user_id=user_id,
+                        is_shared=bool(new_share_state),
                     )
                     queue_ui_sound(
                         "recipe_shared"
@@ -13508,16 +13613,9 @@ elif selected_page == t["t4"]:
     with st.expander(_rcu["shared"], expanded=False):
 
         try:
-            shared_recipe_rows = (
-                supabase.table(RECIPE_LIBRARY_TABLE)
-                .select(
-                    "id,user_id,name,meal_type,category,recipe_servings,""calories,protein,carbs,fat,notes,ingredients_json,""is_shared,image_url,created_at"
-                )
-                .eq("is_shared", True)
-                .order("created_at", desc=True)
-                .execute().data
-                or []
-            )
+            shared_recipe_rows = RecipesRepository(
+                supabase
+            ).list_shared()
         except Exception as exc:
             shared_recipe_rows = []
             print(f"Errore caricamento ricette condivise: {exc}")
