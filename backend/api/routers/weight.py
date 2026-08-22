@@ -5,15 +5,16 @@ from datetime import date as Date
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from backend.api.dependencies import CurrentUser, get_current_user
+from backend.api.dependencies import (
+    CurrentUser,
+    get_current_user,
+    get_weight_repository,
+)
 from backend.repositories.base import RepositoryError
 from backend.repositories.weight import WeightRepository
 
 
-router = APIRouter(
-    prefix="/weight",
-    tags=["weight"],
-)
+router = APIRouter(prefix="/weight", tags=["weight"])
 
 
 class WeightCreate(BaseModel):
@@ -26,22 +27,6 @@ class WeightUpdate(BaseModel):
     weight: float | None = Field(default=None, gt=0)
 
 
-def get_weight_repository(
-    current_user: CurrentUser = Depends(get_current_user),
-) -> WeightRepository:
-    """
-    Create an authenticated Supabase client for weight queries.
-    """
-    from backend.api.dependencies import _supabase_settings
-    from supabase import create_client
-
-    url, key = _supabase_settings()
-    client = create_client(url, key)
-    client.postgrest.auth(current_user.access_token)
-
-    return WeightRepository(client)
-
-
 @router.get("")
 def get_weight_history(
     current_user: CurrentUser = Depends(get_current_user),
@@ -49,12 +34,7 @@ def get_weight_history(
 ):
     try:
         rows = repo.history(current_user.id)
-
-        return {
-            "count": len(rows),
-            "items": rows,
-        }
-
+        return {"count": len(rows), "items": rows}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -68,12 +48,7 @@ def get_latest_weight(
     repo: WeightRepository = Depends(get_weight_repository),
 ):
     try:
-        row = repo.latest(current_user.id)
-
-        return {
-            "item": row,
-        }
-
+        return {"item": repo.latest(current_user.id)}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -93,12 +68,7 @@ def create_weight(
             log_date=payload.date,
             weight=payload.weight,
         )
-
-        return {
-            "created": True,
-            "item": item,
-        }
-
+        return {"created": True, "item": item}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -126,14 +96,12 @@ def update_weight(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Weight is required when changing date",
                 )
-
             item = repo.move_weight(
                 row_id=row_id,
                 user_id=current_user.id,
                 new_date=payload.date,
                 weight=payload.weight,
             )
-
         else:
             item = repo.update_weight(
                 row_id=row_id,
@@ -141,14 +109,10 @@ def update_weight(
                 weight=payload.weight,
             )
 
-        return {
-            "updated": True,
-            "item": item,
-        }
+        return {"updated": True, "item": item}
 
     except HTTPException:
         raise
-
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -163,17 +127,8 @@ def delete_weight(
     repo: WeightRepository = Depends(get_weight_repository),
 ):
     try:
-        item = repo.delete_weight(
-            row_id=row_id,
-            user_id=current_user.id,
-        )
-
-        return {
-            "deleted": True,
-            "id": row_id,
-            "item": item,
-        }
-
+        item = repo.delete_weight(row_id=row_id, user_id=current_user.id)
+        return {"deleted": True, "id": row_id, "item": item}
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
