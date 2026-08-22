@@ -1322,6 +1322,183 @@ def upsert_named_activity_via_api(
     )
 
 
+
+def _api_payload_items(payload):
+    """Normalize common FastAPI list response shapes."""
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+    for key in ("items", "data", "results"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value
+    return []
+
+
+def _api_payload_item(payload):
+    """Normalize common FastAPI single-item response shapes."""
+    if payload is None:
+        return None
+    if isinstance(payload, dict):
+        for key in ("item", "data", "result"):
+            value = payload.get(key)
+            if isinstance(value, dict):
+                return value
+        # A router may return the row itself.
+        if any(key in payload for key in ("id", "date", "weight", "steps", "day_type", "activity_plan")):
+            return payload
+    return None
+
+
+def fetch_daily_log_from_api(cache_user_id, cache_date, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/daily-logs/{cache_date}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    # A missing daily log is equivalent to no row for Streamlit.
+    if response.status_code == 404:
+        return None
+
+    response.raise_for_status()
+    return _api_payload_item(response.json())
+
+
+def update_daily_log_via_api(log_date, values, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    api_payload = dict(values)
+    api_payload.pop("user_id", None)
+    api_payload.pop("date", None)
+
+    response = requests.patch(
+        f"{get_api_base_url()}/daily-logs/{log_date}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=api_payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_item(response.json()) or response.json()
+
+
+def fetch_weight_history_from_api(cache_user_id, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/weight",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_items(response.json())
+
+
+def create_weight_via_api(log_date, weight, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.post(
+        f"{get_api_base_url()}/weight",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json={
+            "date": str(log_date),
+            "weight": float(weight),
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_item(response.json()) or response.json()
+
+
+def update_weight_via_api(row_id, *, log_date=None, weight=None, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    payload = {}
+    if log_date is not None:
+        payload["date"] = str(log_date)
+    if weight is not None:
+        payload["weight"] = float(weight)
+
+    response = requests.patch(
+        f"{get_api_base_url()}/weight/{row_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return _api_payload_item(response.json()) or response.json()
+
+
+def delete_weight_via_api(row_id, access_token):
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.delete(
+        f"{get_api_base_url()}/weight/{row_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return True
+
+
+def weight_rows_for_range(cache_user_id, start_date, end_date, access_token):
+    """Filter API weight history locally to preserve existing report behaviour."""
+    rows = fetch_weight_history_from_api(cache_user_id, access_token)
+    start_s = str(start_date)
+    end_s = str(end_date)
+    return [
+        row for row in rows
+        if start_s <= str(row.get("date") or "") <= end_s
+    ]
+
+
 # ==============================================================================
 # CACHED USER-DATA READS
 # ==============================================================================
@@ -1355,18 +1532,20 @@ def load_daily_activities_cached(
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def load_daily_log_cached(cache_user_id, cache_date):
-    row = DailyLogsRepository(supabase).get_for_date_compatible(
+def load_daily_log_cached(cache_user_id, cache_date, access_token):
+    row = fetch_daily_log_from_api(
         cache_user_id,
         cache_date,
+        access_token,
     )
     return [row] if row else []
 
 
 @st.cache_data(ttl=90, show_spinner=False)
-def load_weight_history_cached(cache_user_id):
-    return DailyLogsRepository(supabase).list_weight_history(
-        cache_user_id
+def load_weight_history_cached(cache_user_id, access_token):
+    return fetch_weight_history_from_api(
+        cache_user_id,
+        access_token,
     )
 
 
@@ -4226,7 +4405,10 @@ if str(user_id) == _PROTEIN_GOAL_SPECIAL_UID and "protein_goal_enabled" not in u
 # Il BMR viene calcolato dinamicamente usando l'ultimo peso registrato.
 latest_weight_row = None
 try:
-    latest_weight_data = load_weight_history_cached(user_id)
+    latest_weight_data = load_weight_history_cached(
+            user_id,
+            st.session_state.get("auth_access_token"),
+        )
     if latest_weight_data:
         latest_weight_row = latest_weight_data[-1]
 except Exception as e:
@@ -4514,10 +4696,10 @@ if profile_incomplete:
 
                 # Salviamo anche il peso nello storico: da questo momento il BMR
                 # seguirà automaticamente l'ultimo peso registrato.
-                DailyLogsRepository(supabase).upsert_for_date(
-                    user_id=user_id,
-                    log_date=date.today(),
-                    values={"weight": float(w_val)},
+                update_daily_log_via_api(
+                    date.today(),
+                    {"weight": float(w_val)},
+                    st.session_state.get("auth_access_token"),
                 )
 
                 if hasattr(res, "user") and res.user:
@@ -7868,11 +8050,11 @@ def render_personal_settings_page():
                 "data": updated_metadata
             })
 
-            DailyLogsRepository(supabase).upsert_for_date(
-                user_id=user_id,
-                log_date=date.today(),
-                values={"weight": float(new_current_weight)},
-            )
+            update_daily_log_via_api(
+                    date.today(),
+                    {"weight": float(new_current_weight)},
+                    st.session_state.get("auth_access_token"),
+                )
 
             if getattr(response, "user", None):
                 st.session_state["user"] = response.user
@@ -10254,7 +10436,11 @@ elif selected_page == t["t2"]:
     )
 
     try:
-        daily_log_res = load_daily_log_cached(user_id, str(summary_date))
+        daily_log_res = load_daily_log_cached(
+            user_id,
+            str(summary_date),
+            st.session_state.get("auth_access_token"),
+        )
         meals_data = load_daily_meals_cached(
             user_id,
             str(summary_date),
@@ -10265,7 +10451,10 @@ elif selected_page == t["t2"]:
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
-        all_weight_logs = load_weight_history_cached(user_id)
+        all_weight_logs = load_weight_history_cached(
+            user_id,
+            st.session_state.get("auth_access_token"),
+        )
     except Exception as e:
         st.error(t["load_data_error"].format(error=e))
         daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
@@ -10422,11 +10611,10 @@ elif selected_page == t["t2"]:
             saved_day_type = None
             saved_activity = None
             try:
-                _plan_row = DailyLogsRepository(
-                    supabase
-                ).get_for_date_compatible(
+                _plan_row = fetch_daily_log_from_api(
                     user_id,
                     plan_date,
+                    st.session_state.get("auth_access_token"),
                 )
                 plan_log = [_plan_row] if _plan_row else []
                 if plan_log:
@@ -10462,12 +10650,10 @@ elif selected_page == t["t2"]:
                         "day_type": day_type,
                         "activity_plan": activity_plan,
                     }
-                    DailyLogsRepository(
-                        supabase
-                    ).upsert_for_date(
-                        user_id=user_id,
-                        log_date=plan_date,
-                        values=payload_plan,
+                    update_daily_log_via_api(
+                        plan_date,
+                        payload_plan,
+                        st.session_state.get("auth_access_token"),
                     )
                     refresh_daily_logs(plan_date)
                     play_hidden_local_audio(resolve_ui_sound("day_plan_saved"))
@@ -11462,10 +11648,6 @@ elif selected_page == t["t2"]:
 # 11. PAGE 3: WEIGHT TRACKING / ANALYTICS
 # ==============================================================================
 elif selected_page == t["t3"]:
-    # First domain wired to the extracted Supabase repository layer.
-    # UI/business behaviour remains in Streamlit for now; only DB access moves.
-    weight_repo = WeightRepository(supabase)
-
     render_page_title_card(t["weight_tracking"])
 
     # Se un peso è appena stato salvato, riproduci il relativo feedback sonoro.
@@ -11478,7 +11660,12 @@ elif selected_page == t["t3"]:
     # 3. target weight, compact
     # ------------------------------------------------------------------
     logs_all = list(
-        reversed(weight_repo.history(user_id))
+        reversed(
+            fetch_weight_history_from_api(
+                user_id,
+                st.session_state.get("auth_access_token"),
+            )
+        )
     )
     edit_options = {
         str(r["id"]): (
@@ -11619,10 +11806,10 @@ elif selected_page == t["t3"]:
                         else:
                             sound_to_play = WEIGHT_SOUND_GAIN
 
-                    weight_repo.save(
-                        user_id=user_id,
-                        log_date=w_date,
-                        weight=float(w),
+                    create_weight_via_api(
+                        w_date,
+                        float(w),
+                        st.session_state.get("auth_access_token"),
                     )
 
                     _weight_metadata = dict(
@@ -11792,25 +11979,17 @@ elif selected_page == t["t3"]:
                                     selected_row["date"]
                                 )
                             ):
-                                weight_repo.move_weight(
-                                    row_id=selected_row[
-                                        "id"
-                                    ],
-                                    user_id=user_id,
-                                    new_date=edited_date,
-                                    weight=float(
-                                        edited_weight
-                                    ),
+                                update_weight_via_api(
+                                    selected_row["id"],
+                                    log_date=edited_date,
+                                    weight=float(edited_weight),
+                                    access_token=st.session_state.get("auth_access_token"),
                                 )
                             else:
-                                weight_repo.update_weight(
-                                    row_id=selected_row[
-                                        "id"
-                                    ],
-                                    user_id=user_id,
-                                    weight=float(
-                                        edited_weight
-                                    ),
+                                update_weight_via_api(
+                                    selected_row["id"],
+                                    weight=float(edited_weight),
+                                    access_token=st.session_state.get("auth_access_token"),
                                 )
 
                             refresh_daily_logs(
@@ -11837,11 +12016,9 @@ elif selected_page == t["t3"]:
                         ),
                     ):
                         try:
-                            weight_repo.delete_weight(
-                                row_id=selected_row[
-                                    "id"
-                                ],
-                                user_id=user_id,
+                            delete_weight_via_api(
+                                selected_row["id"],
+                                st.session_state.get("auth_access_token"),
                             )
                             refresh_daily_logs(
                                 selected_row["date"]
@@ -11925,12 +12102,11 @@ elif selected_page == t["t3"]:
         month_end = pd.Timestamp(date.today())
         month_start = month_end - pd.Timedelta(days=29)
 
-        month_weights_rows = DailyLogsRepository(
-            supabase
-        ).list_weight_range(
-            user_id=user_id,
-            start_date=month_start.date(),
-            end_date=month_end.date(),
+        month_weights_rows = weight_rows_for_range(
+            user_id,
+            month_start.date(),
+            month_end.date(),
+            st.session_state.get("auth_access_token"),
         )
         month_meals_rows = MealsRepository(supabase).list_date_range(
             user_id=user_id,
@@ -12090,12 +12266,11 @@ elif selected_page == t["t3"]:
             chart_start = chart_end - pd.Timedelta(days=selected_days - 1)
             timeline_dates = pd.date_range(chart_start, chart_end, freq="D")
 
-            logs = DailyLogsRepository(
-                supabase
-            ).list_weight_range(
-                user_id=user_id,
-                start_date=chart_start.date(),
-                end_date=chart_end.date(),
+            logs = weight_rows_for_range(
+                user_id,
+                chart_start.date(),
+                chart_end.date(),
+                st.session_state.get("auth_access_token"),
             )
             meals_rows = MealsRepository(supabase).list_date_range(
                 user_id=user_id,
@@ -13975,7 +14150,11 @@ elif selected_page == t["t5"]:
     act_date = st.date_input(t["act_date"], value=date.today())
     
     try:
-        existing_log = load_daily_log_cached(user_id, str(act_date))
+        existing_log = load_daily_log_cached(
+            user_id,
+            str(act_date),
+            st.session_state.get("auth_access_token"),
+        )
         day_steps = (
             existing_log[0].get("steps", 0)
             if existing_log and existing_log[0].get("steps")
@@ -14103,12 +14282,10 @@ elif selected_page == t["t5"]:
             new_steps = st.number_input(ux["total_steps"], value=int(day_steps), min_value=0, step=500)
             if st.button(t["update_steps"], use_container_width=True):
                 try:
-                    DailyLogsRepository(
-                        supabase
-                    ).upsert_for_date(
-                        user_id=user_id,
-                        log_date=act_date,
-                        values={"steps": int(new_steps)},
+                    update_daily_log_via_api(
+                        act_date,
+                        {"steps": int(new_steps)},
+                        st.session_state.get("auth_access_token"),
                     )
                     
                     # I passi sono incompatibili SOLO con attività che già
