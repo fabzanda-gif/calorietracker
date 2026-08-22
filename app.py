@@ -13,6 +13,7 @@ import base64
 import hashlib
 import secrets
 import io
+import os
 from pathlib import Path
 from urllib.parse import urlencode
 from supabase import create_client
@@ -1052,16 +1053,94 @@ def _safe_float(value):
 
 
 # ==============================================================================
+# TRANSITIONAL FASTAPI CLIENT
+# ==============================================================================
+# Step 4A: Streamlit reads meals through FastAPI instead of querying Supabase
+# directly. Other domains still use their current repositories for now.
+
+
+def get_api_base_url():
+    """
+    Resolve the FastAPI base URL.
+
+    Priority:
+    1) environment variable API_BASE_URL
+    2) optional Streamlit secret API_BASE_URL
+    3) local Codespaces/dev default
+    """
+    env_url = os.getenv("API_BASE_URL")
+    if env_url:
+        return env_url.rstrip("/")
+
+    try:
+        secret_url = st.secrets.get("API_BASE_URL")
+        if secret_url:
+            return str(secret_url).rstrip("/")
+    except Exception:
+        pass
+
+    return "http://127.0.0.1:8000"
+
+
+def api_auth_headers():
+    """
+    Reuse the Supabase access token already stored by the Streamlit login.
+    """
+    token = st.session_state.get("auth_access_token")
+    if not token:
+        raise RuntimeError(
+            "Sessione autenticata non disponibile per FastAPI."
+        )
+
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    }
+
+
+def fetch_daily_meals_from_api(cache_user_id, cache_date, access_token):
+    """
+    Transitional read used by load_daily_meals_cached.
+
+    cache_user_id remains part of the function signature only to keep cache
+    isolation explicit. FastAPI ignores it and derives the real user from the
+    Bearer token.
+    """
+    if not access_token:
+        raise RuntimeError(
+            "Access token mancante per la richiesta FastAPI."
+        )
+
+    response = requests.get(
+        f"{get_api_base_url()}/meals/{cache_date}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    payload = response.json()
+    return payload.get("items") or []
+
+
+# ==============================================================================
 # CACHED USER-DATA READS
 # ==============================================================================
 # Streamlit reruns the full script after most interactions. These short-lived
 # caches centralise the hottest Supabase reads. Every cache key includes user_id.
 
 @st.cache_data(ttl=30, show_spinner=False)
-def load_daily_meals_cached(cache_user_id, cache_date):
-    return MealsRepository(supabase).list_for_date_compatible(
+def load_daily_meals_cached(
+    cache_user_id,
+    cache_date,
+    access_token,
+):
+    return fetch_daily_meals_from_api(
         cache_user_id,
         cache_date,
+        access_token,
     )
 
 
@@ -1101,7 +1180,11 @@ def load_quick_meal_rows_cached(cache_user_id):
 
 
 def get_daily_totals(target_date):
-    meals = load_daily_meals_cached(user_id, str(target_date))
+    meals = load_daily_meals_cached(
+        user_id,
+        str(target_date),
+        st.session_state.get("auth_access_token"),
+    )
     activities = load_daily_activities_cached(user_id, str(target_date))
     return {
         "meals": meals,
@@ -2120,6 +2203,7 @@ def suggest_next_meal_type(log_date=None):
         rows = load_daily_meals_cached(
             user_id,
             str(target_date),
+            st.session_state.get("auth_access_token"),
         )
         logged = {
             str(row.get("meal_type") or "").strip().casefold()
@@ -9966,7 +10050,11 @@ elif selected_page == t["t2"]:
 
     try:
         daily_log_res = load_daily_log_cached(user_id, str(summary_date))
-        meals_data = load_daily_meals_cached(user_id, str(summary_date))
+        meals_data = load_daily_meals_cached(
+            user_id,
+            str(summary_date),
+            st.session_state.get("auth_access_token"),
+        )
         raw_activities = load_daily_activities_cached(user_id, str(summary_date))
         all_weight_logs = load_weight_history_cached(user_id)
     except Exception as e:
