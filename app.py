@@ -20,10 +20,7 @@ from supabase import create_client
 from supabase.client import ClientOptions
 from streamlit_cookies_controller import CookieController
 from openai import OpenAI
-from backend.repositories.weight import WeightRepository
-from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.meals import MealsRepository
-from backend.repositories.daily_logs import DailyLogsRepository
 
 # ------------------------------------------------------------------
 # Fotocamera posteriore per Foto AI
@@ -1718,6 +1715,8 @@ def load_weight_history_cached(cache_user_id, access_token):
 
 @st.cache_data(ttl=60, show_spinner=False)
 def load_quick_meal_rows_cached(cache_user_id):
+    # Transitional historical read.
+    # The current Meals API exposes daily CRUD but no history/range endpoint yet.
     return MealsRepository(supabase).list_history_compatible(
         cache_user_id
     )
@@ -3268,17 +3267,16 @@ def load_personal_recipe_by_id(recipe_id):
 
 def breakfast_already_logged(log_date):
     try:
-        rows = (
-            supabase.table("meals")
-            .select("id")
-            .eq("user_id", user_id)
-            .eq("date", str(log_date))
-            .eq("meal_type", "Colazione")
-            .limit(1)
-            .execute().data
-            or []
+        rows = load_daily_meals_cached(
+            user_id,
+            str(log_date),
+            st.session_state.get("auth_access_token"),
         )
-        return bool(rows)
+        return any(
+            str(row.get("meal_type") or "").strip().casefold()
+            == "colazione"
+            for row in rows
+        )
     except Exception as exc:
         print(f"Breakfast logged check failed: {exc}")
         return False
