@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from datetime import date
+from typing import Any
+
+from backend.repositories.meals import MealsRepository
+
+
+class MealConfirmationError(ValueError):
+    pass
+
+
+class MealAlreadyLoggedError(MealConfirmationError):
+    pass
+
+
+class MealPredictionUnavailableError(MealConfirmationError):
+    pass
+
+
+class MealConfirmationService:
+    """
+    Convert an explicit user confirmation of a prediction into a real meal log.
+
+    The service never auto-confirms. It requires an already-built prediction
+    and writes through the existing MealsRepository.
+    """
+
+    def __init__(self, meals_repo: MealsRepository):
+        self.meals_repo = meals_repo
+
+    def confirm(
+        self,
+        *,
+        user_id: str,
+        day_date: date,
+        prediction: dict[str, Any],
+    ) -> dict:
+        if (
+            prediction.get("state") != "predicted"
+            or not prediction.get("value")
+            or not prediction.get("meal_type")
+        ):
+            raise MealPredictionUnavailableError(
+                "No valid meal prediction is available to confirm"
+            )
+
+        meal_type = str(prediction["meal_type"])
+
+        # v0.1 duplicate guard is deliberately strict for breakfast because
+        # that is the first prediction-confirmation vertical slice.
+        if (
+            meal_type == "Colazione"
+            and self.meals_repo.breakfast_exists(user_id, day_date)
+        ):
+            raise MealAlreadyLoggedError(
+                "Breakfast is already logged for this date"
+            )
+
+        payload = {
+            "user_id": user_id,
+            "date": str(day_date),
+            "meal_type": meal_type,
+            "name": str(prediction["value"]),
+            "calories": self._nutrition_value(
+                prediction.get("estimated_calories")
+            ),
+            "protein": self._nutrition_value(
+                prediction.get("estimated_protein_g")
+            ),
+            "carbs": self._nutrition_value(
+                prediction.get("estimated_carbs_g")
+            ),
+            "fat": self._nutrition_value(
+                prediction.get("estimated_fat_g")
+            ),
+        }
+
+        response = self.meals_repo.create_compatible(payload)
+        rows = getattr(response, "data", None) or []
+
+        item = rows[0] if rows else payload
+
+        return {
+            "confirmed": True,
+            "date": str(day_date),
+            "meal_type": meal_type,
+            "item": item,
+            "prediction": prediction,
+        }
+
+    @staticmethod
+    def _nutrition_value(value: Any) -> float:
+        if value in (None, ""):
+            return 0.0
+
+        try:
+            return max(0.0, float(value))
+        except (TypeError, ValueError):
+            return 0.0

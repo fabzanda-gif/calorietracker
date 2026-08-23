@@ -17,13 +17,14 @@ class MealMemoryService:
     """
     Deterministic meal-routine memory.
 
-    v0.1 predicts a recurring meal name for a given meal_type using:
+    v0.2 predicts a recurring meal for a given meal_type using:
     - same weekday;
-    - optional day context (e.g. Ufficio / Casa);
+    - optional day context;
     - recent history;
-    - the same 3/4-week confidence philosophy used by the Day Memory.
+    - the same 3/4-week confidence philosophy used by Day Memory.
 
-    It does NOT create or log meals. It only predicts.
+    Nutrition estimates are averages across matching historical occurrences.
+    The service predicts only; it never writes meal data.
     """
 
     def __init__(
@@ -100,6 +101,8 @@ class MealMemoryService:
                     "name": str(name),
                     "calories": self._safe_float(meal.get("calories")),
                     "protein": self._safe_float(meal.get("protein")),
+                    "carbs": self._safe_float(meal.get("carbs")),
+                    "fat": self._safe_float(meal.get("fat")),
                 }
             )
 
@@ -137,17 +140,6 @@ class MealMemoryService:
             if item["name"] == winner
         ]
 
-        calorie_values = [
-            item["calories"]
-            for item in matching_items
-            if item["calories"] is not None
-        ]
-        protein_values = [
-            item["protein"]
-            for item in matching_items
-            if item["protein"] is not None
-        ]
-
         return {
             "meal_type": meal_type,
             "value": winner,
@@ -156,8 +148,18 @@ class MealMemoryService:
             "confidence": round(probability, 4),
             "confidence_level": confidence_level,
             "day_context": day_context,
-            "estimated_calories": self._average_or_none(calorie_values),
-            "estimated_protein_g": self._average_or_none(protein_values),
+            "estimated_calories": self._average_field(
+                matching_items, "calories"
+            ),
+            "estimated_protein_g": self._average_field(
+                matching_items, "protein"
+            ),
+            "estimated_carbs_g": self._average_field(
+                matching_items, "carbs"
+            ),
+            "estimated_fat_g": self._average_field(
+                matching_items, "fat"
+            ),
             "evidence": {
                 "observations": len(names),
                 "matches": matches,
@@ -175,8 +177,17 @@ class MealMemoryService:
         except (TypeError, ValueError):
             return None
 
-    @staticmethod
-    def _average_or_none(values: list[float]) -> float | None:
+    @classmethod
+    def _average_field(
+        cls,
+        items: list[dict[str, Any]],
+        field_name: str,
+    ) -> float | None:
+        values = [
+            item[field_name]
+            for item in items
+            if item.get(field_name) is not None
+        ]
         if not values:
             return None
         return round(sum(values) / len(values), 2)
@@ -197,6 +208,8 @@ class MealMemoryService:
             "day_context": day_context,
             "estimated_calories": None,
             "estimated_protein_g": None,
+            "estimated_carbs_g": None,
+            "estimated_fat_g": None,
             "evidence": {
                 "observations": 0,
                 "matches": 0,
