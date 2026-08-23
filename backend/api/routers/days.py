@@ -30,6 +30,13 @@ from backend.services.meal_memory import MealMemoryService
 router = APIRouter(prefix="/days", tags=["days"])
 
 
+MEAL_SLOT_TO_TYPE = {
+    "breakfast": "Colazione",
+    "lunch": "Pranzo",
+    "dinner": "Cena",
+}
+
+
 @router.get("/{day_date}/budget")
 def get_day_budget(
     day_date: Date,
@@ -65,13 +72,20 @@ def get_day_budget(
         ) from exc
 
 
-@router.post("/{day_date}/meals/breakfast/confirm")
-def confirm_breakfast_prediction(
+@router.post("/{day_date}/meals/{meal_slot}/confirm")
+def confirm_meal_prediction(
     day_date: Date,
+    meal_slot: str,
     current_user: CurrentUser = Depends(get_current_user),
     daily_logs_repo: DailyLogsRepository = Depends(get_daily_logs_repository),
     meals_repo: MealsRepository = Depends(get_meals_repository),
 ):
+    if meal_slot not in MEAL_SLOT_TO_TYPE:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown meal slot",
+        )
+
     try:
         meal_memory = MealMemoryService(
             meals_repo=meals_repo,
@@ -88,7 +102,7 @@ def confirm_breakfast_prediction(
             day_date=day_date,
         )
 
-        prediction = day["meals"]["breakfast"]
+        prediction = day["meals"][meal_slot]
 
         confirmation = MealConfirmationService(meals_repo)
 
@@ -98,12 +112,10 @@ def confirm_breakfast_prediction(
             prediction=prediction,
         )
 
-    except MealPredictionUnavailableError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
-    except MealAlreadyLoggedError as exc:
+    except (
+        MealPredictionUnavailableError,
+        MealAlreadyLoggedError,
+    ) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
