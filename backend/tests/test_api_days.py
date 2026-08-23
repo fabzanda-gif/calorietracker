@@ -5,7 +5,11 @@ from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
     get_daily_logs_repository,
+    get_meals_repository,
 )
+from backend.api.main import app
+
+
 class FakeMealsRepository:
     def list_date_range(
         self,
@@ -15,9 +19,6 @@ class FakeMealsRepository:
         columns=None,
     ):
         return []
-        def override_meals_repo():
-    return FakeMealsRepository()
-from backend.api.main import app
 
 
 class FakeDailyLogsRepository:
@@ -50,13 +51,17 @@ def override_repo():
     return fake_repo
 
 
+def override_meals_repo():
+    return FakeMealsRepository()
+
+
 @pytest.fixture(autouse=True)
 def api_overrides():
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_daily_logs_repository] = override_repo
+    app.dependency_overrides[get_meals_repository] = override_meals_repo
     yield
     app.dependency_overrides.clear()
-    app.dependency_overrides[get_meals_repository] = override_meals_repo
 
 
 client = TestClient(app)
