@@ -51,10 +51,7 @@ client = TestClient(app)
 
 
 def test_day_route_is_registered():
-    paths = {
-        getattr(route, "path", "")
-        for route in app.routes
-    }
+    paths = app.openapi()["paths"]
 
     assert "/days/{day_date}" in paths
 
