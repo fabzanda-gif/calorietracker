@@ -22,8 +22,8 @@ class MealConfirmationService:
     """
     Convert an explicit user confirmation of a prediction into a real meal log.
 
-    The service never auto-confirms. It requires an already-built prediction
-    and writes through the existing MealsRepository.
+    Generic across meal types. The service never auto-confirms and always
+    writes through the existing MealsRepository.
     """
 
     def __init__(self, meals_repo: MealsRepository):
@@ -47,14 +47,13 @@ class MealConfirmationService:
 
         meal_type = str(prediction["meal_type"])
 
-        # v0.1 duplicate guard is deliberately strict for breakfast because
-        # that is the first prediction-confirmation vertical slice.
-        if (
-            meal_type == "Colazione"
-            and self.meals_repo.breakfast_exists(user_id, day_date)
+        if self._meal_type_exists(
+            user_id=user_id,
+            day_date=day_date,
+            meal_type=meal_type,
         ):
             raise MealAlreadyLoggedError(
-                "Breakfast is already logged for this date"
+                f"{meal_type} is already logged for this date"
             )
 
         payload = {
@@ -88,6 +87,35 @@ class MealConfirmationService:
             "item": item,
             "prediction": prediction,
         }
+
+    def _meal_type_exists(
+        self,
+        *,
+        user_id: str,
+        day_date: date,
+        meal_type: str,
+    ) -> bool:
+        # Keep compatibility with the existing specialized breakfast helper.
+        if meal_type == "Colazione" and hasattr(
+            self.meals_repo,
+            "breakfast_exists",
+        ):
+            return bool(
+                self.meals_repo.breakfast_exists(
+                    user_id,
+                    day_date,
+                )
+            )
+
+        rows = self.meals_repo.list_for_date_compatible(
+            user_id=user_id,
+            log_date=day_date,
+        )
+
+        return any(
+            row.get("meal_type") == meal_type
+            for row in rows
+        )
 
     @staticmethod
     def _nutrition_value(value: Any) -> float:

@@ -7,6 +7,13 @@ from backend.repositories.daily_logs import DailyLogsRepository
 from backend.services.memory import MemoryService
 
 
+MEAL_SLOTS = {
+    "breakfast": "Colazione",
+    "lunch": "Pranzo",
+    "dinner": "Cena",
+}
+
+
 def _known_value(value: Any) -> dict:
     if value is None or value == "":
         return {
@@ -35,6 +42,8 @@ def _unknown_meal(meal_type: str) -> dict:
         "day_context": None,
         "estimated_calories": None,
         "estimated_protein_g": None,
+        "estimated_carbs_g": None,
+        "estimated_fat_g": None,
         "evidence": {
             "observations": 0,
             "matches": 0,
@@ -48,11 +57,8 @@ class DayService:
     """
     Product-level representation of a SanoSync day.
 
-    Explicit daily_logs values are authoritative. Routine predictions are used
-    only when the corresponding user-confirmed field is missing.
-
-    v0.3 optionally includes meal-routine predictions. The first vertical
-    slice is breakfast only; prediction is never treated as an actual log.
+    Explicit planning remains authoritative. Meal predictions are optional and
+    remain predictions until the user explicitly confirms them.
     """
 
     def __init__(
@@ -90,23 +96,25 @@ class DayService:
             if prediction["state"] == "predicted":
                 activity_plan = prediction
 
-        breakfast = _unknown_meal("Colazione")
+        meals = {
+            slot: _unknown_meal(meal_type)
+            for slot, meal_type in MEAL_SLOTS.items()
+        }
 
         if self.meal_memory_service is not None:
-            breakfast = self.meal_memory_service.predict_meal(
-                user_id=user_id,
-                day_date=day_date,
-                meal_type="Colazione",
-                day_context=context.get("value"),
-            )
+            for slot, meal_type in MEAL_SLOTS.items():
+                meals[slot] = self.meal_memory_service.predict_meal(
+                    user_id=user_id,
+                    day_date=day_date,
+                    meal_type=meal_type,
+                    day_context=context.get("value"),
+                )
 
         return {
             "date": str(day_date),
             "context": context,
             "activity_plan": activity_plan,
-            "meals": {
-                "breakfast": breakfast,
-            },
+            "meals": meals,
             "actual": {
                 "weight": row.get("weight"),
                 "steps": row.get("steps"),
