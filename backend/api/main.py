@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.daily_logs import router as daily_logs_router
+from backend.api.routers.days import router as days_router
 from backend.api.routers.health import router as health_router
 from backend.api.routers.meals import router as meals_router
 from backend.api.routers.recipes import router as recipes_router
@@ -20,3 +21,4 @@ app.include_router(activities_router)
 app.include_router(weight_router)
 app.include_router(daily_logs_router)
 app.include_router(recipes_router)
+app.include_router(days_router)
