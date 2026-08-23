@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+from datetime import date as Date
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+
+from backend.api.dependencies import (
+    CurrentUser,
+    get_current_user,
+    get_meal_prep_repository,
+    get_recipes_repository,
+)
+from backend.repositories.base import RepositoryError
+from backend.repositories.meal_prep import MealPrepRepository
+from backend.repositories.recipes import RecipesRepository
+from backend.services.meal_prep import (
+    MealPrepError,
+    MealPrepNotFoundError,
+    MealPrepService,
+    MealPrepUnavailableError,
+)
+
+
+router = APIRouter(
+    prefix="/meal-prep",
+    tags=["meal-prep"],
+)
+
+
+class MealPrepCreate(BaseModel):
+    recipe_id: str
+    prepared_at: Date
+    portions_prepared: int = Field(gt=0)
+    expires_at: Date | None = None
+
+
+class MealPrepConsume(BaseModel):
+    portions: int = Field(default=1, gt=0)
+
+
+class MealPrepStatusUpdate(BaseModel):
+    status: str
+
+
+def _service(
+    meal_prep_repo: MealPrepRepository,
+    recipes_repo: RecipesRepository,
+) -> MealPrepService:
+    return MealPrepService(
+        meal_prep_repo=meal_prep_repo,
+        recipes_repo=recipes_repo,
+    )
+
+
+@router.get("")
+def get_meal_prep_inventory(
+    available_only: bool = False,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: MealPrepRepository = Depends(get_meal_prep_repository),
+):
+    try:
+        items = (
+            repo.list_available(current_user.id)
+            if available_only
+            else repo.list_all(current_user.id)
+        )
+        return {
+            "count": len(items),
+            "items": items,
+        }
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_meal_prep_batch(
+    data: MealPrepCreate,
+    current_user: CurrentUser = Depends(get_current_user),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
+    recipes_repo: RecipesRepository = Depends(
+        get_recipes_repository
+    ),
+):
+    try:
+        item = _service(
+            meal_prep_repo,
+            recipes_repo,
+        ).create_from_recipe(
+            user_id=current_user.id,
+            recipe_id=data.recipe_id,
+            prepared_at=data.prepared_at,
+            portions_prepared=data.portions_prepared,
+            expires_at=data.expires_at,
+        )
+        return {"created": True, "item": item}
+    except MealPrepNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except MealPrepError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/{batch_id}/consume")
+def consume_meal_prep(
+    batch_id: str,
+    data: MealPrepConsume,
+    current_user: CurrentUser = Depends(get_current_user),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
+    recipes_repo: RecipesRepository = Depends(
+        get_recipes_repository
+    ),
+):
+    try:
+        item = _service(
+            meal_prep_repo,
+            recipes_repo,
+        ).consume_portion(
+            user_id=current_user.id,
+            batch_id=batch_id,
+            portions=data.portions,
+        )
+        return {"updated": True, "item": item}
+    except MealPrepNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except MealPrepUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except MealPrepError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch("/{batch_id}/status")
+def update_meal_prep_status(
+    batch_id: str,
+    data: MealPrepStatusUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
+    recipes_repo: RecipesRepository = Depends(
+        get_recipes_repository
+    ),
+):
+    try:
+        item = _service(
+            meal_prep_repo,
+            recipes_repo,
+        ).set_status(
+            user_id=current_user.id,
+            batch_id=batch_id,
+            status=data.status,
+        )
+        return {"updated": True, "item": item}
+    except MealPrepNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except MealPrepError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
