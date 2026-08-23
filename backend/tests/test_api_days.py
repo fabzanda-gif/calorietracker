@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from backend.api.dependencies import (
     CurrentUser,
-    get_current_user,
+    get_current_user, 
     get_daily_logs_repository,
     get_meals_repository,
 )
@@ -24,6 +24,7 @@ class FakeMealsRepository:
 class FakeDailyLogsRepository:
     def __init__(self):
         self.last_get = None
+        self.last_range = None
 
     def get_for_date_compatible(self, user_id, log_date):
         self.last_get = (user_id, str(log_date))
@@ -35,6 +36,20 @@ class FakeDailyLogsRepository:
             "day_type": "Ufficio",
             "activity_plan": "Attiva",
         }
+
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+        columns=None,
+    ):
+        self.last_range = (
+            user_id,
+            str(start_date),
+            str(end_date),
+        )
+        return []
 
 
 fake_repo = FakeDailyLogsRepository()
@@ -101,3 +116,6 @@ def test_get_day_builds_product_level_day_model():
         "weight": 80.1,
         "steps": 7000,
     }
+
+    assert payload["meals"]["breakfast"]["state"] == "unknown"
+    assert payload["meals"]["breakfast"]["value"] is None
