@@ -28,9 +28,8 @@ class DayService:
     """
     Product-level representation of a SanoSync day.
 
-    v0.2 keeps explicit daily_logs planning authoritative and only asks the
-    MemoryService for a context prediction when no user-confirmed day_type
-    exists for the requested day.
+    Explicit daily_logs values are authoritative. Routine predictions are used
+    only when the corresponding user-confirmed field is missing.
     """
 
     def __init__(
@@ -49,7 +48,6 @@ class DayService:
         row = row or {}
 
         context = _known_value(row.get("day_type"))
-
         if context["state"] == "unknown":
             prediction = self.memory_service.predict_context(
                 user_id=user_id,
@@ -58,10 +56,19 @@ class DayService:
             if prediction["state"] == "predicted":
                 context = prediction
 
+        activity_plan = _known_value(row.get("activity_plan"))
+        if activity_plan["state"] == "unknown":
+            prediction = self.memory_service.predict_activity_plan(
+                user_id=user_id,
+                day_date=day_date,
+            )
+            if prediction["state"] == "predicted":
+                activity_plan = prediction
+
         return {
             "date": str(day_date),
             "context": context,
-            "activity_plan": _known_value(row.get("activity_plan")),
+            "activity_plan": activity_plan,
             "actual": {
                 "weight": row.get("weight"),
                 "steps": row.get("steps"),

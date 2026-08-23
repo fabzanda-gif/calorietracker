@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date, timedelta
-from typing import Any
 
 from backend.repositories.daily_logs import DailyLogsRepository
 
@@ -14,20 +13,20 @@ HIGH = "high"
 
 class MemoryService:
     """
-    Deterministic context-memory service.
+    Deterministic SanoSync routine memory.
 
-    v0.2 predicts a day's context from historical `day_type` values recorded
-    on the same weekday, while allowing recent behavior to overtake older
-    routines.
+    v0.3 predicts both:
+    - day context from `day_type`
+    - planned activity from `activity_plan`
 
-    Design rules:
+    Both use the same weekday-based routine logic:
     - no AI / ML;
-    - no persistence of predictions yet;
-    - missing day_type values are ignored;
-    - high confidence requires at least 4 matching weekly observations;
-    - the latest 4 matching weekday observations form the strongest signal;
-    - one-off deviations do not immediately rewrite an established routine;
-    - explicit user data remains authoritative in DayService.
+    - no prediction persistence yet;
+    - missing values are ignored;
+    - recent observations matter more;
+    - four recent consistent weekly observations can establish or replace
+      a high-confidence routine;
+    - isolated deviations do not immediately rewrite established patterns.
     """
 
     def __init__(
@@ -46,6 +45,30 @@ class MemoryService:
         user_id: str,
         day_date: date,
     ) -> dict:
+        return self._predict_weekday_field(
+            user_id=user_id,
+            day_date=day_date,
+            field_name="day_type",
+        )
+
+    def predict_activity_plan(
+        self,
+        user_id: str,
+        day_date: date,
+    ) -> dict:
+        return self._predict_weekday_field(
+            user_id=user_id,
+            day_date=day_date,
+            field_name="activity_plan",
+        )
+
+    def _predict_weekday_field(
+        self,
+        *,
+        user_id: str,
+        day_date: date,
+        field_name: str,
+    ) -> dict:
         start_date = day_date - timedelta(weeks=self.lookback_weeks)
         end_date = day_date - timedelta(days=1)
 
@@ -58,23 +81,20 @@ class MemoryService:
         observations = self._same_weekday_observations(
             rows=rows,
             weekday=day_date.weekday(),
+            field_name=field_name,
         )
 
         if not observations:
             return self._unknown()
 
-        values = [item["day_type"] for item in observations]
+        values = [item["value"] for item in observations]
         recent_values = values[-self.recent_window :]
 
-        # Strong routine-change rule:
-        # four consecutive recent same-weekday observations with the same
-        # context are allowed to replace an older historical pattern.
         if (
             len(recent_values) >= self.recent_window
             and len(set(recent_values)) == 1
         ):
             value = recent_values[-1]
-            recent_matches = len(recent_values)
 
             return {
                 "value": value,
@@ -86,7 +106,7 @@ class MemoryService:
                     "observations": len(values),
                     "matches": values.count(value),
                     "recent_observations": len(recent_values),
-                    "recent_matches": recent_matches,
+                    "recent_matches": len(recent_values),
                     "change_detected": self._historical_mode_differs(
                         older_values=values[:-self.recent_window],
                         recent_value=value,
@@ -94,22 +114,18 @@ class MemoryService:
                 },
             }
 
-        # Otherwise use a recency-weighted vote. Recent observations matter
-        # more, but isolated deviations cannot instantly dominate the history.
         weighted_scores: dict[str, float] = {}
         for index, value in enumerate(values):
             distance_from_latest = len(values) - 1 - index
-
-            if distance_from_latest < self.recent_window:
-                weight = 2.0
-            else:
-                weight = 0.5
-
+            weight = 2.0 if distance_from_latest < self.recent_window else 0.5
             weighted_scores[value] = weighted_scores.get(value, 0.0) + weight
 
         value = max(
             weighted_scores,
-            key=lambda item: (weighted_scores[item], values.count(item)),
+            key=lambda item: (
+                weighted_scores[item],
+                values.count(item),
+            ),
         )
 
         matches = values.count(value)
@@ -139,14 +155,15 @@ class MemoryService:
         *,
         rows: list[dict],
         weekday: int,
+        field_name: str,
     ) -> list[dict]:
         observations = []
 
         for row in rows:
             raw_date = row.get("date")
-            day_type = row.get("day_type")
+            value = row.get(field_name)
 
-            if not raw_date or not day_type:
+            if not raw_date or not value:
                 continue
 
             try:
@@ -160,7 +177,7 @@ class MemoryService:
             observations.append(
                 {
                     "date": row_date,
-                    "day_type": day_type,
+                    "value": value,
                 }
             )
 
