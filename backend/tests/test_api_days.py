@@ -50,7 +50,7 @@ def api_overrides():
 client = TestClient(app)
 
 
-ddef test_day_route_is_registered():
+def test_day_route_is_registered():
     paths = {
         getattr(route, "path", "")
         for route in app.routes
