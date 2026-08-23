@@ -3,7 +3,7 @@ from datetime import date
 from backend.services.meal_memory import MealMemoryService
 
 
-TARGET = date(2026, 9, 1)  # Tuesday
+TARGET = date(2026, 9, 1)
 
 
 class FakeMealsRepository:
@@ -40,6 +40,8 @@ def test_no_history_is_unknown():
 
     assert result["state"] == "unknown"
     assert result["value"] is None
+    assert result["estimated_carbs_g"] is None
+    assert result["estimated_fat_g"] is None
 
 
 def test_one_matching_meal_is_low_confidence():
@@ -126,23 +128,27 @@ def test_context_filters_meal_history():
 
 
 def test_context_does_not_fall_back_to_other_contexts():
-    meals = [
-        {"date": "2026-08-25", "meal_type": "Colazione", "name": "Colazione Casa"},
-    ]
-    day_logs = [
-        {"date": "2026-08-25", "day_type": "Lavoro da casa"},
-    ]
-
     result = predict(
-        meals,
-        day_logs,
+        [
+            {
+                "date": "2026-08-25",
+                "meal_type": "Colazione",
+                "name": "Colazione Casa",
+            }
+        ],
+        [
+            {
+                "date": "2026-08-25",
+                "day_type": "Lavoro da casa",
+            }
+        ],
         context="Ufficio",
     )
 
     assert result["state"] == "unknown"
 
 
-def test_estimated_calories_and_protein_use_matching_routine_average():
+def test_estimated_nutrition_uses_matching_routine_average():
     result = predict([
         {
             "date": "2026-08-11",
@@ -150,6 +156,8 @@ def test_estimated_calories_and_protein_use_matching_routine_average():
             "name": "Colazione Ufficio",
             "calories": 300,
             "protein": 16,
+            "carbs": 30,
+            "fat": 8,
         },
         {
             "date": "2026-08-18",
@@ -157,6 +165,8 @@ def test_estimated_calories_and_protein_use_matching_routine_average():
             "name": "Altro",
             "calories": 800,
             "protein": 50,
+            "carbs": 100,
+            "fat": 30,
         },
         {
             "date": "2026-08-25",
@@ -164,12 +174,16 @@ def test_estimated_calories_and_protein_use_matching_routine_average():
             "name": "Colazione Ufficio",
             "calories": 320,
             "protein": 20,
+            "carbs": 40,
+            "fat": 12,
         },
     ])
 
     assert result["value"] == "Colazione Ufficio"
     assert result["estimated_calories"] == 310
     assert result["estimated_protein_g"] == 18
+    assert result["estimated_carbs_g"] == 35
+    assert result["estimated_fat_g"] == 10
 
 
 def test_missing_nutrition_values_do_not_break_prediction():
@@ -180,6 +194,8 @@ def test_missing_nutrition_values_do_not_break_prediction():
             "name": "Colazione Ufficio",
             "calories": None,
             "protein": None,
+            "carbs": None,
+            "fat": None,
         },
         {
             "date": "2026-08-25",
@@ -191,3 +207,5 @@ def test_missing_nutrition_values_do_not_break_prediction():
     assert result["value"] == "Colazione Ufficio"
     assert result["estimated_calories"] is None
     assert result["estimated_protein_g"] is None
+    assert result["estimated_carbs_g"] is None
+    assert result["estimated_fat_g"] is None
