@@ -19,6 +19,7 @@ from backend.repositories.meals import MealsRepository
 from backend.repositories.weight import WeightRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
+from backend.services.meal_memory import MealMemoryService
 
 
 router = APIRouter(prefix="/days", tags=["days"])
@@ -63,14 +64,25 @@ def get_day_budget(
 def get_day(
     day_date: Date,
     current_user: CurrentUser = Depends(get_current_user),
-    repo: DailyLogsRepository = Depends(get_daily_logs_repository),
+    daily_logs_repo: DailyLogsRepository = Depends(get_daily_logs_repository),
+    meals_repo: MealsRepository = Depends(get_meals_repository),
 ):
     try:
-        service = DayService(repo)
+        meal_memory = MealMemoryService(
+            meals_repo=meals_repo,
+            daily_logs_repo=daily_logs_repo,
+        )
+
+        service = DayService(
+            daily_logs_repo=daily_logs_repo,
+            meal_memory_service=meal_memory,
+        )
+
         return service.build_day(
             user_id=current_user.id,
             day_date=day_date,
         )
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
