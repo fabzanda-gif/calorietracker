@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -22,6 +23,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 class CurrentUser:
     id: str
     access_token: str
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def _supabase_settings() -> tuple[str, str]:
@@ -56,6 +58,9 @@ def get_current_user(
 ) -> CurrentUser:
     """
     Validate the Bearer token and resolve the authenticated Supabase user.
+
+    User metadata is exposed here once so downstream services do not need
+    to call Supabase Auth again.
     """
     if credentials is None or not credentials.credentials:
         raise HTTPException(
@@ -78,9 +83,12 @@ def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        metadata = getattr(user, "user_metadata", None) or {}
+
         return CurrentUser(
             id=str(user.id),
             access_token=token,
+            metadata=dict(metadata),
         )
 
     except HTTPException:
