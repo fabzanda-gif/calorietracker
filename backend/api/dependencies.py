@@ -11,6 +11,7 @@ from supabase import Client, create_client
 
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
@@ -44,9 +45,6 @@ def _supabase_settings() -> tuple[str, str]:
 
 @lru_cache(maxsize=1)
 def get_supabase_client() -> Client:
-    """
-    Anonymous client used for Supabase Auth token validation.
-    """
     url, key = _supabase_settings()
     return create_client(url, key)
 
@@ -56,12 +54,6 @@ def get_current_user(
         bearer_scheme
     ),
 ) -> CurrentUser:
-    """
-    Validate the Bearer token and resolve the authenticated Supabase user.
-
-    User metadata is exposed here once so downstream services do not need
-    to call Supabase Auth again.
-    """
     if credentials is None or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -104,10 +96,6 @@ def get_current_user(
 def get_authenticated_supabase(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Client:
-    """
-    Supabase client whose PostgREST requests carry the logged-in user's JWT.
-    This is the single place where authenticated database access is created.
-    """
     url, key = _supabase_settings()
     client = create_client(url, key)
     client.postgrest.auth(current_user.access_token)
@@ -142,3 +130,9 @@ def get_recipes_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> RecipesRepository:
     return RecipesRepository(supabase)
+
+
+def get_meal_prep_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> MealPrepRepository:
+    return MealPrepRepository(supabase)
