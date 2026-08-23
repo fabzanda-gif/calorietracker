@@ -6,6 +6,17 @@ from backend.api.dependencies import (
     get_current_user,
     get_daily_logs_repository,
 )
+class FakeMealsRepository:
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+        columns=None,
+    ):
+        return []
+        def override_meals_repo():
+    return FakeMealsRepository()
 from backend.api.main import app
 
 
@@ -45,6 +56,7 @@ def api_overrides():
     app.dependency_overrides[get_daily_logs_repository] = override_repo
     yield
     app.dependency_overrides.clear()
+    app.dependency_overrides[get_meals_repository] = override_meals_repo
 
 
 client = TestClient(app)
