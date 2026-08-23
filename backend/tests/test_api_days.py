@@ -50,8 +50,12 @@ def api_overrides():
 client = TestClient(app)
 
 
-def test_day_route_is_registered():
-    paths = {route.path for route in app.routes}
+ddef test_day_route_is_registered():
+    paths = {
+        getattr(route, "path", "")
+        for route in app.routes
+    }
+
     assert "/days/{day_date}" in paths
 
 
