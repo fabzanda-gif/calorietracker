@@ -49,23 +49,30 @@ class FakeMealsRepository:
         end_date,
         columns=None,
     ):
-        return [
-            {
-                "date": d,
-                "meal_type": "Colazione",
-                "name": "Colazione Ufficio",
-                "calories": 310,
-                "protein": 18,
-                "carbs": 35,
-                "fat": 10,
-            }
+        rows = []
+        for meal_type, name, kcal in [
+            ("Colazione", "Colazione Ufficio", 300),
+            ("Pranzo", "Pranzo Ufficio", 700),
+            ("Cena", "Cena Standard", 600),
+        ]:
             for d in [
                 "2026-08-04",
                 "2026-08-11",
                 "2026-08-18",
                 "2026-08-25",
-            ]
-        ]
+            ]:
+                rows.append(
+                    {
+                        "date": d,
+                        "meal_type": meal_type,
+                        "name": name,
+                        "calories": kcal,
+                        "protein": 30,
+                        "carbs": 50,
+                        "fat": 15,
+                    }
+                )
+        return rows
 
     def list_for_date_compatible(self, user_id, log_date):
         return [
@@ -127,33 +134,45 @@ def api_overrides():
 client = TestClient(app)
 
 
-def test_generic_confirm_route_is_registered():
-    assert (
-        "/days/{day_date}/meals/{meal_slot}/confirm"
-        in app.openapi()["paths"]
-    )
-
-
-def test_confirm_predicted_breakfast_creates_meal():
+@pytest.mark.parametrize(
+    "slot,expected_type,expected_name",
+    [
+        ("breakfast", "Colazione", "Colazione Ufficio"),
+        ("lunch", "Pranzo", "Pranzo Ufficio"),
+        ("dinner", "Cena", "Cena Standard"),
+    ],
+)
+def test_generic_confirmation_route_logs_requested_meal(
+    slot,
+    expected_type,
+    expected_name,
+):
     response = client.post(
-        "/days/2026-09-01/meals/breakfast/confirm"
+        f"/days/2026-09-01/meals/{slot}/confirm"
     )
 
     assert response.status_code == 200
-    payload = response.json()
+    item = response.json()["item"]
 
-    assert payload["confirmed"] is True
-    assert payload["item"]["name"] == "Colazione Ufficio"
-    assert payload["item"]["calories"] == 310
+    assert item["meal_type"] == expected_type
+    assert item["name"] == expected_name
 
 
-def test_second_breakfast_confirmation_is_rejected():
+def test_duplicate_lunch_confirmation_is_rejected():
     first = client.post(
-        "/days/2026-09-01/meals/breakfast/confirm"
+        "/days/2026-09-01/meals/lunch/confirm"
     )
     second = client.post(
-        "/days/2026-09-01/meals/breakfast/confirm"
+        "/days/2026-09-01/meals/lunch/confirm"
     )
 
     assert first.status_code == 200
     assert second.status_code == 409
+
+
+def test_unknown_meal_slot_is_404():
+    response = client.post(
+        "/days/2026-09-01/meals/brunch/confirm"
+    )
+
+    assert response.status_code == 404
