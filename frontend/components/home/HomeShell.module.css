@@ -62,17 +62,88 @@
   font-size: 1rem;
 }
 
+.budgetHero {
+  margin: 8px 0 16px;
+  padding: 22px;
+  border-radius: 28px;
+  background: #171815;
+  color: #ffffff;
+}
+
+.budgetTopline {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: #bfc0b8;
+}
+
+.budgetNumber {
+  margin-top: 26px;
+  font-size: clamp(4.5rem, 24vw, 8rem);
+  line-height: 0.82;
+  letter-spacing: -0.07em;
+  font-weight: 800;
+}
+
+.budgetUnit {
+  margin-top: 10px;
+  color: #bfc0b8;
+  font-size: 0.9rem;
+}
+
+.progressTrack,
+.proteinTrack {
+  overflow: hidden;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.progressTrack {
+  height: 8px;
+  margin-top: 26px;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: #ffffff;
+}
+
+.budgetBreakdown {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.budgetBreakdown div {
+  display: grid;
+  gap: 5px;
+}
+
+.budgetBreakdown span {
+  color: #aeb0a7;
+  font-size: 0.72rem;
+}
+
+.budgetBreakdown strong {
+  font-size: 1rem;
+}
+
 .metricsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin: 8px 0 34px;
+  margin: 12px 0;
 }
 
 .metricCard,
 .card,
 .errorCard,
-.mealCard {
+.mealCard,
+.proteinCard {
   border: 1px solid #dfdfd8;
   background: #ffffff;
   border-radius: 22px;
@@ -107,6 +178,49 @@
 .errorCard p {
   margin-bottom: 0;
   color: #8c3333;
+}
+
+.proteinCard {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  margin-bottom: 34px;
+}
+
+.proteinTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 18px;
+}
+
+.proteinTop div {
+  display: grid;
+  gap: 5px;
+}
+
+.proteinTop span {
+  color: #71716a;
+  font-size: 0.78rem;
+}
+
+.proteinTop strong {
+  font-size: 1.1rem;
+}
+
+.proteinRemaining {
+  text-align: right;
+}
+
+.proteinTrack {
+  height: 7px;
+  background: #ecece7;
+}
+
+.proteinFill {
+  height: 100%;
+  border-radius: inherit;
+  background: #1f6f43;
 }
 
 .section {

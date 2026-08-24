@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getDay } from "@/lib/api/day";
-import type { DayResponse } from "@/lib/api/types";
+import {
+  getDay,
+  getDayBudget,
+} from "@/lib/api/day";
+import type {
+  DayBudgetResponse,
+  DayResponse,
+} from "@/lib/api/types";
 
 import styles from "./HomeShell.module.css";
 
@@ -34,6 +40,10 @@ function mealLabel(slot: string): string {
   }[slot] ?? slot;
 }
 
+function roundNumber(value: number): string {
+  return Math.round(value).toLocaleString("it-IT");
+}
+
 export function HomeShell() {
   const {
     user,
@@ -43,6 +53,8 @@ export function HomeShell() {
 
   const [day, setDay] =
     useState<DayResponse | null>(null);
+  const [budgetResult, setBudgetResult] =
+    useState<DayBudgetResponse | null>(null);
   const [loading, setLoading] =
     useState(true);
   const [error, setError] =
@@ -79,13 +91,23 @@ export function HomeShell() {
       setError(null);
 
       try {
-        const payload = await getDay(
-          todayIso(),
-          accessToken,
-        );
+        const date = todayIso();
+
+        const [dayPayload, budgetPayload] =
+          await Promise.all([
+            getDay(
+              date,
+              accessToken,
+            ),
+            getDayBudget(
+              date,
+              accessToken,
+            ),
+          ]);
 
         if (active) {
-          setDay(payload);
+          setDay(dayPayload);
+          setBudgetResult(budgetPayload);
         }
       } catch (err) {
         if (active) {
@@ -108,6 +130,36 @@ export function HomeShell() {
       active = false;
     };
   }, [accessToken]);
+
+  const budget =
+    budgetResult?.budget ?? null;
+
+  const budgetProgress =
+    budget && budget.daily_budget_kcal > 0
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            (budget.consumed_kcal /
+              budget.daily_budget_kcal) *
+              100,
+          ),
+        )
+      : 0;
+
+  const proteinProgress =
+    budget?.protein_target_g &&
+    budget.protein_target_g > 0
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            (budget.protein_consumed_g /
+              budget.protein_target_g) *
+              100,
+          ),
+        )
+      : 0;
 
   return (
     <main className={styles.page}>
@@ -171,6 +223,81 @@ export function HomeShell() {
             </p>
           </section>
 
+          {budget ? (
+            <section className={styles.budgetHero}>
+              <div className={styles.budgetTopline}>
+                <span>Kcal disponibili</span>
+                <span>
+                  Budget{" "}
+                  {roundNumber(
+                    budget.daily_budget_kcal,
+                  )}
+                </span>
+              </div>
+
+              <div className={styles.budgetNumber}>
+                {roundNumber(
+                  budget.available_kcal,
+                )}
+              </div>
+
+              <div className={styles.budgetUnit}>
+                kcal
+              </div>
+
+              <div
+                className={styles.progressTrack}
+                aria-label="Calorie consumate"
+              >
+                <div
+                  className={styles.progressFill}
+                  style={{
+                    width: `${budgetProgress}%`,
+                  }}
+                />
+              </div>
+
+              <div className={styles.budgetBreakdown}>
+                <div>
+                  <span>Consumate</span>
+                  <strong>
+                    {roundNumber(
+                      budget.consumed_kcal,
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Pianificate</span>
+                  <strong>
+                    {roundNumber(
+                      budget.planned_kcal,
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Non allocate</span>
+                  <strong>
+                    {roundNumber(
+                      budget.unallocated_kcal,
+                    )}
+                  </strong>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <section className={styles.card}>
+              <strong>
+                Budget non disponibile
+              </strong>
+              <p className={styles.muted}>
+                Completa il profilo per calcolare
+                il budget energetico.
+              </p>
+            </section>
+          )}
+
           <section
             className={styles.metricsGrid}
           >
@@ -194,6 +321,42 @@ export function HomeShell() {
               </strong>
             </article>
           </section>
+
+          {budget?.protein_target_g != null ? (
+            <section className={styles.proteinCard}>
+              <div className={styles.proteinTop}>
+                <div>
+                  <span>Proteine</span>
+                  <strong>
+                    {roundNumber(
+                      budget.protein_consumed_g,
+                    )}{" "}
+                    /{" "}
+                    {roundNumber(
+                      budget.protein_target_g,
+                    )}{" "}
+                    g
+                  </strong>
+                </div>
+
+                <span className={styles.proteinRemaining}>
+                  {roundNumber(
+                    budget.protein_remaining_g ?? 0,
+                  )}{" "}
+                  g rimaste
+                </span>
+              </div>
+
+              <div className={styles.proteinTrack}>
+                <div
+                  className={styles.proteinFill}
+                  style={{
+                    width: `${proteinProgress}%`,
+                  }}
+                />
+              </div>
+            </section>
+          ) : null}
 
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
