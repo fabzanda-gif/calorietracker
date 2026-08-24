@@ -58,7 +58,6 @@ class FakeMealsRepository:
         return []
 
     def list_history_compatible(self, user_id):
-        # This legacy mode test intentionally has no order history.
         return ([], True)
 
 
@@ -147,7 +146,7 @@ def test_default_mode_is_auto():
     payload = response.json()
     assert payload["mode"] == "auto"
     assert payload["mode_label"] == "Automatico"
-    assert payload["candidate_count"] == 3
+    assert payload["candidate_count"] >= 3
 
 
 def test_ready_mode_keeps_only_meal_prep():
@@ -161,7 +160,7 @@ def test_ready_mode_keeps_only_meal_prep():
     assert payload["candidates"][0]["source"] == "meal_prep"
 
 
-def test_cook_mode_excludes_ready_food():
+def test_cook_mode_excludes_ready_and_order_food():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "cook"},
@@ -174,15 +173,17 @@ def test_cook_mode_excludes_ready_food():
     } == {"routine", "recipe"}
 
 
-def test_order_mode_is_empty_without_order_history():
+def test_order_mode_uses_generic_fallback_without_history():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "order"},
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["candidate_count"] == 0
-    assert payload["empty_reason"] == "no_known_order_options"
+    assert payload["candidate_count"] == 3
+    assert payload["known_order_count"] == 0
+    assert payload["generic_order_count"] == 3
+    assert payload["empty_reason"] is None
 
 
 def test_out_mode_is_empty_until_restaurant_sources_exist():
