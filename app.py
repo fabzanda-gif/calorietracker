@@ -822,6 +822,8 @@ state_defaults = {
     "selected_recipe": None,
     "prod_select": "",
     "recipe_builder_ingredients": [],
+    "selected_recipe_ingredients": None,
+    "selected_recipe_servings": None,
     "selected_source_note": "",
     "selected_source_category": "Casa",
     "day_plan_type": "Lavoro da casa",
@@ -9823,7 +9825,8 @@ if selected_page == t["t1"]:
         st.session_state["is_per_100g_val"] = True
 
     def reset_or_update(name="", cals=0, prot=0, carbs=0, fat=0, selected="", grams=100.0,
-                        is_100g=True, note="", category="Casa"):
+                        is_100g=True, note="", category="Casa",
+                        ingredients_json=None, recipe_servings=None):
         st.session_state["m_name"] = name
         st.session_state["base_cals"] = float(cals)
         st.session_state["base_prot"] = float(prot)
@@ -9834,6 +9837,16 @@ if selected_page == t["t1"]:
         st.session_state["last_selected"] = selected
         st.session_state["selected_source_note"] = str(note or "")
         st.session_state["selected_source_category"] = category if category in MEAL_CATEGORIES else "Casa"
+        st.session_state["selected_recipe_ingredients"] = (
+            [dict(i) for i in ingredients_json]
+            if isinstance(ingredients_json, list)
+            else None
+        )
+        st.session_state["selected_recipe_servings"] = (
+            float(recipe_servings)
+            if recipe_servings not in (None, "")
+            else None
+        )
         st.session_state["form_version"] += 1
 
     def clear_meal_entry_after_save():
@@ -10206,6 +10219,8 @@ if selected_page == t["t1"]:
                                 _safe_float(r.get("fat")) / servings,
                                 sel_quick, 1.0, False,
                                 r.get("notes", ""), r.get("category", "Casa"),
+                                ingredients_json=r.get("ingredients_json"),
+                                recipe_servings=servings,
                             )
                         st.rerun()
                 else:
@@ -10497,6 +10512,76 @@ if selected_page == t["t1"]:
         # AI input now lives exclusively in the top source selector.
         meal_notes = ""
 
+        # --------------------------------------------------------------
+        # Ricetta selezionata: mostra e permette di modificare i grammi
+        # dei singoli ingredienti. I valori nutrizionali per 100 g restano
+        # invariati; kcal e macro del pasto vengono ricalcolati dai grammi.
+        # La ricetta salvata nel catalogo NON viene modificata.
+        # --------------------------------------------------------------
+        _selected_recipe_ingredients = st.session_state.get(
+            "selected_recipe_ingredients"
+        )
+        if _selected_recipe_ingredients:
+            st.markdown("#### 🥕 Ingredienti della ricetta")
+            st.caption(
+                "Modifica solo ciò che è diverso oggi: kcal e macronutrienti "
+                "si aggiornano automaticamente."
+            )
+
+            _edited_recipe_ingredients = []
+            for _ing_idx, _ing in enumerate(_selected_recipe_ingredients):
+                _ing_copy = dict(_ing)
+                _ing_name = str(_ing_copy.get("name") or f"Ingrediente {_ing_idx + 1}")
+                _ing_qty = max(0.0, _safe_float(_ing_copy.get("quantity_g")))
+
+                _ing_cols = st.columns([2.5, 1.2, 2.3], gap="small")
+                _ing_cols[0].write(_ing_name)
+                _new_ing_qty = _ing_cols[1].number_input(
+                    "Quantità (g)",
+                    min_value=0.0,
+                    value=float(_ing_qty),
+                    step=1.0,
+                    key=f"daily_recipe_ing_qty_{v}_{_ing_idx}",
+                    label_visibility="collapsed",
+                )
+
+                _ing_copy["quantity_g"] = float(_new_ing_qty)
+                _ing_factor = float(_new_ing_qty) / 100.0
+                _ing_kcal = _safe_float(_ing_copy.get("calories_per_100g")) * _ing_factor
+                _ing_pro = _safe_float(_ing_copy.get("protein_per_100g")) * _ing_factor
+                _ing_carbs = _safe_float(_ing_copy.get("carbs_per_100g")) * _ing_factor
+                _ing_fat = _safe_float(_ing_copy.get("fat_per_100g")) * _ing_factor
+                _ing_cols[2].caption(
+                    f"{_ing_kcal:.0f} kcal · P {_ing_pro:.1f} · "
+                    f"C {_ing_carbs:.1f} · F {_ing_fat:.1f}"
+                )
+                _edited_recipe_ingredients.append(_ing_copy)
+
+            st.session_state["selected_recipe_ingredients"] = _edited_recipe_ingredients
+
+            _recipe_weight, _recipe_totals, _recipe_per100 = calculate_recipe_totals(
+                _edited_recipe_ingredients
+            )
+            _recipe_servings_for_log = max(
+                1.0,
+                _safe_float(st.session_state.get("selected_recipe_servings") or 1.0),
+            )
+
+            # Il form sottostante lavora per porzione. Aggiorniamo quindi i
+            # valori base usando i nuovi totali della ricetta divisi per porzioni.
+            st.session_state["base_cals"] = _recipe_totals["calories"] / _recipe_servings_for_log
+            st.session_state["base_prot"] = _recipe_totals["protein"] / _recipe_servings_for_log
+            st.session_state["base_carbs"] = _recipe_totals["carbs"] / _recipe_servings_for_log
+            st.session_state["base_fat"] = _recipe_totals["fat"] / _recipe_servings_for_log
+
+            st.caption(
+                f"Ricetta aggiornata: {_recipe_weight:.0f} g totali · "
+                f"{_recipe_totals['calories']:.0f} kcal · "
+                f"P {_recipe_totals['protein']:.1f} g · "
+                f"C {_recipe_totals['carbs']:.1f} g · "
+                f"F {_recipe_totals['fat']:.1f} g"
+            )
+
         mode_options = [t["per_100g"], t["per_portion"]]
         default_index = 0 if st.session_state["is_per_100g_val"] else 1
         mode = st.radio(
@@ -10519,6 +10604,22 @@ if selected_page == t["t1"]:
         pro_key = f"meal_pro_{v}"
         carbs_key = f"meal_carbs_{v}"
         fat_key = f"meal_fat_{v}"
+
+        # Ingredient edits happen above these widgets. When a recipe is active,
+        # refresh the displayed totals from the recalculated per-serving base.
+        if st.session_state.get("selected_recipe_ingredients"):
+            _qty_for_recipe = float(
+                st.session_state.get(qty_key, st.session_state.get("grams_val", 1.0))
+            )
+            _recipe_form_factor = (
+                _qty_for_recipe / 100.0
+                if mode == t["per_100g"]
+                else _qty_for_recipe
+            )
+            st.session_state[kcal_key] = int(round(st.session_state["base_cals"] * _recipe_form_factor))
+            st.session_state[pro_key] = int(round(st.session_state["base_prot"] * _recipe_form_factor))
+            st.session_state[carbs_key] = int(round(st.session_state["base_carbs"] * _recipe_form_factor))
+            st.session_state[fat_key] = int(round(st.session_state["base_fat"] * _recipe_form_factor))
 
         def _current_factor(qty=None):
             if qty is None:
@@ -10643,7 +10744,8 @@ if selected_page == t["t1"]:
                         base_fat=float(fat_in) / safe_factor,
                         notes=meal_notes,
                         category=meal_category,
-                        ingredients_json=None,
+                        ingredients_json=st.session_state.get("selected_recipe_ingredients"),
+                        recipe_servings=st.session_state.get("selected_recipe_servings"),
                     )
                     refresh_daily_logs(log_date)
 
