@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
+
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { AuthGate } from "@/components/auth/AuthGate";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SanoSync",
-  description: "SanoSync mobile-first nutrition companion",
+  description:
+    "SanoSync mobile-first nutrition companion",
 };
 
 export default function RootLayout({
@@ -13,7 +18,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <AuthGate>
+            {children}
+          </AuthGate>
+        </AuthProvider>
+      </body>
     </html>
   );
 }
