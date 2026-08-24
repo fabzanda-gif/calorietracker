@@ -28,6 +28,9 @@ from backend.services.decision_mode import (
     DecisionModeService,
 )
 from backend.services.decision_ranking import DecisionRankingService
+from backend.services.generic_order_candidates import (
+    GenericOrderCandidateService,
+)
 from backend.services.meal_candidates import MealCandidateService
 from backend.services.meal_confirmation import (
     MealAlreadyLoggedError,
@@ -118,15 +121,23 @@ def _build_order_candidates(
     user_id: str,
     meal_type: str,
     meals_repo: MealsRepository,
-) -> list[dict]:
+) -> tuple[list[dict], list[dict]]:
     history, _enhanced = meals_repo.list_history_compatible(
         user_id
     )
 
-    return OrderCandidateService().build(
+    known = OrderCandidateService().build(
         meals=history,
         meal_type=meal_type,
     )
+
+    fallback = GenericOrderCandidateService().build(
+        meal_type=meal_type,
+        known_candidates=known,
+        target_count=3,
+    )
+
+    return known, fallback
 
 
 @router.get("/{day_date}/budget")
@@ -205,7 +216,7 @@ def get_ranked_meal_options(
             "protein_remaining_g"
         )
 
-        order_candidates = _build_order_candidates(
+        known_orders, generic_orders = _build_order_candidates(
             user_id=current_user.id,
             meal_type=meal_type,
             meals_repo=meals_repo,
@@ -221,7 +232,10 @@ def get_ranked_meal_options(
             recipes=recipes_repo.list_available(
                 current_user.id
             ),
-            order_candidates=order_candidates,
+            order_candidates=[
+                *known_orders,
+                *generic_orders,
+            ],
         )
 
         mode_result = DecisionModeService().apply(
@@ -244,7 +258,13 @@ def get_ranked_meal_options(
             "mode_label": mode_result["mode_label"],
             "all_candidate_count": len(all_candidates),
             "candidate_count": mode_result["candidate_count"],
-            "known_order_count": len(order_candidates),
+            "known_order_count": len(known_orders),
+            "generic_order_count": len(generic_orders),
+            "order_personalization_state": (
+                "known"
+                if len(known_orders) >= 3
+                else "learning"
+            ),
             "empty_reason": mode_result["empty_reason"],
             "candidates": mode_result["candidates"],
             **ranked,
