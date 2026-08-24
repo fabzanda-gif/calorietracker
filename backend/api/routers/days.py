@@ -9,6 +9,7 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
+    get_optional_decision_selections_repository,
     get_meal_prep_repository,
     get_meals_repository,
     get_recipes_repository,
@@ -17,12 +18,15 @@ from backend.api.dependencies import (
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
+from backend.services.decision_feedback import DecisionFeedbackService
+from backend.services.decision_learning_pipeline import DecisionLearningPipelineService
 from backend.services.decision_mode import (
     DecisionModeError,
     DecisionModeService,
@@ -33,6 +37,9 @@ from backend.services.eating_out_candidates import (
 )
 from backend.services.eating_out_personalization import (
     EatingOutPersonalizationService,
+)
+from backend.services.generic_eating_out_candidates import (
+    GenericEatingOutCandidateService,
 )
 from backend.services.generic_order_candidates import (
     GenericOrderCandidateService,
@@ -221,6 +228,9 @@ def get_ranked_meal_options(
     recipes_repo: RecipesRepository = Depends(
         get_recipes_repository
     ),
+    decision_selections_repo: DecisionSelectionsRepository | None = Depends(
+        get_optional_decision_selections_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -273,6 +283,16 @@ def get_ranked_meal_options(
                 target_count=3,
             )
 
+        generic_eating_out = []
+        if normalized_mode == "out":
+            generic_eating_out = (
+                GenericEatingOutCandidateService().build(
+                    meal_type=meal_type,
+                    known_candidates=eating_out,
+                    target_count=3,
+                )
+            )
+
         all_candidates = MealCandidateService().build(
             day_date=day_date,
             meal_type=meal_type,
@@ -287,6 +307,7 @@ def get_ranked_meal_options(
                 *known_orders,
                 *generic_orders,
                 *eating_out,
+                *generic_eating_out,
             ],
         )
 
@@ -295,11 +316,57 @@ def get_ranked_meal_options(
             mode=normalized_mode,
         )
 
-        ranked = DecisionRankingService().rank(
+        selection_events = []
+
+        if decision_selections_repo is not None:
+            try:
+                selection_events = (
+                    decision_selections_repo.list_for_user(
+                        current_user.id,
+                        limit=100,
+                    )
+                )
+            except RepositoryError:
+                selection_events = []
+
+        outcome_meals = []
+
+        if selection_events:
+            selection_dates = [
+                str(event.get("date"))
+                for event in selection_events
+                if event.get("date")
+            ]
+
+            if selection_dates:
+                try:
+                    outcome_meals = meals_repo.list_date_range(
+                        current_user.id,
+                        min(selection_dates),
+                        max(selection_dates),
+                    )
+                except RepositoryError:
+                    outcome_meals = []
+
+        learning_pipeline = DecisionLearningPipelineService().build(
+            selections=selection_events,
+            meals=outcome_meals,
+        )
+        blended_preferences = learning_pipeline["blended_profile"]
+
+        feedback = DecisionFeedbackService().enrich_candidates(
             candidates=mode_result["candidates"],
+            learned_profile=blended_preferences,
+            mode=mode_result["mode"],
+        )
+
+        ranked = DecisionRankingService().rank(
+            candidates=feedback["candidates"],
             available_kcal=available_kcal,
             protein_remaining_g=protein_remaining_g,
             mode=mode_result["mode"],
+            preferred_lens=feedback["preferred_lens"],
+            preferred_mode=feedback["preferred_mode"],
         )
 
         return {
@@ -313,6 +380,7 @@ def get_ranked_meal_options(
             "known_order_count": len(known_orders),
             "generic_order_count": len(generic_orders),
             "known_eating_out_count": len(eating_out),
+            "generic_eating_out_count": len(generic_eating_out),
             "order_personalization_state": (
                 "known"
                 if len(known_orders) >= 3
@@ -323,6 +391,15 @@ def get_ranked_meal_options(
                 if len(eating_out) >= 3
                 else "learning"
             ),
+            "decision_preferences": {
+                "preferred_mode": feedback["preferred_mode"],
+                "preferred_lens": feedback["preferred_lens"],
+                "preferred_source": feedback["preferred_source"],
+                "mode_learning_source": blended_preferences["profile"]["mode"]["learning_source"],
+                "lens_learning_source": blended_preferences["profile"]["lens"]["learning_source"],
+                "source_learning_source": blended_preferences["profile"]["source"]["learning_source"],
+                "outcome_evidence": blended_preferences["outcome_evidence"],
+            },
             "empty_reason": mode_result["empty_reason"],
             "candidates": mode_result["candidates"],
             **ranked,
@@ -330,7 +407,7 @@ def get_ranked_meal_options(
 
     except DecisionModeError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
     except RepositoryError as exc:

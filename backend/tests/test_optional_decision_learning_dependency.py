@@ -113,8 +113,15 @@ def test_options_work_without_supabase_learning_configuration(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json()["decision_preferences"] == {
-        "preferred_mode": None,
-        "preferred_lens": None,
-        "preferred_source": None,
+    prefs = response.json()["decision_preferences"]
+
+    assert prefs["preferred_mode"] is None
+    assert prefs["preferred_lens"] is None
+    assert prefs["preferred_source"] is None
+    assert prefs["mode_learning_source"] is None
+    assert prefs["lens_learning_source"] is None
+    assert prefs["source_learning_source"] is None
+    assert prefs["outcome_evidence"] == {
+        "item_count": 0,
+        "observed_count": 0,
     }

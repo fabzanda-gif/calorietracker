@@ -57,13 +57,13 @@ def update_daily_log(
 
     if payload.get("steps") is not None and payload["steps"] < 0:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Steps cannot be negative",
         )
 
     if payload.get("weight") is not None and payload["weight"] <= 0:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Weight must be greater than zero",
         )
 

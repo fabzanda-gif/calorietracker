@@ -126,7 +126,7 @@ def overrides():
 client = TestClient(app)
 
 
-def test_out_mode_returns_known_eating_out_candidates():
+def test_out_mode_returns_known_candidates_plus_generic_filler():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "out"},
@@ -136,14 +136,18 @@ def test_out_mode_returns_known_eating_out_candidates():
     payload = response.json()
 
     assert payload["mode"] == "out"
-    assert payload["candidate_count"] == 2
+    assert payload["candidate_count"] == 3
     assert payload["known_eating_out_count"] == 2
+    assert payload["generic_eating_out_count"] == 1
     assert payload["empty_reason"] is None
 
-    assert all(
-        item["source"] == "restaurant"
+    sources = {
+        item["source"]
         for item in payload["candidates"]
-    )
+    }
+
+    assert "restaurant" in sources
+    assert "generic_eating_out" in sources
 
 
 def test_frequent_recent_eating_out_is_personalized():

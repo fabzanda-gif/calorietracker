@@ -122,7 +122,7 @@ def create_meal_prep_batch(
         ) from exc
     except MealPrepError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
     except RepositoryError as exc:
@@ -166,7 +166,7 @@ def consume_meal_prep(
         ) from exc
     except MealPrepError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
     except RepositoryError as exc:
@@ -242,7 +242,7 @@ def update_meal_prep_remaining(
         ) from exc
     except MealPrepError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
     except RepositoryError as exc:
@@ -281,7 +281,7 @@ def update_meal_prep_status(
         ) from exc
     except MealPrepError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
     except RepositoryError as exc:

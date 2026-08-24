@@ -66,3 +66,23 @@ class DecisionSelectionsRepository(BaseRepository):
             raise RepositoryError(
                 f"Unable to load decision selections in range: {exc}"
             ) from exc
+
+
+    def delete(
+        self,
+        selection_id: Any,
+        user_id: str,
+    ) -> bool:
+        try:
+            (
+                self.table
+                .delete()
+                .eq("id", selection_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
+            return True
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to delete decision selection: {exc}"
+            ) from exc

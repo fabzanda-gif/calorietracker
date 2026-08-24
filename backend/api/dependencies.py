@@ -11,6 +11,7 @@ from supabase import Client, create_client
 
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
@@ -136,3 +137,27 @@ def get_meal_prep_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> MealPrepRepository:
     return MealPrepRepository(supabase)
+
+def get_decision_selections_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> DecisionSelectionsRepository:
+    return DecisionSelectionsRepository(supabase)
+
+
+def get_optional_decision_selections_repository(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> DecisionSelectionsRepository | None:
+    """
+    Best-effort dependency for non-critical ranking personalization.
+
+    The core /options endpoint must remain usable even when decision-learning
+    persistence is not configured or temporarily unavailable. Strict
+    persistence endpoints continue using get_decision_selections_repository.
+    """
+    try:
+        supabase = get_authenticated_supabase(current_user)
+    except RuntimeError:
+        return None
+
+    return DecisionSelectionsRepository(supabase)
+

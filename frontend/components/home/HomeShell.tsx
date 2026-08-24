@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { confirmMealPrediction } from "@/lib/api/confirm";
 import { commitMealDecision } from "@/lib/api/decision";
+import {
+  getMealsForDate,
+  type LoggedMeal,
+} from "@/lib/api/meals";
 import {
   getDay,
   getDayBudget,
@@ -79,8 +84,14 @@ export function HomeShell() {
     useState(true);
   const [committingIndex, setCommittingIndex] =
     useState<number | null>(null);
+  const [confirmingSlot, setConfirmingSlot] =
+    useState<string | null>(null);
   const [commitMessage, setCommitMessage] =
     useState<string | null>(null);
+  const [actualDinner, setActualDinner] =
+    useState<LoggedMeal | null>(null);
+  const [actualMeals, setActualMeals] =
+    useState<LoggedMeal[]>([]);
   const [error, setError] =
     useState<string | null>(null);
 
@@ -121,6 +132,7 @@ export function HomeShell() {
           dayPayload,
           budgetPayload,
           dinnerPayload,
+          mealsPayload,
         ] = await Promise.all([
           getDay(
             date,
@@ -136,12 +148,22 @@ export function HomeShell() {
             "auto",
             accessToken,
           ),
+          getMealsForDate(
+            date,
+            accessToken,
+          ),
         ]);
 
         if (active) {
           setDay(dayPayload);
           setBudgetResult(budgetPayload);
           setDinnerOptions(dinnerPayload);
+          setActualMeals(mealsPayload.items);
+          setActualDinner(
+            mealsPayload.items.find(
+              (meal) => meal.meal_type === "Cena",
+            ) ?? null,
+          );
         }
       } catch (err) {
         if (active) {
@@ -206,6 +228,7 @@ export function HomeShell() {
       dayPayload,
       budgetPayload,
       dinnerPayload,
+      mealsPayload,
     ] = await Promise.all([
       getDay(date, accessToken),
       getDayBudget(date, accessToken),
@@ -215,11 +238,71 @@ export function HomeShell() {
         "auto",
         accessToken,
       ),
+      getMealsForDate(
+        date,
+        accessToken,
+      ),
     ]);
 
     setDay(dayPayload);
     setBudgetResult(budgetPayload);
     setDinnerOptions(dinnerPayload);
+    setActualMeals(mealsPayload.items);
+    setActualDinner(
+      mealsPayload.items.find(
+        (meal) => meal.meal_type === "Cena",
+      ) ?? null,
+    );
+  }
+
+  function actualMealForSlot(
+    slot: string,
+  ): LoggedMeal | null {
+    const type = mealLabel(slot);
+
+    return (
+      actualMeals.find(
+        (meal) => meal.meal_type === type,
+      ) ?? null
+    );
+  }
+
+  async function confirmPredictedMeal(
+    slot: string,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    setConfirmingSlot(slot);
+
+    try {
+      await confirmMealPrediction(
+        todayIso(),
+        slot,
+        accessToken,
+      );
+
+      await refreshHome();
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "";
+
+      // Se nel frattempo il pasto era già stato
+      // registrato, riallineiamo comunque la Home.
+      if (message.includes("409")) {
+        await refreshHome();
+      } else {
+        setError(
+          message ||
+            "Non riesco a confermare il pasto.",
+        );
+      }
+    } finally {
+      setConfirmingSlot(null);
+    }
   }
 
   async function chooseDinner(
@@ -497,27 +580,43 @@ export function HomeShell() {
 
                       <span
                         className={
-                          meal.state ===
-                          "predicted"
-                            ? styles.predictedBadge
-                            : styles.unknownBadge
+                          actualMealForSlot(slot)
+                            ? styles.registeredMealBadge
+                            : meal.state === "predicted"
+                              ? styles.predictedBadge
+                              : styles.unknownBadge
                         }
                       >
-                        {meal.state ===
-                        "predicted"
-                          ? "Previsto"
-                          : "Da decidere"}
+                        {actualMealForSlot(slot)
+                          ? "Registrato"
+                          : meal.state === "predicted"
+                            ? "Previsto"
+                            : "Da decidere"}
                       </span>
                     </div>
 
                     <strong
                       className={styles.mealName}
                     >
-                      {meal.value ||
+                      {actualMealForSlot(slot)?.name ||
+                        meal.value ||
                         "Nessuna routine abbastanza forte"}
                     </strong>
 
-                    {typeof meal.estimated_calories ===
+                    {actualMealForSlot(slot) ? (
+                      <p className={styles.mealMeta}>
+                        {roundNumber(
+                          actualMealForSlot(slot)!.calories,
+                        )} kcal
+                        {typeof actualMealForSlot(slot)!
+                          .protein === "number"
+                          ? ` · ${roundNumber(
+                              actualMealForSlot(slot)!
+                                .protein,
+                            )} g proteine`
+                          : ""}
+                      </p>
+                    ) : typeof meal.estimated_calories ===
                       "number" ? (
                       <p
                         className={
@@ -536,13 +635,30 @@ export function HomeShell() {
                           : ""}
                       </p>
                     ) : null}
+
+                    {!actualMealForSlot(slot) &&
+                    meal.state === "predicted" ? (
+                      <button
+                        type="button"
+                        className={styles.confirmMealButton}
+                        disabled={confirmingSlot !== null}
+                        onClick={() => {
+                          void confirmPredictedMeal(slot);
+                        }}
+                      >
+                        {confirmingSlot === slot
+                          ? "Confermo…"
+                          : "Conferma"}
+                      </button>
+                    ) : null}
                   </article>
                 ),
               )}
             </div>
           </section>
 
-          <section className={styles.decisionSection}>
+          {!actualDinner ? (
+            <section className={styles.decisionSection}>
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
@@ -635,6 +751,7 @@ export function HomeShell() {
               </article>
             )}
           </section>
+          ) : null}
         </>
       ) : null}
     </main>

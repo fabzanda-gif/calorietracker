@@ -118,11 +118,11 @@ class MealConfirmationService:
         )
 
     @staticmethod
-    def _nutrition_value(value: Any) -> float:
+    def _nutrition_value(value: Any) -> int:
         if value in (None, ""):
-            return 0.0
+            return 0
 
         try:
-            return max(0.0, float(value))
+            return max(0, int(round(float(value))))
         except (TypeError, ValueError):
-            return 0.0
+            return 0

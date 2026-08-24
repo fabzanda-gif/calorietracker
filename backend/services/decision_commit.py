@@ -113,20 +113,20 @@ class DecisionCommitService:
             "meal_type": meal_type,
             "name": candidate_name,
             "base_name": candidate_name,
-            "calories": self._number(
+            "calories": self._integer_number(
                 candidate.get("calories")
             ),
-            "protein": self._number(
+            "protein": self._integer_number(
                 candidate.get("protein_g")
                 if candidate.get("protein_g") is not None
                 else candidate.get("protein")
             ),
-            "carbs": self._number(
+            "carbs": self._integer_number(
                 candidate.get("carbs_g")
                 if candidate.get("carbs_g") is not None
                 else candidate.get("carbs")
             ),
-            "fat": self._number(
+            "fat": self._integer_number(
                 candidate.get("fat_g")
                 if candidate.get("fat_g") is not None
                 else candidate.get("fat")
@@ -242,6 +242,18 @@ class DecisionCommitService:
             .lower()
             .split()
         )
+
+    @staticmethod
+    def _integer_number(
+        value: Any,
+    ) -> int:
+        try:
+            return int(round(float(value or 0)))
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return 0
 
     @staticmethod
     def _number(

@@ -6,7 +6,7 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
-    get_decision_selections_repository,
+    get_optional_decision_selections_repository,
     get_meal_prep_repository,
     get_meals_repository,
     get_recipes_repository,
@@ -137,7 +137,7 @@ def overrides():
     app.dependency_overrides[get_weight_repository] = lambda: FakeWeightRepository()
     app.dependency_overrides[get_meal_prep_repository] = lambda: FakeMealPrepRepository()
     app.dependency_overrides[get_recipes_repository] = lambda: FakeRecipesRepository()
-    app.dependency_overrides[get_decision_selections_repository] = (
+    app.dependency_overrides[get_optional_decision_selections_repository] = (
         lambda: FakeDecisionSelectionsRepository()
     )
     yield

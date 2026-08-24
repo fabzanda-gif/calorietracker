@@ -97,6 +97,13 @@ def test_preferred_lens_adds_bonus_only_to_that_lens():
             30,
             7,
         ),
+        candidate(
+            "C",
+            "delivery",
+            540,
+            30,
+            7,
+        ),
     ]
 
     no_pref = service.rank(
@@ -124,3 +131,10 @@ def test_preferred_lens_adds_bonus_only_to_that_lens():
     )
 
     assert with_pref_taste["score"] > no_pref_taste["score"]
+
+    # The ranking must still keep all three lens choices distinct.
+    names = [
+        option["candidate"]["name"]
+        for option in with_pref["options"]
+    ]
+    assert len(names) == len(set(names))

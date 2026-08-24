@@ -41,6 +41,11 @@ class FakeDailyLogsRepository:
 
 
 class FakeMealsRepository:
+    def list_history_compatible(self, user_id):
+        # This test predates order-history candidates. Keep its original
+        # scenario unchanged by explicitly providing no order history.
+        return ([], True)
+
     def list_date_range(
         self,
         user_id,
