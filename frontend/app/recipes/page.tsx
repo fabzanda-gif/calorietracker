@@ -13,6 +13,10 @@ import {
   type Ingredient,
 } from "@/lib/api/ingredients";
 import {
+  uploadRecipeImage,
+} from "@/lib/api/recipeImages";
+
+import {
   createRecipe,
   getRecipe,
   getRecipes,
@@ -64,7 +68,7 @@ function todayLocalIso(): string {
 }
 
 export default function RecipesPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
 
   const [recipes, setRecipes] =
     useState<Recipe[]>([]);
@@ -79,6 +83,9 @@ export default function RecipesPage() {
     useState("Cena");
   const [servings, setServings] =
     useState("1");
+
+  const [imageUrl, setImageUrl] =
+    useState<string | null>(null);
 
   const [draftIngredients, setDraftIngredients] =
     useState<DraftIngredient[]>([]);
@@ -104,6 +111,9 @@ export default function RecipesPage() {
       recipeId: string;
       name: string;
       mealType: string;
+      recipeServings: number;
+      selectedServings: number;
+      baseIngredients: DraftIngredient[];
       ingredients: DraftIngredient[];
     } | null>(null);
 
@@ -151,6 +161,7 @@ export default function RecipesPage() {
     setName("");
     setMealType("Cena");
     setServings("1");
+    setImageUrl(null);
     setDraftIngredients([]);
     setMessage(null);
   }
@@ -177,6 +188,9 @@ export default function RecipesPage() {
       );
       setServings(
         String(recipe.recipe_servings || 1),
+      );
+      setImageUrl(
+        recipe.image_url || null,
       );
 
       setDraftIngredients(
@@ -306,19 +320,43 @@ export default function RecipesPage() {
         return;
       }
 
-      setMealDraft({
-        recipeId: recipe.id,
-        name: recipe.name,
-        mealType:
-          recipe.meal_type || "Cena",
-        ingredients: structured.map(
+      const recipeServings = Math.max(
+        1,
+        Number(
+          recipe.recipe_servings || 1,
+        ),
+      );
+
+      const baseIngredients =
+        structured.map(
           (item) => ({
             ingredientId:
               item.ingredient_id,
             quantityG:
               item.quantity_g,
           }),
-        ),
+        );
+
+      const initialScale =
+        1 / recipeServings;
+
+      setMealDraft({
+        recipeId: recipe.id,
+        name: recipe.name,
+        mealType:
+          recipe.meal_type || "Cena",
+        recipeServings,
+        selectedServings: 1,
+        baseIngredients,
+        ingredients:
+          baseIngredients.map(
+            (item) => ({
+              ...item,
+              quantityG:
+                item.quantityG *
+                initialScale,
+            }),
+          ),
       });
     } catch (err) {
       setMessage(
@@ -327,6 +365,40 @@ export default function RecipesPage() {
           : "Non riesco ad aprire la ricetta.",
       );
     }
+  }
+
+  function updateMealDraftServings(
+    nextServings: number,
+  ) {
+    setMealDraft((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const safeServings = Math.max(
+        0.1,
+        nextServings,
+      );
+
+      const scale =
+        safeServings /
+        current.recipeServings;
+
+      return {
+        ...current,
+        selectedServings:
+          safeServings,
+        ingredients:
+          current.baseIngredients.map(
+            (item) => ({
+              ...item,
+              quantityG:
+                item.quantityG *
+                scale,
+            }),
+          ),
+      };
+    });
   }
 
   function updateMealDraftQuantity(
@@ -514,6 +586,41 @@ export default function RecipesPage() {
     }
   }
 
+  async function handleRecipeImage(
+    file: File,
+  ) {
+    if (!user) {
+      setMessage(
+        "Sessione utente non disponibile.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const url = await uploadRecipeImage(
+        file,
+        user.id,
+      );
+
+      setImageUrl(url);
+
+      setMessage(
+        "Foto caricata. Salva la ricetta per confermare.",
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a caricare la foto.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveRecipe() {
     if (
       !accessToken ||
@@ -537,6 +644,7 @@ export default function RecipesPage() {
           1,
           Number(servings) || 1,
         ),
+      image_url: imageUrl,
       structured_ingredients:
         draftIngredients.map((item) => ({
           ingredient_id:
@@ -696,6 +804,36 @@ export default function RecipesPage() {
             originale non verrà cambiata.
           </p>
 
+
+          <div className={styles.twoColumns}>
+            <label className={styles.field}>
+              Porzioni da mangiare
+              <input
+                type="number"
+                min="0.1"
+                step="0.5"
+                value={
+                  mealDraft.selectedServings
+                }
+                onChange={(event) => {
+                  updateMealDraftServings(
+                    Number(
+                      event.target.value,
+                    ) || 0.1,
+                  );
+                }}
+              />
+            </label>
+
+            <div className={styles.field}>
+              Ricetta originale
+              <div>
+                {mealDraft.recipeServings}{" "}
+                porzioni
+              </div>
+            </div>
+          </div>
+
           {mealDraft.ingredients.map(
             (row, index) => {
               const ingredient =
@@ -827,6 +965,38 @@ export default function RecipesPage() {
             placeholder="Chicken rice"
             onChange={(event) => {
               setName(event.target.value);
+            }}
+          />
+        </label>
+
+        {imageUrl ? (
+          <div className={styles.recipeImageWrap}>
+            <img
+              src={imageUrl}
+              alt={name || "Ricetta"}
+              className={styles.recipeImage}
+            />
+          </div>
+        ) : null}
+
+
+        <label className={styles.secondaryButton}>
+          {imageUrl
+            ? "Sostituisci foto"
+            : "Aggiungi foto"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(event) => {
+              const file =
+                event.target.files?.[0];
+
+              if (file) {
+                void handleRecipeImage(file);
+              }
+
+              event.target.value = "";
             }}
           />
         </label>
@@ -1113,6 +1283,14 @@ export default function RecipesPage() {
                 key={recipe.id}
                 className={styles.recipeCard}
               >
+                {recipe.image_url ? (
+                  <img
+                    src={recipe.image_url}
+                    alt={recipe.name}
+                    className={styles.recipeThumb}
+                  />
+                ) : null}
+
                 <div>
                   <strong>
                     {recipe.name}

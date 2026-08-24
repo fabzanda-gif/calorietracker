@@ -31,6 +31,7 @@ export interface Recipe {
   fat: number;
   notes?: string | null;
   ingredients_json?: unknown;
+  image_url?: string | null;
   structured_ingredients?: StructuredRecipeIngredient[];
 }
 
@@ -44,6 +45,7 @@ export interface RecipeWriteInput {
   meal_type?: string | null;
   category?: string | null;
   recipe_servings?: number | null;
+  image_url?: string | null;
   structured_ingredients: Array<{
     ingredient_id: string;
     quantity: number;
