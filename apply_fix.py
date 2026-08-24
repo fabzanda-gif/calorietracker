@@ -1,120 +1,67 @@
 from pathlib import Path
 
-path = Path("backend/tests/test_decision_ranking_feedback.py")
-text = path.read_text(encoding="utf-8")
+path = Path("backend/tests/conftest.py")
 
-old = '''def test_preferred_lens_adds_bonus_only_to_that_lens():
-    candidates = [
-        candidate(
-            "A",
-            "delivery",
-            500,
-            30,
-            7,
-        ),
-        candidate(
-            "B",
-            "takeaway",
-            520,
-            30,
-            7,
-        ),
-    ]
+block = '''
+import pytest
 
-    no_pref = service.rank(
-        candidates=candidates,
-        available_kcal=800,
-        protein_remaining_g=50,
-        mode="order",
-    )
-
-    with_pref = service.rank(
-        candidates=candidates,
-        available_kcal=800,
-        protein_remaining_g=50,
-        mode="order",
-        preferred_lens="taste",
-    )
-
-    no_pref_taste = next(
-        x for x in no_pref["options"]
-        if x["lens"] == "taste"
-    )
-    with_pref_taste = next(
-        x for x in with_pref["options"]
-        if x["lens"] == "taste"
-    )
-
-    assert with_pref_taste["score"] > no_pref_taste["score"]
-'''
-
-new = '''def test_preferred_lens_adds_bonus_only_to_that_lens():
-    candidates = [
-        candidate(
-            "A",
-            "delivery",
-            500,
-            30,
-            7,
-        ),
-        candidate(
-            "B",
-            "takeaway",
-            520,
-            30,
-            7,
-        ),
-        candidate(
-            "C",
-            "delivery",
-            540,
-            30,
-            7,
-        ),
-    ]
-
-    no_pref = service.rank(
-        candidates=candidates,
-        available_kcal=800,
-        protein_remaining_g=50,
-        mode="order",
-    )
-
-    with_pref = service.rank(
-        candidates=candidates,
-        available_kcal=800,
-        protein_remaining_g=50,
-        mode="order",
-        preferred_lens="taste",
-    )
-
-    no_pref_taste = next(
-        x for x in no_pref["options"]
-        if x["lens"] == "taste"
-    )
-    with_pref_taste = next(
-        x for x in with_pref["options"]
-        if x["lens"] == "taste"
-    )
-
-    assert with_pref_taste["score"] > no_pref_taste["score"]
-
-    # The ranking must still keep all three lens choices distinct.
-    names = [
-        option["candidate"]["name"]
-        for option in with_pref["options"]
-    ]
-    assert len(names) == len(set(names))
-'''
-
-if old not in text:
-    raise SystemExit(
-        "Expected test block not found. No changes made."
-    )
-
-path.write_text(
-    text.replace(old, new, 1),
-    encoding="utf-8",
+from backend.api.dependencies import (
+    get_decision_selections_repository,
 )
+from backend.api.main import app
 
-print("Updated:", path)
+
+class _DefaultFakeDecisionSelectionsRepository:
+    def list_for_user(self, user_id, *, limit=100):
+        return []
+
+
+@pytest.fixture(autouse=True)
+def _default_decision_selections_override():
+    """
+    Legacy API tests predate the decision-learning dependency added in 5C.8F.
+
+    Give them an empty decision history by default so they remain isolated
+    from real Supabase. Tests that specifically exercise decision feedback
+    can override get_decision_selections_repository locally as usual.
+    """
+    previous = app.dependency_overrides.get(
+        get_decision_selections_repository
+    )
+
+    app.dependency_overrides.setdefault(
+        get_decision_selections_repository,
+        lambda: _DefaultFakeDecisionSelectionsRepository(),
+    )
+
+    yield
+
+    if previous is None:
+        app.dependency_overrides.pop(
+            get_decision_selections_repository,
+            None,
+        )
+    else:
+        app.dependency_overrides[
+            get_decision_selections_repository
+        ] = previous
+'''
+
+marker = "def _default_decision_selections_override():"
+
+if path.exists():
+    text = path.read_text(encoding="utf-8")
+    if marker in text:
+        print("Already fixed:", path)
+    else:
+        if text and not text.endswith("\n"):
+            text += "\n"
+        path.write_text(
+            text + "\n" + block.lstrip(),
+            encoding="utf-8",
+        )
+        print("Updated:", path)
+else:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(block.lstrip(), encoding="utf-8")
+    print("Created:", path)
