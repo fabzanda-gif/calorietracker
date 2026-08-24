@@ -1,67 +1,118 @@
 from pathlib import Path
 
-path = Path("backend/tests/conftest.py")
 
-block = '''
-import pytest
-
-from backend.api.dependencies import (
-    get_decision_selections_repository,
-)
-from backend.api.main import app
-
-
-class _DefaultFakeDecisionSelectionsRepository:
-    def list_for_user(self, user_id, *, limit=100):
-        return []
-
-
-@pytest.fixture(autouse=True)
-def _default_decision_selections_override():
-    """
-    Legacy API tests predate the decision-learning dependency added in 5C.8F.
-
-    Give them an empty decision history by default so they remain isolated
-    from real Supabase. Tests that specifically exercise decision feedback
-    can override get_decision_selections_repository locally as usual.
-    """
-    previous = app.dependency_overrides.get(
-        get_decision_selections_repository
-    )
-
-    app.dependency_overrides.setdefault(
-        get_decision_selections_repository,
-        lambda: _DefaultFakeDecisionSelectionsRepository(),
-    )
-
-    yield
-
-    if previous is None:
-        app.dependency_overrides.pop(
-            get_decision_selections_repository,
-            None,
-        )
-    else:
-        app.dependency_overrides[
-            get_decision_selections_repository
-        ] = previous
-'''
-
-marker = "def _default_decision_selections_override():"
-
-if path.exists():
+def patch_dependencies():
+    path = Path("backend/api/dependencies.py")
     text = path.read_text(encoding="utf-8")
-    if marker in text:
-        print("Already fixed:", path)
-    else:
-        if text and not text.endswith("\n"):
-            text += "\n"
-        path.write_text(
-            text + "\n" + block.lstrip(),
-            encoding="utf-8",
+
+    if "def get_optional_decision_selections_repository(" not in text:
+        anchor = (
+            "def get_decision_selections_repository(\n"
+            "    supabase: Client = Depends(get_authenticated_supabase),\n"
+            ") -> DecisionSelectionsRepository:\n"
+            "    return DecisionSelectionsRepository(supabase)\n"
         )
-        print("Updated:", path)
-else:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(block.lstrip(), encoding="utf-8")
-    print("Created:", path)
+
+        replacement = anchor + (
+            "\n\n"
+            "def get_optional_decision_selections_repository(\n"
+            "    current_user: CurrentUser = Depends(get_current_user),\n"
+            ") -> DecisionSelectionsRepository | None:\n"
+            "    \"\"\"\n"
+            "    Best-effort dependency for non-critical ranking personalization.\n\n"
+            "    The core /options endpoint must remain usable even when decision-learning\n"
+            "    persistence is not configured or temporarily unavailable. Strict\n"
+            "    persistence endpoints continue using get_decision_selections_repository.\n"
+            "    \"\"\"\n"
+            "    try:\n"
+            "        supabase = get_authenticated_supabase(current_user)\n"
+            "    except RuntimeError:\n"
+            "        return None\n\n"
+            "    return DecisionSelectionsRepository(supabase)\n"
+        )
+
+        if anchor not in text:
+            raise SystemExit(
+                "Could not find get_decision_selections_repository in "
+                "backend/api/dependencies.py"
+            )
+
+        text = text.replace(anchor, replacement, 1)
+
+    path.write_text(text, encoding="utf-8")
+    print("Updated:", path)
+
+
+def patch_days():
+    path = Path("backend/api/routers/days.py")
+    text = path.read_text(encoding="utf-8")
+
+    if "    get_optional_decision_selections_repository,\n" not in text:
+        text = text.replace(
+            "    get_decision_selections_repository,\n",
+            "    get_optional_decision_selections_repository,\n",
+            1,
+        )
+
+    old_signature = (
+        "    decision_selections_repo: DecisionSelectionsRepository = Depends(\n"
+        "        get_decision_selections_repository\n"
+        "    ),\n"
+    )
+    new_signature = (
+        "    decision_selections_repo: DecisionSelectionsRepository | None = Depends(\n"
+        "        get_optional_decision_selections_repository\n"
+        "    ),\n"
+    )
+
+    if old_signature in text:
+        text = text.replace(
+            old_signature,
+            new_signature,
+            1,
+        )
+
+    old_learning = (
+        "        selection_events = decision_selections_repo.list_for_user(\n"
+        "            current_user.id,\n"
+        "            limit=100,\n"
+        "        )\n"
+        "        learned_preferences = DecisionLearningService().build(\n"
+        "            events=selection_events,\n"
+        "        )\n"
+    )
+
+    new_learning = (
+        "        selection_events = []\n\n"
+        "        if decision_selections_repo is not None:\n"
+        "            try:\n"
+        "                selection_events = (\n"
+        "                    decision_selections_repo.list_for_user(\n"
+        "                        current_user.id,\n"
+        "                        limit=100,\n"
+        "                    )\n"
+        "                )\n"
+        "            except RepositoryError:\n"
+        "                selection_events = []\n\n"
+        "        learned_preferences = DecisionLearningService().build(\n"
+        "            events=selection_events,\n"
+        "        )\n"
+    )
+
+    if old_learning not in text:
+        raise SystemExit(
+            "Could not find selection learning block in days.py"
+        )
+
+    text = text.replace(
+        old_learning,
+        new_learning,
+        1,
+    )
+
+    path.write_text(text, encoding="utf-8")
+    print("Updated:", path)
+
+
+patch_dependencies()
+patch_days()
