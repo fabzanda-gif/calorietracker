@@ -372,3 +372,29 @@
     min-height: 180px;
   }
 }
+
+.chooseButton {
+  min-height: 44px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 14px;
+  background: #171815;
+  color: #ffffff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.chooseButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.commitMessage {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #edf5ea;
+  color: #315b2c;
+  font-size: 0.86rem;
+  font-weight: 700;
+}

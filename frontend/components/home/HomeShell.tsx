@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { commitMealDecision } from "@/lib/api/decision";
 import {
   getDay,
   getDayBudget,
@@ -76,6 +77,10 @@ export function HomeShell() {
     useState<MealOptionsResponse | null>(null);
   const [loading, setLoading] =
     useState(true);
+  const [committingIndex, setCommittingIndex] =
+    useState<number | null>(null);
+  const [commitMessage, setCommitMessage] =
+    useState<string | null>(null);
   const [error, setError] =
     useState<string | null>(null);
 
@@ -189,6 +194,79 @@ export function HomeShell() {
           ),
         )
       : 0;
+
+  async function refreshHome() {
+    if (!accessToken) {
+      return;
+    }
+
+    const date = todayIso();
+
+    const [
+      dayPayload,
+      budgetPayload,
+      dinnerPayload,
+    ] = await Promise.all([
+      getDay(date, accessToken),
+      getDayBudget(date, accessToken),
+      getMealOptions(
+        date,
+        "dinner",
+        "auto",
+        accessToken,
+      ),
+    ]);
+
+    setDay(dayPayload);
+    setBudgetResult(budgetPayload);
+    setDinnerOptions(dinnerPayload);
+  }
+
+  async function chooseDinner(
+    option: RankedMealOption,
+    optionIndex: number,
+  ) {
+    if (!accessToken || !dinnerOptions) {
+      return;
+    }
+
+    setCommittingIndex(optionIndex);
+    setCommitMessage(null);
+
+    try {
+      const result = await commitMealDecision(
+        todayIso(),
+        "dinner",
+        {
+          mode: dinnerOptions.mode,
+          lens: option.lens,
+          option_index: optionIndex,
+          candidate: option.candidate,
+          available_kcal:
+            budget?.available_kcal ?? null,
+          protein_remaining_g:
+            budget?.protein_remaining_g ?? null,
+        },
+        accessToken,
+      );
+
+      setCommitMessage(
+        result.already_committed
+          ? "Cena già registrata."
+          : "Cena registrata.",
+      );
+
+      await refreshHome();
+    } catch (err) {
+      setCommitMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare la cena.",
+      );
+    } finally {
+      setCommittingIndex(null);
+    }
+  }
 
   return (
     <main className={styles.page}>
@@ -480,6 +558,12 @@ export function HomeShell() {
               ) : null}
             </div>
 
+            {commitMessage ? (
+              <p className={styles.commitMessage}>
+                {commitMessage}
+              </p>
+            ) : null}
+
             {dinnerOptions?.options.length ? (
               <div className={styles.optionList}>
                 {dinnerOptions.options.map(
@@ -518,6 +602,23 @@ export function HomeShell() {
                       <p className={styles.optionReason}>
                         {option.reason}
                       </p>
+
+                      <button
+                        type="button"
+                        className={styles.chooseButton}
+                        disabled={committingIndex !== null}
+                        onClick={() => {
+                          void chooseDinner(
+                            option,
+                            dinnerOptions.options.indexOf(option),
+                          );
+                        }}
+                      >
+                        {committingIndex ===
+                        dinnerOptions.options.indexOf(option)
+                          ? "Registro…"
+                          : "Scelgo questa"}
+                      </button>
                     </article>
                   ),
                 )}
