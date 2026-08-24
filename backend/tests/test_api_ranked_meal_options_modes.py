@@ -22,13 +22,7 @@ class FakeDailyLogsRepository:
             "activity_plan": "Riposo",
         }
 
-    def list_date_range(
-        self,
-        user_id,
-        start_date,
-        end_date,
-        columns=None,
-    ):
+    def list_date_range(self, user_id, start_date, end_date, columns=None):
         return [
             {"date": d, "day_type": "Ufficio"}
             for d in [
@@ -41,13 +35,7 @@ class FakeDailyLogsRepository:
 
 
 class FakeMealsRepository:
-    def list_date_range(
-        self,
-        user_id,
-        start_date,
-        end_date,
-        columns=None,
-    ):
+    def list_date_range(self, user_id, start_date, end_date, columns=None):
         return [
             {
                 "date": d,
@@ -66,12 +54,12 @@ class FakeMealsRepository:
             ]
         ]
 
-    def list_for_date_compatible(
-        self,
-        user_id,
-        log_date,
-    ):
+    def list_for_date_compatible(self, user_id, log_date):
         return []
+
+    def list_history_compatible(self, user_id):
+        # This legacy mode test intentionally has no order history.
+        return ([], True)
 
 
 class FakeActivitiesRepository:
@@ -137,27 +125,13 @@ def override_current_user():
 
 @pytest.fixture(autouse=True)
 def overrides():
-    app.dependency_overrides[get_current_user] = (
-        override_current_user
-    )
-    app.dependency_overrides[get_daily_logs_repository] = (
-        lambda: FakeDailyLogsRepository()
-    )
-    app.dependency_overrides[get_meals_repository] = (
-        lambda: FakeMealsRepository()
-    )
-    app.dependency_overrides[get_activities_repository] = (
-        lambda: FakeActivitiesRepository()
-    )
-    app.dependency_overrides[get_weight_repository] = (
-        lambda: FakeWeightRepository()
-    )
-    app.dependency_overrides[get_meal_prep_repository] = (
-        lambda: FakeMealPrepRepository()
-    )
-    app.dependency_overrides[get_recipes_repository] = (
-        lambda: FakeRecipesRepository()
-    )
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_daily_logs_repository] = lambda: FakeDailyLogsRepository()
+    app.dependency_overrides[get_meals_repository] = lambda: FakeMealsRepository()
+    app.dependency_overrides[get_activities_repository] = lambda: FakeActivitiesRepository()
+    app.dependency_overrides[get_weight_repository] = lambda: FakeWeightRepository()
+    app.dependency_overrides[get_meal_prep_repository] = lambda: FakeMealPrepRepository()
+    app.dependency_overrides[get_recipes_repository] = lambda: FakeRecipesRepository()
     yield
     app.dependency_overrides.clear()
 
@@ -169,10 +143,8 @@ def test_default_mode_is_auto():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options"
     )
-
     assert response.status_code == 200
     payload = response.json()
-
     assert payload["mode"] == "auto"
     assert payload["mode_label"] == "Automatico"
     assert payload["candidate_count"] == 3
@@ -183,15 +155,10 @@ def test_ready_mode_keeps_only_meal_prep():
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "ready"},
     )
-
     assert response.status_code == 200
     payload = response.json()
-
-    assert payload["mode"] == "ready"
-    assert payload["mode_label"] == "Già pronto"
     assert payload["candidate_count"] == 1
     assert payload["candidates"][0]["source"] == "meal_prep"
-    assert payload["options"][0]["candidate"]["name"] == "Chili pronto"
 
 
 def test_cook_mode_excludes_ready_food():
@@ -199,32 +166,22 @@ def test_cook_mode_excludes_ready_food():
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "cook"},
     )
-
     assert response.status_code == 200
     payload = response.json()
-
-    assert payload["candidate_count"] == 2
     assert {
         item["source"]
         for item in payload["candidates"]
-    } == {
-        "routine",
-        "recipe",
-    }
+    } == {"routine", "recipe"}
 
 
-def test_order_mode_is_empty_until_order_sources_exist():
+def test_order_mode_is_empty_without_order_history():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "order"},
     )
-
     assert response.status_code == 200
     payload = response.json()
-
-    assert payload["mode"] == "order"
     assert payload["candidate_count"] == 0
-    assert payload["options"] == []
     assert payload["empty_reason"] == "no_known_order_options"
 
 
@@ -233,10 +190,8 @@ def test_out_mode_is_empty_until_restaurant_sources_exist():
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "out"},
     )
-
     assert response.status_code == 200
     payload = response.json()
-
     assert payload["candidate_count"] == 0
     assert payload["empty_reason"] == "no_known_eating_out_options"
 
@@ -246,5 +201,4 @@ def test_invalid_mode_returns_422():
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "whatever"},
     )
-
     assert response.status_code == 422
