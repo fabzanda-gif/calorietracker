@@ -1,0 +1,90 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  align-items: center;
+  padding: 24px 18px;
+}
+
+.card {
+  width: min(100%, 420px);
+  margin: 0 auto;
+  display: grid;
+  gap: 28px;
+  padding: 28px;
+  border: 1px solid #deded7;
+  border-radius: 28px;
+  background: #ffffff;
+}
+
+.brand {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.heading {
+  display: grid;
+  gap: 8px;
+}
+
+.heading h1 {
+  margin: 0;
+  font-size: 2.2rem;
+  letter-spacing: -0.04em;
+}
+
+.heading p {
+  margin: 0;
+  color: #686861;
+  line-height: 1.5;
+}
+
+.form {
+  display: grid;
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #d6d6cf;
+  border-radius: 14px;
+  background: #fafaf8;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: #161616;
+}
+
+.button {
+  min-height: 50px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 14px;
+  background: #161616;
+  color: #ffffff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.error {
+  margin: 0;
+  color: #a22828;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
