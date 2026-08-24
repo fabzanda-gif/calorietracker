@@ -2,17 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.services.decision_feedback import DecisionFeedbackService
+
 
 class DecisionRankingService:
     """
     Rank compatible meal candidates through three distinct product lenses.
 
-    - calorie: protect remaining calorie budget;
-    - balanced: compromise between calories, protein and preference;
-    - taste: favour user preference while remaining budget-compatible.
-
-    In auto mode, available meal-prep receives an explicit preference so the
-    default product behaviour fights food waste without hiding alternatives.
+    Learned decision feedback may add only a small bounded score bonus.
+    Eligibility, calorie fit, protein fit and food-waste logic remain primary.
     """
 
     LENSES = ("calorie", "balanced", "taste")
@@ -24,6 +22,8 @@ class DecisionRankingService:
         available_kcal: float | None,
         protein_remaining_g: float | None = None,
         mode: str = "auto",
+        preferred_lens: str | None = None,
+        preferred_mode: str | None = None,
     ) -> dict:
         eligible = [
             self._normalize(item)
@@ -50,6 +50,8 @@ class DecisionRankingService:
                     available_kcal=available_kcal,
                     protein_remaining_g=protein_remaining_g,
                     mode=mode,
+                    preferred_lens=preferred_lens,
+                    preferred_mode=preferred_mode,
                 ),
                 reverse=True,
             )
@@ -82,6 +84,8 @@ class DecisionRankingService:
                             available_kcal=available_kcal,
                             protein_remaining_g=protein_remaining_g,
                             mode=mode,
+                            preferred_lens=preferred_lens,
+                            preferred_mode=preferred_mode,
                         ),
                         4,
                     ),
@@ -106,6 +110,8 @@ class DecisionRankingService:
         available_kcal: float | None,
         protein_remaining_g: float | None,
         mode: str,
+        preferred_lens: str | None,
+        preferred_mode: str | None,
     ) -> float:
         calories = item["calories"]
         protein = item["protein_g"]
@@ -153,7 +159,15 @@ class DecisionRankingService:
                 + 0.10 * waste_bonus
             )
 
-        return base + ready_bonus
+        feedback = DecisionFeedbackService().score_boost(
+            candidate=item,
+            lens=lens,
+            mode=mode,
+            preferred_lens=preferred_lens,
+            preferred_mode=preferred_mode,
+        )
+
+        return base + ready_bonus + feedback
 
     @staticmethod
     def _is_eligible(
