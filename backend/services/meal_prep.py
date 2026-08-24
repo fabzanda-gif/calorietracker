@@ -33,6 +33,11 @@ class MealPrepService:
 
     A batch snapshots recipe name and per-portion nutrition at preparation
     time. Later recipe edits therefore never rewrite what was actually cooked.
+
+    v0.2 adds quick inventory corrections:
+    - explicit remaining portions;
+    - zero remaining -> finished;
+    - positive remaining -> available again.
     """
 
     def __init__(
@@ -127,12 +132,42 @@ class MealPrepService:
                 "Not enough portions remaining"
             )
 
-        new_remaining = remaining - portions
+        return self.set_remaining_portions(
+            user_id=user_id,
+            batch_id=batch_id,
+            portions_remaining=remaining - portions,
+        )
+
+    def set_remaining_portions(
+        self,
+        *,
+        user_id: str,
+        batch_id: Any,
+        portions_remaining: int,
+    ) -> dict:
+        """
+        Fast correction for stale inventory.
+
+        Example: the app says 4 portions remain, but the user knows only 2 do.
+        """
+        if portions_remaining < 0:
+            raise MealPrepError(
+                "portions_remaining cannot be negative"
+            )
+
+        batch = self._get_batch(batch_id, user_id)
+
+        prepared = int(batch.get("portions_prepared") or 0)
+        if portions_remaining > prepared:
+            raise MealPrepError(
+                "portions_remaining cannot exceed portions_prepared"
+            )
+
         payload = {
-            "portions_remaining": new_remaining,
+            "portions_remaining": int(portions_remaining),
             "status": (
                 "finished"
-                if new_remaining == 0
+                if portions_remaining == 0
                 else "available"
             ),
         }

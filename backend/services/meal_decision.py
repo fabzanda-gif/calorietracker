@@ -5,7 +5,15 @@ from typing import Any
 
 
 class MealDecisionService:
-    """Choose between available meal prep and an existing routine prediction."""
+    """
+    Deterministic meal decision layer.
+
+    v0.2 adds food-waste intelligence:
+    - expired inventory is never recommended;
+    - stale "available" expired batches are surfaced as cleanup warnings;
+    - use-soon batches receive explicit waste-risk levels;
+    - nearest valid expiry still wins among budget-compatible inventory.
+    """
 
     def decide(
         self,
@@ -17,13 +25,32 @@ class MealDecisionService:
         routine_prediction: dict | None,
     ) -> dict:
         candidates = []
+        warnings = []
 
         for batch in available_inventory:
             remaining = self._number(batch.get("portions_remaining"))
             if remaining <= 0 or batch.get("status") != "available":
                 continue
 
-            calories = self._number(batch.get("calories_per_portion"))
+            expires_at = self._parse_date(batch.get("expires_at"))
+
+            if (
+                expires_at is not None
+                and expires_at < day_date
+            ):
+                warnings.append(
+                    {
+                        "batch_id": batch.get("id"),
+                        "name": batch.get("name"),
+                        "type": "expired_inventory",
+                        "message": "Inventory is past its expiry date",
+                    }
+                )
+                continue
+
+            calories = self._number(
+                batch.get("calories_per_portion")
+            )
 
             if (
                 available_kcal is not None
@@ -31,7 +58,10 @@ class MealDecisionService:
             ):
                 continue
 
-            expires_at = self._parse_date(batch.get("expires_at"))
+            waste_risk = self._waste_risk(
+                day_date=day_date,
+                expires_at=expires_at,
+            )
 
             candidates.append(
                 {
@@ -41,14 +71,35 @@ class MealDecisionService:
                     "name": batch.get("name"),
                     "meal_type": meal_type,
                     "calories": calories,
-                    "protein_g": self._number(batch.get("protein_per_portion")),
-                    "carbs_g": self._number(batch.get("carbs_per_portion")),
-                    "fat_g": self._number(batch.get("fat_per_portion")),
+                    "protein_g": self._number(
+                        batch.get("protein_per_portion")
+                    ),
+                    "carbs_g": self._number(
+                        batch.get("carbs_per_portion")
+                    ),
+                    "fat_g": self._number(
+                        batch.get("fat_per_portion")
+                    ),
                     "portions_remaining": int(remaining),
-                    "expires_at": str(expires_at) if expires_at else None,
-                    "priority": self._priority(day_date, expires_at),
-                    "reason": "available_inventory",
-                    "_sort_key": self._sort_key(day_date, expires_at),
+                    "expires_at": (
+                        str(expires_at)
+                        if expires_at is not None
+                        else None
+                    ),
+                    "priority": self._priority(
+                        day_date,
+                        expires_at,
+                    ),
+                    "waste_risk": waste_risk,
+                    "reason": (
+                        "use_soon"
+                        if waste_risk == "high"
+                        else "available_inventory"
+                    ),
+                    "_sort_key": self._sort_key(
+                        day_date,
+                        expires_at,
+                    ),
                 }
             )
 
@@ -56,7 +107,9 @@ class MealDecisionService:
 
         recommendation = None
         if candidates:
-            recommendation = self._public_candidate(candidates[0])
+            recommendation = self._public_candidate(
+                candidates[0]
+            )
 
         prediction = routine_prediction or {
             "meal_type": meal_type,
@@ -64,20 +117,32 @@ class MealDecisionService:
             "state": "unknown",
         }
 
-        if recommendation is None and prediction.get("state") == "predicted":
+        if (
+            recommendation is None
+            and prediction.get("state") == "predicted"
+        ):
             recommendation = {
                 "source": "routine",
                 "batch_id": None,
                 "recipe_id": None,
                 "name": prediction.get("value"),
                 "meal_type": meal_type,
-                "calories": prediction.get("estimated_calories"),
-                "protein_g": prediction.get("estimated_protein_g"),
-                "carbs_g": prediction.get("estimated_carbs_g"),
-                "fat_g": prediction.get("estimated_fat_g"),
+                "calories": prediction.get(
+                    "estimated_calories"
+                ),
+                "protein_g": prediction.get(
+                    "estimated_protein_g"
+                ),
+                "carbs_g": prediction.get(
+                    "estimated_carbs_g"
+                ),
+                "fat_g": prediction.get(
+                    "estimated_fat_g"
+                ),
                 "portions_remaining": None,
                 "expires_at": None,
                 "priority": "normal",
+                "waste_risk": None,
                 "reason": "routine_prediction",
             }
 
@@ -90,6 +155,7 @@ class MealDecisionService:
                 self._public_candidate(item)
                 for item in candidates
             ],
+            "inventory_warnings": warnings,
         }
 
     @staticmethod
@@ -115,15 +181,37 @@ class MealDecisionService:
             return None
 
     @staticmethod
-    def _priority(day_date: date, expires_at: date | None) -> str:
+    def _priority(
+        day_date: date,
+        expires_at: date | None,
+    ) -> str:
         if expires_at is None:
             return "normal"
+
         days_left = (expires_at - day_date).days
+
         if days_left <= 1:
             return "high"
         if days_left <= 3:
             return "medium"
         return "normal"
+
+    @staticmethod
+    def _waste_risk(
+        *,
+        day_date: date,
+        expires_at: date | None,
+    ) -> str:
+        if expires_at is None:
+            return "low"
+
+        days_left = (expires_at - day_date).days
+
+        if days_left <= 1:
+            return "high"
+        if days_left <= 3:
+            return "medium"
+        return "low"
 
     @staticmethod
     def _sort_key(
@@ -132,4 +220,8 @@ class MealDecisionService:
     ) -> tuple[int, int]:
         if expires_at is None:
             return (1, 999999)
-        return (0, (expires_at - day_date).days)
+
+        return (
+            0,
+            (expires_at - day_date).days,
+        )
