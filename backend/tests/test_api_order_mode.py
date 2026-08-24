@@ -159,7 +159,7 @@ def overrides():
 client = TestClient(app)
 
 
-def test_order_mode_returns_known_takeaway_and_delivery():
+def test_order_mode_returns_known_orders_plus_generic_filler():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "order"},
@@ -169,17 +169,19 @@ def test_order_mode_returns_known_takeaway_and_delivery():
     payload = response.json()
 
     assert payload["mode"] == "order"
-    assert payload["candidate_count"] == 2
+    assert payload["candidate_count"] == 3
     assert payload["known_order_count"] == 2
+    assert payload["generic_order_count"] == 1
     assert payload["empty_reason"] is None
 
-    assert {
+    sources = {
         item["source"]
         for item in payload["candidates"]
-    } == {
-        "takeaway",
-        "delivery",
     }
+
+    assert "takeaway" in sources
+    assert "delivery" in sources
+    assert "generic_order" in sources
 
 
 def test_repeated_takeaway_is_aggregated_in_api():
@@ -199,9 +201,27 @@ def test_repeated_takeaway_is_aggregated_in_api():
     assert pizza["order_count"] == 2
     assert pizza["calories"] == 820
     assert pizza["protein_g"] == 31
+    assert pizza["known_order"] is True
 
 
-def test_order_mode_is_ranked_with_three_lenses_when_possible():
+def test_generic_filler_is_clearly_marked():
+    response = client.get(
+        "/days/2026-09-01/meals/dinner/options",
+        params={"mode": "order"},
+    )
+
+    generic = next(
+        item
+        for item in response.json()["candidates"]
+        if item["source"] == "generic_order"
+    )
+
+    assert generic["known_order"] is False
+    assert generic["generic_fallback"] is True
+    assert generic["nutrition_estimated"] is True
+
+
+def test_order_mode_can_return_three_ranked_lenses():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "order"},
@@ -209,16 +229,18 @@ def test_order_mode_is_ranked_with_three_lenses_when_possible():
 
     payload = response.json()
 
-    # Only two known unique orders exist, so ranking correctly returns two
-    # distinct options rather than duplicating one to force three cards.
-    assert len(payload["options"]) == 2
-    assert len({
-        option["candidate"]["name"]
+    assert len(payload["options"]) == 3
+    assert [
+        option["lens"]
         for option in payload["options"]
-    }) == 2
+    ] == [
+        "calorie",
+        "balanced",
+        "taste",
+    ]
 
 
-def test_non_order_mode_still_excludes_order_sources():
+def test_non_order_mode_does_not_include_generic_order_fallback():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
         params={"mode": "cook"},
@@ -227,8 +249,8 @@ def test_non_order_mode_still_excludes_order_sources():
     assert response.status_code == 200
     payload = response.json()
 
-    assert payload["candidate_count"] == 0
+    assert payload["generic_order_count"] == 0
     assert all(
-        item["source"] not in {"takeaway", "delivery"}
+        item["source"] != "generic_order"
         for item in payload["candidates"]
     )
