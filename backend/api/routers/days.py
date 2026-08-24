@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date as Date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from backend.api.dependencies import (
     CurrentUser,
@@ -23,6 +23,10 @@ from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
+from backend.services.decision_mode import (
+    DecisionModeError,
+    DecisionModeService,
+)
 from backend.services.decision_ranking import DecisionRankingService
 from backend.services.meal_candidates import MealCandidateService
 from backend.services.meal_confirmation import (
@@ -139,6 +143,7 @@ def get_day_budget(
 def get_ranked_meal_options(
     day_date: Date,
     meal_slot: str,
+    mode: str = Query(default="auto"),
     current_user: CurrentUser = Depends(get_current_user),
     daily_logs_repo: DailyLogsRepository = Depends(
         get_daily_logs_repository
@@ -183,7 +188,7 @@ def get_ranked_meal_options(
             "protein_remaining_g"
         )
 
-        candidates = MealCandidateService().build(
+        all_candidates = MealCandidateService().build(
             day_date=day_date,
             meal_type=meal_type,
             meal_prep_items=meal_prep_repo.list_available(
@@ -195,21 +200,36 @@ def get_ranked_meal_options(
             ),
         )
 
+        mode_result = DecisionModeService().apply(
+            candidates=all_candidates,
+            mode=mode,
+        )
+
         ranked = DecisionRankingService().rank(
-            candidates=candidates,
+            candidates=mode_result["candidates"],
             available_kcal=available_kcal,
             protein_remaining_g=protein_remaining_g,
+            mode=mode_result["mode"],
         )
 
         return {
             "date": str(day_date),
             "meal_slot": meal_slot,
             "meal_type": meal_type,
-            "candidate_count": len(candidates),
-            "candidates": candidates,
+            "mode": mode_result["mode"],
+            "mode_label": mode_result["mode_label"],
+            "all_candidate_count": len(all_candidates),
+            "candidate_count": mode_result["candidate_count"],
+            "empty_reason": mode_result["empty_reason"],
+            "candidates": mode_result["candidates"],
             **ranked,
         }
 
+    except DecisionModeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
