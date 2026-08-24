@@ -1,36 +1,110 @@
 from pathlib import Path
 
-path = Path("backend/tests/test_api_ranked_meal_options_modes.py")
+path = Path("backend/tests/test_decision_ranking_feedback.py")
 text = path.read_text(encoding="utf-8")
 
-old = '''def test_out_mode_is_empty_until_restaurant_sources_exist():
-    response = client.get(
-        "/days/2026-09-01/meals/dinner/options",
-        params={"mode": "out"},
+old = '''def test_preferred_lens_adds_bonus_only_to_that_lens():
+    candidates = [
+        candidate(
+            "A",
+            "delivery",
+            500,
+            30,
+            7,
+        ),
+        candidate(
+            "B",
+            "takeaway",
+            520,
+            30,
+            7,
+        ),
+    ]
+
+    no_pref = service.rank(
+        candidates=candidates,
+        available_kcal=800,
+        protein_remaining_g=50,
+        mode="order",
     )
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["candidate_count"] == 0
-    assert payload["empty_reason"] == "no_known_eating_out_options"
+
+    with_pref = service.rank(
+        candidates=candidates,
+        available_kcal=800,
+        protein_remaining_g=50,
+        mode="order",
+        preferred_lens="taste",
+    )
+
+    no_pref_taste = next(
+        x for x in no_pref["options"]
+        if x["lens"] == "taste"
+    )
+    with_pref_taste = next(
+        x for x in with_pref["options"]
+        if x["lens"] == "taste"
+    )
+
+    assert with_pref_taste["score"] > no_pref_taste["score"]
 '''
 
-new = '''def test_out_mode_uses_generic_fallback_without_history():
-    response = client.get(
-        "/days/2026-09-01/meals/dinner/options",
-        params={"mode": "out"},
-    )
-    assert response.status_code == 200
-    payload = response.json()
+new = '''def test_preferred_lens_adds_bonus_only_to_that_lens():
+    candidates = [
+        candidate(
+            "A",
+            "delivery",
+            500,
+            30,
+            7,
+        ),
+        candidate(
+            "B",
+            "takeaway",
+            520,
+            30,
+            7,
+        ),
+        candidate(
+            "C",
+            "delivery",
+            540,
+            30,
+            7,
+        ),
+    ]
 
-    assert payload["candidate_count"] == 3
-    assert payload["known_eating_out_count"] == 0
-    assert payload["generic_eating_out_count"] == 3
-    assert payload["empty_reason"] is None
-
-    assert all(
-        item["source"] == "generic_eating_out"
-        for item in payload["candidates"]
+    no_pref = service.rank(
+        candidates=candidates,
+        available_kcal=800,
+        protein_remaining_g=50,
+        mode="order",
     )
+
+    with_pref = service.rank(
+        candidates=candidates,
+        available_kcal=800,
+        protein_remaining_g=50,
+        mode="order",
+        preferred_lens="taste",
+    )
+
+    no_pref_taste = next(
+        x for x in no_pref["options"]
+        if x["lens"] == "taste"
+    )
+    with_pref_taste = next(
+        x for x in with_pref["options"]
+        if x["lens"] == "taste"
+    )
+
+    assert with_pref_taste["score"] > no_pref_taste["score"]
+
+    # The ranking must still keep all three lens choices distinct.
+    names = [
+        option["candidate"]["name"]
+        for option in with_pref["options"]
+    ]
+    assert len(names) == len(set(names))
 '''
 
 if old not in text:
