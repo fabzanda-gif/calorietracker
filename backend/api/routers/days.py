@@ -309,6 +309,7 @@ def get_ranked_meal_options(
                 *eating_out,
                 *generic_eating_out,
             ],
+            historical_meals=history,
         )
 
         mode_result = DecisionModeService().apply(

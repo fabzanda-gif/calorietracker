@@ -12,6 +12,7 @@ class MealCandidateService:
     - meal prep inventory;
     - learned routine prediction;
     - available recipes;
+    - historical logged meals;
     - known takeaway/delivery candidates.
     """
 
@@ -24,6 +25,7 @@ class MealCandidateService:
         routine_prediction: dict | None,
         recipes: list[dict],
         order_candidates: list[dict] | None = None,
+        historical_meals: list[dict] | None = None,
     ) -> list[dict]:
         candidates: list[dict] = []
 
@@ -150,6 +152,108 @@ class MealCandidateService:
                 }
             )
 
+        historical_by_name: dict[str, list[dict]] = {}
+
+        for meal in historical_meals or []:
+            if meal.get("meal_type") != meal_type:
+                continue
+
+            name = str(
+                meal.get("base_name")
+                or meal.get("name")
+                or ""
+            ).strip()
+
+            if not name:
+                continue
+
+            category = str(
+                meal.get("category") or ""
+            ).strip().lower()
+
+            if category in {
+                "restaurant",
+                "ristorante",
+                "eating_out",
+                "eating out",
+                "fuori",
+                "fuori_casa",
+                "fuori casa",
+            }:
+                source = "restaurant"
+            elif category == "delivery":
+                source = "delivery"
+            elif category in {
+                "takeaway",
+                "take away",
+                "ordine",
+                "ordinato",
+            }:
+                source = "takeaway"
+            else:
+                source = "meal_history"
+
+            normalized_name = " ".join(
+                name.lower().split()
+            )
+
+            key = f"{source}:{normalized_name}"
+
+            historical_by_name.setdefault(
+                key,
+                [],
+            ).append(meal)
+
+        for key, items in historical_by_name.items():
+            latest = items[0]
+
+            name = str(
+                latest.get("base_name")
+                or latest.get("name")
+                or ""
+            ).strip()
+
+            source = key.split(":", 1)[0]
+
+            average_calories = self._average(
+                items,
+                "calories",
+            )
+
+            # Historical lunch/dinner entries should represent
+            # a meaningful meal, not isolated snacks or sides.
+            if (
+                meal_type in {"Pranzo", "Cena"}
+                and average_calories < 200
+            ):
+                continue
+
+            candidates.append(
+                {
+                    "id": f"{source}:{name}",
+                    "source": source,
+                    "source_id": None,
+                    "name": name,
+                    "meal_type": meal_type,
+                    "calories": average_calories,
+                    "protein_g": self._average(
+                        items,
+                        "protein",
+                    ),
+                    "carbs_g": self._average(
+                        items,
+                        "carbs",
+                    ),
+                    "fat_g": self._average(
+                        items,
+                        "fat",
+                    ),
+                    "taste_score": 5.0,
+                    "waste_risk": None,
+                    "occurrences": len(items),
+                }
+            )
+
         for order in order_candidates or []:
             if order.get("meal_type") != meal_type:
                 continue
@@ -177,6 +281,35 @@ class MealCandidateService:
             result.append(item)
 
         return result
+
+    @classmethod
+    def _average(
+        cls,
+        items: list[dict],
+        field_name: str,
+    ) -> float:
+        values = []
+
+        for item in items:
+            value = item.get(field_name)
+
+            if value in (None, ""):
+                continue
+
+            try:
+                values.append(
+                    max(0.0, float(value))
+                )
+            except (TypeError, ValueError):
+                continue
+
+        if not values:
+            return 0.0
+
+        return round(
+            sum(values) / len(values),
+            2,
+        )
 
     @staticmethod
     def _number(value: Any) -> float:

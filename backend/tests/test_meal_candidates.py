@@ -139,3 +139,59 @@ def test_meal_prep_near_expiry_gets_high_waste_risk():
     )
 
     assert result[0]["waste_risk"] == "high"
+
+
+def test_small_historical_entries_are_not_meal_candidates():
+    result = MealCandidateService().build(
+        day_date=DAY,
+        meal_type="Cena",
+        meal_prep_items=[],
+        routine_prediction=None,
+        recipes=[],
+        historical_meals=[
+            {
+                "meal_type": "Cena",
+                "name": "Mela Verde",
+                "calories": 52,
+                "protein": 0,
+            },
+            {
+                "meal_type": "Cena",
+                "name": "Appel Partjes",
+                "calories": 55,
+                "protein": 0,
+            },
+            {
+                "meal_type": "Cena",
+                "name": "Chicken Rice Bowl",
+                "calories": 520,
+                "protein": 42,
+            },
+        ],
+    )
+
+    assert len(result) == 1
+    assert result[0]["name"] == "Chicken Rice Bowl"
+    assert result[0]["source"] == "meal_history"
+    assert result[0]["calories"] == 520
+
+
+def test_structured_historical_lunch_is_candidate():
+    result = MealCandidateService().build(
+        day_date=DAY,
+        meal_type="Pranzo",
+        meal_prep_items=[],
+        routine_prediction=None,
+        recipes=[],
+        historical_meals=[
+            {
+                "meal_type": "Pranzo",
+                "name": "Pasta al pomodoro",
+                "calories": 450,
+                "protein": 16,
+            },
+        ],
+    )
+
+    assert len(result) == 1
+    assert result[0]["name"] == "Pasta al pomodoro"
