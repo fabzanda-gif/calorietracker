@@ -8,6 +8,7 @@ from backend.api.routers.decision_outcomes import router as decision_outcomes_ro
 from backend.api.routers.decision_selections import router as decision_selections_router
 from backend.api.routers.days import router as days_router
 from backend.api.routers.health import router as health_router
+from backend.api.routers.ingredients import router as ingredients_router
 from backend.api.routers.learned_insights import router as learned_insights_router
 from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
@@ -37,6 +38,7 @@ app.include_router(activities_router)
 app.include_router(weight_router)
 app.include_router(daily_logs_router)
 app.include_router(recipes_router)
+app.include_router(ingredients_router)
 app.include_router(days_router)
 app.include_router(meal_prep_router)
 app.include_router(learned_insights_router)
