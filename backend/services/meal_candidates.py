@@ -8,12 +8,11 @@ class MealCandidateService:
     """
     Assemble a source-agnostic candidate pool for the ranking engine.
 
-    Sources in v0.1:
+    Sources:
     - meal prep inventory;
     - learned routine prediction;
-    - available recipes.
-
-    The service does not rank. It only normalizes candidates.
+    - available recipes;
+    - known takeaway/delivery candidates.
     """
 
     def build(
@@ -24,6 +23,7 @@ class MealCandidateService:
         meal_prep_items: list[dict],
         routine_prediction: dict | None,
         recipes: list[dict],
+        order_candidates: list[dict] | None = None,
     ) -> list[dict]:
         candidates: list[dict] = []
 
@@ -149,6 +149,11 @@ class MealCandidateService:
                     "waste_risk": None,
                 }
             )
+
+        for order in order_candidates or []:
+            if order.get("meal_type") != meal_type:
+                continue
+            candidates.append(dict(order))
 
         return self._deduplicate(candidates)
 
