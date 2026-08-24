@@ -42,6 +42,25 @@ class RecipeIngredientsRepository(BaseRepository):
                 f"Unable to create recipe ingredient: {exc}"
             ) from exc
 
+    def update(
+        self,
+        row_id: Any,
+        payload: dict,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update(payload)
+                .eq("id", row_id)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to update recipe ingredient: {exc}"
+            ) from exc
+
     def delete(
         self,
         row_id: Any,

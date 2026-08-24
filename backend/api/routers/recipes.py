@@ -8,13 +8,30 @@ from pydantic import BaseModel, Field
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
+    get_ingredients_repository,
+    get_recipe_ingredients_repository,
     get_recipes_repository,
 )
 from backend.repositories.base import RepositoryError
+from backend.repositories.ingredients import IngredientsRepository
+from backend.repositories.recipe_ingredients import (
+    RecipeIngredientsRepository,
+)
 from backend.repositories.recipes import RecipesRepository
+from backend.services.structured_recipe import (
+    StructuredRecipeError,
+    StructuredRecipeService,
+)
 
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
+
+
+class StructuredRecipeIngredient(BaseModel):
+    ingredient_id: str
+    quantity: float = Field(gt=0)
+    unit: str = "g"
+    quantity_g: float = Field(gt=0)
 
 
 class RecipeCreate(BaseModel):
@@ -28,6 +45,7 @@ class RecipeCreate(BaseModel):
     fat: float = 0
     notes: str | None = None
     ingredients_json: Any | None = None
+    structured_ingredients: list[StructuredRecipeIngredient] | None = None
     is_shared: bool = False
     image_url: str | None = None
 
@@ -43,6 +61,7 @@ class RecipeUpdate(BaseModel):
     fat: float | None = None
     notes: str | None = None
     ingredients_json: Any | None = None
+    structured_ingredients: list[StructuredRecipeIngredient] | None = None
     image_url: str | None = None
 
 
@@ -128,16 +147,53 @@ def create_recipe(
     recipe: RecipeCreate,
     current_user: CurrentUser = Depends(get_current_user),
     repo: RecipesRepository = Depends(get_recipes_repository),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    recipe_ingredients_repo: RecipeIngredientsRepository = Depends(
+        get_recipe_ingredients_repository
+    ),
 ):
     payload = recipe.model_dump(exclude_none=True)
-    payload["user_id"] = current_user.id
+    structured = payload.pop(
+        "structured_ingredients",
+        None,
+    )
 
     try:
+        if structured is not None:
+            result = StructuredRecipeService(
+                recipes_repo=repo,
+                ingredients_repo=ingredients_repo,
+                recipe_ingredients_repo=recipe_ingredients_repo,
+            ).create(
+                user_id=current_user.id,
+                recipe_payload=payload,
+                structured_ingredients=structured,
+            )
+
+            return {
+                "created": True,
+                "structured": True,
+                "item": result["recipe"],
+                "recipe_ingredients": result[
+                    "recipe_ingredients"
+                ],
+            }
+
+        payload["user_id"] = current_user.id
         item = repo.create(payload)
+
         return {
             "created": True,
+            "structured": False,
             "item": item if item is not None else payload,
         }
+    except StructuredRecipeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -151,6 +207,12 @@ def update_recipe(
     changes: RecipeUpdate,
     current_user: CurrentUser = Depends(get_current_user),
     repo: RecipesRepository = Depends(get_recipes_repository),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    recipe_ingredients_repo: RecipeIngredientsRepository = Depends(
+        get_recipe_ingredients_repository
+    ),
 ):
     payload = changes.model_dump(exclude_unset=True)
 
@@ -160,9 +222,49 @@ def update_recipe(
             detail="No fields supplied",
         )
 
+    structured = payload.pop(
+        "structured_ingredients",
+        None,
+    )
+
     try:
-        item = repo.update(recipe_id, current_user.id, payload)
-        return {"updated": True, "item": item}
+        if structured is not None:
+            result = StructuredRecipeService(
+                recipes_repo=repo,
+                ingredients_repo=ingredients_repo,
+                recipe_ingredients_repo=recipe_ingredients_repo,
+            ).update(
+                user_id=current_user.id,
+                recipe_id=recipe_id,
+                recipe_payload=payload,
+                structured_ingredients=structured,
+            )
+
+            return {
+                "updated": True,
+                "structured": True,
+                "item": result["recipe"],
+                "recipe_ingredients": result[
+                    "recipe_ingredients"
+                ],
+            }
+
+        item = repo.update(
+            recipe_id,
+            current_user.id,
+            payload,
+        )
+
+        return {
+            "updated": True,
+            "structured": False,
+            "item": item,
+        }
+    except StructuredRecipeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
