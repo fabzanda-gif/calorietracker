@@ -29,15 +29,8 @@ class DecisionModeService:
     """
     Filter a normalized candidate pool by the user's current eating mode.
 
-    Modes:
-    - auto: all known candidate sources are eligible;
-    - ready: prepared inventory only;
-    - cook: recipes + routine meals;
-    - order: takeaway / delivery sources only;
-    - out: restaurant / eating-out sources only.
-
-    v0.1 does not invent candidates for modes that do not yet have persisted
-    sources. Empty results are intentional and explicit.
+    Generic order fallback is allowed in order mode but remains a distinct
+    source from learned takeaway/delivery history.
     """
 
     SOURCE_GROUPS = {
@@ -51,6 +44,7 @@ class DecisionModeService:
         "order": {
             "takeaway",
             "delivery",
+            "generic_order",
         },
         "out": {
             "restaurant",
@@ -105,6 +99,6 @@ class DecisionModeService:
             "auto": "no_compatible_candidates",
             "ready": "no_ready_food",
             "cook": "no_cook_candidates",
-            "order": "no_known_order_options",
+            "order": "no_order_options",
             "out": "no_known_eating_out_options",
         }[mode]
