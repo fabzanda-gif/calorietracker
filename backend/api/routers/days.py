@@ -36,6 +36,7 @@ from backend.services.meal_confirmation import (
 )
 from backend.services.meal_decision import MealDecisionService
 from backend.services.meal_memory import MealMemoryService
+from backend.services.order_candidates import OrderCandidateService
 
 
 router = APIRouter(prefix="/days", tags=["days"])
@@ -109,6 +110,22 @@ def _build_budget(
         day_date=day_date,
         metadata=current_user.metadata,
         current_weight=current_weight,
+    )
+
+
+def _build_order_candidates(
+    *,
+    user_id: str,
+    meal_type: str,
+    meals_repo: MealsRepository,
+) -> list[dict]:
+    history, _enhanced = meals_repo.list_history_compatible(
+        user_id
+    )
+
+    return OrderCandidateService().build(
+        meals=history,
+        meal_type=meal_type,
     )
 
 
@@ -188,6 +205,12 @@ def get_ranked_meal_options(
             "protein_remaining_g"
         )
 
+        order_candidates = _build_order_candidates(
+            user_id=current_user.id,
+            meal_type=meal_type,
+            meals_repo=meals_repo,
+        )
+
         all_candidates = MealCandidateService().build(
             day_date=day_date,
             meal_type=meal_type,
@@ -198,6 +221,7 @@ def get_ranked_meal_options(
             recipes=recipes_repo.list_available(
                 current_user.id
             ),
+            order_candidates=order_candidates,
         )
 
         mode_result = DecisionModeService().apply(
@@ -220,6 +244,7 @@ def get_ranked_meal_options(
             "mode_label": mode_result["mode_label"],
             "all_candidate_count": len(all_candidates),
             "candidate_count": mode_result["candidate_count"],
+            "known_order_count": len(order_candidates),
             "empty_reason": mode_result["empty_reason"],
             "candidates": mode_result["candidates"],
             **ranked,
