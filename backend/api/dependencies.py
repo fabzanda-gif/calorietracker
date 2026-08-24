@@ -13,6 +13,7 @@ from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.ingredients import IngredientsRepository
+from backend.repositories.meal_ingredients import MealIngredientsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipe_ingredients import RecipeIngredientsRepository
@@ -109,6 +110,12 @@ def get_meals_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> MealsRepository:
     return MealsRepository(supabase)
+
+
+def get_meal_ingredients_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> MealIngredientsRepository:
+    return MealIngredientsRepository(supabase)
 
 
 def get_activities_repository(

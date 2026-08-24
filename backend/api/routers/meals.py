@@ -9,13 +9,30 @@ from pydantic import BaseModel, Field
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
+    get_ingredients_repository,
+    get_meal_ingredients_repository,
     get_meals_repository,
 )
 from backend.repositories.base import RepositoryError
+from backend.repositories.ingredients import IngredientsRepository
+from backend.repositories.meal_ingredients import (
+    MealIngredientsRepository,
+)
 from backend.repositories.meals import MealsRepository
+from backend.services.structured_meal import (
+    StructuredMealError,
+    StructuredMealService,
+)
 
 
 router = APIRouter(prefix="/meals", tags=["meals"])
+
+
+class StructuredMealIngredient(BaseModel):
+    ingredient_id: str
+    quantity: float = Field(gt=0)
+    unit: str = "g"
+    quantity_g: float = Field(gt=0)
 
 
 class MealCreate(BaseModel):
@@ -27,6 +44,7 @@ class MealCreate(BaseModel):
     protein: float = 0
     carbs: float = 0
     fat: float = 0
+    structured_ingredients: list[StructuredMealIngredient] | None = None
 
     base_name: str | None = None
     quantity: float | None = None
@@ -192,25 +210,55 @@ def create_meal(
     meal: MealCreate,
     current_user: CurrentUser = Depends(get_current_user),
     repo: MealsRepository = Depends(get_meals_repository),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    meal_ingredients_repo: MealIngredientsRepository = Depends(
+        get_meal_ingredients_repository
+    ),
 ):
-    """
-    Create a meal for the authenticated user.
-
-    `user_id` is never accepted from the client: FastAPI adds it from
-    the authenticated Supabase session.
-    """
     payload = meal.model_dump(exclude_none=True)
-    payload["date"] = str(payload["date"])
-    payload["user_id"] = current_user.id
+
+    structured = payload.pop(
+        "structured_ingredients",
+        None,
+    )
 
     try:
-        response = repo.create_compatible(payload)
-        rows = getattr(response, "data", None) or []
+        if structured is not None:
+            result = StructuredMealService(
+                meals_repo=repo,
+                ingredients_repo=ingredients_repo,
+                meal_ingredients_repo=meal_ingredients_repo,
+            ).create(
+                user_id=current_user.id,
+                meal_payload=payload,
+                structured_ingredients=structured,
+            )
+
+            return {
+                "created": True,
+                "structured": True,
+                "item": result["meal"],
+                "meal_ingredients": result[
+                    "meal_ingredients"
+                ],
+            }
+
+        payload["user_id"] = current_user.id
+        item = repo.create(payload)
 
         return {
             "created": True,
-            "item": rows[0] if rows else payload,
+            "structured": False,
+            "item": item if item is not None else payload,
         }
+
+    except StructuredMealError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
     except RepositoryError as exc:
         raise HTTPException(

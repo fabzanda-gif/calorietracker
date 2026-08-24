@@ -16,6 +16,15 @@ class FakeMealsRepository:
         self.last_update = None
         self.last_delete = None
 
+    def create(self, payload):
+        self.last_create = dict(payload)
+
+        return {
+            "id": 123,
+            **payload,
+        }
+
+
     def create_compatible(self, payload):
         self.last_create = payload
         return SimpleNamespace(data=[{"id": "meal-1", **payload}])
