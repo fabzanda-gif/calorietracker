@@ -40,6 +40,9 @@ from backend.services.meal_confirmation import (
 from backend.services.meal_decision import MealDecisionService
 from backend.services.meal_memory import MealMemoryService
 from backend.services.order_candidates import OrderCandidateService
+from backend.services.order_personalization import (
+    OrderPersonalizationService,
+)
 
 
 router = APIRouter(prefix="/days", tags=["days"])
@@ -121,14 +124,20 @@ def _build_known_order_candidates(
     user_id: str,
     meal_type: str,
     meals_repo: MealsRepository,
+    on_date: Date,
 ) -> list[dict]:
     history, _enhanced = meals_repo.list_history_compatible(
         user_id
     )
 
-    return OrderCandidateService().build(
+    known = OrderCandidateService().build(
         meals=history,
         meal_type=meal_type,
+    )
+
+    return OrderPersonalizationService().enrich(
+        candidates=known,
+        on_date=on_date,
     )
 
 
@@ -214,10 +223,9 @@ def get_ranked_meal_options(
             user_id=current_user.id,
             meal_type=meal_type,
             meals_repo=meals_repo,
+            on_date=day_date,
         )
 
-        # Generic catalogue is a cold-start aid for explicit Order mode only.
-        # It must not pollute Auto / Ready / Cook candidate pools.
         generic_orders = []
         if normalized_mode == "order":
             generic_orders = GenericOrderCandidateService().build(
