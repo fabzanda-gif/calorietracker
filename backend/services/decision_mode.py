@@ -28,9 +28,6 @@ class DecisionModeError(ValueError):
 class DecisionModeService:
     """
     Filter a normalized candidate pool by the user's current eating mode.
-
-    Generic order fallback is allowed in order mode but remains a distinct
-    source from learned takeaway/delivery history.
     """
 
     SOURCE_GROUPS = {
@@ -49,6 +46,7 @@ class DecisionModeService:
         "out": {
             "restaurant",
             "eating_out",
+            "generic_eating_out",
         },
     }
 
