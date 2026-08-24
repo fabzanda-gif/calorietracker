@@ -169,6 +169,17 @@ class MealsRepository(BaseRepository):
         Preserve the current SanoSync rollout compatibility:
         try the enhanced schema first, then fall back to legacy core fields.
         """
+        payload = dict(payload)
+
+        for key in ("calories", "protein", "carbs", "fat"):
+            if key not in payload or payload[key] is None:
+                continue
+
+            try:
+                payload[key] = int(round(float(payload[key])))
+            except (TypeError, ValueError):
+                payload[key] = 0
+
         try:
             return self.table.insert(payload).execute()
         except Exception as enhanced_exc:

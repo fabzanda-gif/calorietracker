@@ -458,3 +458,94 @@
   opacity: 0.55;
   cursor: wait;
 }
+
+
+.mealActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.alternateMealButton {
+  min-height: 42px;
+  border: 1px solid #d9d9d2;
+  border-radius: 13px;
+  background: #ffffff;
+  color: #30302d;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.alternateMealButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.alternateMealForm {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f7f7f3;
+}
+
+.alternateMealForm label {
+  display: grid;
+  gap: 6px;
+  color: #5d5d57;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.alternateMealForm input {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid #d7d7d0;
+  border-radius: 11px;
+  padding: 9px 11px;
+  background: #ffffff;
+  color: #171815;
+  font: inherit;
+}
+
+.alternateMealNumbers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.alternateFormActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.saveAlternateButton,
+.cancelAlternateButton {
+  min-height: 42px;
+  border-radius: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.saveAlternateButton {
+  border: 0;
+  background: #171815;
+  color: #ffffff;
+}
+
+.cancelAlternateButton {
+  border: 1px solid #d7d7d0;
+  background: #ffffff;
+  color: #30302d;
+}
+
+.saveAlternateButton:disabled,
+.cancelAlternateButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}

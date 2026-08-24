@@ -32,3 +32,33 @@ export function getMealsForDate(
     },
   );
 }
+
+
+export interface MealCreateInput {
+  date: string;
+  meal_type: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface MealCreateResponse {
+  created: boolean;
+  item: LoggedMeal;
+}
+
+export function createMeal(
+  input: MealCreateInput,
+  accessToken?: string | null,
+): Promise<MealCreateResponse> {
+  return apiRequest<MealCreateResponse>(
+    "/meals",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}

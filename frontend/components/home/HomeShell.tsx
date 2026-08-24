@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { confirmMealPrediction } from "@/lib/api/confirm";
 import { commitMealDecision } from "@/lib/api/decision";
 import {
+  createMeal,
   getMealsForDate,
   type LoggedMeal,
 } from "@/lib/api/meals";
@@ -86,6 +87,16 @@ export function HomeShell() {
     useState<number | null>(null);
   const [confirmingSlot, setConfirmingSlot] =
     useState<string | null>(null);
+  const [alternateSlot, setAlternateSlot] =
+    useState<string | null>(null);
+  const [alternateName, setAlternateName] =
+    useState("");
+  const [alternateCalories, setAlternateCalories] =
+    useState("");
+  const [alternateProtein, setAlternateProtein] =
+    useState("");
+  const [savingAlternate, setSavingAlternate] =
+    useState(false);
   const [commitMessage, setCommitMessage] =
     useState<string | null>(null);
   const [actualDinner, setActualDinner] =
@@ -265,6 +276,77 @@ export function HomeShell() {
         (meal) => meal.meal_type === type,
       ) ?? null
     );
+  }
+
+  function closeAlternateMeal() {
+    setAlternateSlot(null);
+    setAlternateName("");
+    setAlternateCalories("");
+    setAlternateProtein("");
+  }
+
+  async function saveAlternateMeal(
+    slot: string,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    const name = alternateName.trim();
+    const calories = Number(alternateCalories);
+    const protein = alternateProtein.trim()
+      ? Number(alternateProtein)
+      : 0;
+
+    if (!name) {
+      setError("Inserisci il nome del pasto.");
+      return;
+    }
+
+    if (
+      !Number.isFinite(calories) ||
+      calories < 0
+    ) {
+      setError("Inserisci delle kcal valide.");
+      return;
+    }
+
+    if (
+      !Number.isFinite(protein) ||
+      protein < 0
+    ) {
+      setError("Inserisci proteine valide.");
+      return;
+    }
+
+    setSavingAlternate(true);
+    setError(null);
+
+    try {
+      await createMeal(
+        {
+          date: todayIso(),
+          meal_type: mealLabel(slot),
+          name,
+          calories: Math.round(calories),
+          protein: Math.round(protein),
+          carbs: 0,
+          fat: 0,
+        },
+        accessToken,
+      );
+
+      closeAlternateMeal();
+      await refreshHome();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare il pasto.",
+      );
+    } finally {
+      setSavingAlternate(false);
+    }
   }
 
   async function confirmPredictedMeal(
@@ -638,18 +720,124 @@ export function HomeShell() {
 
                     {!actualMealForSlot(slot) &&
                     meal.state === "predicted" ? (
-                      <button
-                        type="button"
-                        className={styles.confirmMealButton}
-                        disabled={confirmingSlot !== null}
-                        onClick={() => {
-                          void confirmPredictedMeal(slot);
-                        }}
-                      >
-                        {confirmingSlot === slot
-                          ? "Confermo…"
-                          : "Conferma"}
-                      </button>
+                      <>
+                        <div className={styles.mealActions}>
+                          <button
+                            type="button"
+                            className={styles.confirmMealButton}
+                            disabled={
+                              confirmingSlot !== null ||
+                              savingAlternate
+                            }
+                            onClick={() => {
+                              void confirmPredictedMeal(slot);
+                            }}
+                          >
+                            {confirmingSlot === slot
+                              ? "Confermo…"
+                              : "Conferma"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className={styles.alternateMealButton}
+                            disabled={
+                              confirmingSlot !== null ||
+                              savingAlternate
+                            }
+                            onClick={() => {
+                              setError(null);
+
+                              if (alternateSlot === slot) {
+                                closeAlternateMeal();
+                              } else {
+                                setAlternateSlot(slot);
+                                setAlternateName("");
+                                setAlternateCalories("");
+                                setAlternateProtein("");
+                              }
+                            }}
+                          >
+                            Ho mangiato altro
+                          </button>
+                        </div>
+
+                        {alternateSlot === slot ? (
+                          <div className={styles.alternateMealForm}>
+                            <label>
+                              Cosa hai mangiato?
+                              <input
+                                type="text"
+                                value={alternateName}
+                                placeholder="Es. Piadina con pollo"
+                                onChange={(event) => {
+                                  setAlternateName(
+                                    event.target.value,
+                                  );
+                                }}
+                              />
+                            </label>
+
+                            <div className={styles.alternateMealNumbers}>
+                              <label>
+                                Kcal
+                                <input
+                                  type="number"
+                                  min="0"
+                                  inputMode="numeric"
+                                  value={alternateCalories}
+                                  placeholder="450"
+                                  onChange={(event) => {
+                                    setAlternateCalories(
+                                      event.target.value,
+                                    );
+                                  }}
+                                />
+                              </label>
+
+                              <label>
+                                Proteine
+                                <input
+                                  type="number"
+                                  min="0"
+                                  inputMode="numeric"
+                                  value={alternateProtein}
+                                  placeholder="30"
+                                  onChange={(event) => {
+                                    setAlternateProtein(
+                                      event.target.value,
+                                    );
+                                  }}
+                                />
+                              </label>
+                            </div>
+
+                            <div className={styles.alternateFormActions}>
+                              <button
+                                type="button"
+                                className={styles.saveAlternateButton}
+                                disabled={savingAlternate}
+                                onClick={() => {
+                                  void saveAlternateMeal(slot);
+                                }}
+                              >
+                                {savingAlternate
+                                  ? "Salvo…"
+                                  : "Salva"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className={styles.cancelAlternateButton}
+                                disabled={savingAlternate}
+                                onClick={closeAlternateMeal}
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
                     ) : null}
                   </article>
                 ),
