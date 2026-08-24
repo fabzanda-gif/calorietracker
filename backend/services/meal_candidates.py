@@ -3,6 +3,10 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from backend.services.legacy_meal_events import (
+    LegacyMealEventService,
+)
+
 
 class MealCandidateService:
     """
@@ -152,105 +156,77 @@ class MealCandidateService:
                 }
             )
 
-        historical_by_name: dict[str, list[dict]] = {}
+        historical_events = (
+            LegacyMealEventService().build(
+                meals=historical_meals or [],
+                meal_type=meal_type,
+            )
+        )
 
-        for meal in historical_meals or []:
-            if meal.get("meal_type") != meal_type:
-                continue
+        historical_by_name: dict[
+            str,
+            list[dict],
+        ] = {}
 
+        for event in historical_events:
             name = str(
-                meal.get("base_name")
-                or meal.get("name")
-                or ""
+                event.get("name") or ""
             ).strip()
 
             if not name:
                 continue
 
-            category = str(
-                meal.get("category") or ""
-            ).strip().lower()
-
-            if category in {
-                "restaurant",
-                "ristorante",
-                "eating_out",
-                "eating out",
-                "fuori",
-                "fuori_casa",
-                "fuori casa",
-            }:
-                source = "restaurant"
-            elif category == "delivery":
-                source = "delivery"
-            elif category in {
-                "takeaway",
-                "take away",
-                "ordine",
-                "ordinato",
-            }:
-                source = "takeaway"
-            else:
-                source = "meal_history"
-
             normalized_name = " ".join(
                 name.lower().split()
             )
 
-            key = f"{source}:{normalized_name}"
-
             historical_by_name.setdefault(
-                key,
+                normalized_name,
                 [],
-            ).append(meal)
+            ).append(event)
 
-        for key, items in historical_by_name.items():
-            latest = items[0]
+        for normalized_name, events in (
+            historical_by_name.items()
+        ):
+            latest = events[0]
 
             name = str(
-                latest.get("base_name")
-                or latest.get("name")
-                or ""
+                latest.get("name") or ""
             ).strip()
-
-            source = key.split(":", 1)[0]
-
-            average_calories = self._average(
-                items,
-                "calories",
-            )
-
-            # Historical lunch/dinner entries should represent
-            # a meaningful meal, not isolated snacks or sides.
-            if (
-                meal_type in {"Pranzo", "Cena"}
-                and average_calories < 200
-            ):
-                continue
 
             candidates.append(
                 {
-                    "id": f"{source}:{name}",
-                    "source": source,
+                    "id": (
+                        "meal_history:"
+                        f"{normalized_name}"
+                    ),
+                    "source": "meal_history",
                     "source_id": None,
                     "name": name,
                     "meal_type": meal_type,
-                    "calories": average_calories,
+                    "calories": self._average(
+                        events,
+                        "calories",
+                    ),
                     "protein_g": self._average(
-                        items,
+                        events,
                         "protein",
                     ),
                     "carbs_g": self._average(
-                        items,
+                        events,
                         "carbs",
                     ),
                     "fat_g": self._average(
-                        items,
+                        events,
                         "fat",
                     ),
                     "taste_score": 5.0,
                     "waste_risk": None,
-                    "occurrences": len(items),
+                    "occurrences": len(events),
+                    "components": latest.get(
+                        "components",
+                        [],
+                    ),
                 }
             )
 

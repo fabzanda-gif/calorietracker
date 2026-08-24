@@ -150,18 +150,21 @@ def test_small_historical_entries_are_not_meal_candidates():
         recipes=[],
         historical_meals=[
             {
+                "date": "2026-08-18",
                 "meal_type": "Cena",
                 "name": "Mela Verde",
                 "calories": 52,
                 "protein": 0,
             },
             {
+                "date": "2026-08-19",
                 "meal_type": "Cena",
                 "name": "Appel Partjes",
                 "calories": 55,
                 "protein": 0,
             },
             {
+                "date": "2026-08-20",
                 "meal_type": "Cena",
                 "name": "Chicken Rice Bowl",
                 "calories": 520,
@@ -185,6 +188,7 @@ def test_structured_historical_lunch_is_candidate():
         recipes=[],
         historical_meals=[
             {
+                "date": "2026-08-20",
                 "meal_type": "Pranzo",
                 "name": "Pasta al pomodoro",
                 "calories": 450,
