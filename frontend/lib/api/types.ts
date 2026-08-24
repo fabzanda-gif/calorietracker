@@ -3,11 +3,21 @@ export type ConfidenceState =
   | "predicted"
   | "unknown";
 
+export interface DayEvidence {
+  observations?: number;
+  matches?: number;
+  recent_observations?: number;
+  recent_matches?: number;
+  change_detected?: boolean;
+}
+
 export interface DaySignal<T> {
   value: T | null;
   state: ConfidenceState;
   source: string | null;
   confidence: number | null;
+  confidence_level?: string | null;
+  evidence?: DayEvidence;
 }
 
 export interface DayActual {
@@ -16,9 +26,18 @@ export interface DayActual {
 }
 
 export interface DayMealPrediction {
+  meal_type?: string;
+  value: string | null;
   state: string;
   source?: string | null;
   confidence?: number | null;
+  confidence_level?: string | null;
+  day_context?: string | null;
+  estimated_calories?: number | null;
+  estimated_protein_g?: number | null;
+  estimated_carbs_g?: number | null;
+  estimated_fat_g?: number | null;
+  evidence?: DayEvidence;
   [key: string]: unknown;
 }
 
