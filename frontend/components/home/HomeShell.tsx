@@ -6,10 +6,13 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   getDay,
   getDayBudget,
+  getMealOptions,
 } from "@/lib/api/day";
 import type {
   DayBudgetResponse,
   DayResponse,
+  MealOptionsResponse,
+  RankedMealOption,
 } from "@/lib/api/types";
 
 import styles from "./HomeShell.module.css";
@@ -44,6 +47,20 @@ function roundNumber(value: number): string {
   return Math.round(value).toLocaleString("it-IT");
 }
 
+function optionLensLabel(
+  option: RankedMealOption,
+): string {
+  if (option.label) {
+    return option.label;
+  }
+
+  return {
+    calorie: "Più leggera",
+    balanced: "Più bilanciata",
+    taste: "Più gusto",
+  }[option.lens] ?? option.lens;
+}
+
 export function HomeShell() {
   const {
     user,
@@ -55,6 +72,8 @@ export function HomeShell() {
     useState<DayResponse | null>(null);
   const [budgetResult, setBudgetResult] =
     useState<DayBudgetResponse | null>(null);
+  const [dinnerOptions, setDinnerOptions] =
+    useState<MealOptionsResponse | null>(null);
   const [loading, setLoading] =
     useState(true);
   const [error, setError] =
@@ -93,21 +112,31 @@ export function HomeShell() {
       try {
         const date = todayIso();
 
-        const [dayPayload, budgetPayload] =
-          await Promise.all([
-            getDay(
-              date,
-              accessToken,
-            ),
-            getDayBudget(
-              date,
-              accessToken,
-            ),
-          ]);
+        const [
+          dayPayload,
+          budgetPayload,
+          dinnerPayload,
+        ] = await Promise.all([
+          getDay(
+            date,
+            accessToken,
+          ),
+          getDayBudget(
+            date,
+            accessToken,
+          ),
+          getMealOptions(
+            date,
+            "dinner",
+            "auto",
+            accessToken,
+          ),
+        ]);
 
         if (active) {
           setDay(dayPayload);
           setBudgetResult(budgetPayload);
+          setDinnerOptions(dinnerPayload);
         }
       } catch (err) {
         if (active) {
@@ -433,6 +462,77 @@ export function HomeShell() {
                 ),
               )}
             </div>
+          </section>
+
+          <section className={styles.decisionSection}>
+            <div className={styles.sectionHeader}>
+              <div>
+                <p className={styles.kicker}>
+                  Stasera
+                </p>
+                <h2>Tre idee per cena</h2>
+              </div>
+
+              {dinnerOptions?.mode_label ? (
+                <span className={styles.modeBadge}>
+                  {dinnerOptions.mode_label}
+                </span>
+              ) : null}
+            </div>
+
+            {dinnerOptions?.options.length ? (
+              <div className={styles.optionList}>
+                {dinnerOptions.options.map(
+                  (option) => (
+                    <article
+                      key={`${option.lens}-${option.candidate.id ?? option.candidate.name}`}
+                      className={styles.optionCard}
+                    >
+                      <div className={styles.optionTop}>
+                        <span className={styles.optionLens}>
+                          {optionLensLabel(option)}
+                        </span>
+
+                        <span className={styles.optionSource}>
+                          {option.candidate.source}
+                        </span>
+                      </div>
+
+                      <h3>
+                        {option.candidate.name}
+                      </h3>
+
+                      <p className={styles.optionNumbers}>
+                        {roundNumber(
+                          option.candidate.calories,
+                        )}{" "}
+                        kcal
+                        {typeof option.candidate.protein_g ===
+                        "number"
+                          ? ` · ${roundNumber(
+                              option.candidate.protein_g,
+                            )} g proteine`
+                          : ""}
+                      </p>
+
+                      <p className={styles.optionReason}>
+                        {option.reason}
+                      </p>
+                    </article>
+                  ),
+                )}
+              </div>
+            ) : (
+              <article className={styles.emptyDecisionCard}>
+                <strong>
+                  Sto ancora imparando le tue cene.
+                </strong>
+                <p>
+                  Registra qualche altra scelta e SanoSync
+                  inizierà a proporti alternative più utili.
+                </p>
+              </article>
+            )}
           </section>
         </>
       ) : null}
