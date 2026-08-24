@@ -28,6 +28,12 @@ from backend.services.decision_mode import (
     DecisionModeService,
 )
 from backend.services.decision_ranking import DecisionRankingService
+from backend.services.eating_out_candidates import (
+    EatingOutCandidateService,
+)
+from backend.services.eating_out_personalization import (
+    EatingOutPersonalizationService,
+)
 from backend.services.generic_order_candidates import (
     GenericOrderCandidateService,
 )
@@ -119,23 +125,46 @@ def _build_budget(
     )
 
 
-def _build_known_order_candidates(
+def _history(
     *,
     user_id: str,
-    meal_type: str,
     meals_repo: MealsRepository,
-    on_date: Date,
 ) -> list[dict]:
     history, _enhanced = meals_repo.list_history_compatible(
         user_id
     )
+    return history
 
+
+def _build_known_order_candidates(
+    *,
+    history: list[dict],
+    meal_type: str,
+    on_date: Date,
+) -> list[dict]:
     known = OrderCandidateService().build(
         meals=history,
         meal_type=meal_type,
     )
 
     return OrderPersonalizationService().enrich(
+        candidates=known,
+        on_date=on_date,
+    )
+
+
+def _build_eating_out_candidates(
+    *,
+    history: list[dict],
+    meal_type: str,
+    on_date: Date,
+) -> list[dict]:
+    known = EatingOutCandidateService().build(
+        meals=history,
+        meal_type=meal_type,
+    )
+
+    return EatingOutPersonalizationService().enrich(
         candidates=known,
         on_date=on_date,
     )
@@ -219,10 +248,20 @@ def get_ranked_meal_options(
 
         normalized_mode = str(mode or "auto").strip().lower()
 
-        known_orders = _build_known_order_candidates(
+        history = _history(
             user_id=current_user.id,
-            meal_type=meal_type,
             meals_repo=meals_repo,
+        )
+
+        known_orders = _build_known_order_candidates(
+            history=history,
+            meal_type=meal_type,
+            on_date=day_date,
+        )
+
+        eating_out = _build_eating_out_candidates(
+            history=history,
+            meal_type=meal_type,
             on_date=day_date,
         )
 
@@ -247,6 +286,7 @@ def get_ranked_meal_options(
             order_candidates=[
                 *known_orders,
                 *generic_orders,
+                *eating_out,
             ],
         )
 
@@ -272,9 +312,15 @@ def get_ranked_meal_options(
             "candidate_count": mode_result["candidate_count"],
             "known_order_count": len(known_orders),
             "generic_order_count": len(generic_orders),
+            "known_eating_out_count": len(eating_out),
             "order_personalization_state": (
                 "known"
                 if len(known_orders) >= 3
+                else "learning"
+            ),
+            "eating_out_personalization_state": (
+                "known"
+                if len(eating_out) >= 3
                 else "learning"
             ),
             "empty_reason": mode_result["empty_reason"],
