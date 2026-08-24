@@ -11,6 +11,7 @@ from backend.api.dependencies import (
     get_daily_logs_repository,
     get_meal_prep_repository,
     get_meals_repository,
+    get_recipes_repository,
     get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
@@ -18,9 +19,12 @@ from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
+from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
+from backend.services.decision_ranking import DecisionRankingService
+from backend.services.meal_candidates import MealCandidateService
 from backend.services.meal_confirmation import (
     MealAlreadyLoggedError,
     MealConfirmationService,
@@ -40,6 +44,15 @@ MEAL_SLOT_TO_TYPE = {
 }
 
 
+def _validate_slot(meal_slot: str) -> str:
+    if meal_slot not in MEAL_SLOT_TO_TYPE:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown meal slot",
+        )
+    return MEAL_SLOT_TO_TYPE[meal_slot]
+
+
 def _meal_memory(
     meals_repo: MealsRepository,
     daily_logs_repo: DailyLogsRepository,
@@ -50,27 +63,153 @@ def _meal_memory(
     )
 
 
+def _build_day(
+    *,
+    user_id: str,
+    day_date: Date,
+    daily_logs_repo: DailyLogsRepository,
+    meals_repo: MealsRepository,
+) -> dict:
+    return DayService(
+        daily_logs_repo=daily_logs_repo,
+        meal_memory_service=_meal_memory(
+            meals_repo,
+            daily_logs_repo,
+        ),
+    ).build_day(
+        user_id=user_id,
+        day_date=day_date,
+    )
+
+
+def _build_budget(
+    *,
+    current_user: CurrentUser,
+    day_date: Date,
+    meals_repo: MealsRepository,
+    activities_repo: ActivitiesRepository,
+    weight_repo: WeightRepository,
+) -> dict:
+    latest_weight = weight_repo.latest(current_user.id)
+    current_weight = (
+        latest_weight.get("weight")
+        if latest_weight is not None
+        else None
+    )
+
+    return DayBudgetService(
+        meals_repo=meals_repo,
+        activities_repo=activities_repo,
+    ).build(
+        user_id=current_user.id,
+        day_date=day_date,
+        metadata=current_user.metadata,
+        current_weight=current_weight,
+    )
+
+
 @router.get("/{day_date}/budget")
 def get_day_budget(
     day_date: Date,
     current_user: CurrentUser = Depends(get_current_user),
     meals_repo: MealsRepository = Depends(get_meals_repository),
-    activities_repo: ActivitiesRepository = Depends(get_activities_repository),
-    weight_repo: WeightRepository = Depends(get_weight_repository),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
 ):
     try:
-        latest_weight = weight_repo.latest(current_user.id)
-        current_weight = latest_weight.get("weight") if latest_weight else None
-
-        return DayBudgetService(
+        return _build_budget(
+            current_user=current_user,
+            day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
-        ).build(
+            weight_repo=weight_repo,
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/{day_date}/meals/{meal_slot}/options")
+def get_ranked_meal_options(
+    day_date: Date,
+    meal_slot: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
+    recipes_repo: RecipesRepository = Depends(
+        get_recipes_repository
+    ),
+):
+    meal_type = _validate_slot(meal_slot)
+
+    try:
+        day = _build_day(
             user_id=current_user.id,
             day_date=day_date,
-            metadata=current_user.metadata,
-            current_weight=current_weight,
+            daily_logs_repo=daily_logs_repo,
+            meals_repo=meals_repo,
         )
+
+        budget_result = _build_budget(
+            current_user=current_user,
+            day_date=day_date,
+            meals_repo=meals_repo,
+            activities_repo=activities_repo,
+            weight_repo=weight_repo,
+        )
+
+        budget = budget_result.get("budget") or {}
+        available_kcal = budget.get("available_kcal")
+        protein_remaining_g = budget.get(
+            "protein_remaining_g"
+        )
+
+        candidates = MealCandidateService().build(
+            day_date=day_date,
+            meal_type=meal_type,
+            meal_prep_items=meal_prep_repo.list_available(
+                current_user.id
+            ),
+            routine_prediction=day["meals"][meal_slot],
+            recipes=recipes_repo.list_available(
+                current_user.id
+            ),
+        )
+
+        ranked = DecisionRankingService().rank(
+            candidates=candidates,
+            available_kcal=available_kcal,
+            protein_remaining_g=protein_remaining_g,
+        )
+
+        return {
+            "date": str(day_date),
+            "meal_slot": meal_slot,
+            "meal_type": meal_type,
+            "candidate_count": len(candidates),
+            "candidates": candidates,
+            **ranked,
+        }
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -83,51 +222,56 @@ def get_meal_decision(
     day_date: Date,
     meal_slot: str,
     current_user: CurrentUser = Depends(get_current_user),
-    daily_logs_repo: DailyLogsRepository = Depends(get_daily_logs_repository),
-    meals_repo: MealsRepository = Depends(get_meals_repository),
-    activities_repo: ActivitiesRepository = Depends(get_activities_repository),
-    weight_repo: WeightRepository = Depends(get_weight_repository),
-    meal_prep_repo: MealPrepRepository = Depends(get_meal_prep_repository),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
 ):
-    if meal_slot not in MEAL_SLOT_TO_TYPE:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Unknown meal slot",
-        )
+    meal_type = _validate_slot(meal_slot)
 
     try:
-        day = DayService(
-            daily_logs_repo=daily_logs_repo,
-            meal_memory_service=_meal_memory(meals_repo, daily_logs_repo),
-        ).build_day(
+        day = _build_day(
             user_id=current_user.id,
             day_date=day_date,
+            daily_logs_repo=daily_logs_repo,
+            meals_repo=meals_repo,
         )
 
-        latest_weight = weight_repo.latest(current_user.id)
-        current_weight = latest_weight.get("weight") if latest_weight else None
-
-        budget_result = DayBudgetService(
+        budget_result = _build_budget(
+            current_user=current_user,
+            day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
-        ).build(
-            user_id=current_user.id,
-            day_date=day_date,
-            metadata=current_user.metadata,
-            current_weight=current_weight,
+            weight_repo=weight_repo,
         )
 
         available_kcal = None
         if budget_result.get("budget") is not None:
-            available_kcal = budget_result["budget"].get("available_kcal")
+            available_kcal = budget_result["budget"].get(
+                "available_kcal"
+            )
 
         return MealDecisionService().decide(
             day_date=day_date,
-            meal_type=MEAL_SLOT_TO_TYPE[meal_slot],
-            available_inventory=meal_prep_repo.list_available(current_user.id),
+            meal_type=meal_type,
+            available_inventory=meal_prep_repo.list_available(
+                current_user.id
+            ),
             available_kcal=available_kcal,
             routine_prediction=day["meals"][meal_slot],
         )
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -140,30 +284,35 @@ def confirm_meal_prediction(
     day_date: Date,
     meal_slot: str,
     current_user: CurrentUser = Depends(get_current_user),
-    daily_logs_repo: DailyLogsRepository = Depends(get_daily_logs_repository),
-    meals_repo: MealsRepository = Depends(get_meals_repository),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
 ):
-    if meal_slot not in MEAL_SLOT_TO_TYPE:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Unknown meal slot",
-        )
+    _validate_slot(meal_slot)
 
     try:
-        day = DayService(
-            daily_logs_repo=daily_logs_repo,
-            meal_memory_service=_meal_memory(meals_repo, daily_logs_repo),
-        ).build_day(
+        day = _build_day(
             user_id=current_user.id,
             day_date=day_date,
+            daily_logs_repo=daily_logs_repo,
+            meals_repo=meals_repo,
         )
 
-        return MealConfirmationService(meals_repo).confirm(
+        return MealConfirmationService(
+            meals_repo
+        ).confirm(
             user_id=current_user.id,
             day_date=day_date,
             prediction=day["meals"][meal_slot],
         )
-    except (MealPredictionUnavailableError, MealAlreadyLoggedError) as exc:
+
+    except (
+        MealPredictionUnavailableError,
+        MealAlreadyLoggedError,
+    ) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
@@ -179,16 +328,19 @@ def confirm_meal_prediction(
 def get_day(
     day_date: Date,
     current_user: CurrentUser = Depends(get_current_user),
-    daily_logs_repo: DailyLogsRepository = Depends(get_daily_logs_repository),
-    meals_repo: MealsRepository = Depends(get_meals_repository),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
 ):
     try:
-        return DayService(
-            daily_logs_repo=daily_logs_repo,
-            meal_memory_service=_meal_memory(meals_repo, daily_logs_repo),
-        ).build_day(
+        return _build_day(
             user_id=current_user.id,
             day_date=day_date,
+            daily_logs_repo=daily_logs_repo,
+            meals_repo=meals_repo,
         )
     except RepositoryError as exc:
         raise HTTPException(
