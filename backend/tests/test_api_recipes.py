@@ -5,6 +5,7 @@ from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
     get_recipes_repository,
+    get_recipe_ingredients_repository,
 )
 from backend.api.main import app
 
@@ -55,6 +56,11 @@ class FakeRecipesRepository:
 fake_repo = FakeRecipesRepository()
 
 
+
+class FakeRecipeIngredientsRepository:
+    def list_for_recipe(self, recipe_id):
+        return []
+
 def override_current_user():
     return CurrentUser(id="authenticated-user", access_token="fake-token")
 
@@ -67,9 +73,13 @@ def override_repo():
 def api_overrides():
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_recipes_repository] = override_repo
-    yield
-    app.dependency_overrides.clear()
+    app.dependency_overrides[
+        get_recipe_ingredients_repository
+    ] = lambda: FakeRecipeIngredientsRepository()
 
+    yield
+
+    app.dependency_overrides.clear()
 
 client = TestClient(app)
 

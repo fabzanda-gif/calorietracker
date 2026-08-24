@@ -122,9 +122,15 @@ def get_recipe(
     recipe_id: str,
     current_user: CurrentUser = Depends(get_current_user),
     repo: RecipesRepository = Depends(get_recipes_repository),
+    recipe_ingredients_repo: RecipeIngredientsRepository = Depends(
+        get_recipe_ingredients_repository
+    ),
 ):
     try:
-        item = repo.get_personal_by_id(recipe_id, current_user.id)
+        item = repo.get_personal_by_id(
+            recipe_id,
+            current_user.id,
+        )
 
         if item is None:
             raise HTTPException(
@@ -132,7 +138,18 @@ def get_recipe(
                 detail="Recipe not found",
             )
 
-        return {"item": item}
+        structured = (
+            recipe_ingredients_repo.list_for_recipe(
+                recipe_id
+            )
+        )
+
+        return {
+            "item": {
+                **item,
+                "structured_ingredients": structured,
+            }
+        }
     except HTTPException:
         raise
     except RepositoryError as exc:

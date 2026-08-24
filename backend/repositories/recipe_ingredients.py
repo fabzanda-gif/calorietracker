@@ -21,7 +21,15 @@ class RecipeIngredientsRepository(BaseRepository):
         try:
             response = (
                 self.table
-                .select(RECIPE_INGREDIENT_COLUMNS)
+                .select(
+                    RECIPE_INGREDIENT_COLUMNS
+                    + ",ingredients("
+                    "id,name,normalized_name,"
+                    "calories_per_100g,protein_per_100g,"
+                    "carbs_per_100g,fat_per_100g,"
+                    "default_unit"
+                    ")"
+                )
                 .eq("recipe_id", recipe_id)
                 .order("created_at")
                 .execute()
