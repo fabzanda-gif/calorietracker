@@ -5,21 +5,14 @@ from typing import Any
 
 class DecisionRankingService:
     """
-    Rank compatible meal candidates through three distinct product lenses:
+    Rank compatible meal candidates through three distinct product lenses.
 
     - calorie: protect remaining calorie budget;
     - balanced: compromise between calories, protein and preference;
     - taste: favour user preference while remaining budget-compatible.
 
-    v0.1 is deterministic and source-agnostic. A candidate may come from
-    meal prep, routine memory, recipes or (later) takeaway/delivery.
-
-    Expected candidate fields:
-      id / name / source
-      calories
-      protein_g
-      taste_score (optional, 0-10)
-      waste_risk (optional: low/medium/high)
+    In auto mode, available meal-prep receives an explicit preference so the
+    default product behaviour fights food waste without hiding alternatives.
     """
 
     LENSES = ("calorie", "balanced", "taste")
@@ -30,6 +23,7 @@ class DecisionRankingService:
         candidates: list[dict[str, Any]],
         available_kcal: float | None,
         protein_remaining_g: float | None = None,
+        mode: str = "auto",
     ) -> dict:
         eligible = [
             self._normalize(item)
@@ -55,6 +49,7 @@ class DecisionRankingService:
                     lens=lens,
                     available_kcal=available_kcal,
                     protein_remaining_g=protein_remaining_g,
+                    mode=mode,
                 ),
                 reverse=True,
             )
@@ -73,8 +68,7 @@ class DecisionRankingService:
             if pick is None:
                 continue
 
-            key = self._identity(pick)
-            used_keys.add(key)
+            used_keys.add(self._identity(pick))
 
             selected.append(
                 {
@@ -87,6 +81,7 @@ class DecisionRankingService:
                             lens=lens,
                             available_kcal=available_kcal,
                             protein_remaining_g=protein_remaining_g,
+                            mode=mode,
                         ),
                         4,
                     ),
@@ -97,8 +92,6 @@ class DecisionRankingService:
                 }
             )
 
-        # If there are fewer than three unique candidates, return only the
-        # unique options that actually exist rather than manufacturing variety.
         return {
             "available_kcal": available_kcal,
             "protein_remaining_g": protein_remaining_g,
@@ -112,6 +105,7 @@ class DecisionRankingService:
         lens: str,
         available_kcal: float | None,
         protein_remaining_g: float | None,
+        mode: str,
     ) -> float:
         calories = item["calories"]
         protein = item["protein_g"]
@@ -129,29 +123,37 @@ class DecisionRankingService:
         waste_bonus = self._waste_bonus(
             item.get("waste_risk")
         )
+        ready_bonus = (
+            0.15
+            if (
+                mode == "auto"
+                and item.get("source") == "meal_prep"
+            )
+            else 0.0
+        )
 
         if lens == "calorie":
-            return (
+            base = (
                 0.70 * calorie_efficiency
                 + 0.20 * protein_fit
                 + 0.10 * waste_bonus
             )
-
-        if lens == "taste":
-            return (
+        elif lens == "taste":
+            base = (
                 0.65 * taste_norm
                 + 0.20 * calorie_efficiency
                 + 0.10 * protein_fit
                 + 0.05 * waste_bonus
             )
+        else:
+            base = (
+                0.40 * calorie_efficiency
+                + 0.30 * protein_fit
+                + 0.20 * taste_norm
+                + 0.10 * waste_bonus
+            )
 
-        # balanced
-        return (
-            0.40 * calorie_efficiency
-            + 0.30 * protein_fit
-            + 0.20 * taste_norm
-            + 0.10 * waste_bonus
-        )
+        return base + ready_bonus
 
     @staticmethod
     def _is_eligible(
@@ -202,8 +204,6 @@ class DecisionRankingService:
         available_kcal: float | None,
     ) -> float:
         if available_kcal is None or available_kcal <= 0:
-            # Lower calories remain directionally preferable when no useful
-            # budget denominator exists.
             return 1.0 / (1.0 + calories / 500.0)
 
         ratio = calories / available_kcal
