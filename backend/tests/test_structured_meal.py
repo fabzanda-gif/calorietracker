@@ -120,7 +120,7 @@ def test_structured_meal_creates_one_meal_with_components():
     )
 
     assert meals.created["calories"] == 577
-    assert meals.created["protein"] == 61.4
+    assert meals.created["protein"] == 61
 
     assert len(components.created) == 2
 

@@ -42,6 +42,12 @@ export interface MealCreateInput {
   protein: number;
   carbs: number;
   fat: number;
+  structured_ingredients?: Array<{
+    ingredient_id: string;
+    quantity: number;
+    unit: string;
+    quantity_g: number;
+  }>;
 }
 
 export interface MealCreateResponse {

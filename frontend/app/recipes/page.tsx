@@ -16,9 +16,14 @@ import {
   createRecipe,
   getRecipe,
   getRecipes,
+  migrateLegacyRecipes,
   updateRecipe,
   type Recipe,
 } from "@/lib/api/recipes";
+
+import {
+  createMeal,
+} from "@/lib/api/meals";
 
 import styles from "./RecipesPage.module.css";
 
@@ -42,6 +47,21 @@ const EMPTY_INGREDIENT: IngredientDraft = {
   carbs: "",
   fat: "",
 };
+
+
+function todayLocalIso(): string {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(
+    now.getMonth() + 1,
+  ).padStart(2, "0");
+  const day = String(
+    now.getDate(),
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
 
 export default function RecipesPage() {
   const { accessToken } = useAuth();
@@ -77,6 +97,18 @@ export default function RecipesPage() {
     useState(false);
   const [message, setMessage] =
     useState<string | null>(null);
+
+
+  const [mealDraft, setMealDraft] =
+    useState<{
+      recipeId: string;
+      name: string;
+      mealType: string;
+      ingredients: DraftIngredient[];
+    } | null>(null);
+
+  const [loggingMeal, setLoggingMeal] =
+    useState(false);
 
   useEffect(() => {
     if (!accessToken) {
@@ -248,6 +280,240 @@ export default function RecipesPage() {
     );
   }, [draftIngredients, ingredients]);
 
+  async function startMealFromRecipe(
+    recipeId: string,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    setMessage(null);
+
+    try {
+      const response = await getRecipe(
+        recipeId,
+        accessToken,
+      );
+
+      const recipe = response.item;
+      const structured =
+        recipe.structured_ingredients ?? [];
+
+      if (!structured.length) {
+        setMessage(
+          "Questa ricetta è ancora in formato legacy. Aprila con Modifica e aggiungi gli ingredienti strutturati prima di registrarla come pasto.",
+        );
+        return;
+      }
+
+      setMealDraft({
+        recipeId: recipe.id,
+        name: recipe.name,
+        mealType:
+          recipe.meal_type || "Cena",
+        ingredients: structured.map(
+          (item) => ({
+            ingredientId:
+              item.ingredient_id,
+            quantityG:
+              item.quantity_g,
+          }),
+        ),
+      });
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad aprire la ricetta.",
+      );
+    }
+  }
+
+  function updateMealDraftQuantity(
+    index: number,
+    quantityG: number,
+  ) {
+    setMealDraft((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        ingredients:
+          current.ingredients.map(
+            (item, itemIndex) =>
+              itemIndex === index
+                ? {
+                    ...item,
+                    quantityG,
+                  }
+                : item,
+          ),
+      };
+    });
+  }
+
+  const mealDraftNutrition = useMemo(() => {
+    if (!mealDraft) {
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+      };
+    }
+
+    return mealDraft.ingredients.reduce(
+      (total, row) => {
+        const ingredient =
+          ingredients.find(
+            (item) =>
+              item.id ===
+              row.ingredientId,
+          );
+
+        if (!ingredient) {
+          return total;
+        }
+
+        const factor =
+          Math.max(
+            0,
+            row.quantityG,
+          ) / 100;
+
+        return {
+          calories:
+            total.calories +
+            ingredient
+              .calories_per_100g *
+              factor,
+          protein:
+            total.protein +
+            ingredient
+              .protein_per_100g *
+              factor,
+          carbs:
+            total.carbs +
+            ingredient
+              .carbs_per_100g *
+              factor,
+          fat:
+            total.fat +
+            ingredient
+              .fat_per_100g *
+              factor,
+        };
+      },
+      {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+      },
+    );
+  }, [mealDraft, ingredients]);
+
+  async function saveMealFromRecipe() {
+    if (
+      !accessToken ||
+      !mealDraft
+    ) {
+      return;
+    }
+
+    if (
+      mealDraft.ingredients.some(
+        (item) =>
+          item.quantityG <= 0,
+      )
+    ) {
+      setMessage(
+        "Le grammature devono essere maggiori di zero.",
+      );
+      return;
+    }
+
+    setLoggingMeal(true);
+    setMessage(null);
+
+    try {
+      await createMeal(
+        {
+          date: todayLocalIso(),
+          meal_type:
+            mealDraft.mealType,
+          name: mealDraft.name,
+
+          // StructuredMealService recalculates these
+          // from the ingredient snapshots.
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+
+          structured_ingredients:
+            mealDraft.ingredients.map(
+              (item) => ({
+                ingredient_id:
+                  item.ingredientId,
+                quantity:
+                  item.quantityG,
+                unit: "g",
+                quantity_g:
+                  item.quantityG,
+              }),
+            ),
+        },
+        accessToken,
+      );
+
+      setMealDraft(null);
+
+      setMessage(
+        `${mealDraft.name} registrato come ${mealDraft.mealType.toLowerCase()}.`,
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare il pasto.",
+      );
+    } finally {
+      setLoggingMeal(false);
+    }
+  }
+
+  async function migrateLegacyLibrary() {
+    if (!accessToken) {
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const result = await migrateLegacyRecipes(
+        accessToken,
+      );
+
+      await refresh();
+
+      setMessage(
+        `Migrazione completata: ${result.migrated_recipes} ricette, ${result.created_ingredients} ingredienti creati, ${result.created_links} collegamenti creati.`,
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a migrare le ricette.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveRecipe() {
     if (
       !accessToken ||
@@ -399,6 +665,133 @@ export default function RecipesPage() {
         <p className={styles.message}>
           {message}
         </p>
+      ) : null}
+
+      {mealDraft ? (
+        <section className={styles.editorCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.kicker}>
+                Pasto di oggi
+              </p>
+              <h2>
+                {mealDraft.name}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => {
+                setMealDraft(null);
+              }}
+            >
+              Annulla
+            </button>
+          </div>
+
+          <p>
+            {mealDraft.mealType} · modifica
+            liberamente le quantità. La ricetta
+            originale non verrà cambiata.
+          </p>
+
+          {mealDraft.ingredients.map(
+            (row, index) => {
+              const ingredient =
+                ingredients.find(
+                  (item) =>
+                    item.id ===
+                    row.ingredientId,
+                );
+
+              return (
+                <div
+                  key={`${row.ingredientId}-${index}`}
+                  className={
+                    styles.ingredientRow
+                  }
+                >
+                  <strong>
+                    {ingredient?.name ||
+                      "Ingrediente"}
+                  </strong>
+
+                  <div
+                    className={
+                      styles.quantityField
+                    }
+                  >
+                    <input
+                      type="number"
+                      min="1"
+                      value={
+                        row.quantityG
+                      }
+                      onChange={(
+                        event,
+                      ) => {
+                        updateMealDraftQuantity(
+                          index,
+                          Number(
+                            event.target
+                              .value,
+                          ) || 0,
+                        );
+                      }}
+                    />
+                    <span>g</span>
+                  </div>
+
+                  <span />
+                </div>
+              );
+            },
+          )}
+
+          <div
+            className={
+              styles.nutritionCard
+            }
+          >
+            <span>
+              {Math.round(
+                mealDraftNutrition.calories,
+              )} kcal
+            </span>
+
+            <span>
+              {mealDraftNutrition.protein.toFixed(
+                1,
+              )} g proteine
+            </span>
+
+            <span>
+              {mealDraftNutrition.carbs.toFixed(
+                1,
+              )} g carbo
+            </span>
+
+            <span>
+              {mealDraftNutrition.fat.toFixed(
+                1,
+              )} g grassi
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className={styles.saveButton}
+            disabled={loggingMeal}
+            onClick={() => {
+              void saveMealFromRecipe();
+            }}
+          >
+            {loggingMeal
+              ? "Registro…"
+              : "Registra questo pasto"}
+          </button>
+        </section>
       ) : null}
 
       <section className={styles.editorCard}>
@@ -698,6 +1091,17 @@ export default function RecipesPage() {
             </p>
             <h2>Le tue ricette</h2>
           </div>
+
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            disabled={saving}
+            onClick={() => {
+              void migrateLegacyLibrary();
+            }}
+          >
+            Aggiorna ricette legacy
+          </button>
         </div>
 
         {loading ? (
@@ -727,17 +1131,31 @@ export default function RecipesPage() {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => {
-                    void editRecipe(
-                      recipe.id,
-                    );
-                  }}
-                >
-                  Modifica
-                </button>
+                <div className={styles.smallActions}>
+                  <button
+                    type="button"
+                    className={styles.primarySmallButton}
+                    onClick={() => {
+                      void startMealFromRecipe(
+                        recipe.id,
+                      );
+                    }}
+                  >
+                    Registra
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => {
+                      void editRecipe(
+                        recipe.id,
+                      );
+                    }}
+                  >
+                    Modifica
+                  </button>
+                </div>
               </article>
             ))}
           </div>

@@ -93,7 +93,26 @@ class StructuredMealService:
 
         payload = dict(meal_payload)
         payload["user_id"] = user_id
-        payload.update(nutrition["totals"])
+
+        # The legacy meals table stores nutrition as integers.
+        # Keep precise values in meal_ingredients snapshots, while
+        # the meal event stores backwards-compatible rounded totals.
+        payload.update(
+            {
+                "calories": round(
+                    nutrition["totals"]["calories"]
+                ),
+                "protein": round(
+                    nutrition["totals"]["protein"]
+                ),
+                "carbs": round(
+                    nutrition["totals"]["carbs"]
+                ),
+                "fat": round(
+                    nutrition["totals"]["fat"]
+                ),
+            }
+        )
 
         meal = self.meals_repo.create(
             payload

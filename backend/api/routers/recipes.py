@@ -18,6 +18,9 @@ from backend.repositories.recipe_ingredients import (
     RecipeIngredientsRepository,
 )
 from backend.repositories.recipes import RecipesRepository
+from backend.services.legacy_recipe_migration import (
+    LegacyRecipeMigrationService,
+)
 from backend.services.structured_recipe import (
     StructuredRecipeError,
     StructuredRecipeService,
@@ -110,6 +113,38 @@ def get_shared_recipes(
             exclude_user_id=current_user.id if exclude_mine else None
         )
         return {"count": len(items), "items": items}
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/migrate-legacy")
+def migrate_legacy_recipes(
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: RecipesRepository = Depends(get_recipes_repository),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    recipe_ingredients_repo: RecipeIngredientsRepository = Depends(
+        get_recipe_ingredients_repository
+    ),
+):
+    try:
+        result = LegacyRecipeMigrationService(
+            recipes_repo=repo,
+            ingredients_repo=ingredients_repo,
+            recipe_ingredients_repo=recipe_ingredients_repo,
+        ).migrate_user(
+            user_id=current_user.id,
+        )
+
+        return {
+            "migrated": True,
+            **result,
+        }
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

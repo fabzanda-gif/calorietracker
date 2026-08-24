@@ -31,6 +31,30 @@ class IngredientsRepository(BaseRepository):
                 f"Unable to load ingredients: {exc}"
             ) from exc
 
+    def get_by_normalized_name(
+        self,
+        normalized_name: str,
+        user_id: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(INGREDIENT_COLUMNS)
+                .eq("user_id", user_id)
+                .eq(
+                    "normalized_name",
+                    normalized_name,
+                )
+                .limit(1)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load ingredient by name: {exc}"
+            ) from exc
+
     def get_by_id(
         self,
         ingredient_id: Any,

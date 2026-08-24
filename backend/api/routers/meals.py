@@ -217,7 +217,10 @@ def create_meal(
         get_meal_ingredients_repository
     ),
 ):
-    payload = meal.model_dump(exclude_none=True)
+    payload = meal.model_dump(
+        mode="json",
+        exclude_none=True,
+    )
 
     structured = payload.pop(
         "structured_ingredients",

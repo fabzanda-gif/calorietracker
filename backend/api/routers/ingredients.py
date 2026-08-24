@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import unicodedata
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,6 +12,9 @@ from backend.api.dependencies import (
 )
 from backend.repositories.base import RepositoryError
 from backend.repositories.ingredients import IngredientsRepository
+from backend.services.ingredient_names import (
+    normalize_ingredient_name,
+)
 
 
 router = APIRouter(
@@ -62,23 +64,6 @@ class IngredientUpdate(BaseModel):
         default=None,
         min_length=1,
     )
-
-
-def normalize_ingredient_name(value: Any) -> str:
-    text = str(value or "").strip().lower()
-
-    text = unicodedata.normalize(
-        "NFKD",
-        text,
-    )
-
-    text = "".join(
-        char
-        for char in text
-        if not unicodedata.combining(char)
-    )
-
-    return " ".join(text.split())
 
 
 @router.get("")

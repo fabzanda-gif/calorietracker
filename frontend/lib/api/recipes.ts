@@ -103,3 +103,23 @@ export async function updateRecipe(
     },
   );
 }
+
+export interface LegacyRecipeMigrationResult {
+  migrated: boolean;
+  migrated_recipes: number;
+  created_ingredients: number;
+  created_links: number;
+  skipped_recipes: number;
+}
+
+export async function migrateLegacyRecipes(
+  accessToken?: string | null,
+): Promise<LegacyRecipeMigrationResult> {
+  return apiRequest<LegacyRecipeMigrationResult>(
+    "/recipes/migrate-legacy",
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
+}
