@@ -39,6 +39,10 @@ class MealPrepConsume(BaseModel):
     portions: int = Field(default=1, gt=0)
 
 
+class MealPrepRemainingUpdate(BaseModel):
+    portions_remaining: int = Field(ge=0)
+
+
 class MealPrepStatusUpdate(BaseModel):
     status: str
 
@@ -146,6 +150,45 @@ def consume_meal_prep(
     except MealPrepUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except MealPrepError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch("/{batch_id}/remaining")
+def update_meal_prep_remaining(
+    batch_id: str,
+    data: MealPrepRemainingUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
+    recipes_repo: RecipesRepository = Depends(
+        get_recipes_repository
+    ),
+):
+    try:
+        item = _service(
+            meal_prep_repo,
+            recipes_repo,
+        ).set_remaining_portions(
+            user_id=current_user.id,
+            batch_id=batch_id,
+            portions_remaining=data.portions_remaining,
+        )
+        return {"updated": True, "item": item}
+    except MealPrepNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
     except MealPrepError as exc:
