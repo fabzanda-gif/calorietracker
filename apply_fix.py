@@ -1,58 +1,50 @@
 from pathlib import Path
 
-path = Path("backend/tests/test_api_order_personalization.py")
+path = Path("backend/tests/test_api_eating_out_mode.py")
 text = path.read_text(encoding="utf-8")
 
-old = '''def test_frequent_recent_order_can_win_taste_lens():
+old = '''def test_out_mode_returns_known_eating_out_candidates():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
-        params={"mode": "order"},
+        params={"mode": "out"},
     )
 
+    assert response.status_code == 200
     payload = response.json()
 
-    taste = next(
-        option
-        for option in payload["options"]
-        if option["lens"] == "taste"
-    )
+    assert payload["mode"] == "out"
+    assert payload["candidate_count"] == 2
+    assert payload["known_eating_out_count"] == 2
+    assert payload["empty_reason"] is None
 
-    assert taste["candidate"]["name"] == "Poke Salmone"
-    assert (
-        taste["candidate"]["personalization_reason"]
-        == "frequent_and_recent_order"
+    assert all(
+        item["source"] == "restaurant"
+        for item in payload["candidates"]
     )
 '''
 
-new = '''def test_frequent_recent_order_is_promoted_by_personalized_ranking():
+new = '''def test_out_mode_returns_known_candidates_plus_generic_filler():
     response = client.get(
         "/days/2026-09-01/meals/dinner/options",
-        params={"mode": "order"},
+        params={"mode": "out"},
     )
 
+    assert response.status_code == 200
     payload = response.json()
 
-    ranked_poke = next(
-        option
-        for option in payload["options"]
-        if option["candidate"]["name"] == "Poke Salmone"
-    )
+    assert payload["mode"] == "out"
+    assert payload["candidate_count"] == 3
+    assert payload["known_eating_out_count"] == 2
+    assert payload["generic_eating_out_count"] == 1
+    assert payload["empty_reason"] is None
 
-    assert (
-        ranked_poke["candidate"]["personalization_reason"]
-        == "frequent_and_recent_order"
-    )
-    assert ranked_poke["candidate"]["personalization_strength"] == 1.0
-    assert ranked_poke["candidate"]["taste_score"] > 8.0
+    sources = {
+        item["source"]
+        for item in payload["candidates"]
+    }
 
-    # Ranking intentionally avoids duplicating the same candidate across
-    # the three lenses. Poke may therefore occupy calorie/balanced before
-    # the taste lens is assigned.
-    names = [
-        option["candidate"]["name"]
-        for option in payload["options"]
-    ]
-    assert len(names) == len(set(names))
+    assert "restaurant" in sources
+    assert "generic_eating_out" in sources
 '''
 
 if old not in text:
