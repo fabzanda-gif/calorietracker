@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import type {
+  DayBudgetResponse,
   DayResponse,
   DecisionMode,
   MealOptionsResponse,
@@ -11,6 +12,18 @@ export function getDay(
 ): Promise<DayResponse> {
   return apiRequest<DayResponse>(
     `/days/${encodeURIComponent(dayDate)}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function getDayBudget(
+  dayDate: string,
+  accessToken?: string | null,
+): Promise<DayBudgetResponse> {
+  return apiRequest<DayBudgetResponse>(
+    `/days/${encodeURIComponent(dayDate)}/budget`,
     {
       accessToken,
     },
