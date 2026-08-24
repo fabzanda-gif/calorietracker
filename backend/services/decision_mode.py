@@ -99,6 +99,6 @@ class DecisionModeService:
             "auto": "no_compatible_candidates",
             "ready": "no_ready_food",
             "cook": "no_cook_candidates",
-            "order": "no_order_options",
+            "order": "no_known_order_options",
             "out": "no_known_eating_out_options",
         }[mode]
