@@ -1,81 +1,191 @@
 .page {
   width: min(100%, 720px);
   margin: 0 auto;
-  padding: 24px 18px 48px;
+  padding: 22px 18px 64px;
 }
 
-.hero {
-  padding: 44px 0 28px;
-}
-
-.topline {
+.header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 10px;
+  gap: 18px;
+  padding: 18px 0 34px;
 }
 
-.eyebrow {
-  margin: 0;
-  font-size: 0.8rem;
-  font-weight: 700;
+.brand,
+.kicker {
+  margin: 0 0 7px;
+  font-size: 0.76rem;
+  font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: #73736d;
+}
+
+.header h1,
+.dayIntro h2,
+.sectionHeader h2 {
+  margin: 0;
+  letter-spacing: -0.04em;
+}
+
+.header h1 {
+  font-size: clamp(2rem, 9vw, 3.6rem);
 }
 
 .signOut {
-  border: 0;
-  background: transparent;
-  padding: 8px;
-  color: #5b5b55;
+  border: 1px solid #deded7;
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: #ffffff;
   cursor: pointer;
 }
 
-.title {
-  margin: 0;
+.dayIntro {
+  padding: 26px 0 24px;
+}
+
+.dayIntro h2 {
   max-width: 12ch;
-  font-size: clamp(2.4rem, 11vw, 4.5rem);
-  line-height: 0.98;
-  letter-spacing: -0.045em;
+  font-size: clamp(2.6rem, 12vw, 5rem);
+  line-height: 0.95;
+}
+
+.subtitle,
+.muted,
+.mealMeta {
+  color: #696963;
 }
 
 .subtitle {
-  margin: 20px 0 0;
-  max-width: 34rem;
-  color: #5b5b55;
+  margin: 16px 0 0;
   font-size: 1rem;
-  line-height: 1.6;
 }
 
-.card {
+.metricsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 8px 0 34px;
+}
+
+.metricCard,
+.card,
+.errorCard,
+.mealCard {
+  border: 1px solid #dfdfd8;
+  background: #ffffff;
+  border-radius: 22px;
+}
+
+.metricCard {
   display: grid;
   gap: 8px;
+  padding: 18px;
+}
+
+.metricCard span {
+  color: #71716a;
+  font-size: 0.82rem;
+}
+
+.metricCard strong {
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
+.card,
+.errorCard {
   padding: 20px;
-  border: 1px solid #deded7;
-  border-radius: 22px;
-  background: #ffffff;
 }
 
-.cardLabel {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.errorCard {
+  border-color: #e8c5c5;
+  background: #fff8f8;
 }
 
-.card p {
+.errorCard p {
+  margin-bottom: 0;
+  color: #8c3333;
+}
+
+.section {
+  display: grid;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+}
+
+.sectionHeader h2 {
+  font-size: 1.8rem;
+}
+
+.mealList {
+  display: grid;
+  gap: 12px;
+}
+
+.mealCard {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.mealCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mealLabel {
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.predictedBadge,
+.unknownBadge {
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.predictedBadge {
+  background: #edf5ea;
+  color: #315b2c;
+}
+
+.unknownBadge {
+  background: #f3f3ef;
+  color: #6b6b65;
+}
+
+.mealName {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.mealMeta {
   margin: 0;
-  color: #686861;
-  line-height: 1.5;
+  font-size: 0.86rem;
 }
 
 @media (min-width: 768px) {
   .page {
-    padding-top: 40px;
+    padding-top: 34px;
   }
 
-  .hero {
-    padding-top: 72px;
+  .mealList {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .mealCard {
+    min-height: 180px;
   }
 }
