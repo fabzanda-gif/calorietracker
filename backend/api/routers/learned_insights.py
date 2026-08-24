@@ -13,6 +13,7 @@ from backend.api.dependencies import (
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.meals import MealsRepository
+from backend.services.insight_presentation import InsightPresentationService
 from backend.services.learned_insights import LearnedInsightsService
 
 
@@ -34,21 +35,28 @@ def get_learned_insights(
     ),
 ):
     """
-    Return structured patterns SanoSync has learned about the user.
-
-    `learned` contains medium/high-confidence patterns.
-    `learning` contains low-confidence observations still being learned.
+    Return both structured learned-pattern data and UI-ready presentation cards.
     """
     target_date = on_date or Date.today()
 
     try:
-        return LearnedInsightsService(
+        structured = LearnedInsightsService(
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
         ).build(
             user_id=current_user.id,
             on_date=target_date,
         )
+
+        presentation = InsightPresentationService().present(
+            structured
+        )
+
+        return {
+            **structured,
+            "presentation": presentation,
+        }
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
