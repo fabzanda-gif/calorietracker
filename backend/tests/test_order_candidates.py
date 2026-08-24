@@ -29,6 +29,23 @@ def test_builds_takeaway_candidate_from_logged_history():
     assert result[0]["known_order"] is True
 
 
+def test_known_order_has_no_synthetic_taste_score():
+    result = service.build(
+        meals=[
+            {
+                "date": "2026-08-01",
+                "meal_type": "Cena",
+                "name": "Poke Salmone",
+                "category": "delivery",
+                "calories": 650,
+            }
+        ],
+        meal_type="Cena",
+    )
+
+    assert "taste_score" not in result[0]
+
+
 def test_delivery_candidate_is_supported():
     result = service.build(
         meals=[
