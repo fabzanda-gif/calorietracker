@@ -8,12 +8,28 @@
   padding: 44px 0 28px;
 }
 
+.topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
 .eyebrow {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.signOut {
+  border: 0;
+  background: transparent;
+  padding: 8px;
+  color: #5b5b55;
+  cursor: pointer;
 }
 
 .title {
