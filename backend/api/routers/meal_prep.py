@@ -9,16 +9,23 @@ from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
     get_meal_prep_repository,
+    get_meals_repository,
     get_recipes_repository,
 )
 from backend.repositories.base import RepositoryError
 from backend.repositories.meal_prep import MealPrepRepository
+from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.services.meal_prep import (
     MealPrepError,
     MealPrepNotFoundError,
     MealPrepService,
     MealPrepUnavailableError,
+)
+from backend.services.meal_prep_logging import (
+    MealPrepBatchNotFoundError,
+    MealPrepBatchUnavailableError,
+    MealPrepLoggingService,
 )
 
 
@@ -45,6 +52,11 @@ class MealPrepRemainingUpdate(BaseModel):
 
 class MealPrepStatusUpdate(BaseModel):
     status: str
+
+
+class MealPrepLogRequest(BaseModel):
+    date: Date
+    meal_type: str
 
 
 def _service(
@@ -155,6 +167,43 @@ def consume_meal_prep(
     except MealPrepError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/{batch_id}/log")
+def log_meal_prep_portion(
+    batch_id: str,
+    data: MealPrepLogRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
+    meals_repo: MealsRepository = Depends(get_meals_repository),
+):
+    try:
+        return MealPrepLoggingService(
+            meal_prep_repo=meal_prep_repo,
+            meals_repo=meals_repo,
+        ).log_portion(
+            user_id=current_user.id,
+            batch_id=batch_id,
+            meal_date=data.date,
+            meal_type=data.meal_type,
+        )
+    except MealPrepBatchNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except MealPrepBatchUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
     except RepositoryError as exc:
