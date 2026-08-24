@@ -116,28 +116,20 @@ def _build_budget(
     )
 
 
-def _build_order_candidates(
+def _build_known_order_candidates(
     *,
     user_id: str,
     meal_type: str,
     meals_repo: MealsRepository,
-) -> tuple[list[dict], list[dict]]:
+) -> list[dict]:
     history, _enhanced = meals_repo.list_history_compatible(
         user_id
     )
 
-    known = OrderCandidateService().build(
+    return OrderCandidateService().build(
         meals=history,
         meal_type=meal_type,
     )
-
-    fallback = GenericOrderCandidateService().build(
-        meal_type=meal_type,
-        known_candidates=known,
-        target_count=3,
-    )
-
-    return known, fallback
 
 
 @router.get("/{day_date}/budget")
@@ -216,11 +208,23 @@ def get_ranked_meal_options(
             "protein_remaining_g"
         )
 
-        known_orders, generic_orders = _build_order_candidates(
+        normalized_mode = str(mode or "auto").strip().lower()
+
+        known_orders = _build_known_order_candidates(
             user_id=current_user.id,
             meal_type=meal_type,
             meals_repo=meals_repo,
         )
+
+        # Generic catalogue is a cold-start aid for explicit Order mode only.
+        # It must not pollute Auto / Ready / Cook candidate pools.
+        generic_orders = []
+        if normalized_mode == "order":
+            generic_orders = GenericOrderCandidateService().build(
+                meal_type=meal_type,
+                known_candidates=known_orders,
+                target_count=3,
+            )
 
         all_candidates = MealCandidateService().build(
             day_date=day_date,
@@ -240,7 +244,7 @@ def get_ranked_meal_options(
 
         mode_result = DecisionModeService().apply(
             candidates=all_candidates,
-            mode=mode,
+            mode=normalized_mode,
         )
 
         ranked = DecisionRankingService().rank(
