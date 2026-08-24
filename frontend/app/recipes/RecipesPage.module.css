@@ -1,0 +1,201 @@
+.page {
+  width: min(100%, 720px);
+  margin: 0 auto;
+  padding: 24px 18px 80px;
+}
+
+.header,
+.sectionHeader,
+.ingredientsHeader,
+.recipeCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.header h1,
+.sectionHeader h2 {
+  margin: 2px 0 0;
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+}
+
+.homeLink {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.editorCard,
+.recipeCard,
+.newIngredientCard,
+.nutritionCard {
+  border: 1px solid #deded8;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.editorCard {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  margin-bottom: 30px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.field input,
+.field select,
+.ingredientRow select,
+.quantityField input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 42px;
+  border: 1px solid #d7d7d0;
+  border-radius: 11px;
+  padding: 9px 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.twoColumns,
+.macroInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.smallActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ingredientRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 38px;
+  gap: 8px;
+  align-items: center;
+}
+
+.quantityField {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.removeButton,
+.secondaryButton,
+.primarySmallButton,
+.saveButton {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.removeButton {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: #f1f1ed;
+  font-size: 1.25rem;
+}
+
+.secondaryButton {
+  min-height: 38px;
+  padding: 7px 11px;
+  border: 1px solid #d7d7d0;
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+}
+
+.primarySmallButton {
+  min-height: 38px;
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 10px;
+  background: #1a1b18;
+  color: #fff;
+}
+
+.newIngredientCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: #f7f7f3;
+}
+
+.nutritionCard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 14px;
+  background: #f7f7f3;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.saveButton {
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  background: #1a1b18;
+  color: #fff;
+}
+
+.saveButton:disabled {
+  opacity: 0.55;
+}
+
+.recipeList {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.recipeCard {
+  padding: 14px 16px;
+}
+
+.recipeCard p {
+  margin: 5px 0 0;
+  opacity: 0.65;
+  font-size: 0.82rem;
+}
+
+.message {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f2f2ed;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 520px) {
+  .macroInputs {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ingredientRow {
+    grid-template-columns: 1fr 94px 36px;
+  }
+}
