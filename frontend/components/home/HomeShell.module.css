@@ -1,0 +1,65 @@
+.page {
+  width: min(100%, 720px);
+  margin: 0 auto;
+  padding: 24px 18px 48px;
+}
+
+.hero {
+  padding: 44px 0 28px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  max-width: 12ch;
+  font-size: clamp(2.4rem, 11vw, 4.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+
+.subtitle {
+  margin: 20px 0 0;
+  max-width: 34rem;
+  color: #5b5b55;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.card {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid #deded7;
+  border-radius: 22px;
+  background: #ffffff;
+}
+
+.cardLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card p {
+  margin: 0;
+  color: #686861;
+  line-height: 1.5;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding-top: 40px;
+  }
+
+  .hero {
+    padding-top: 72px;
+  }
+}
