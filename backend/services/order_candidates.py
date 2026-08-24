@@ -17,14 +17,12 @@ class OrderCandidateService:
     """
     Build order-mode candidates from meals the user has actually logged.
 
-    v0.1 deliberately uses known history only:
-    - no invented restaurants;
-    - no invented nutrition;
-    - repeated orders are aggregated into one candidate;
-    - nutrition is averaged from the matching historical logs.
+    Known historical orders deliberately do NOT receive a synthetic
+    taste_score. Taste is learned later by OrderPersonalizationService from
+    frequency and recency. This prevents a neutral placeholder (5/10) from
+    being mistaken for an explicit user rating.
 
-    A future generic catalogue can be added as a separate source without
-    changing this contract.
+    A future explicit rating can be added as a separate persisted signal.
     """
 
     def build(
@@ -68,7 +66,6 @@ class OrderCandidateService:
                     "protein_g": self._average(rows, "protein"),
                     "carbs_g": self._average(rows, "carbs"),
                     "fat_g": self._average(rows, "fat"),
-                    "taste_score": 5.0,
                     "waste_risk": None,
                     "order_count": len(rows),
                     "known_order": True,
