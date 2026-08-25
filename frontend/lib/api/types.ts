@@ -121,6 +121,16 @@ export interface DecisionPreferences {
   };
 }
 
+export interface DayDecisionContext {
+  kind:
+    | "tight_budget"
+    | "protein_focus"
+    | "flexible"
+    | "balanced";
+  title: string;
+  message: string;
+}
+
 export interface MealOptionsResponse {
   date: string;
   meal_slot: string;
@@ -130,6 +140,7 @@ export interface MealOptionsResponse {
   candidate_count: number;
   candidates: MealCandidate[];
   options: RankedMealOption[];
+  day_context: DayDecisionContext;
   decision_preferences: DecisionPreferences;
   empty_reason: string | null;
 }

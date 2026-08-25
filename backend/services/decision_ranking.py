@@ -38,6 +38,10 @@ class DecisionRankingService:
             return {
                 "available_kcal": available_kcal,
                 "protein_remaining_g": protein_remaining_g,
+                "day_context": self._day_context(
+                    available_kcal=available_kcal,
+                    protein_remaining_g=protein_remaining_g,
+                ),
                 "options": [],
             }
 
@@ -99,7 +103,71 @@ class DecisionRankingService:
         return {
             "available_kcal": available_kcal,
             "protein_remaining_g": protein_remaining_g,
+            "day_context": self._day_context(
+                available_kcal=available_kcal,
+                protein_remaining_g=protein_remaining_g,
+            ),
             "options": selected,
+        }
+
+    @staticmethod
+    def _day_context(
+        *,
+        available_kcal: float | None,
+        protein_remaining_g: float | None,
+    ) -> dict[str, str]:
+        if available_kcal is None:
+            return {
+                "kind": "balanced",
+                "title": "Scelte equilibrate",
+                "message": (
+                    "Le alternative tengono conto di "
+                    "proteine, gusto e preferenze."
+                ),
+            }
+
+        available = float(available_kcal)
+
+        if available <= 500:
+            return {
+                "kind": "tight_budget",
+                "title": "Oggi il margine è più stretto",
+                "message": (
+                    "Le alternative danno più peso "
+                    "alle opzioni leggere."
+                ),
+            }
+
+        if (
+            protein_remaining_g is not None
+            and float(protein_remaining_g) >= 50
+        ):
+            return {
+                "kind": "protein_focus",
+                "title": "Ti restano proteine da coprire",
+                "message": (
+                    "Le alternative bilanciate "
+                    "favoriscono anche pasti più proteici."
+                ),
+            }
+
+        if available >= 900:
+            return {
+                "kind": "flexible",
+                "title": "Oggi hai più flessibilità",
+                "message": (
+                    "C'è abbastanza margine per dare "
+                    "più spazio anche a gusto e preferenze."
+                ),
+            }
+
+        return {
+            "kind": "balanced",
+            "title": "Scelte adatte alla tua giornata",
+            "message": (
+                "Le alternative bilanciano il margine "
+                "rimasto, le proteine e le preferenze."
+            ),
         }
 
     def _score(

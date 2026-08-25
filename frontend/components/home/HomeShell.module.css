@@ -389,6 +389,29 @@
   cursor: wait;
 }
 
+.dayDecisionContext {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e1e1da;
+  border-radius: 16px;
+  background: #f7f7f3;
+}
+
+.dayDecisionContext strong {
+  color: #252522;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.dayDecisionContext p {
+  margin: 0;
+  color: #696963;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .commitMessage {
   margin: 0;
   padding: 12px 14px;
@@ -718,4 +741,126 @@
   font-size: 0.78rem;
   font-weight: 750;
   text-decoration: none;
+}
+
+
+/* Dinner alternatives layout polish */
+
+.decisionSection {
+  margin-top: 28px;
+  padding: 22px;
+  border: 1px solid #dfdfd8;
+  border-radius: 26px;
+  background: #ffffff;
+}
+
+.decisionSection .sectionHeader {
+  margin-bottom: 18px;
+}
+
+.dayDecisionContext {
+  display: grid;
+  gap: 5px;
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  border: 1px solid #dbe5d8;
+  border-radius: 18px;
+  background: #f3f7f1;
+}
+
+.dayDecisionContext strong {
+  color: #315b2c;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.dayDecisionContext p {
+  margin: 0;
+  color: #60645e;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.decisionSection .optionList {
+  gap: 14px;
+  align-items: stretch;
+}
+
+.decisionSection .optionCard {
+  display: grid;
+  grid-template-rows:
+    auto
+    auto
+    auto
+    1fr
+    auto;
+  min-width: 0;
+  height: 100%;
+  padding: 20px;
+  border: 1px solid #dfdfd8;
+  border-radius: 22px;
+  background: #ffffff;
+}
+
+.decisionSection .optionCard h3 {
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 1.18rem;
+  line-height: 1.28;
+}
+
+.decisionSection .optionNumbers {
+  margin-top: 8px;
+}
+
+.decisionSection .optionReason {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #ecece7;
+}
+
+.decisionSection .chooseButton {
+  width: 100%;
+  align-self: end;
+  margin-top: 20px;
+}
+
+@media (min-width: 768px) {
+  .decisionSection {
+    padding: 28px;
+  }
+
+  .decisionSection .optionList {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+
+  .decisionSection .optionCard {
+    min-height: 330px;
+  }
+}
+
+/* Reusable historical meal action */
+
+.reuseRegisteredMealButton {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #d8d8d1;
+  border-radius: 14px;
+  background: #f4f4ef;
+  color: #55554f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.reuseRegisteredMealButton:hover {
+  background: #ecece6;
+}
+
+.reuseRegisteredMealButton:disabled {
+  cursor: default;
+  opacity: 0.55;
 }

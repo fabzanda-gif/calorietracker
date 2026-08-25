@@ -26,6 +26,7 @@ export interface LoggedMeal {
   carbs: number;
   fat: number;
   category?: string | null;
+  is_reusable?: boolean | null;
   notes?: string | null;
   structured_ingredients?: StructuredMealIngredient[];
   [key: string]: unknown;
@@ -65,6 +66,7 @@ export interface MealCreateInput {
   protein: number;
   carbs: number;
   fat: number;
+  is_reusable?: boolean;
   structured_ingredients?: Array<{
     ingredient_id: string;
     quantity: number;
@@ -80,6 +82,7 @@ export interface MealUpdateInput {
   protein?: number;
   carbs?: number;
   fat?: number;
+  is_reusable?: boolean;
   structured_ingredients?: Array<{
     ingredient_id: string;
     quantity: number;

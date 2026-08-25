@@ -243,6 +243,51 @@ export function RegisteredToday({
   }
 
 
+  async function toggleMealReusable(
+    meal: LoggedMeal,
+  ) {
+    if (
+      !accessToken ||
+      meal.id === null ||
+      meal.id === undefined
+    ) {
+      return;
+    }
+
+    const nextReusable =
+      meal.is_reusable === false;
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      await updateMeal(
+        meal.id,
+        {
+          is_reusable: nextReusable,
+        },
+        accessToken,
+      );
+
+      setMessage(
+        nextReusable
+          ? `"${meal.name}" può essere usato di nuovo nei suggerimenti.`
+          : `"${meal.name}" resta nello storico ma non verrà più usato nei suggerimenti.`,
+      );
+
+      await onChanged();
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad aggiornare il pasto.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
   async function removeMeal(
     meal: LoggedMeal,
   ) {
@@ -381,6 +426,18 @@ export function RegisteredToday({
             </div>
 
             <div className={styles.itemActions}>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  void toggleMealReusable(meal);
+                }}
+              >
+                {meal.is_reusable === false
+                  ? "Riusa nei suggerimenti"
+                  : "Non suggerire più"}
+              </button>
+
               <button
                 type="button"
                 onClick={() => {

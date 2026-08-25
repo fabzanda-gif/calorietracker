@@ -527,6 +527,39 @@ export function HomeShell() {
     }
   }
 
+  async function toggleRegisteredMealReusable(
+    meal: LoggedMeal,
+  ) {
+    if (
+      !accessToken ||
+      meal.id === null ||
+      meal.id === undefined
+    ) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await updateMeal(
+        meal.id,
+        {
+          is_reusable:
+            meal.is_reusable === false,
+        },
+        accessToken,
+      );
+
+      await refreshHome();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad aggiornare i suggerimenti.",
+      );
+    }
+  }
+
   async function deleteRegisteredMeal(
     meal: LoggedMeal,
   ) {
@@ -1075,6 +1108,32 @@ export function HomeShell() {
                           <button
                             type="button"
                             className={
+                              styles.reuseRegisteredMealButton
+                            }
+                            disabled={
+                              deletingMealId !== null ||
+                              savingMealEdit
+                            }
+                            onClick={() => {
+                              const actual =
+                                actualMealForSlot(slot);
+
+                              if (actual) {
+                                void toggleRegisteredMealReusable(
+                                  actual,
+                                );
+                              }
+                            }}
+                          >
+                            {actualMealForSlot(slot)
+                              ?.is_reusable === false
+                              ? "Riusa nei suggerimenti"
+                              : "Non suggerire più"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className={
                               styles.deleteRegisteredMealButton
                             }
                             disabled={
@@ -1408,19 +1467,6 @@ export function HomeShell() {
             </div>
           </section>
 
-          <QuickAdd
-            date={todayIso()}
-            accessToken={accessToken}
-            onSaved={refreshHome}
-          />
-
-          <RegisteredToday
-            meals={actualMeals}
-            activities={actualActivities}
-            accessToken={accessToken}
-            onChanged={refreshHome}
-          />
-
           {!actualDinner &&
           showDinnerAlternatives ? (
             <section className={styles.decisionSection}>
@@ -1438,6 +1484,17 @@ export function HomeShell() {
                 </span>
               ) : null}
             </div>
+
+            {dinnerOptions?.day_context ? (
+              <div className={styles.dayDecisionContext}>
+                <strong>
+                  {dinnerOptions.day_context.title}
+                </strong>
+                <p>
+                  {dinnerOptions.day_context.message}
+                </p>
+              </div>
+            ) : null}
 
             {commitMessage ? (
               <p className={styles.commitMessage}>
@@ -1519,6 +1576,20 @@ export function HomeShell() {
             )}
           </section>
           ) : null}
+
+          <QuickAdd
+            date={todayIso()}
+            accessToken={accessToken}
+            onSaved={refreshHome}
+          />
+
+          <RegisteredToday
+            meals={actualMeals}
+            activities={actualActivities}
+            accessToken={accessToken}
+            onChanged={refreshHome}
+          />
+
         </>
       ) : null}
       </main>

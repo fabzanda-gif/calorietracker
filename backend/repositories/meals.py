@@ -8,7 +8,7 @@ from .base import BaseRepository, RepositoryError
 MEAL_COLUMNS = (
     "id,user_id,date,meal_type,name,base_name,quantity,is_per_100g,"
     "base_calories,base_protein,base_carbs,base_fat,"
-    "calories,protein,carbs,fat,notes,category,"
+    "calories,protein,carbs,fat,notes,category,is_reusable,"
     "ingredients_json,recipe_servings,is_shared,image_url"
 )
 
@@ -87,7 +87,7 @@ class MealsRepository(BaseRepository):
         meal_type: str,
     ) -> list[dict]:
         enhanced = (
-            "id,date,meal_type,name,base_name,calories,notes,category"
+            "id,date,meal_type,name,base_name,calories,notes,category,is_reusable"
         )
         legacy = (
             "id,date,meal_type,name,base_name,calories,notes"

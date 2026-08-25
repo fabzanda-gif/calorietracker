@@ -63,6 +63,7 @@ class MealCreate(BaseModel):
 
     notes: str | None = None
     category: str | None = None
+    is_reusable: bool | None = None
     ingredients_json: Any | None = None
     recipe_servings: float | None = None
     is_shared: bool | None = None
@@ -90,6 +91,7 @@ class MealUpdate(BaseModel):
 
     notes: str | None = None
     category: str | None = None
+    is_reusable: bool | None = None
     ingredients_json: Any | None = None
     recipe_servings: float | None = None
     is_shared: bool | None = None
@@ -143,7 +145,7 @@ def get_meals_for_range(
             columns=(
                 "id,date,meal_type,name,base_name,quantity,is_per_100g,"
                 "base_calories,base_protein,base_carbs,base_fat,"
-                "calories,protein,carbs,fat,notes,category,"
+                "calories,protein,carbs,fat,notes,category,is_reusable,"
                 "ingredients_json,recipe_servings,is_shared,image_url"
             ),
         )

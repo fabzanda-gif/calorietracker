@@ -163,9 +163,15 @@ class MealCandidateService:
                 }
             )
 
+        reusable_historical_meals = [
+            meal
+            for meal in (historical_meals or [])
+            if meal.get("is_reusable") is not False
+        ]
+
         historical_events = (
             LegacyMealEventService().build(
-                meals=historical_meals or [],
+                meals=reusable_historical_meals,
                 meal_type=meal_type,
             )
         )
