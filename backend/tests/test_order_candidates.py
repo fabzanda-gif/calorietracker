@@ -143,3 +143,32 @@ def test_base_name_is_used_when_available():
     )
 
     assert result[0]["name"] == "Pizza Margherita"
+
+
+def test_same_order_event_components_are_combined():
+    result = service.build(
+        meals=[
+            {
+                "date": "2026-08-01",
+                "meal_type": "Cena",
+                "name": "Burger",
+                "category": "delivery",
+                "calories": 650,
+            },
+            {
+                "date": "2026-08-01",
+                "meal_type": "Cena",
+                "name": "Patatine",
+                "category": "delivery",
+                "calories": 250,
+            },
+        ],
+        meal_type="Cena",
+    )
+
+    assert len(result) == 1
+    assert (
+        result[0]["name"]
+        == "Burger + Patatine"
+    )
+    assert result[0]["calories"] == 900

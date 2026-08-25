@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
+    get_ingredients_repository,
+    get_meal_ingredients_repository,
     get_meals_repository,
 )
 from backend.api.main import app
@@ -52,10 +54,24 @@ def override_meals_repo():
     return fake_repo
 
 
+def override_ingredients_repo():
+    return object()
+
+
+def override_meal_ingredients_repo():
+    return object()
+
+
 @pytest.fixture(autouse=True)
 def api_overrides():
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_meals_repository] = override_meals_repo
+    app.dependency_overrides[get_ingredients_repository] = (
+        override_ingredients_repo
+    )
+    app.dependency_overrides[get_meal_ingredients_repository] = (
+        override_meal_ingredients_repo
+    )
     yield
     app.dependency_overrides.clear()
 

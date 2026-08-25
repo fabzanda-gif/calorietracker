@@ -12,6 +12,8 @@ from backend.api.dependencies import (
     get_ingredients_repository,
     get_meal_ingredients_repository,
     get_meals_repository,
+    get_recipe_ingredients_repository,
+    get_recipes_repository,
 )
 from backend.repositories.base import RepositoryError
 from backend.repositories.ingredients import IngredientsRepository
@@ -19,6 +21,10 @@ from backend.repositories.meal_ingredients import (
     MealIngredientsRepository,
 )
 from backend.repositories.meals import MealsRepository
+from backend.repositories.recipe_ingredients import (
+    RecipeIngredientsRepository,
+)
+from backend.repositories.recipes import RecipesRepository
 from backend.services.structured_meal import (
     StructuredMealError,
     StructuredMealService,
@@ -71,6 +77,7 @@ class MealUpdate(BaseModel):
     protein: float | None = None
     carbs: float | None = None
     fat: float | None = None
+    structured_ingredients: list[StructuredMealIngredient] | None = None
 
     base_name: str | None = None
     quantity: float | None = None
@@ -180,6 +187,182 @@ def get_meals_by_type(
         ) from exc
 
 
+@router.get("/item/{meal_id}")
+def get_meal(
+    meal_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: MealsRepository = Depends(get_meals_repository),
+    meal_ingredients_repo: MealIngredientsRepository = Depends(
+        get_meal_ingredients_repository
+    ),
+    recipes_repo: RecipesRepository = Depends(
+        get_recipes_repository
+    ),
+    recipe_ingredients_repo: RecipeIngredientsRepository = Depends(
+        get_recipe_ingredients_repository
+    ),
+):
+    """
+    Load one meal and its editable structured components.
+
+    Legacy meals may predate meal_ingredients. When possible,
+    recover their editable composition from a matching recipe.
+    The fallback is read-only until the user saves: PATCH then
+    materializes real meal_ingredients snapshots.
+    """
+    try:
+        item = repo.get_by_id(
+            meal_id,
+            current_user.id,
+        )
+
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meal not found",
+            )
+
+        structured = (
+            meal_ingredients_repo.list_for_meal(
+                meal_id
+            )
+        )
+
+        structured_origin = (
+            "meal"
+            if structured
+            else None
+        )
+
+        source_recipe = None
+
+        if not structured:
+            recipe_name = (
+                item.get("base_name")
+                or item.get("name")
+                or ""
+            )
+
+            source_recipe = (
+                recipes_repo.get_available_by_name(
+                    recipe_name,
+                    current_user.id,
+                )
+            )
+
+            if source_recipe is not None:
+                recipe_components = (
+                    recipe_ingredients_repo.list_for_recipe(
+                        source_recipe["id"]
+                    )
+                )
+
+                structured = []
+
+                for component in recipe_components:
+                    ingredient = (
+                        component.get("ingredients")
+                        or {}
+                    )
+
+                    quantity_g = float(
+                        component.get("quantity_g")
+                        or 0
+                    )
+
+                    factor = quantity_g / 100.0
+
+                    structured.append(
+                        {
+                            "recipe_ingredient_id": (
+                                component.get("id")
+                            ),
+                            "ingredient_id": (
+                                component.get(
+                                    "ingredient_id"
+                                )
+                            ),
+                            "name_snapshot": (
+                                ingredient.get("name")
+                                or "Ingrediente"
+                            ),
+                            "quantity": component.get(
+                                "quantity"
+                            ),
+                            "unit": (
+                                component.get("unit")
+                                or "g"
+                            ),
+                            "quantity_g": quantity_g,
+                            "calories": round(
+                                float(
+                                    ingredient.get(
+                                        "calories_per_100g"
+                                    )
+                                    or 0
+                                )
+                                * factor,
+                                2,
+                            ),
+                            "protein": round(
+                                float(
+                                    ingredient.get(
+                                        "protein_per_100g"
+                                    )
+                                    or 0
+                                )
+                                * factor,
+                                2,
+                            ),
+                            "carbs": round(
+                                float(
+                                    ingredient.get(
+                                        "carbs_per_100g"
+                                    )
+                                    or 0
+                                )
+                                * factor,
+                                2,
+                            ),
+                            "fat": round(
+                                float(
+                                    ingredient.get(
+                                        "fat_per_100g"
+                                    )
+                                    or 0
+                                )
+                                * factor,
+                                2,
+                            ),
+                        }
+                    )
+
+                if structured:
+                    structured_origin = "recipe"
+
+        return {
+            "item": {
+                **item,
+                "structured_ingredients": structured,
+                "structured_origin": structured_origin,
+                "source_recipe_id": (
+                    source_recipe.get("id")
+                    if source_recipe is not None
+                    else None
+                ),
+            }
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/{meal_date}")
 def get_meals_for_date(
     meal_date: date,
@@ -249,6 +432,21 @@ def create_meal(
             }
 
         payload["user_id"] = current_user.id
+
+        # Legacy meals table stores nutrition as integers.
+        # Pydantic exposes numeric MealCreate fields as floats,
+        # so normalize them before sending the payload to Supabase.
+        for key in (
+            "calories",
+            "protein",
+            "carbs",
+            "fat",
+        ):
+            if key in payload:
+                payload[key] = int(
+                    round(float(payload[key] or 0))
+                )
+
         item = repo.create(payload)
 
         return {
@@ -264,6 +462,11 @@ def create_meal(
         ) from exc
 
     except RepositoryError as exc:
+        print(
+            "CREATE MEAL REPOSITORY ERROR:",
+            repr(exc),
+            flush=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
@@ -276,11 +479,23 @@ def update_meal(
     changes: MealUpdate,
     current_user: CurrentUser = Depends(get_current_user),
     repo: MealsRepository = Depends(get_meals_repository),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    meal_ingredients_repo: MealIngredientsRepository = Depends(
+        get_meal_ingredients_repository
+    ),
 ):
     """
-    Update only fields explicitly supplied by the client.
+    Update a legacy meal or rebuild a structured meal.
+
+    When structured_ingredients are supplied, nutrition is
+    recalculated and meal_ingredients snapshots are replaced.
     """
-    payload = changes.model_dump(exclude_unset=True)
+    payload = changes.model_dump(
+        mode="json",
+        exclude_unset=True,
+    )
 
     if not payload:
         raise HTTPException(
@@ -288,7 +503,33 @@ def update_meal(
             detail="No fields supplied",
         )
 
+    structured = payload.pop(
+        "structured_ingredients",
+        None,
+    )
+
     try:
+        if structured is not None:
+            result = StructuredMealService(
+                meals_repo=repo,
+                ingredients_repo=ingredients_repo,
+                meal_ingredients_repo=meal_ingredients_repo,
+            ).update(
+                user_id=current_user.id,
+                meal_id=meal_id,
+                meal_payload=payload,
+                structured_ingredients=structured,
+            )
+
+            return {
+                "updated": True,
+                "structured": True,
+                "item": result["meal"],
+                "meal_ingredients": result[
+                    "meal_ingredients"
+                ],
+            }
+
         item = repo.update(
             meal_id=meal_id,
             user_id=current_user.id,
@@ -297,8 +538,15 @@ def update_meal(
 
         return {
             "updated": True,
+            "structured": False,
             "item": item,
         }
+
+    except StructuredMealError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
     except RepositoryError as exc:
         raise HTTPException(

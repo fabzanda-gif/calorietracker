@@ -317,6 +317,8 @@ def get_ranked_meal_options(
             mode=normalized_mode,
         )
 
+
+
         selection_events = []
 
         if decision_selections_repo is not None:

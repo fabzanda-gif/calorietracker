@@ -67,6 +67,7 @@ def get_current_user(
 
     token = credentials.credentials
 
+
     try:
         supabase = get_supabase_client()
         response = supabase.auth.get_user(token)

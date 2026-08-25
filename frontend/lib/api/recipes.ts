@@ -46,6 +46,7 @@ export interface RecipeWriteInput {
   category?: string | null;
   recipe_servings?: number | null;
   image_url?: string | null;
+  notes?: string | null;
   structured_ingredients: Array<{
     ingredient_id: string;
     quantity: number;

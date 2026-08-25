@@ -1,5 +1,20 @@
 import { apiRequest } from "./client";
 
+export interface StructuredMealIngredient {
+  id?: string | number | null;
+  meal_id?: string | number | null;
+  ingredient_id: string;
+  name_snapshot?: string | null;
+  quantity: number;
+  unit: string;
+  quantity_g: number;
+  original_quantity_g?: number;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}
+
 export interface LoggedMeal {
   id?: string | number | null;
   date: string;
@@ -12,6 +27,7 @@ export interface LoggedMeal {
   fat: number;
   category?: string | null;
   notes?: string | null;
+  structured_ingredients?: StructuredMealIngredient[];
   [key: string]: unknown;
 }
 
@@ -34,6 +50,13 @@ export function getMealsForDate(
 }
 
 
+export interface StructuredMealCreateIngredient {
+  ingredient_id: string;
+  quantity: number;
+  unit: string;
+  quantity_g: number;
+}
+
 export interface MealCreateInput {
   date: string;
   meal_type: string;
@@ -42,6 +65,21 @@ export interface MealCreateInput {
   protein: number;
   carbs: number;
   fat: number;
+  structured_ingredients?: Array<{
+    ingredient_id: string;
+    quantity: number;
+    unit: string;
+    quantity_g: number;
+  }>;
+}
+
+export interface MealUpdateInput {
+  meal_type?: string;
+  name?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
   structured_ingredients?: Array<{
     ingredient_id: string;
     quantity: number;
@@ -65,6 +103,56 @@ export function createMeal(
       method: "POST",
       accessToken,
       body: JSON.stringify(input),
+    },
+  );
+}
+
+
+export function getMeal(
+  mealId: string | number,
+  accessToken?: string | null,
+): Promise<{ item: LoggedMeal }> {
+  return apiRequest<{ item: LoggedMeal }>(
+    `/meals/item/${encodeURIComponent(String(mealId))}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function updateMeal(
+  mealId: string | number,
+  input: MealUpdateInput,
+  accessToken?: string | null,
+): Promise<{
+  updated: boolean;
+  structured: boolean;
+  item: LoggedMeal;
+  meal_ingredients?: StructuredMealIngredient[];
+}> {
+  return apiRequest(
+    `/meals/${encodeURIComponent(String(mealId))}`,
+    {
+      method: "PATCH",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+
+export function deleteMeal(
+  mealId: string | number,
+  accessToken?: string | null,
+): Promise<{
+  deleted: boolean;
+  id: string;
+}> {
+  return apiRequest(
+    `/meals/${encodeURIComponent(String(mealId))}`,
+    {
+      method: "DELETE",
+      accessToken,
     },
   );
 }

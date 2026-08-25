@@ -13,6 +13,7 @@ from backend.api.routers.learned_insights import router as learned_insights_rout
 from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
 from backend.api.routers.recipes import router as recipes_router
+from backend.api.routers.progress import router as progress_router
 from backend.api.routers.weight import router as weight_router
 
 
@@ -36,6 +37,7 @@ app.include_router(health_router)
 app.include_router(meals_router)
 app.include_router(activities_router)
 app.include_router(weight_router)
+app.include_router(progress_router)
 app.include_router(daily_logs_router)
 app.include_router(recipes_router)
 app.include_router(ingredients_router)

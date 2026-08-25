@@ -1,0 +1,278 @@
+.section {
+  margin: 26px 0;
+  padding: 22px;
+  border: 1px solid #dfdfd8;
+  border-radius: 24px;
+  background: #ffffff;
+}
+
+.header h2 {
+  margin: 0;
+  letter-spacing: -0.035em;
+}
+
+.kicker {
+  margin: 0 0 7px;
+  color: #74746e;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: #70706a;
+  line-height: 1.45;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.action,
+.actionActive {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid #d8d8d1;
+  border-radius: 13px;
+  background: #f7f7f3;
+  color: #30302d;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.actionActive {
+  border-color: #171815;
+  background: #171815;
+  color: #ffffff;
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f7f7f3;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.closeButton {
+  border: 0;
+  background: transparent;
+  color: #6e6e68;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.panel label > span {
+  color: #5d5d57;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.panel input,
+.panel select,
+.ingredientRow select {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid #d7d7d0;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #171815;
+  font: inherit;
+}
+
+.modeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 13px;
+  background: #e9e9e4;
+}
+
+.modeButton,
+.modeActive {
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.modeButton {
+  background: transparent;
+  color: #65655f;
+}
+
+.modeActive {
+  background: #ffffff;
+  color: #171815;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.macroGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ingredientList {
+  display: grid;
+  gap: 8px;
+}
+
+.ingredientRow {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(190px, 220px)
+    38px;
+  gap: 8px;
+  align-items: center;
+}
+
+.quantity {
+  display: grid;
+  grid-template-columns:
+    minmax(72px, 90px)
+    minmax(100px, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.quantity input,
+.quantity select {
+  width: 100%;
+  min-width: 0;
+}
+
+.quantity span {
+  color: #70706a;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.removeIngredient {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: #e8e8e3;
+  color: #55554f;
+  cursor: pointer;
+  font-size: 1.15rem;
+}
+
+.addIngredientButton {
+  min-height: 41px;
+  border: 1px dashed #c9c9c1;
+  border-radius: 11px;
+  background: transparent;
+  color: #55554f;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.nutritionPreview {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  padding: 13px;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.nutritionPreview div {
+  display: grid;
+  gap: 3px;
+}
+
+.nutritionPreview span {
+  color: #777771;
+  font-size: 0.68rem;
+}
+
+.nutritionPreview strong {
+  font-size: 0.86rem;
+}
+
+.helper {
+  padding: 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #70706a;
+  font-size: 0.8rem;
+}
+
+.saveButton {
+  min-height: 46px;
+  border: 0;
+  border-radius: 13px;
+  background: #171815;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.saveButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.message {
+  margin-top: 14px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #fff4f4;
+  color: #8b3030;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 620px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  .ingredientRow {
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(165px, 190px)
+      36px;
+  }
+
+  .quantity {
+    grid-template-columns:
+      minmax(62px, 76px)
+      minmax(90px, 1fr);
+  }
+
+  .nutritionPreview {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+}

@@ -549,3 +549,173 @@
   opacity: 0.55;
   cursor: wait;
 }
+
+.editRegisteredMealButton {
+  min-height: 40px;
+  border: 1px solid #d7d7d0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #30302d;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.registeredMealEditor {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f7f7f3;
+}
+
+.registeredMealEditor label {
+  display: grid;
+  gap: 6px;
+  color: #5d5d57;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.registeredMealQuantity {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.registeredMealQuantity input {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid #d7d7d0;
+  border-radius: 11px;
+  padding: 9px 11px;
+  background: #ffffff;
+  color: #171815;
+  font: inherit;
+}
+
+.registeredMealEditActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.saveRegisteredMealButton,
+.cancelRegisteredMealButton {
+  min-height: 42px;
+  border-radius: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.saveRegisteredMealButton {
+  border: 0;
+  background: #171815;
+  color: #ffffff;
+}
+
+.cancelRegisteredMealButton {
+  border: 1px solid #d7d7d0;
+  background: #ffffff;
+  color: #30302d;
+}
+
+.saveRegisteredMealButton:disabled,
+.cancelRegisteredMealButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+
+.registeredMealNutrition {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  font-size: 0.76rem;
+}
+
+.registeredMealNutrition strong,
+.registeredMealNutrition span {
+  margin: 0;
+}
+
+.registeredMealNutrition strong {
+  font-size: 0.9rem;
+}
+
+.registeredMealNutrition span {
+  color: #5f5f59;
+}
+
+
+.registeredMealPrimaryActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.deleteRegisteredMealButton {
+  min-height: 40px;
+  border: 1px solid #e2c2c2;
+  border-radius: 12px;
+  background: #fffafa;
+  color: #8b3030;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.editRegisteredMealButton:disabled,
+.deleteRegisteredMealButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+
+.alternativeIdeasButton {
+  min-height: 42px;
+  border: 1px solid #d9d9d2;
+  border-radius: 13px;
+  background: #f4f4ef;
+  color: #30302d;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.alternativeIdeasButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.mealActions:has(.alternativeIdeasButton) {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progressLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid #d7d7d0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #30302d;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-decoration: none;
+}

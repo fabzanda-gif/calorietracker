@@ -221,3 +221,22 @@
   border-radius: 12px;
   flex: 0 0 auto;
 }
+
+
+.preparationTextarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.recipeDescription {
+  margin-top: 6px;
+  line-height: 1.45;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

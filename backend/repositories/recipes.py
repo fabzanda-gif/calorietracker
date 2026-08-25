@@ -73,6 +73,49 @@ class RecipesRepository(BaseRepository):
                 f"Unable to load available recipes: {exc}"
             ) from exc
 
+    def get_available_by_name(
+        self,
+        name: str,
+        user_id: str,
+    ) -> dict | None:
+        """
+        Find an available recipe by its canonical name.
+
+        Personal recipes win over shared recipes with the
+        same name.
+        """
+        target = " ".join(
+            str(name or "").strip().casefold().split()
+        )
+
+        if not target:
+            return None
+
+        matches = []
+
+        for row in self.list_available(user_id):
+            candidate = " ".join(
+                str(row.get("name") or "")
+                .strip()
+                .casefold()
+                .split()
+            )
+
+            if candidate == target:
+                matches.append(row)
+
+        if not matches:
+            return None
+
+        matches.sort(
+            key=lambda row: (
+                str(row.get("user_id")) == str(user_id),
+            ),
+            reverse=True,
+        )
+
+        return matches[0]
+
     def get_personal_by_id(
         self,
         recipe_id: Any,

@@ -1,0 +1,597 @@
+.page {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 72px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 34px;
+}
+
+.brand,
+.kicker {
+  margin: 0 0 8px;
+  color: #74746e;
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.header h1,
+.sectionHeader h2 {
+  margin: 0;
+  letter-spacing: -0.04em;
+}
+
+.header h1 {
+  font-size: clamp(2.2rem, 7vw, 4.2rem);
+}
+
+.subtitle,
+.muted {
+  color: #74746e;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  font-size: 1rem;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #d9d9d2;
+  border-radius: 14px;
+  background: #ffffff;
+  font-weight: 750;
+}
+
+.hero,
+.chartSection,
+.errorCard {
+  border: 1px solid #dfdfd8;
+  border-radius: 26px;
+  background: #ffffff;
+}
+
+.hero {
+  display: grid;
+  gap: 26px;
+  padding: 24px;
+}
+
+.currentWeight {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: clamp(3rem, 10vw, 6rem);
+  font-weight: 850;
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+}
+
+.currentWeight span {
+  color: #74746e;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.changeDown,
+.changeUp,
+.changeNeutral {
+  margin: 14px 0 0;
+  font-weight: 750;
+}
+
+.changeDown {
+  color: #315b2c;
+}
+
+.changeUp {
+  color: #8b5b30;
+}
+
+.changeNeutral {
+  color: #65655f;
+}
+
+.weightForm {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background: #f7f7f3;
+}
+
+.weightForm label {
+  display: grid;
+  gap: 6px;
+  color: #5d5d57;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.weightForm input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d7d7d0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #171815;
+}
+
+.weightInput {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.weightInput span {
+  color: #6b6b65;
+}
+
+.weightForm button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 13px;
+  background: #171815;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.weightForm button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.chartSection {
+  margin-top: 22px;
+  padding: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.sectionHeader h2 {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+}
+
+.rangeSelector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rangeSelector button {
+  min-height: 36px;
+  border: 1px solid #deded7;
+  border-radius: 999px;
+  padding: 0 13px;
+  background: #f7f7f3;
+  color: #65655f;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.rangeSelector button.rangeActive {
+  border-color: #171815;
+  background: #171815;
+  color: #ffffff;
+}
+
+.chartScroll {
+  overflow-x: auto;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  min-width: 580px;
+  height: auto;
+}
+
+.gridLine {
+  stroke: #e8e8e2;
+  stroke-width: 1;
+}
+
+.axisLabel,
+.dateLabel {
+  fill: #85857e;
+  font-size: 13px;
+}
+
+.weightLine {
+  stroke: #171815;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.weightPoint {
+  fill: #ffffff;
+  stroke: #171815;
+  stroke-width: 4;
+}
+
+.emptyChart,
+.loadingChart {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 300px;
+  color: #74746e;
+  text-align: center;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.statsGrid article {
+  display: grid;
+  gap: 7px;
+  padding: 18px;
+  border: 1px solid #dfdfd8;
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.statsGrid span {
+  color: #74746e;
+  font-size: 0.78rem;
+}
+
+.statsGrid strong {
+  font-size: 1.25rem;
+}
+
+.errorCard {
+  margin-bottom: 20px;
+  padding: 18px;
+  border-color: #e8c5c5;
+  background: #fff8f8;
+}
+
+.errorCard p {
+  margin-bottom: 0;
+  color: #8c3333;
+}
+
+@media (min-width: 760px) {
+  .page {
+    padding-top: 42px;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.7fr);
+    align-items: end;
+    padding: 30px;
+  }
+
+  .chartSection {
+    padding: 30px;
+  }
+
+  .sectionHeader {
+    flex-direction: row;
+    align-items: end;
+    justify-content: space-between;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #74746e;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.chartLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chartLegend i {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.legendActual {
+  background: #171815;
+}
+
+.legendTrend {
+  background: #6f8a74;
+}
+
+.trendLine {
+  stroke: #6f8a74;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 8 7;
+}
+
+
+.analyticsSection {
+  margin-top: 46px;
+  padding: 24px;
+  border: 1px solid #dfdfd8;
+  border-radius: 26px;
+  background: #ffffff;
+}
+
+.sectionSubtitle {
+  max-width: 520px;
+  margin: 7px 0 0;
+  color: #74746e;
+  line-height: 1.5;
+}
+
+.calorieChartWrap {
+  margin-top: 4px;
+}
+
+.legendCalories {
+  background: #171815;
+}
+
+.legendBudget {
+  background: #9a9a91;
+}
+
+.calorieBar {
+  fill: #252622;
+}
+
+.calorieBarOver {
+  fill: #8b5b30;
+}
+
+.budgetLine {
+  stroke: #8b8b84;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 8 7;
+}
+
+.nutritionStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.nutritionStatsGrid article {
+  display: grid;
+  gap: 7px;
+  padding: 18px;
+  border: 1px solid #dfdfd8;
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.nutritionStatsGrid span {
+  color: #74746e;
+  font-size: 0.78rem;
+}
+
+.nutritionStatsGrid strong {
+  font-size: 1.25rem;
+}
+
+@media (min-width: 760px) {
+  .analyticsSection {
+    padding: 30px;
+  }
+
+  .nutritionStatsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+
+.analyticsControls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 26px 0 18px;
+}
+
+.analyticsControls label {
+  display: grid;
+  gap: 7px;
+}
+
+.analyticsControls label > span {
+  color: #5f5f59;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.analyticsControls select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 42px 0 14px;
+  border: 1px solid #d9d9d2;
+  border-radius: 14px;
+  background: #f7f7f4;
+  color: #171815;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.analyticsControls select:focus {
+  outline: 2px solid #171815;
+  outline-offset: 2px;
+}
+
+@media (min-width: 760px) {
+  .analyticsControls {
+    grid-template-columns:
+      minmax(260px, 1.5fr)
+      minmax(160px, 0.5fr);
+  }
+}
+
+
+.legendProtein {
+  background: #6f8a74;
+}
+
+.legendCarbs {
+  background: #343733;
+}
+
+.legendFat {
+  background: #b8afa1;
+}
+
+.macroProteinBar {
+  fill: #6f8a74;
+}
+
+.macroCarbsBar {
+  fill: #343733;
+}
+
+.macroFatBar {
+  fill: #b8afa1;
+}
+
+
+/* Meal distribution */
+
+.legendBreakfast,
+.mealBreakfastBar {
+  fill: #d8b26e;
+  background: #d8b26e;
+}
+
+.legendLunch,
+.mealLunchBar {
+  fill: #79927c;
+  background: #79927c;
+}
+
+.legendDinner,
+.mealDinnerBar {
+  fill: #536b76;
+  background: #536b76;
+}
+
+.legendOtherMeal,
+.mealOtherBar {
+  fill: #b7aaa0;
+  background: #b7aaa0;
+}
+
+
+/* Progress insights */
+
+.insightsSection {
+  margin-top: 46px;
+  padding: 24px;
+  border: 1px solid #dfdfd8;
+  border-radius: 26px;
+  background: #ffffff;
+}
+
+.insightsHeader h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  letter-spacing: -0.045em;
+}
+
+.insightsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.insightCard {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 170px;
+  padding: 20px;
+  border: 1px solid #dfdfd8;
+  border-radius: 20px;
+  background: #f7f7f4;
+}
+
+.insightEyebrow {
+  color: #6f8a74;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.insightCard strong {
+  max-width: 360px;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.insightCard p {
+  max-width: 420px;
+  margin: 0;
+  color: #74746e;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+@media (min-width: 760px) {
+  .insightsSection {
+    padding: 30px;
+  }
+
+  .insightsGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .insightsGrid {
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+  }
+}

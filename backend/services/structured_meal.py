@@ -195,3 +195,192 @@ class StructuredMealService:
             "meal_ingredients": saved_components,
             "nutrition": nutrition,
         }
+
+
+    def update(
+        self,
+        *,
+        user_id: str,
+        meal_id: Any,
+        meal_payload: dict[str, Any],
+        structured_ingredients: list[dict[str, Any]],
+    ) -> dict:
+        if not structured_ingredients:
+            raise StructuredMealError(
+                "At least one structured ingredient is required"
+            )
+
+        components = []
+
+        for component in structured_ingredients:
+            ingredient_id = component.get(
+                "ingredient_id"
+            )
+
+            ingredient = (
+                self.ingredients_repo.get_by_id(
+                    ingredient_id,
+                    user_id,
+                )
+            )
+
+            if ingredient is None:
+                raise StructuredMealError(
+                    f"Ingredient not found: {ingredient_id}"
+                )
+
+            components.append(
+                {
+                    "ingredient": ingredient,
+                    "quantity": component.get(
+                        "quantity"
+                    ),
+                    "unit": (
+                        component.get("unit")
+                        or "g"
+                    ),
+                    "quantity_g": component.get(
+                        "quantity_g"
+                    ),
+                }
+            )
+
+        nutrition = (
+            RecipeNutritionService().calculate(
+                components
+            )
+        )
+
+        payload = dict(meal_payload)
+
+        # meals remains backwards-compatible with the
+        # legacy integer nutrition columns.
+        payload.update(
+            {
+                "calories": round(
+                    nutrition["totals"]["calories"]
+                ),
+                "protein": round(
+                    nutrition["totals"]["protein"]
+                ),
+                "carbs": round(
+                    nutrition["totals"]["carbs"]
+                ),
+                "fat": round(
+                    nutrition["totals"]["fat"]
+                ),
+            }
+        )
+
+        updated_meal = self.meals_repo.update(
+            meal_id=meal_id,
+            user_id=user_id,
+            payload=payload,
+        )
+
+        if updated_meal is None:
+            raise StructuredMealError(
+                "Meal not found or could not be updated"
+            )
+
+        # Preserve the existing snapshots in case rebuilding
+        # the structured components fails.
+        previous_components = (
+            self.meal_ingredients_repo.list_for_meal(
+                meal_id
+            )
+        )
+
+        self.meal_ingredients_repo.delete_for_meal(
+            meal_id
+        )
+
+        saved_components = []
+
+        try:
+            for component, calculated in zip(
+                components,
+                nutrition["ingredients"],
+            ):
+                ingredient = component[
+                    "ingredient"
+                ]
+
+                saved = (
+                    self.meal_ingredients_repo.create(
+                        {
+                            "meal_id": meal_id,
+                            "ingredient_id": ingredient[
+                                "id"
+                            ],
+                            "name_snapshot": ingredient[
+                                "name"
+                            ],
+                            "quantity": component[
+                                "quantity"
+                            ],
+                            "unit": component[
+                                "unit"
+                            ],
+                            "quantity_g": component[
+                                "quantity_g"
+                            ],
+                            "calories": calculated[
+                                "calories"
+                            ],
+                            "protein": calculated[
+                                "protein"
+                            ],
+                            "carbs": calculated[
+                                "carbs"
+                            ],
+                            "fat": calculated[
+                                "fat"
+                            ],
+                        }
+                    )
+                )
+
+                if saved is not None:
+                    saved_components.append(
+                        saved
+                    )
+
+        except Exception:
+            # Best-effort restoration of the previous
+            # ingredient snapshots.
+            try:
+                self.meal_ingredients_repo.delete_for_meal(
+                    meal_id
+                )
+
+                for previous in previous_components:
+                    restored = {
+                        key: previous.get(key)
+                        for key in (
+                            "meal_id",
+                            "ingredient_id",
+                            "name_snapshot",
+                            "quantity",
+                            "unit",
+                            "quantity_g",
+                            "calories",
+                            "protein",
+                            "carbs",
+                            "fat",
+                        )
+                    }
+
+                    self.meal_ingredients_repo.create(
+                        restored
+                    )
+            except RepositoryError:
+                pass
+
+            raise
+
+        return {
+            "meal": updated_meal,
+            "meal_ingredients": saved_components,
+            "nutrition": nutrition,
+        }

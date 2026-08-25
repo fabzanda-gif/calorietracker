@@ -154,6 +154,27 @@ class MealsRepository(BaseRepository):
                 f"Unable to load meals in date range: {exc}"
             ) from exc
 
+    def get_by_id(
+        self,
+        meal_id: Any,
+        user_id: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(MEAL_COLUMNS)
+                .eq("id", meal_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load meal: {exc}"
+            ) from exc
+
     def create(self, payload: dict) -> dict | None:
         try:
             response = self.table.insert(payload).execute()

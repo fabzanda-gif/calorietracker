@@ -36,6 +36,16 @@ class IngredientCreate(BaseModel):
         min_length=1,
     )
 
+    grams_per_unit: float | None = Field(
+        default=None,
+        gt=0,
+    )
+
+    default_quantity: float | None = Field(
+        default=None,
+        gt=0,
+    )
+
 
 class IngredientUpdate(BaseModel):
     name: str | None = Field(
@@ -63,6 +73,16 @@ class IngredientUpdate(BaseModel):
     default_unit: str | None = Field(
         default=None,
         min_length=1,
+    )
+
+    grams_per_unit: float | None = Field(
+        default=None,
+        gt=0,
+    )
+
+    default_quantity: float | None = Field(
+        default=None,
+        gt=0,
     )
 
 

@@ -130,6 +130,13 @@ class MealCandidateService:
             ):
                 continue
 
+            servings = max(
+                1.0,
+                self._number(
+                    recipe.get("recipe_servings")
+                ),
+            )
+
             candidates.append(
                 {
                     "id": f"recipe:{recipe.get('id')}",
@@ -139,16 +146,16 @@ class MealCandidateService:
                     "meal_type": meal_type,
                     "calories": self._number(
                         recipe.get("calories")
-                    ),
+                    ) / servings,
                     "protein_g": self._number(
                         recipe.get("protein")
-                    ),
+                    ) / servings,
                     "carbs_g": self._number(
                         recipe.get("carbs")
-                    ),
+                    ) / servings,
                     "fat_g": self._number(
                         recipe.get("fat")
-                    ),
+                    ) / servings,
                     "taste_score": self._taste(
                         recipe.get("taste_score")
                     ),

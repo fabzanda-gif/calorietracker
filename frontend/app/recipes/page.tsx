@@ -1,5 +1,7 @@
 "use client";
 
+import { AppNav } from "@/components/navigation/AppNav";
+
 import {
   useEffect,
   useMemo,
@@ -87,6 +89,9 @@ export default function RecipesPage() {
   const [imageUrl, setImageUrl] =
     useState<string | null>(null);
 
+  const [notes, setNotes] =
+    useState("");
+
   const [draftIngredients, setDraftIngredients] =
     useState<DraftIngredient[]>([]);
 
@@ -162,6 +167,7 @@ export default function RecipesPage() {
     setMealType("Cena");
     setServings("1");
     setImageUrl(null);
+    setNotes("");
     setDraftIngredients([]);
     setMessage(null);
   }
@@ -191,6 +197,9 @@ export default function RecipesPage() {
       );
       setImageUrl(
         recipe.image_url || null,
+      );
+      setNotes(
+        recipe.notes || "",
       );
 
       setDraftIngredients(
@@ -645,6 +654,7 @@ export default function RecipesPage() {
           Number(servings) || 1,
         ),
       image_url: imageUrl,
+      notes: notes.trim() || null,
       structured_ingredients:
         draftIngredients.map((item) => ({
           ingredient_id:
@@ -752,7 +762,10 @@ export default function RecipesPage() {
   }
 
   return (
-    <main className={styles.page}>
+    <>
+      <AppNav />
+
+      <main className={styles.page}>
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>
@@ -1033,6 +1046,19 @@ export default function RecipesPage() {
           </label>
         </div>
 
+        <label className={styles.field}>
+          Preparazione
+          <textarea
+            className={styles.preparationTextarea}
+            value={notes}
+            rows={8}
+            placeholder="Descrivi la preparazione, i passaggi, i tempi di cottura, eventuali sostituzioni o suggerimenti..."
+            onChange={(event) => {
+              setNotes(event.target.value);
+            }}
+          />
+        </label>
+
         <div className={styles.ingredientsHeader}>
           <strong>Ingredienti</strong>
 
@@ -1307,6 +1333,16 @@ export default function RecipesPage() {
                     )}{" "}
                     kcal
                   </p>
+
+                  {recipe.notes ? (
+                    <p
+                      className={
+                        styles.recipeDescription
+                      }
+                    >
+                      {recipe.notes}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className={styles.smallActions}>
@@ -1343,6 +1379,7 @@ export default function RecipesPage() {
           </p>
         )}
       </section>
-    </main>
+      </main>
+    </>
   );
 }

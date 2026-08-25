@@ -10,6 +10,8 @@ export interface Ingredient {
   carbs_per_100g: number;
   fat_per_100g: number;
   default_unit: string;
+  grams_per_unit: number | null;
+  default_quantity: number | null;
 }
 
 export interface IngredientsResponse {
@@ -24,6 +26,8 @@ export interface IngredientCreateInput {
   carbs_per_100g: number;
   fat_per_100g: number;
   default_unit?: string;
+  grams_per_unit?: number | null;
+  default_quantity?: number | null;
 }
 
 export async function getIngredients(

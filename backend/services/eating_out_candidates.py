@@ -17,16 +17,11 @@ EATING_OUT_CATEGORIES = {
 
 class EatingOutCandidateService:
     """
-    Build eating-out candidates from meals the user has actually logged.
+    Build restaurant candidates from historical eating-out events.
 
-    v0.1:
-    - uses only real meal history;
-    - aggregates repeated restaurant/out-of-home choices;
-    - averages nutrition from matching logs;
-    - keeps frequency and recency for later personalization.
-
-    No venue discovery is attempted here. This service only represents what
-    SanoSync already knows from the user's own history.
+    Multiple restaurant rows logged on the same date + meal type are
+    interpreted as components of one meal before repeated visits are
+    aggregated.
     """
 
     def build(
@@ -35,7 +30,10 @@ class EatingOutCandidateService:
         meals: list[dict[str, Any]],
         meal_type: str,
     ) -> list[dict]:
-        grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        event_rows: dict[
+            tuple[str, str],
+            list[dict[str, Any]],
+        ] = defaultdict(list)
 
         for meal in meals:
             if meal.get("meal_type") != meal_type:
@@ -44,24 +42,50 @@ class EatingOutCandidateService:
             category = self._category(
                 meal.get("category")
             )
+
             if category not in EATING_OUT_CATEGORIES:
                 continue
 
-            name = (
-                meal.get("base_name")
-                or meal.get("name")
-            )
-            if not name:
+            raw_date = meal.get("date")
+
+            if not raw_date:
                 continue
 
-            grouped[str(name).strip()].append(meal)
+            event_rows[
+                (str(raw_date), meal_type)
+            ].append(meal)
+
+        events = []
+
+        for (day_date, _), rows in event_rows.items():
+            event = self._build_event(
+                rows=rows,
+                day_date=day_date,
+                meal_type=meal_type,
+            )
+
+            if event is not None:
+                events.append(event)
+
+        grouped: dict[
+            str,
+            list[dict[str, Any]],
+        ] = defaultdict(list)
+
+        for event in events:
+            grouped[event["name"]].append(
+                event
+            )
 
         candidates = []
 
         for name, rows in grouped.items():
             candidates.append(
                 {
-                    "id": f"restaurant:{self._slug(name)}",
+                    "id": (
+                        "restaurant:"
+                        f"{self._slug(name)}"
+                    ),
                     "source": "restaurant",
                     "source_id": None,
                     "name": name,
@@ -85,25 +109,101 @@ class EatingOutCandidateService:
                     "waste_risk": None,
                     "visit_count": len(rows),
                     "known_eating_out": True,
-                    "last_visited_date": self._latest_date(
-                        rows
-                    ),
+                    "last_visited_date":
+                        self._latest_date(rows),
                 }
             )
 
         candidates.sort(
             key=lambda item: (
                 item["visit_count"],
-                item["last_visited_date"] or "",
+                item["last_visited_date"]
+                or "",
             ),
             reverse=True,
         )
 
         return candidates
 
+    def _build_event(
+        self,
+        *,
+        rows: list[dict[str, Any]],
+        day_date: str,
+        meal_type: str,
+    ) -> dict[str, Any] | None:
+        names = []
+
+        for row in rows:
+            name = (
+                row.get("base_name")
+                or row.get("name")
+            )
+
+            name = str(
+                name or ""
+            ).strip()
+
+            if (
+                name
+                and name.casefold()
+                not in {
+                    item.casefold()
+                    for item in names
+                }
+            ):
+                names.append(name)
+
+        if not names:
+            return None
+
+        return {
+            "date": day_date,
+            "meal_type": meal_type,
+            "name": " + ".join(names),
+            "calories": self._sum(
+                rows,
+                "calories",
+            ),
+            "protein": self._sum(
+                rows,
+                "protein",
+            ),
+            "carbs": self._sum(
+                rows,
+                "carbs",
+            ),
+            "fat": self._sum(
+                rows,
+                "fat",
+            ),
+        }
+
     @staticmethod
     def _category(value: Any) -> str:
-        return str(value or "").strip().lower()
+        return str(
+            value or ""
+        ).strip().lower()
+
+    @staticmethod
+    def _sum(
+        rows: list[dict[str, Any]],
+        field: str,
+    ) -> float:
+        total = 0.0
+
+        for row in rows:
+            try:
+                total += max(
+                    0.0,
+                    float(
+                        row.get(field) or 0
+                    ),
+                )
+            except (TypeError, ValueError):
+                continue
+
+        return round(total, 2)
 
     @staticmethod
     def _average(
@@ -117,7 +217,10 @@ class EatingOutCandidateService:
                 values.append(
                     max(
                         0.0,
-                        float(row.get(field) or 0),
+                        float(
+                            row.get(field)
+                            or 0
+                        ),
                     )
                 )
             except (TypeError, ValueError):

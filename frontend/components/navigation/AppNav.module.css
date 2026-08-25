@@ -1,0 +1,134 @@
+.desktopNav {
+  width: min(1180px, calc(100% - 32px));
+  min-height: 68px;
+  margin: 0 auto;
+  display: none;
+  align-items: center;
+  gap: 28px;
+  border-bottom: 1px solid #deded8;
+}
+
+.brand {
+  color: #171815;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+}
+
+.desktopLinks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.desktopLink,
+.desktopLinkActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 13px;
+  border-radius: 999px;
+  color: #686862;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-decoration: none;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.desktopLink:hover {
+  background: #efefeb;
+  color: #171815;
+}
+
+.desktopLinkActive {
+  background: #171815;
+  color: #ffffff;
+}
+
+.signOut {
+  min-height: 38px;
+  margin-left: auto;
+  padding: 0 14px;
+  border: 1px solid #d8d8d1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #30302d;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.signOut:hover {
+  background: #f0f0ec;
+}
+
+.mobileNav {
+  position: fixed;
+  z-index: 100;
+  left: 12px;
+  right: 12px;
+  bottom: max(
+    12px,
+    env(safe-area-inset-bottom)
+  );
+
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+
+  min-height: 64px;
+  padding: 6px;
+
+  border: 1px solid rgba(215, 215, 208, 0.95);
+  border-radius: 22px;
+
+  background: rgba(255, 255, 255, 0.94);
+
+  box-shadow:
+    0 12px 36px rgba(23, 24, 21, 0.13);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.mobileLink,
+.mobileLinkActive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+
+  min-width: 0;
+  border-radius: 16px;
+
+  color: #777771;
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.mobileLinkActive {
+  background: #171815;
+  color: #ffffff;
+}
+
+.mobileIcon {
+  height: 18px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+
+@media (min-width: 760px) {
+  .desktopNav {
+    display: flex;
+  }
+
+  .mobileNav {
+    display: none;
+  }
+}

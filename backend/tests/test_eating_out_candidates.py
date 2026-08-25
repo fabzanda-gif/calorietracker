@@ -161,3 +161,41 @@ def test_known_eating_out_has_no_synthetic_taste_score():
     )
 
     assert "taste_score" not in result[0]
+
+
+def test_same_restaurant_event_components_are_combined():
+    result = service.build(
+        meals=[
+            {
+                "date": "2026-08-01",
+                "meal_type": "Cena",
+                "name": "OTacos - Dutch Beef",
+                "category": "restaurant",
+                "calories": 700,
+                "protein": 30,
+            },
+            {
+                "date": "2026-08-01",
+                "meal_type": "Cena",
+                "name": "OTacos - Tender Pieces",
+                "category": "restaurant",
+                "calories": 200,
+                "protein": 18,
+            },
+        ],
+        meal_type="Cena",
+    )
+
+    assert len(result) == 1
+
+    assert (
+        result[0]["name"]
+        == (
+            "OTacos - Dutch Beef"
+            " + "
+            "OTacos - Tender Pieces"
+        )
+    )
+
+    assert result[0]["calories"] == 900
+    assert result[0]["protein_g"] == 48

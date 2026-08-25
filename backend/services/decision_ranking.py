@@ -183,11 +183,29 @@ class DecisionRankingService:
         if calories < 0:
             return False
 
+        meal_type = str(
+            item.get("meal_type") or ""
+        ).strip()
+
         if (
-            available_kcal is not None
-            and calories > float(available_kcal)
+            meal_type in {"Pranzo", "Cena"}
+            and calories < 300.0
         ):
             return False
+
+        if available_kcal is not None:
+            available = float(available_kcal)
+
+            # Calorie availability is a strong preference, not a
+            # razor-thin hard cutoff. A real meal slightly above the
+            # remaining budget can still be a useful suggestion.
+            max_reasonable = max(
+                available + 250.0,
+                available * 1.5,
+            )
+
+            if calories > max_reasonable:
+                return False
 
         return bool(item.get("name"))
 

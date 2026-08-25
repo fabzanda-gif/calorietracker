@@ -1,5 +1,10 @@
 "use client";
 
+import { AppNav } from "@/components/navigation/AppNav";
+import { QuickAdd } from "@/components/home/QuickAdd";
+import { RegisteredToday } from "@/components/home/RegisteredToday";
+import { getActivitiesForDate, type Activity } from "@/lib/api/activities";
+
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -7,8 +12,12 @@ import { confirmMealPrediction } from "@/lib/api/confirm";
 import { commitMealDecision } from "@/lib/api/decision";
 import {
   createMeal,
+  deleteMeal,
+  getMeal,
   getMealsForDate,
+  updateMeal,
   type LoggedMeal,
+  type StructuredMealIngredient,
 } from "@/lib/api/meals";
 import {
   getDay,
@@ -68,11 +77,27 @@ function optionLensLabel(
   }[option.lens] ?? option.lens;
 }
 
+function optionSourceLabel(
+  source: string,
+): string {
+  return {
+    recipe: "Ricetta",
+    meal_history: "Dai tuoi pasti",
+    meal_prep: "Già pronto",
+    routine: "Dalla tua routine",
+    restaurant: "Fuori casa",
+    eating_out: "Fuori casa",
+    generic_eating_out: "Idea fuori casa",
+    takeaway: "Takeaway",
+    delivery: "Delivery",
+    generic_order: "Idea da ordinare",
+  }[source] ?? source;
+}
+
 export function HomeShell() {
   const {
     user,
     accessToken,
-    signOut,
   } = useAuth();
 
   const [day, setDay] =
@@ -81,6 +106,10 @@ export function HomeShell() {
     useState<DayBudgetResponse | null>(null);
   const [dinnerOptions, setDinnerOptions] =
     useState<MealOptionsResponse | null>(null);
+  const [
+    showDinnerAlternatives,
+    setShowDinnerAlternatives,
+  ] = useState(false);
   const [loading, setLoading] =
     useState(true);
   const [committingIndex, setCommittingIndex] =
@@ -95,6 +124,10 @@ export function HomeShell() {
     useState("");
   const [alternateProtein, setAlternateProtein] =
     useState("");
+  const [alternateCarbs, setAlternateCarbs] =
+    useState("");
+  const [alternateFat, setAlternateFat] =
+    useState("");
   const [savingAlternate, setSavingAlternate] =
     useState(false);
   const [commitMessage, setCommitMessage] =
@@ -103,6 +136,21 @@ export function HomeShell() {
     useState<LoggedMeal | null>(null);
   const [actualMeals, setActualMeals] =
     useState<LoggedMeal[]>([]);
+
+  const [actualActivities, setActualActivities] =
+    useState<Activity[]>([]);
+
+  const [editingMealId, setEditingMealId] =
+    useState<string | number | null>(null);
+
+  const [mealEditIngredients, setMealEditIngredients] =
+    useState<StructuredMealIngredient[]>([]);
+
+  const [savingMealEdit, setSavingMealEdit] =
+    useState(false);
+
+  const [deletingMealId, setDeletingMealId] =
+    useState<string | number | null>(null);
   const [error, setError] =
     useState<string | null>(null);
 
@@ -144,6 +192,7 @@ export function HomeShell() {
           budgetPayload,
           dinnerPayload,
           mealsPayload,
+          activitiesPayload,
         ] = await Promise.all([
           getDay(
             date,
@@ -163,6 +212,10 @@ export function HomeShell() {
             date,
             accessToken,
           ),
+          getActivitiesForDate(
+            date,
+            accessToken,
+          ),
         ]);
 
         if (active) {
@@ -170,6 +223,9 @@ export function HomeShell() {
           setBudgetResult(budgetPayload);
           setDinnerOptions(dinnerPayload);
           setActualMeals(mealsPayload.items);
+          setActualActivities(
+            activitiesPayload.items,
+          );
           setActualDinner(
             mealsPayload.items.find(
               (meal) => meal.meal_type === "Cena",
@@ -240,6 +296,7 @@ export function HomeShell() {
       budgetPayload,
       dinnerPayload,
       mealsPayload,
+      activitiesPayload,
     ] = await Promise.all([
       getDay(date, accessToken),
       getDayBudget(date, accessToken),
@@ -253,12 +310,19 @@ export function HomeShell() {
         date,
         accessToken,
       ),
+      getActivitiesForDate(
+        date,
+        accessToken,
+      ),
     ]);
 
     setDay(dayPayload);
     setBudgetResult(budgetPayload);
     setDinnerOptions(dinnerPayload);
     setActualMeals(mealsPayload.items);
+    setActualActivities(
+      activitiesPayload.items,
+    );
     setActualDinner(
       mealsPayload.items.find(
         (meal) => meal.meal_type === "Cena",
@@ -278,11 +342,242 @@ export function HomeShell() {
     );
   }
 
+  async function openMealEditor(
+    meal: LoggedMeal,
+  ) {
+    if (
+      !accessToken ||
+      meal.id === null ||
+      meal.id === undefined
+    ) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const response = await getMeal(
+        meal.id,
+        accessToken,
+      );
+
+      const structured =
+        response.item.structured_ingredients ?? [];
+
+      if (!structured.length) {
+        setError(
+          "Questo pasto non ha ingredienti strutturati modificabili.",
+        );
+        return;
+      }
+
+      setEditingMealId(meal.id);
+      setMealEditIngredients(
+        structured.map((item) => ({
+          ...item,
+          original_quantity_g:
+            Number(item.quantity_g) || 0,
+        })),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad aprire il pasto.",
+      );
+    }
+  }
+
+  function closeMealEditor() {
+    setEditingMealId(null);
+    setMealEditIngredients([]);
+  }
+
+  function updateMealIngredientQuantity(
+    index: number,
+    quantityG: number,
+  ) {
+    setMealEditIngredients((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              quantity: quantityG,
+              quantity_g: quantityG,
+            }
+          : item,
+      ),
+    );
+  }
+
+  function mealEditNutrition() {
+    return mealEditIngredients.reduce(
+      (total, item) => {
+        const currentQuantity =
+          Math.max(
+            0,
+            Number(item.quantity_g) || 0,
+          );
+
+        const originalQuantity =
+          Math.max(
+            0,
+            Number(
+              item.original_quantity_g ??
+                item.quantity_g,
+            ) || 0,
+          );
+
+        const scale =
+          originalQuantity > 0
+            ? currentQuantity /
+              originalQuantity
+            : 0;
+
+        return {
+          calories:
+            total.calories +
+            (Number(item.calories) || 0) *
+              scale,
+          protein:
+            total.protein +
+            (Number(item.protein) || 0) *
+              scale,
+          carbs:
+            total.carbs +
+            (Number(item.carbs) || 0) *
+              scale,
+          fat:
+            total.fat +
+            (Number(item.fat) || 0) *
+              scale,
+        };
+      },
+      {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+      },
+    );
+  }
+
+  async function saveMealEditor(
+    meal: LoggedMeal,
+  ) {
+    if (
+      !accessToken ||
+      meal.id === null ||
+      meal.id === undefined
+    ) {
+      return;
+    }
+
+    if (
+      mealEditIngredients.length === 0 ||
+      mealEditIngredients.some(
+        (item) =>
+          !Number.isFinite(
+            Number(item.quantity_g),
+          ) ||
+          Number(item.quantity_g) <= 0,
+      )
+    ) {
+      setError(
+        "Inserisci grammature valide per tutti gli ingredienti.",
+      );
+      return;
+    }
+
+    setSavingMealEdit(true);
+    setError(null);
+
+    try {
+      await updateMeal(
+        meal.id,
+        {
+          name: meal.name,
+          meal_type: meal.meal_type,
+          structured_ingredients:
+            mealEditIngredients.map(
+              (item) => ({
+                ingredient_id:
+                  item.ingredient_id,
+                quantity:
+                  Number(item.quantity_g),
+                unit: item.unit || "g",
+                quantity_g:
+                  Number(item.quantity_g),
+              }),
+            ),
+        },
+        accessToken,
+      );
+
+      closeMealEditor();
+      await refreshHome();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a salvare il pasto.",
+      );
+    } finally {
+      setSavingMealEdit(false);
+    }
+  }
+
+  async function deleteRegisteredMeal(
+    meal: LoggedMeal,
+  ) {
+    if (
+      !accessToken ||
+      meal.id === null ||
+      meal.id === undefined
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Eliminare "${meal.name}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingMealId(meal.id);
+    setError(null);
+
+    try {
+      await deleteMeal(
+        meal.id,
+        accessToken,
+      );
+
+      if (editingMealId === meal.id) {
+        closeMealEditor();
+      }
+
+      await refreshHome();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a eliminare il pasto.",
+      );
+    } finally {
+      setDeletingMealId(null);
+    }
+  }
+
   function closeAlternateMeal() {
     setAlternateSlot(null);
     setAlternateName("");
     setAlternateCalories("");
     setAlternateProtein("");
+    setAlternateCarbs("");
+    setAlternateFat("");
   }
 
   async function saveAlternateMeal(
@@ -296,6 +591,12 @@ export function HomeShell() {
     const calories = Number(alternateCalories);
     const protein = alternateProtein.trim()
       ? Number(alternateProtein)
+      : 0;
+    const carbs = alternateCarbs.trim()
+      ? Number(alternateCarbs)
+      : 0;
+    const fat = alternateFat.trim()
+      ? Number(alternateFat)
       : 0;
 
     if (!name) {
@@ -319,6 +620,26 @@ export function HomeShell() {
       return;
     }
 
+    if (
+      !Number.isFinite(carbs) ||
+      carbs < 0
+    ) {
+      setError(
+        "Inserisci carboidrati validi.",
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(fat) ||
+      fat < 0
+    ) {
+      setError(
+        "Inserisci grassi validi.",
+      );
+      return;
+    }
+
     setSavingAlternate(true);
     setError(null);
 
@@ -330,8 +651,8 @@ export function HomeShell() {
           name,
           calories: Math.round(calories),
           protein: Math.round(protein),
-          carbs: 0,
-          fat: 0,
+          carbs: Math.round(carbs),
+          fat: Math.round(fat),
         },
         accessToken,
       );
@@ -434,12 +755,16 @@ export function HomeShell() {
   }
 
   return (
-    <main className={styles.page}>
+    <>
+      <AppNav />
+
+      <main className={styles.page}>
       <header className={styles.header}>
         <div>
           <p className={styles.brand}>
             SANOSYNC
           </p>
+
           <h1>
             {greeting()}
             {firstName
@@ -447,16 +772,6 @@ export function HomeShell() {
               : ""}
           </h1>
         </div>
-
-        <button
-          type="button"
-          className={styles.signOut}
-          onClick={() => {
-            void signOut();
-          }}
-        >
-          Esci
-        </button>
       </header>
 
       {loading ? (
@@ -718,6 +1033,197 @@ export function HomeShell() {
                       </p>
                     ) : null}
 
+                    {actualMealForSlot(slot) ? (
+                      <>
+                        <div
+                          className={
+                            styles.registeredMealPrimaryActions
+                          }
+                        >
+                          <button
+                            type="button"
+                            className={
+                              styles.editRegisteredMealButton
+                            }
+                            disabled={
+                              deletingMealId !== null
+                            }
+                            onClick={() => {
+                              const actual =
+                                actualMealForSlot(slot);
+
+                              if (actual) {
+                                if (
+                                  editingMealId ===
+                                  actual.id
+                                ) {
+                                  closeMealEditor();
+                                } else {
+                                  void openMealEditor(
+                                    actual,
+                                  );
+                                }
+                              }
+                            }}
+                          >
+                            {editingMealId ===
+                            actualMealForSlot(slot)?.id
+                              ? "Chiudi modifica"
+                              : "Modifica"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.deleteRegisteredMealButton
+                            }
+                            disabled={
+                              deletingMealId !== null ||
+                              savingMealEdit
+                            }
+                            onClick={() => {
+                              const actual =
+                                actualMealForSlot(slot);
+
+                              if (actual) {
+                                void deleteRegisteredMeal(
+                                  actual,
+                                );
+                              }
+                            }}
+                          >
+                            {deletingMealId ===
+                            actualMealForSlot(slot)?.id
+                              ? "Elimino…"
+                              : "Elimina"}
+                          </button>
+                        </div>
+
+                        {editingMealId ===
+                        actualMealForSlot(slot)?.id ? (
+                          <div
+                            className={
+                              styles.registeredMealEditor
+                            }
+                          >
+                            {mealEditIngredients.map(
+                              (ingredient, index) => (
+                                <label
+                                  key={
+                                    String(
+                                      ingredient.id ??
+                                        ingredient.ingredient_id,
+                                    ) + index
+                                  }
+                                >
+                                  <span>
+                                    {ingredient.name_snapshot ||
+                                      "Ingrediente"}
+                                  </span>
+
+                                  <div
+                                    className={
+                                      styles.registeredMealQuantity
+                                    }
+                                  >
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={
+                                        ingredient.quantity_g
+                                      }
+                                      onChange={(event) => {
+                                        updateMealIngredientQuantity(
+                                          index,
+                                          Number(
+                                            event.target.value,
+                                          ) || 0,
+                                        );
+                                      }}
+                                    />
+                                    <span>g</span>
+                                  </div>
+                                </label>
+                              ),
+                            )}
+
+                            <div
+                              className={
+                                styles.registeredMealNutrition
+                              }
+                            >
+                              <strong>
+                                {Math.round(
+                                  mealEditNutrition()
+                                    .calories,
+                                )} kcal
+                              </strong>
+
+                              <span>
+                                {mealEditNutrition()
+                                  .protein.toFixed(1)}{" "}
+                                g proteine
+                              </span>
+
+                              <span>
+                                {mealEditNutrition()
+                                  .carbs.toFixed(1)}{" "}
+                                g carbo
+                              </span>
+
+                              <span>
+                                {mealEditNutrition()
+                                  .fat.toFixed(1)}{" "}
+                                g grassi
+                              </span>
+                            </div>
+
+                            <div
+                              className={
+                                styles.registeredMealEditActions
+                              }
+                            >
+                              <button
+                                type="button"
+                                className={
+                                  styles.saveRegisteredMealButton
+                                }
+                                disabled={savingMealEdit}
+                                onClick={() => {
+                                  const actual =
+                                    actualMealForSlot(slot);
+
+                                  if (actual) {
+                                    void saveMealEditor(
+                                      actual,
+                                    );
+                                  }
+                                }}
+                              >
+                                {savingMealEdit
+                                  ? "Salvo…"
+                                  : "Salva modifiche"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className={
+                                  styles.cancelRegisteredMealButton
+                                }
+                                disabled={savingMealEdit}
+                                onClick={
+                                  closeMealEditor
+                                }
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+
                     {!actualMealForSlot(slot) &&
                     meal.state === "predicted" ? (
                       <>
@@ -738,6 +1244,28 @@ export function HomeShell() {
                               : "Conferma"}
                           </button>
 
+                          {slot === "dinner" ? (
+                            <button
+                              type="button"
+                              className={
+                                styles.alternativeIdeasButton
+                              }
+                              disabled={
+                                confirmingSlot !== null ||
+                                savingAlternate
+                              }
+                              onClick={() => {
+                                setShowDinnerAlternatives(
+                                  (current) => !current,
+                                );
+                              }}
+                            >
+                              {showDinnerAlternatives
+                                ? "Nascondi idee"
+                                : "Alternative"}
+                            </button>
+                          ) : null}
+
                           <button
                             type="button"
                             className={styles.alternateMealButton}
@@ -755,6 +1283,8 @@ export function HomeShell() {
                                 setAlternateName("");
                                 setAlternateCalories("");
                                 setAlternateProtein("");
+                                setAlternateCarbs("");
+                                setAlternateFat("");
                               }
                             }}
                           >
@@ -810,6 +1340,39 @@ export function HomeShell() {
                                   }}
                                 />
                               </label>
+
+
+                              <label>
+                                Carboidrati
+                                <input
+                                  type="number"
+                                  min="0"
+                                  inputMode="numeric"
+                                  value={alternateCarbs}
+                                  placeholder="45"
+                                  onChange={(event) => {
+                                    setAlternateCarbs(
+                                      event.target.value,
+                                    );
+                                  }}
+                                />
+                              </label>
+
+                              <label>
+                                Grassi
+                                <input
+                                  type="number"
+                                  min="0"
+                                  inputMode="numeric"
+                                  value={alternateFat}
+                                  placeholder="15"
+                                  onChange={(event) => {
+                                    setAlternateFat(
+                                      event.target.value,
+                                    );
+                                  }}
+                                />
+                              </label>
                             </div>
 
                             <div className={styles.alternateFormActions}>
@@ -845,12 +1408,26 @@ export function HomeShell() {
             </div>
           </section>
 
-          {!actualDinner ? (
+          <QuickAdd
+            date={todayIso()}
+            accessToken={accessToken}
+            onSaved={refreshHome}
+          />
+
+          <RegisteredToday
+            meals={actualMeals}
+            activities={actualActivities}
+            accessToken={accessToken}
+            onChanged={refreshHome}
+          />
+
+          {!actualDinner &&
+          showDinnerAlternatives ? (
             <section className={styles.decisionSection}>
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
-                  Stasera
+                  Alternative
                 </p>
                 <h2>Tre idee per cena</h2>
               </div>
@@ -882,7 +1459,9 @@ export function HomeShell() {
                         </span>
 
                         <span className={styles.optionSource}>
-                          {option.candidate.source}
+                          {optionSourceLabel(
+                            option.candidate.source,
+                          )}
                         </span>
                       </div>
 
@@ -942,6 +1521,7 @@ export function HomeShell() {
           ) : null}
         </>
       ) : null}
-    </main>
+      </main>
+    </>
   );
 }

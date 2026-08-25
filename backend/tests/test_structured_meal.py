@@ -207,3 +207,123 @@ def test_structured_meal_requires_components():
             },
             structured_ingredients=[],
         )
+
+
+def test_structured_meal_update_rebuilds_components():
+    class UpdateMealsRepository(FakeMealsRepository):
+        def __init__(self):
+            super().__init__()
+            self.updated = None
+
+        def update(
+            self,
+            meal_id,
+            user_id,
+            payload,
+        ):
+            self.updated = (
+                meal_id,
+                user_id,
+                dict(payload),
+            )
+
+            return {
+                "id": meal_id,
+                **payload,
+            }
+
+    class UpdateMealIngredientsRepository(
+        FakeMealIngredientsRepository
+    ):
+        def __init__(self):
+            super().__init__()
+            self.deleted_for_meal = []
+            self.existing = [
+                {
+                    "id": "old-component",
+                    "meal_id": "meal-1",
+                    "ingredient_id": "rice",
+                    "name_snapshot": "Riso",
+                    "quantity": 80,
+                    "unit": "g",
+                    "quantity_g": 80,
+                    "calories": 280,
+                    "protein": 5.6,
+                    "carbs": 62.4,
+                    "fat": 0.8,
+                }
+            ]
+
+        def list_for_meal(self, meal_id):
+            return list(self.existing)
+
+        def delete_for_meal(self, meal_id):
+            self.deleted_for_meal.append(
+                meal_id
+            )
+            self.created = []
+            return True
+
+    meals = UpdateMealsRepository()
+    ingredients = FakeIngredientsRepository()
+    components = (
+        UpdateMealIngredientsRepository()
+    )
+
+    service = StructuredMealService(
+        meals_repo=meals,
+        ingredients_repo=ingredients,
+        meal_ingredients_repo=components,
+    )
+
+    result = service.update(
+        user_id="u1",
+        meal_id="meal-1",
+        meal_payload={
+            "name": "Chicken Rice",
+        },
+        structured_ingredients=[
+            {
+                "ingredient_id": "rice",
+                "quantity": 100,
+                "unit": "g",
+                "quantity_g": 100,
+            },
+            {
+                "ingredient_id": "chicken",
+                "quantity": 150,
+                "unit": "g",
+                "quantity_g": 150,
+            },
+        ],
+    )
+
+    assert meals.updated is not None
+
+    meal_id, user_id, payload = (
+        meals.updated
+    )
+
+    assert meal_id == "meal-1"
+    assert user_id == "u1"
+
+    assert payload["calories"] == 598
+    assert payload["protein"] == 54
+
+    assert components.deleted_for_meal == [
+        "meal-1"
+    ]
+
+    assert len(
+        result["meal_ingredients"]
+    ) == 2
+
+    assert {
+        item["ingredient_id"]
+        for item in result[
+            "meal_ingredients"
+        ]
+    } == {
+        "rice",
+        "chicken",
+    }
