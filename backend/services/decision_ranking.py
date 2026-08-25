@@ -239,7 +239,15 @@ class DecisionRankingService:
             return 1.0 / (1.0 + calories / 500.0)
 
         ratio = calories / available_kcal
-        return max(0.0, 1.0 - ratio)
+
+        if ratio <= 1.0:
+            return 1.0 - ratio
+
+        # Keep calorie fit informative even when every realistic
+        # meal is above the remaining budget. Do not flatten all
+        # over-budget candidates to zero: a smaller excess should
+        # still rank better than a larger one.
+        return 1.0 / (1.0 + ratio)
 
     @staticmethod
     def _protein_fit(

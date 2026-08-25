@@ -49,13 +49,13 @@ def test_feedback_can_break_close_tie():
     )
 
 
-def test_feedback_does_not_reinstate_over_budget_candidate():
+def test_feedback_does_not_reinstate_excessively_over_budget_candidate():
     result = service.rank(
         candidates=[
             candidate(
                 "Too large",
                 "delivery",
-                1000,
+                1200,
                 40,
                 10,
                 boost=0.08,

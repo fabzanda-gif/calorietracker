@@ -89,10 +89,10 @@ def test_taste_lens_can_prefer_higher_calorie_option():
     assert taste["candidate"]["name"] == "Favourite pasta"
 
 
-def test_over_budget_candidates_are_excluded():
+def test_excessively_over_budget_candidates_are_excluded():
     result = service.rank(
         candidates=[
-            candidate("Too large", 1000, 40, 10),
+            candidate("Too large", 1200, 40, 10),
             candidate("Compatible", 500, 30, 7),
         ],
         available_kcal=700,
