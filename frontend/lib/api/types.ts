@@ -131,6 +131,25 @@ export interface DayDecisionContext {
   message: string;
 }
 
+export type MealReplanningStrategy =
+  | "routine"
+  | "adapted_routine"
+  | "alternate_candidate"
+  | "adapted_alternative";
+
+export interface MealReplanningRecommendation {
+  candidate: MealCandidate;
+  portion_multiplier: number;
+  strategy: MealReplanningStrategy;
+  reason: string;
+  adaptation: {
+    changed: boolean;
+    original_calories: number;
+    recommended_calories: number;
+    calorie_delta: number;
+  };
+}
+
 export interface MealOptionsResponse {
   date: string;
   meal_slot: string;
@@ -140,6 +159,7 @@ export interface MealOptionsResponse {
   candidate_count: number;
   candidates: MealCandidate[];
   options: RankedMealOption[];
+  recommended: MealReplanningRecommendation | null;
   day_context: DayDecisionContext;
   decision_preferences: DecisionPreferences;
   empty_reason: string | null;

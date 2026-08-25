@@ -75,6 +75,42 @@ class MealConfirmationService:
             ),
         }
 
+        estimated_quantity = prediction.get(
+            "estimated_quantity"
+        )
+
+        if estimated_quantity not in (None, ""):
+            try:
+                quantity = float(estimated_quantity)
+            except (TypeError, ValueError):
+                quantity = 0.0
+
+            if quantity > 0:
+                payload.update(
+                    {
+                        "base_name": str(
+                            prediction["value"]
+                        ),
+                        "quantity": quantity,
+                        "base_calories": round(
+                            payload["calories"] / quantity,
+                            2,
+                        ),
+                        "base_protein": round(
+                            payload["protein"] / quantity,
+                            2,
+                        ),
+                        "base_carbs": round(
+                            payload["carbs"] / quantity,
+                            2,
+                        ),
+                        "base_fat": round(
+                            payload["fat"] / quantity,
+                            2,
+                        ),
+                    }
+                )
+
         response = self.meals_repo.create_compatible(payload)
         rows = getattr(response, "data", None) or []
 

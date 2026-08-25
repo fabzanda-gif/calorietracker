@@ -954,3 +954,50 @@
 .registeredMealMenuDelete:hover {
   background: #fff3f3 !important;
 }
+
+
+/* Dynamic meal replanning preview */
+
+.replanningPreview {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 14px 15px;
+  border: 1px solid #dbe5d8;
+  border-radius: 16px;
+  background: #f5f8f3;
+}
+
+.replanningPreviewTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.replanningBadge {
+  color: #52754d;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.replanningMealName {
+  color: #242621;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.replanningNutrition {
+  margin: 0;
+  color: #4f544c;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.replanningReason {
+  margin: 2px 0 0;
+  color: #686c65;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}

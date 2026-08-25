@@ -52,6 +52,7 @@ from backend.services.meal_confirmation import (
 )
 from backend.services.meal_decision import MealDecisionService
 from backend.services.meal_memory import MealMemoryService
+from backend.services.meal_replanning import MealReplanningService
 from backend.services.order_candidates import OrderCandidateService
 from backend.services.order_personalization import (
     OrderPersonalizationService,
@@ -372,6 +373,24 @@ def get_ranked_meal_options(
             preferred_mode=feedback["preferred_mode"],
         )
 
+        routine_candidate = None
+
+        if mode_result["mode"] == "auto":
+            routine_candidate = next(
+                (
+                    candidate
+                    for candidate in feedback["candidates"]
+                    if candidate.get("source") == "routine"
+                ),
+                None,
+            )
+
+        recommended = MealReplanningService().recommend(
+            routine_candidate=routine_candidate,
+            ranked_options=ranked["options"],
+            available_kcal=available_kcal,
+        )
+
         return {
             "date": str(day_date),
             "meal_slot": meal_slot,
@@ -405,6 +424,7 @@ def get_ranked_meal_options(
             },
             "empty_reason": mode_result["empty_reason"],
             "candidates": mode_result["candidates"],
+            "recommended": recommended,
             **ranked,
         }
 

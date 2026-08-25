@@ -126,3 +126,40 @@ def test_missing_macro_estimates_are_written_as_zero_not_invented():
 
     assert result["item"]["carbs"] == 0
     assert result["item"]["fat"] == 0
+
+
+def test_structured_prediction_preserves_quantity_identity():
+    repo = FakeMealsRepository()
+
+    p = prediction()
+    p.update(
+        {
+            "value": "Fit Lasagna",
+            "estimated_quantity": 2,
+            "estimated_calories": 696,
+            "estimated_protein_g": 60,
+            "estimated_carbs_g": 80,
+            "estimated_fat_g": 24,
+        }
+    )
+
+    result = MealConfirmationService(repo).confirm(
+        user_id="u1",
+        day_date=DAY,
+        prediction=p,
+    )
+
+    item = result["item"]
+
+    assert item["name"] == "Fit Lasagna"
+    assert item["base_name"] == "Fit Lasagna"
+    assert item["quantity"] == 2
+    assert item["base_calories"] == 348
+    assert item["base_protein"] == 30
+    assert item["base_carbs"] == 40
+    assert item["base_fat"] == 12
+
+    assert item["calories"] == 696
+    assert item["protein"] == 60
+    assert item["carbs"] == 80
+    assert item["fat"] == 24

@@ -209,3 +209,274 @@ def test_missing_nutrition_values_do_not_break_prediction():
     assert result["estimated_protein_g"] is None
     assert result["estimated_carbs_g"] is None
     assert result["estimated_fat_g"] is None
+
+
+def test_base_name_is_used_as_routine_identity_when_available():
+    result = predict([
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (1 porz.)",
+            "base_name": "Fit Lasagna",
+            "quantity": 1,
+            "calories": 348,
+            "protein": 30,
+        },
+        {
+            "date": "2026-08-18",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (2 porz.)",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "calories": 696,
+            "protein": 60,
+        },
+        {
+            "date": "2026-08-25",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "calories": 696,
+            "protein": 60,
+        },
+    ])
+
+    assert result["value"] == "Fit Lasagna"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["matches"] == 3
+
+
+def test_legacy_meals_still_use_name_when_base_name_is_missing():
+    result = predict([
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Colazione Ufficio",
+            "calories": 300,
+        },
+        {
+            "date": "2026-08-18",
+            "meal_type": "Colazione",
+            "name": "Colazione Ufficio",
+            "calories": 320,
+        },
+        {
+            "date": "2026-08-25",
+            "meal_type": "Colazione",
+            "name": "Colazione Ufficio",
+            "calories": 310,
+        },
+    ])
+
+    assert result["value"] == "Colazione Ufficio"
+    assert result["estimated_calories"] == 310
+
+
+def test_base_name_is_used_as_routine_identity_when_available():
+    result = predict([
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (1 porz.)",
+            "base_name": "Fit Lasagna",
+            "quantity": 1,
+            "calories": 348,
+            "protein": 30,
+        },
+        {
+            "date": "2026-08-18",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (2 porz.)",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "calories": 696,
+            "protein": 60,
+        },
+        {
+            "date": "2026-08-25",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "calories": 696,
+            "protein": 60,
+        },
+    ])
+
+    assert result["value"] == "Fit Lasagna"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["matches"] == 3
+
+
+def test_legacy_meals_still_use_name_when_base_name_is_missing():
+    result = predict([
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Colazione Ufficio",
+            "calories": 300,
+        },
+        {
+            "date": "2026-08-18",
+            "meal_type": "Colazione",
+            "name": "Colazione Ufficio",
+            "calories": 320,
+        },
+        {
+            "date": "2026-08-25",
+            "meal_type": "Colazione",
+            "name": "Colazione Ufficio",
+            "calories": 310,
+        },
+    ])
+
+    assert result["value"] == "Colazione Ufficio"
+    assert result["estimated_calories"] == 310
+
+
+def test_structured_routine_learns_typical_quantity():
+    result = predict([
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna",
+            "base_name": "Fit Lasagna",
+            "quantity": 1,
+            "base_calories": 348,
+            "base_protein": 30,
+            "calories": 348,
+            "protein": 30,
+        },
+        {
+            "date": "2026-08-18",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "base_calories": 348,
+            "base_protein": 30,
+            "calories": 696,
+            "protein": 60,
+        },
+        {
+            "date": "2026-08-25",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "base_calories": 348,
+            "base_protein": 30,
+            "calories": 696,
+            "protein": 60,
+        },
+    ])
+
+    assert result["value"] == "Fit Lasagna"
+    assert result["estimated_quantity"] == 2
+    assert result["estimated_calories"] == 696
+    assert result["estimated_protein_g"] == 60
+
+
+def test_structured_routine_uses_recent_quantity_on_tie():
+    result = predict([
+        {
+            "date": "2026-08-04",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna",
+            "base_name": "Fit Lasagna",
+            "quantity": 1,
+            "base_calories": 348,
+            "calories": 348,
+        },
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "base_calories": 348,
+            "calories": 696,
+        },
+    ])
+
+    assert result["estimated_quantity"] == 2
+    assert result["estimated_calories"] == 696
+
+
+def test_legacy_routine_keeps_average_nutrition_behavior():
+    result = predict([
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Legacy Meal",
+            "calories": 300,
+        },
+        {
+            "date": "2026-08-18",
+            "meal_type": "Colazione",
+            "name": "Legacy Meal",
+            "calories": 320,
+        },
+    ])
+
+    assert result["estimated_quantity"] is None
+    assert result["estimated_calories"] == 310
+
+
+def test_portion_routine_ignores_gram_based_observation_for_nutrition():
+    result = predict([
+        {
+            "date": "2026-08-04",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (745g)",
+            "base_name": "Fit Lasagna",
+            "quantity": 745,
+            "is_per_100g": True,
+            "base_calories": 206.85,
+            "base_protein": 11.52,
+            "calories": 1541,
+            "protein": 86,
+        },
+        {
+            "date": "2026-08-11",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (2 porz.)",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "is_per_100g": False,
+            "base_calories": 347.75,
+            "base_protein": 20.45,
+            "calories": 696,
+            "protein": 41,
+        },
+        {
+            "date": "2026-08-18",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (2 porz.)",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "is_per_100g": False,
+            "base_calories": 347.75,
+            "base_protein": 20.45,
+            "calories": 696,
+            "protein": 41,
+        },
+        {
+            "date": "2026-08-25",
+            "meal_type": "Colazione",
+            "name": "Fit Lasagna (2 porz.)",
+            "base_name": "Fit Lasagna",
+            "quantity": 2,
+            "is_per_100g": False,
+            "base_calories": 347.75,
+            "base_protein": 20.45,
+            "calories": 696,
+            "protein": 41,
+        },
+    ])
+
+    assert result["value"] == "Fit Lasagna"
+    assert result["estimated_quantity"] == 2
+    assert result["estimated_calories"] == 695.5
+    assert result["estimated_protein_g"] == 40.9

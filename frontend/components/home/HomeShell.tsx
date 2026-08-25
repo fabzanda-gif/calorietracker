@@ -1066,6 +1066,84 @@ export function HomeShell() {
                       </p>
                     ) : null}
 
+                    {slot === "dinner" &&
+                    !actualMealForSlot(slot) &&
+                    dinnerOptions?.recommended ? (
+                      <div
+                        className={
+                          styles.replanningPreview
+                        }
+                      >
+                        <div
+                          className={
+                            styles.replanningPreviewTop
+                          }
+                        >
+                          <span
+                            className={
+                              styles.replanningBadge
+                            }
+                          >
+                            {dinnerOptions.recommended
+                              .strategy ===
+                            "adapted_routine"
+                              ? "Adattata alla tua giornata"
+                              : dinnerOptions.recommended
+                                    .strategy ===
+                                  "routine"
+                                ? "Già adatta alla giornata"
+                                : "Oggi ti conviene cambiare"}
+                          </span>
+                        </div>
+
+                        <strong
+                          className={
+                            styles.replanningMealName
+                          }
+                        >
+                          {
+                            dinnerOptions.recommended
+                              .candidate.name
+                          }
+                        </strong>
+
+                        <p
+                          className={
+                            styles.replanningNutrition
+                          }
+                        >
+                          {dinnerOptions.recommended
+                            .portion_multiplier !== 1
+                            ? `${dinnerOptions.recommended.portion_multiplier} porz. · `
+                            : ""}
+                          {roundNumber(
+                            dinnerOptions.recommended
+                              .candidate.calories,
+                          )}{" "}
+                          kcal
+                          {typeof dinnerOptions
+                            .recommended.candidate
+                            .protein_g === "number"
+                            ? ` · ${roundNumber(
+                                dinnerOptions.recommended
+                                  .candidate.protein_g,
+                              )} g proteine`
+                            : ""}
+                        </p>
+
+                        <p
+                          className={
+                            styles.replanningReason
+                          }
+                        >
+                          {
+                            dinnerOptions.recommended
+                              .reason
+                          }
+                        </p>
+                      </div>
+                    ) : null}
+
                     {actualMealForSlot(slot) ? (
                       <>
                         <div

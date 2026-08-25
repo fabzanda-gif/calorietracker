@@ -245,3 +245,57 @@ def test_unknown_slot_returns_404():
     )
 
     assert response.status_code == 404
+
+
+def test_auto_mode_exposes_replanned_recommendation():
+    response = client.get(
+        "/days/2026-09-01/meals/dinner/options",
+        params={"mode": "auto"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert "recommended" in payload
+    assert payload["recommended"] is not None
+
+    recommended = payload["recommended"]
+
+    assert "candidate" in recommended
+    assert "strategy" in recommended
+    assert "reason" in recommended
+    assert "adaptation" in recommended
+
+
+def test_explicit_mode_recommendation_respects_filtered_candidates():
+    response = client.get(
+        "/days/2026-09-01/meals/dinner/options",
+        params={"mode": "ready"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert "recommended" in payload
+
+    recommended = payload["recommended"]
+
+    if recommended is not None:
+        allowed_ids = {
+            candidate.get("id")
+            for candidate in payload["candidates"]
+            if candidate.get("id") is not None
+        }
+        allowed_source_ids = {
+            candidate.get("source_id")
+            for candidate in payload["candidates"]
+            if candidate.get("source_id") is not None
+        }
+
+        candidate = recommended["candidate"]
+
+        assert candidate["source"] == "meal_prep"
+        assert (
+            candidate.get("id") in allowed_ids
+            or candidate.get("source_id") in allowed_source_ids
+        )
