@@ -679,8 +679,9 @@
 
 .registeredMealPrimaryActions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+  align-items: stretch;
 }
 
 .deleteRegisteredMealButton {
@@ -863,4 +864,93 @@
 .reuseRegisteredMealButton:disabled {
   cursor: default;
   opacity: 0.55;
+}
+
+
+/* Compact menu for registered meal actions */
+
+.registeredMealActionMenu {
+  position: relative;
+}
+
+.registeredMealActionMenu[open] {
+  z-index: 20;
+}
+
+.registeredMealMoreButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  min-height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #d7d7d0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #30302d;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1;
+  list-style: none;
+  user-select: none;
+}
+
+.registeredMealMoreButton::-webkit-details-marker {
+  display: none;
+}
+
+.registeredMealMoreButton:hover {
+  background: #f4f4ef;
+}
+
+.registeredMealActionMenu[open]
+.registeredMealMoreButton {
+  background: #f0f0eb;
+}
+
+.registeredMealMenuPanel {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid #d9d9d2;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.1);
+}
+
+.registeredMealMenuPanel button {
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #30302d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-align: left;
+}
+
+.registeredMealMenuPanel button:hover {
+  background: #f4f4ef;
+}
+
+.registeredMealMenuPanel button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.registeredMealMenuDelete {
+  color: #9a3030 !important;
+}
+
+.registeredMealMenuDelete:hover {
+  background: #fff3f3 !important;
 }

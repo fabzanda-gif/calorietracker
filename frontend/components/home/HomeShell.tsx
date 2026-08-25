@@ -1105,57 +1105,84 @@ export function HomeShell() {
                               : "Modifica"}
                           </button>
 
-                          <button
-                            type="button"
+                          <details
                             className={
-                              styles.reuseRegisteredMealButton
+                              styles.registeredMealActionMenu
                             }
-                            disabled={
-                              deletingMealId !== null ||
-                              savingMealEdit
-                            }
-                            onClick={() => {
-                              const actual =
-                                actualMealForSlot(slot);
-
-                              if (actual) {
-                                void toggleRegisteredMealReusable(
-                                  actual,
-                                );
-                              }
-                            }}
                           >
-                            {actualMealForSlot(slot)
-                              ?.is_reusable === false
-                              ? "Riusa nei suggerimenti"
-                              : "Non suggerire più"}
-                          </button>
-
-                          <button
-                            type="button"
-                            className={
-                              styles.deleteRegisteredMealButton
-                            }
-                            disabled={
-                              deletingMealId !== null ||
-                              savingMealEdit
-                            }
-                            onClick={() => {
-                              const actual =
-                                actualMealForSlot(slot);
-
-                              if (actual) {
-                                void deleteRegisteredMeal(
-                                  actual,
-                                );
+                            <summary
+                              className={
+                                styles.registeredMealMoreButton
                               }
-                            }}
-                          >
-                            {deletingMealId ===
-                            actualMealForSlot(slot)?.id
-                              ? "Elimino…"
-                              : "Elimina"}
-                          </button>
+                              aria-label="Altre azioni"
+                              title="Altre azioni"
+                            >
+                              •••
+                            </summary>
+
+                            <div
+                              className={
+                                styles.registeredMealMenuPanel
+                              }
+                            >
+                              <button
+                                type="button"
+                                disabled={
+                                  deletingMealId !== null ||
+                                  savingMealEdit
+                                }
+                                onClick={(event) => {
+                                  const actual =
+                                    actualMealForSlot(slot);
+
+                                  if (actual) {
+                                    void toggleRegisteredMealReusable(
+                                      actual,
+                                    );
+                                  }
+
+                                  event.currentTarget
+                                    .closest("details")
+                                    ?.removeAttribute("open");
+                                }}
+                              >
+                                {actualMealForSlot(slot)
+                                  ?.is_reusable === false
+                                  ? "Riusa nei suggerimenti"
+                                  : "Non suggerire più"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className={
+                                  styles.registeredMealMenuDelete
+                                }
+                                disabled={
+                                  deletingMealId !== null ||
+                                  savingMealEdit
+                                }
+                                onClick={(event) => {
+                                  const actual =
+                                    actualMealForSlot(slot);
+
+                                  if (actual) {
+                                    void deleteRegisteredMeal(
+                                      actual,
+                                    );
+                                  }
+
+                                  event.currentTarget
+                                    .closest("details")
+                                    ?.removeAttribute("open");
+                                }}
+                              >
+                                {deletingMealId ===
+                                actualMealForSlot(slot)?.id
+                                  ? "Elimino…"
+                                  : "Elimina"}
+                              </button>
+                            </div>
+                          </details>
                         </div>
 
                         {editingMealId ===
