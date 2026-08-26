@@ -5,9 +5,11 @@ from fastapi.testclient import TestClient
 
 from backend.api.dependencies import (
     CurrentUser,
+    get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
     get_meals_repository,
+    get_weight_repository,
 )
 from backend.api.main import app
 
@@ -33,6 +35,16 @@ class FakeDailyLogsRepository:
             {"date": "2026-08-18", "day_type": "Ufficio"},
             {"date": "2026-08-25", "day_type": "Ufficio"},
         ]
+
+
+class FakeActivitiesRepository:
+    def list_for_date(self, user_id, log_date):
+        return []
+
+
+class FakeWeightRepository:
+    def latest(self, user_id):
+        return {"weight": 80}
 
 
 class FakeMealsRepository:
@@ -107,6 +119,12 @@ def override_current_user():
     return CurrentUser(
         id="authenticated-user",
         access_token="fake-token",
+        metadata={
+            "height": 180,
+            "birth_date": "1990-01-01",
+            "gender": "Uomo",
+            "goal_mode": "maintenance",
+        },
     )
 
 
@@ -125,6 +143,12 @@ def api_overrides():
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_daily_logs_repository] = override_daily_logs
     app.dependency_overrides[get_meals_repository] = override_meals
+    app.dependency_overrides[
+        get_activities_repository
+    ] = lambda: FakeActivitiesRepository()
+    app.dependency_overrides[
+        get_weight_repository
+    ] = lambda: FakeWeightRepository()
 
     yield
 
@@ -236,3 +260,68 @@ def test_next_meal_route_advances_after_confirmation():
     assert response.status_code == 200
     assert response.json()["next_slot"] == "lunch"
     assert response.json()["next_meal_type"] == "Pranzo"
+
+
+def test_extra_meal_reduces_budget_without_advancing_next_slot():
+    breakfast = fake_meals.create_compatible(
+        {
+            "user_id": "authenticated-user",
+            "date": "2026-09-01",
+            "meal_type": "Colazione",
+            "name": "Colazione",
+            "calories": 300,
+            "protein": 20,
+            "carbs": 30,
+            "fat": 10,
+        }
+    )
+
+    assert breakfast.data
+
+    before_budget = client.get(
+        "/days/2026-09-01/budget"
+    )
+    before_next = client.get(
+        "/days/2026-09-01/next-meal"
+    )
+
+    assert before_budget.status_code == 200
+    assert before_next.status_code == 200
+    assert before_next.json()["next_slot"] == "lunch"
+
+    before_available = (
+        before_budget.json()["budget"]["available_kcal"]
+    )
+
+    snack = fake_meals.create_compatible(
+        {
+            "user_id": "authenticated-user",
+            "date": "2026-09-01",
+            "meal_type": "Spuntino",
+            "name": "Snack test",
+            "calories": 250,
+            "protein": 10,
+            "carbs": 25,
+            "fat": 8,
+        }
+    )
+
+    assert snack.data
+
+    after_budget = client.get(
+        "/days/2026-09-01/budget"
+    )
+    after_next = client.get(
+        "/days/2026-09-01/next-meal"
+    )
+
+    assert after_budget.status_code == 200
+    assert after_next.status_code == 200
+
+    assert after_next.json()["next_slot"] == "lunch"
+
+    after_available = (
+        after_budget.json()["budget"]["available_kcal"]
+    )
+
+    assert after_available == before_available - 250

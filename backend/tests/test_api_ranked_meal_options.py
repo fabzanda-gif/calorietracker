@@ -41,6 +41,9 @@ class FakeDailyLogsRepository:
 
 
 class FakeMealsRepository:
+    def __init__(self):
+        self.today_meals = []
+
     def list_history_compatible(self, user_id):
         # This test predates order-history candidates. Keep its original
         # scenario unchanged by explicitly providing no order history.
@@ -76,12 +79,15 @@ class FakeMealsRepository:
         user_id,
         log_date,
     ):
-        return []
+        return list(self.today_meals)
 
 
 class FakeActivitiesRepository:
+    def __init__(self):
+        self.today_activities = []
+
     def list_for_date(self, user_id, log_date):
-        return []
+        return list(self.today_activities)
 
 
 class FakeWeightRepository:
@@ -137,6 +143,10 @@ class FakeRecipesRepository:
         ]
 
 
+fake_meals = FakeMealsRepository()
+fake_activities = FakeActivitiesRepository()
+
+
 def override_current_user():
     return CurrentUser(
         id="authenticated-user",
@@ -154,6 +164,9 @@ def override_current_user():
 
 @pytest.fixture(autouse=True)
 def overrides():
+    fake_meals.today_meals.clear()
+    fake_activities.today_activities.clear()
+
     app.dependency_overrides[get_current_user] = (
         override_current_user
     )
@@ -161,10 +174,10 @@ def overrides():
         lambda: FakeDailyLogsRepository()
     )
     app.dependency_overrides[get_meals_repository] = (
-        lambda: FakeMealsRepository()
+        lambda: fake_meals
     )
     app.dependency_overrides[get_activities_repository] = (
-        lambda: FakeActivitiesRepository()
+        lambda: fake_activities
     )
     app.dependency_overrides[get_weight_repository] = (
         lambda: FakeWeightRepository()
@@ -299,3 +312,177 @@ def test_explicit_mode_recommendation_respects_filtered_candidates():
             candidate.get("id") in allowed_ids
             or candidate.get("source_id") in allowed_source_ids
         )
+
+
+def test_snack_replans_lunch_without_changing_routine_identity():
+    fake_meals.today_meals.append(
+        {
+            "date": "2026-09-01",
+            "meal_type": "Colazione",
+            "name": "Breakfast",
+            "calories": 300,
+            "protein": 20,
+            "carbs": 35,
+            "fat": 8,
+        }
+    )
+
+    before_budget_response = client.get(
+        "/days/2026-09-01/budget"
+    )
+    before_options_response = client.get(
+        "/days/2026-09-01/meals/lunch/options",
+        params={"mode": "auto"},
+    )
+
+    assert before_budget_response.status_code == 200
+    assert before_options_response.status_code == 200
+
+    before_budget = before_budget_response.json()["budget"]
+    before_recommendation = (
+        before_options_response.json()["recommended"]
+    )
+
+    assert before_recommendation is not None
+    assert before_recommendation["strategy"] == "routine"
+    assert before_recommendation["portion_multiplier"] == 1.0
+
+    fake_meals.today_meals.append(
+        {
+            "date": "2026-09-01",
+            "meal_type": "Spuntino",
+            "name": "Large snack",
+            "calories": 900,
+            "protein": 10,
+            "carbs": 100,
+            "fat": 30,
+        }
+    )
+
+    after_budget_response = client.get(
+        "/days/2026-09-01/budget"
+    )
+    after_options_response = client.get(
+        "/days/2026-09-01/meals/lunch/options",
+        params={"mode": "auto"},
+    )
+
+    assert after_budget_response.status_code == 200
+    assert after_options_response.status_code == 200
+
+    after_budget = after_budget_response.json()["budget"]
+    after_recommendation = (
+        after_options_response.json()["recommended"]
+    )
+
+    assert after_recommendation is not None
+
+    assert (
+        after_budget["available_kcal"]
+        == before_budget["available_kcal"] - 900
+    )
+
+    assert (
+        after_recommendation["strategy"]
+        == "adapted_routine"
+    )
+
+    assert (
+        after_recommendation["portion_multiplier"]
+        < before_recommendation["portion_multiplier"]
+    )
+
+    assert (
+        after_recommendation["candidate"]["calories"]
+        < before_recommendation["candidate"]["calories"]
+    )
+
+
+def test_activity_can_relax_lunch_replanning():
+    fake_meals.today_meals.extend(
+        [
+            {
+                "date": "2026-09-01",
+                "meal_type": "Colazione",
+                "name": "Breakfast",
+                "calories": 300,
+                "protein": 20,
+                "carbs": 35,
+                "fat": 8,
+            },
+            {
+                "date": "2026-09-01",
+                "meal_type": "Spuntino",
+                "name": "Large snack",
+                "calories": 900,
+                "protein": 10,
+                "carbs": 100,
+                "fat": 30,
+            },
+        ]
+    )
+
+    before_budget_response = client.get(
+        "/days/2026-09-01/budget"
+    )
+    before_options_response = client.get(
+        "/days/2026-09-01/meals/lunch/options",
+        params={"mode": "auto"},
+    )
+
+    assert before_budget_response.status_code == 200
+    assert before_options_response.status_code == 200
+
+    before_budget = before_budget_response.json()["budget"]
+    before_recommendation = (
+        before_options_response.json()["recommended"]
+    )
+
+    assert before_recommendation is not None
+    assert (
+        before_recommendation["strategy"]
+        == "adapted_routine"
+    )
+
+    fake_activities.today_activities.append(
+        {
+            "date": "2026-09-01",
+            "name": "Workout",
+            "burned_calories": 500,
+        }
+    )
+
+    after_budget_response = client.get(
+        "/days/2026-09-01/budget"
+    )
+    after_options_response = client.get(
+        "/days/2026-09-01/meals/lunch/options",
+        params={"mode": "auto"},
+    )
+
+    assert after_budget_response.status_code == 200
+    assert after_options_response.status_code == 200
+
+    after_budget = after_budget_response.json()["budget"]
+    after_recommendation = (
+        after_options_response.json()["recommended"]
+    )
+
+    assert after_recommendation is not None
+
+    assert (
+        after_budget["available_kcal"]
+        == before_budget["available_kcal"] + 500
+    )
+
+    assert (
+        after_recommendation["portion_multiplier"]
+        >=
+        before_recommendation["portion_multiplier"]
+    )
+
+    assert (
+        after_recommendation["candidate"]["calories"]
+        >=
+        before_recommendation["candidate"]["calories"]
+    )

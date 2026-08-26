@@ -39,3 +39,23 @@ def test_order_of_logged_rows_does_not_matter():
     assert next_slot(
         ["Pranzo", "Colazione"]
     ) == "dinner"
+
+
+def test_extra_meal_does_not_advance_standard_sequence():
+    service = NextMealReplanningService()
+
+    assert service.next_slot(
+        logged_meal_types=["Spuntino"],
+    ) == "breakfast"
+
+    assert service.next_slot(
+        logged_meal_types=["Colazione", "Spuntino"],
+    ) == "lunch"
+
+    assert service.next_slot(
+        logged_meal_types=[
+            "Colazione",
+            "Spuntino",
+            "Pranzo",
+        ],
+    ) == "dinner"
