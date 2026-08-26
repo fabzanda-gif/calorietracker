@@ -1,3 +1,5 @@
+import os
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 
@@ -22,11 +24,22 @@ app = FastAPI(
     version="0.3.0",
 )
 
+default_origins = [
+    "http://localhost:3000",
+    "https://glowing-cod-wv9qq5pr677pcqrj-3000.app.github.dev",
+]
+
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+allowed_origins = configured_origins or default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://glowing-cod-wv9qq5pr677pcqrj-3000.app.github.dev",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
