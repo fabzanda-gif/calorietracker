@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+from typing import Any
+
+
+class MealReplanningContextService:
+    """
+    Explain how the current day context relates to a meal
+    recommendation.
+
+    V1 intentionally stays descriptive rather than claiming
+    strict causality:
+    - a reduced portion with food already logged is described
+      as food pressure;
+    - activity with an unchanged/full recommendation is
+      exposed as additional available margin;
+    - otherwise the recommendation is described as compatible
+      with the normal day context.
+    """
+
+    def build(
+        self,
+        *,
+        recommendation: dict[str, Any] | None,
+        actual: dict[str, Any] | None,
+        budget: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not isinstance(recommendation, dict):
+            return None
+
+        actual = actual if isinstance(actual, dict) else {}
+        budget = budget if isinstance(budget, dict) else {}
+
+        multiplier = self._number(
+            recommendation.get("portion_multiplier"),
+            default=1.0,
+        )
+        consumed_kcal = self._number(
+            actual.get("consumed_kcal")
+        )
+        activity_kcal = self._number(
+            actual.get("actual_activity_kcal")
+        )
+
+        available_kcal = self._optional_number(
+            budget.get("available_kcal")
+        )
+
+        portion_changed = multiplier != 1.0
+
+        if multiplier < 1.0 and consumed_kcal > 0:
+            return {
+                "direction": "reduced",
+                "driver": "food",
+                "portion_changed": True,
+                "available_kcal": available_kcal,
+                "title": "Porzione adattata alla giornata",
+                "message": (
+                    "Quello che hai già registrato oggi lascia "
+                    "meno margine per questo pasto."
+                ),
+            }
+
+        if activity_kcal > 0 and multiplier >= 1.0:
+            return {
+                "direction": "expanded",
+                "driver": "activity",
+                "portion_changed": portion_changed,
+                "available_kcal": available_kcal,
+                "title": "Più margine disponibile",
+                "message": (
+                    "L'attività registrata oggi ha aumentato "
+                    "il margine disponibile."
+                ),
+            }
+
+        return {
+            "direction": "unchanged",
+            "driver": "normal",
+            "portion_changed": portion_changed,
+            "available_kcal": available_kcal,
+            "title": "In linea con la giornata",
+            "message": (
+                "Il pasto abituale è compatibile con "
+                "il margine disponibile."
+            ),
+        }
+
+    @staticmethod
+    def _number(
+        value: Any,
+        *,
+        default: float = 0.0,
+    ) -> float:
+        try:
+            return max(
+                0.0,
+                float(
+                    default
+                    if value is None
+                    else value
+                ),
+            )
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _optional_number(
+        value: Any,
+    ) -> float | None:
+        if value is None:
+            return None
+
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+
+        number = max(0.0, number)
+
+        if number.is_integer():
+            return int(number)
+
+        return round(number, 2)

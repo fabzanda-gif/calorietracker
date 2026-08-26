@@ -1058,3 +1058,12 @@
   border: 1px solid currentColor;
   opacity: 0.8;
 }
+
+.replanningContextTitle {
+  display: block;
+  margin-top: 2px;
+  color: #385f34;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.3;
+}

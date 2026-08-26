@@ -54,6 +54,7 @@ from backend.services.meal_decision import MealDecisionService
 from backend.services.meal_memory import MealMemoryService
 from backend.services.next_meal_replanning import NextMealReplanningService
 from backend.services.meal_replanning import MealReplanningService
+from backend.services.meal_replanning_context import MealReplanningContextService
 from backend.services.order_candidates import OrderCandidateService
 from backend.services.order_personalization import (
     OrderPersonalizationService,
@@ -430,6 +431,12 @@ def get_ranked_meal_options(
             available_kcal=available_kcal,
         )
 
+        replanning_context = MealReplanningContextService().build(
+            recommendation=recommended,
+            actual=budget_result.get("actual"),
+            budget=budget,
+        )
+
         return {
             "date": str(day_date),
             "meal_slot": meal_slot,
@@ -464,6 +471,7 @@ def get_ranked_meal_options(
             "empty_reason": mode_result["empty_reason"],
             "candidates": mode_result["candidates"],
             "recommended": recommended,
+            "replanning_context": replanning_context,
             **ranked,
         }
 

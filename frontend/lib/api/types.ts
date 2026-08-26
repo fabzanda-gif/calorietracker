@@ -145,6 +145,15 @@ export type MealReplanningStrategy =
   | "alternate_candidate"
   | "adapted_alternative";
 
+export interface MealReplanningContext {
+  direction: "reduced" | "expanded" | "unchanged";
+  driver: "food" | "activity" | "normal";
+  portion_changed: boolean;
+  available_kcal: number | null;
+  title: string;
+  message: string;
+}
+
 export interface MealReplanningRecommendation {
   candidate: MealCandidate;
   portion_multiplier: number;
@@ -169,6 +178,7 @@ export interface MealOptionsResponse {
   candidates: MealCandidate[];
   options: RankedMealOption[];
   recommended: MealReplanningRecommendation | null;
+  replanning_context: MealReplanningContext | null;
   day_context: DayDecisionContext;
   decision_preferences: DecisionPreferences;
   empty_reason: string | null;

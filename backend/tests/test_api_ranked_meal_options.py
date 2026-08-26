@@ -486,3 +486,112 @@ def test_activity_can_relax_lunch_replanning():
         >=
         before_recommendation["candidate"]["calories"]
     )
+
+
+def test_snack_exposes_food_replanning_context():
+    fake_meals.today_meals.extend(
+        [
+            {
+                "date": "2026-09-01",
+                "meal_type": "Colazione",
+                "name": "Breakfast",
+                "calories": 300,
+                "protein": 20,
+                "carbs": 35,
+                "fat": 8,
+            },
+            {
+                "date": "2026-09-01",
+                "meal_type": "Spuntino",
+                "name": "Large snack",
+                "calories": 900,
+                "protein": 10,
+                "carbs": 100,
+                "fat": 30,
+            },
+        ]
+    )
+
+    response = client.get(
+        "/days/2026-09-01/meals/lunch/options",
+        params={"mode": "auto"},
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["recommended"] is not None
+    assert (
+        payload["recommended"]["strategy"]
+        == "adapted_routine"
+    )
+
+    assert payload["replanning_context"] == {
+        "direction": "reduced",
+        "driver": "food",
+        "portion_changed": True,
+        "available_kcal": payload[
+            "replanning_context"
+        ]["available_kcal"],
+        "title": "Porzione adattata alla giornata",
+        "message": (
+            "Quello che hai già registrato oggi lascia "
+            "meno margine per questo pasto."
+        ),
+    }
+
+
+def test_activity_exposes_positive_replanning_context():
+    fake_meals.today_meals.extend(
+        [
+            {
+                "date": "2026-09-01",
+                "meal_type": "Colazione",
+                "name": "Breakfast",
+                "calories": 300,
+                "protein": 20,
+                "carbs": 35,
+                "fat": 8,
+            },
+            {
+                "date": "2026-09-01",
+                "meal_type": "Spuntino",
+                "name": "Large snack",
+                "calories": 900,
+                "protein": 10,
+                "carbs": 100,
+                "fat": 30,
+            },
+        ]
+    )
+
+    fake_activities.today_activities.append(
+        {
+            "date": "2026-09-01",
+            "name": "Workout",
+            "burned_calories": 500,
+        }
+    )
+
+    response = client.get(
+        "/days/2026-09-01/meals/lunch/options",
+        params={"mode": "auto"},
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["recommended"] is not None
+
+    context = payload["replanning_context"]
+
+    assert context["driver"] == "activity"
+    assert context["direction"] == "expanded"
+    assert context["title"] == "Più margine disponibile"
+    assert (
+        context["message"]
+        == "L'attività registrata oggi ha aumentato "
+        "il margine disponibile."
+    )

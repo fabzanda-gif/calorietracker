@@ -1157,11 +1157,14 @@ export function HomeShell() {
 
                           <div>
                             <strong>
-                              Già adatta alla giornata
+                              {nextMealOptions
+                                .replanning_context?.title ??
+                                "Già adatta alla giornata"}
                             </strong>
                             <p>
-                              Il tuo pasto abituale va bene
-                              così com'è oggi.
+                              {nextMealOptions
+                                .replanning_context?.message ??
+                                "Il tuo pasto abituale va bene così com'è oggi."}
                             </p>
                           </div>
                         </div>
@@ -1227,16 +1230,32 @@ export function HomeShell() {
                               : ""}
                           </p>
 
-                          <p
-                            className={
-                              styles.replanningReason
-                            }
-                          >
-                            {
-                              nextMealOptions.recommended
-                                .reason
-                            }
-                          </p>
+                          <div>
+                            {nextMealOptions
+                              .replanning_context?.title ? (
+                              <strong
+                                className={
+                                  styles.replanningContextTitle
+                                }
+                              >
+                                {
+                                  nextMealOptions
+                                    .replanning_context.title
+                                }
+                              </strong>
+                            ) : null}
+
+                            <p
+                              className={
+                                styles.replanningReason
+                              }
+                            >
+                              {nextMealOptions
+                                .replanning_context?.message ??
+                                nextMealOptions.recommended
+                                  .reason}
+                            </p>
+                          </div>
                         </div>
                       )
                     ) : null}
