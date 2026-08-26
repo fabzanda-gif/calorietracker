@@ -713,10 +713,36 @@ export function HomeShell() {
     setConfirmingSlot(slot);
 
     try {
+      const replannedRecommendation =
+        slot === "dinner" &&
+        dinnerOptions?.recommended
+          ? {
+              name:
+                dinnerOptions.recommended
+                  .candidate.name,
+              quantity:
+                dinnerOptions.recommended
+                  .recommended_quantity,
+              calories:
+                dinnerOptions.recommended
+                  .candidate.calories,
+              protein_g:
+                dinnerOptions.recommended
+                  .candidate.protein_g,
+              carbs_g:
+                dinnerOptions.recommended
+                  .candidate.carbs_g,
+              fat_g:
+                dinnerOptions.recommended
+                  .candidate.fat_g,
+            }
+          : null;
+
       await confirmMealPrediction(
         todayIso(),
         slot,
         accessToken,
+        replannedRecommendation,
       );
 
       await refreshHome();
@@ -1069,79 +1095,106 @@ export function HomeShell() {
                     {slot === "dinner" &&
                     !actualMealForSlot(slot) &&
                     dinnerOptions?.recommended ? (
-                      <div
-                        className={
-                          styles.replanningPreview
-                        }
-                      >
+                      dinnerOptions.recommended.strategy ===
+                      "routine" ? (
                         <div
                           className={
-                            styles.replanningPreviewTop
+                            styles.replanningCompact
                           }
                         >
                           <span
                             className={
-                              styles.replanningBadge
+                              styles.replanningCompactIcon
+                            }
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+
+                          <div>
+                            <strong>
+                              Già adatta alla giornata
+                            </strong>
+                            <p>
+                              La tua cena abituale va bene
+                              così com'è oggi.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className={
+                            styles.replanningPreview
+                          }
+                        >
+                          <div
+                            className={
+                              styles.replanningPreviewTop
                             }
                           >
-                            {dinnerOptions.recommended
-                              .strategy ===
-                            "adapted_routine"
-                              ? "Adattata alla tua giornata"
-                              : dinnerOptions.recommended
-                                    .strategy ===
-                                  "routine"
-                                ? "Già adatta alla giornata"
+                            <span
+                              className={
+                                styles.replanningBadge
+                              }
+                            >
+                              {dinnerOptions.recommended
+                                .strategy ===
+                              "adapted_routine"
+                                ? "Adattata alla tua giornata"
                                 : "Oggi ti conviene cambiare"}
-                          </span>
+                            </span>
+                          </div>
+
+                          <strong
+                            className={
+                              styles.replanningMealName
+                            }
+                          >
+                            {
+                              dinnerOptions.recommended
+                                .candidate.name
+                            }
+                          </strong>
+
+                          <p
+                            className={
+                              styles.replanningNutrition
+                            }
+                          >
+                            {typeof dinnerOptions.recommended
+                              .recommended_quantity === "number"
+                              ? `${roundNumber(
+                                  dinnerOptions.recommended
+                                    .recommended_quantity,
+                                )} porz. · `
+                              : ""}
+                            {roundNumber(
+                              dinnerOptions.recommended
+                                .candidate.calories,
+                            )}{" "}
+                            kcal
+                            {typeof dinnerOptions
+                              .recommended.candidate
+                              .protein_g === "number"
+                              ? ` · ${roundNumber(
+                                  dinnerOptions.recommended
+                                    .candidate.protein_g,
+                                )} g proteine`
+                              : ""}
+                          </p>
+
+                          <p
+                            className={
+                              styles.replanningReason
+                            }
+                          >
+                            {
+                              dinnerOptions.recommended
+                                .reason
+                            }
+                          </p>
                         </div>
-
-                        <strong
-                          className={
-                            styles.replanningMealName
-                          }
-                        >
-                          {
-                            dinnerOptions.recommended
-                              .candidate.name
-                          }
-                        </strong>
-
-                        <p
-                          className={
-                            styles.replanningNutrition
-                          }
-                        >
-                          {dinnerOptions.recommended
-                            .portion_multiplier !== 1
-                            ? `${dinnerOptions.recommended.portion_multiplier} porz. · `
-                            : ""}
-                          {roundNumber(
-                            dinnerOptions.recommended
-                              .candidate.calories,
-                          )}{" "}
-                          kcal
-                          {typeof dinnerOptions
-                            .recommended.candidate
-                            .protein_g === "number"
-                            ? ` · ${roundNumber(
-                                dinnerOptions.recommended
-                                  .candidate.protein_g,
-                              )} g proteine`
-                            : ""}
-                        </p>
-
-                        <p
-                          className={
-                            styles.replanningReason
-                          }
-                        >
-                          {
-                            dinnerOptions.recommended
-                              .reason
-                          }
-                        </p>
-                      </div>
+                      )
                     ) : null}
 
                     {actualMealForSlot(slot) ? (

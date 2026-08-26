@@ -176,3 +176,34 @@ def test_unknown_meal_slot_is_404():
     )
 
     assert response.status_code == 404
+
+
+def test_confirmation_can_log_replanned_quantity():
+    response = client.post(
+        "/days/2026-09-01/meals/dinner/confirm",
+        json={
+            "recommendation": {
+                "name": "Fit Lasagna",
+                "quantity": 1.5,
+                "calories": 578,
+                "protein_g": 32.25,
+                "carbs_g": 99,
+                "fat_g": 24,
+            }
+        },
+    )
+
+    assert response.status_code == 200
+
+    item = response.json()["item"]
+
+    assert item["meal_type"] == "Cena"
+    assert item["name"] == "Fit Lasagna"
+
+    assert item["base_name"] == "Fit Lasagna"
+    assert item["quantity"] == 1.5
+
+    assert item["calories"] == 578
+    assert item["protein"] == 32
+    assert item["carbs"] == 99
+    assert item["fat"] == 24

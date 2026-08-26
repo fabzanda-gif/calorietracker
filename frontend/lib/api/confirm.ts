@@ -5,10 +5,20 @@ export interface ConfirmMealResponse {
   item: Record<string, unknown>;
 }
 
+export interface ConfirmMealRecommendation {
+  name: string;
+  quantity: number | null;
+  calories: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fat_g?: number;
+}
+
 export function confirmMealPrediction(
   dayDate: string,
   mealSlot: string,
   accessToken?: string | null,
+  recommendation?: ConfirmMealRecommendation | null,
 ): Promise<ConfirmMealResponse> {
   return apiRequest<ConfirmMealResponse>(
     `/days/${encodeURIComponent(dayDate)}` +
@@ -17,6 +27,11 @@ export function confirmMealPrediction(
     {
       method: "POST",
       accessToken,
+      body: recommendation
+        ? JSON.stringify({
+            recommendation,
+          })
+        : undefined,
     },
   );
 }

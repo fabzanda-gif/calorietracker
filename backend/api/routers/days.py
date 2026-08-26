@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date as Date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from backend.api.dependencies import (
     CurrentUser,
@@ -506,6 +506,7 @@ def get_meal_decision(
 def confirm_meal_prediction(
     day_date: Date,
     meal_slot: str,
+    body: dict | None = Body(default=None),
     current_user: CurrentUser = Depends(get_current_user),
     daily_logs_repo: DailyLogsRepository = Depends(
         get_daily_logs_repository
@@ -514,7 +515,7 @@ def confirm_meal_prediction(
         get_meals_repository
     ),
 ):
-    _validate_slot(meal_slot)
+    meal_type = _validate_slot(meal_slot)
 
     try:
         day = _build_day(
@@ -524,12 +525,47 @@ def confirm_meal_prediction(
             meals_repo=meals_repo,
         )
 
+        prediction = day["meals"][meal_slot]
+
+        recommendation = (
+            body.get("recommendation")
+            if isinstance(body, dict)
+            else None
+        )
+
+        if isinstance(recommendation, dict):
+            name = recommendation.get("name")
+
+            if name:
+                prediction = {
+                    **prediction,
+                    "meal_type": meal_type,
+                    "value": str(name),
+                    "state": "predicted",
+                    "source": "replanning",
+                    "estimated_quantity": recommendation.get(
+                        "quantity"
+                    ),
+                    "estimated_calories": recommendation.get(
+                        "calories"
+                    ),
+                    "estimated_protein_g": recommendation.get(
+                        "protein_g"
+                    ),
+                    "estimated_carbs_g": recommendation.get(
+                        "carbs_g"
+                    ),
+                    "estimated_fat_g": recommendation.get(
+                        "fat_g"
+                    ),
+                }
+
         return MealConfirmationService(
             meals_repo
         ).confirm(
             user_id=current_user.id,
             day_date=day_date,
-            prediction=day["meals"][meal_slot],
+            prediction=prediction,
         )
 
     except (

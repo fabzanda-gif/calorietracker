@@ -114,9 +114,23 @@ class MealReplanningService:
             candidate.get("calories")
         )
 
+        original_quantity = cls._number(
+            original.get("quantity")
+        )
+
+        recommended_quantity = (
+            round(
+                original_quantity * multiplier,
+                2,
+            )
+            if original_quantity > 0
+            else None
+        )
+
         return {
             "candidate": candidate,
             "portion_multiplier": multiplier,
+            "recommended_quantity": recommended_quantity,
             "strategy": strategy,
             "reason": cls._reason(strategy),
             "adaptation": {

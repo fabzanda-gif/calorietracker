@@ -33,6 +33,7 @@ export interface DayMealPrediction {
   confidence?: number | null;
   confidence_level?: string | null;
   day_context?: string | null;
+  estimated_quantity?: number | null;
   estimated_calories?: number | null;
   estimated_protein_g?: number | null;
   estimated_carbs_g?: number | null;
@@ -89,6 +90,7 @@ export interface MealCandidate {
   source_id?: string | null;
   name: string;
   meal_type?: string;
+  quantity?: number | null;
   calories: number;
   protein_g?: number;
   carbs_g?: number;
@@ -140,6 +142,7 @@ export type MealReplanningStrategy =
 export interface MealReplanningRecommendation {
   candidate: MealCandidate;
   portion_multiplier: number;
+  recommended_quantity: number | null;
   strategy: MealReplanningStrategy;
   reason: string;
   adaptation: {

@@ -100,6 +100,9 @@ class MealCandidateService:
                     "source_id": None,
                     "name": prediction.get("value"),
                     "meal_type": meal_type,
+                    "quantity": self._number(
+                        prediction.get("estimated_quantity")
+                    ),
                     "calories": self._number(
                         prediction.get("estimated_calories")
                     ),

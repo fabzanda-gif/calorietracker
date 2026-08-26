@@ -199,3 +199,63 @@ def test_structured_historical_lunch_is_candidate():
 
     assert len(result) == 1
     assert result[0]["name"] == "Pasta al pomodoro"
+
+
+def test_routine_candidate_preserves_estimated_quantity():
+    candidates = MealCandidateService().build(
+        day_date=date(2026, 9, 1),
+        meal_type="Cena",
+        meal_prep_items=[],
+        routine_prediction={
+            "meal_type": "Cena",
+            "value": "Fit Lasagna",
+            "state": "predicted",
+            "source": "routine",
+            "estimated_quantity": 2,
+            "estimated_calories": 696,
+            "estimated_protein_g": 41,
+            "estimated_carbs_g": 130,
+            "estimated_fat_g": 27,
+        },
+        recipes=[],
+        historical_meals=[],
+    )
+
+    routine = next(
+        item
+        for item in candidates
+        if item["source"] == "routine"
+    )
+
+    assert routine["name"] == "Fit Lasagna"
+    assert routine["quantity"] == 2
+
+
+def test_routine_candidate_preserves_estimated_quantity():
+    candidates = MealCandidateService().build(
+        day_date=date(2026, 9, 1),
+        meal_type="Cena",
+        meal_prep_items=[],
+        routine_prediction={
+            "meal_type": "Cena",
+            "value": "Fit Lasagna",
+            "state": "predicted",
+            "source": "routine",
+            "estimated_quantity": 2,
+            "estimated_calories": 696,
+            "estimated_protein_g": 41,
+            "estimated_carbs_g": 130,
+            "estimated_fat_g": 27,
+        },
+        recipes=[],
+        historical_meals=[],
+    )
+
+    routine = next(
+        item
+        for item in candidates
+        if item["source"] == "routine"
+    )
+
+    assert routine["name"] == "Fit Lasagna"
+    assert routine["quantity"] == 2
