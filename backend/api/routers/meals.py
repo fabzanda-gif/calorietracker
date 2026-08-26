@@ -6,6 +6,16 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from backend.services.conversational_meal_logging import (
+    ConversationalMealLoggingService,
+)
+from backend.services.meal_text_interpreter import (
+    MealTextInterpreter,
+)
+from backend.services.groq_meal_interpreter import (
+    GroqMealInterpreter,
+)
+
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
@@ -70,6 +80,22 @@ class MealCreate(BaseModel):
     image_url: str | None = None
 
 
+def interpret_meal_text(
+    *,
+    text: str,
+    meal_type: str,
+) -> dict:
+    return GroqMealInterpreter().interpret(
+        text=text,
+        meal_type=meal_type,
+    )
+
+
+class ConversationalMealPreviewRequest(BaseModel):
+    text: str = Field(min_length=1)
+    meal_type: str
+
+
 class MealUpdate(BaseModel):
     meal_type: str | None = None
     name: str | None = None
@@ -103,6 +129,27 @@ class MealUpdate(BaseModel):
 # IMPORTANT: keep these BEFORE /{meal_date}, otherwise strings such as
 # "history" or "range" could be interpreted as the dynamic date route.
 # ------------------------------------------------------------------
+
+@router.post("/conversational/preview")
+def preview_conversational_meal(
+    request: ConversationalMealPreviewRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    raw_interpretation = interpret_meal_text(
+        text=request.text,
+        meal_type=request.meal_type,
+    )
+
+    normalized = MealTextInterpreter().normalize(
+        raw_interpretation
+    )
+
+    return ConversationalMealLoggingService().build_preview(
+        text=request.text,
+        meal_type=normalized["meal_type"],
+        interpreted_items=normalized["items"],
+    )
+
 
 @router.get("/history")
 def get_meal_history(

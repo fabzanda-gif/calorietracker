@@ -15,7 +15,9 @@ import {
   deleteMeal,
   getMeal,
   getMealsForDate,
+  previewConversationalMeal,
   updateMeal,
+  type ConversationalMealPreview,
   type LoggedMeal,
   type StructuredMealIngredient,
 } from "@/lib/api/meals";
@@ -156,10 +158,31 @@ export function HomeShell() {
   const [savingMealEdit, setSavingMealEdit] =
     useState(false);
 
+  const [simpleMealEdit, setSimpleMealEdit] =
+    useState<LoggedMeal | null>(null);
+  const [simpleMealQuantity, setSimpleMealQuantity] =
+    useState(1);
+
   const [deletingMealId, setDeletingMealId] =
     useState<string | number | null>(null);
   const [error, setError] =
     useState<string | null>(null);
+
+  const [conversationText, setConversationText] =
+    useState("");
+  const [conversationMealType, setConversationMealType] =
+    useState("Pranzo");
+  const [conversationPreview, setConversationPreview] =
+    useState<ConversationalMealPreview | null>(null);
+  const [conversationLoading, setConversationLoading] =
+    useState(false);
+  const [conversationError, setConversationError] =
+    useState<string | null>(null);
+  const [conversationConfirming, setConversationConfirming] =
+    useState(false);
+  const [conversationSuccess, setConversationSuccess] =
+    useState<string | null>(null);
+
 
   const firstName = useMemo(() => {
     const metadataName =
@@ -305,6 +328,122 @@ export function HomeShell() {
         )
       : 0;
 
+  async function analyzeConversationMeal() {
+    if (!accessToken || !conversationText.trim()) {
+      return;
+    }
+
+    setConversationLoading(true);
+    setConversationError(null);
+    setConversationPreview(null);
+
+    try {
+      const preview = await previewConversationalMeal(
+        conversationText.trim(),
+        conversationMealType,
+        accessToken,
+      );
+
+      setConversationPreview(preview);
+    } catch (err) {
+      setConversationError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad analizzare questo pasto.",
+      );
+    } finally {
+      setConversationLoading(false);
+    }
+  }
+
+  async function confirmConversationMeal() {
+    if (
+      !accessToken ||
+      !conversationPreview ||
+      !conversationPreview.requires_confirmation
+    ) {
+      return;
+    }
+
+    setConversationConfirming(true);
+    setConversationError(null);
+    setConversationSuccess(null);
+
+    try {
+      const mealName =
+        conversationPreview.items
+          .map((item) => item.name)
+          .join(" + ") || "Pasto registrato";
+
+      const singleItem =
+        conversationPreview.items.length === 1
+          ? conversationPreview.items[0]
+          : null;
+
+      await createMeal(
+        {
+          date: todayIso(),
+          meal_type: conversationPreview.meal_type,
+          name: mealName,
+          calories: conversationPreview.totals.calories,
+          protein: conversationPreview.totals.protein,
+          carbs: conversationPreview.totals.carbs,
+          fat: conversationPreview.totals.fat,
+          is_reusable: false,
+          ...(singleItem
+            ? (() => {
+                const isPer100g =
+                  singleItem.unit.toLowerCase() === "g";
+
+                const baseFactor = isPer100g
+                  ? singleItem.quantity / 100
+                  : singleItem.quantity;
+
+                const safeFactor =
+                  baseFactor > 0 ? baseFactor : 1;
+
+                return {
+                  base_name: singleItem.name,
+                  quantity: singleItem.quantity,
+                  is_per_100g: isPer100g,
+                  base_calories:
+                    conversationPreview.totals.calories /
+                    safeFactor,
+                  base_protein:
+                    conversationPreview.totals.protein /
+                    safeFactor,
+                  base_carbs:
+                    conversationPreview.totals.carbs /
+                    safeFactor,
+                  base_fat:
+                    conversationPreview.totals.fat /
+                    safeFactor,
+                };
+              })()
+            : {}),
+        },
+        accessToken,
+      );
+
+      setConversationSuccess(
+        "Pasto registrato. Ho aggiornato la tua giornata.",
+      );
+
+      setConversationText("");
+      setConversationPreview(null);
+
+      await refreshHome();
+    } catch (err) {
+      setConversationError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare questo pasto.",
+      );
+    } finally {
+      setConversationConfirming(false);
+    }
+  }
+
   async function refreshHome() {
     if (!accessToken) {
       return;
@@ -399,14 +538,18 @@ export function HomeShell() {
       const structured =
         response.item.structured_ingredients ?? [];
 
+      setEditingMealId(meal.id);
+
       if (!structured.length) {
-        setError(
-          "Questo pasto non ha ingredienti strutturati modificabili.",
+        setMealEditIngredients([]);
+        setSimpleMealEdit(response.item);
+        setSimpleMealQuantity(
+          Number(response.item.quantity) || 1,
         );
         return;
       }
 
-      setEditingMealId(meal.id);
+      setSimpleMealEdit(null);
       setMealEditIngredients(
         structured.map((item) => ({
           ...item,
@@ -426,6 +569,8 @@ export function HomeShell() {
   function closeMealEditor() {
     setEditingMealId(null);
     setMealEditIngredients([]);
+    setSimpleMealEdit(null);
+    setSimpleMealQuantity(1);
   }
 
   function updateMealIngredientQuantity(
@@ -495,6 +640,81 @@ export function HomeShell() {
         fat: 0,
       },
     );
+  }
+
+  function simpleMealEditNutrition() {
+    if (!simpleMealEdit) {
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+      };
+    }
+
+    const factor = simpleMealEdit.is_per_100g
+      ? simpleMealQuantity / 100
+      : simpleMealQuantity;
+
+    return {
+      calories:
+        Number(simpleMealEdit.base_calories ?? 0) *
+        factor,
+      protein:
+        Number(simpleMealEdit.base_protein ?? 0) *
+        factor,
+      carbs:
+        Number(simpleMealEdit.base_carbs ?? 0) *
+        factor,
+      fat:
+        Number(simpleMealEdit.base_fat ?? 0) *
+        factor,
+    };
+  }
+
+  async function saveSimpleMealEditor(
+    meal: LoggedMeal,
+  ) {
+    if (
+      !accessToken ||
+      meal.id === null ||
+      meal.id === undefined ||
+      !simpleMealEdit ||
+      !Number.isFinite(simpleMealQuantity) ||
+      simpleMealQuantity <= 0
+    ) {
+      return;
+    }
+
+    const nutrition = simpleMealEditNutrition();
+
+    setSavingMealEdit(true);
+    setError(null);
+
+    try {
+      await updateMeal(
+        meal.id,
+        {
+          quantity: simpleMealQuantity,
+          calories: nutrition.calories,
+          protein: nutrition.protein,
+          carbs: nutrition.carbs,
+          fat: nutrition.fat,
+        },
+        accessToken,
+      );
+
+      closeMealEditor();
+      await refreshHome();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a salvare il pasto.",
+      );
+    } finally {
+      setSavingMealEdit(false);
+    }
   }
 
   async function saveMealEditor(
@@ -1039,6 +1259,177 @@ export function HomeShell() {
             </section>
           ) : null}
 
+          <section className={styles.conversationCard}>
+            <div className={styles.conversationHeader}>
+              <div>
+                <span className={styles.conversationEyebrow}>
+                  SanoSync AI
+                </span>
+                <h2>Raccontami cosa hai mangiato</h2>
+                <p>
+                  Scrivilo come lo diresti normalmente.
+                  Prima di registrare qualcosa ti mostro
+                  sempre una preview.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.conversationControls}>
+              <select
+                value={conversationMealType}
+                onChange={(event) =>
+                  setConversationMealType(
+                    event.target.value,
+                  )
+                }
+                aria-label="Tipo di pasto"
+              >
+                <option value="Colazione">
+                  Colazione
+                </option>
+                <option value="Pranzo">
+                  Pranzo
+                </option>
+                <option value="Cena">
+                  Cena
+                </option>
+                <option value="Spuntino">
+                  Spuntino
+                </option>
+              </select>
+
+              <textarea
+                value={conversationText}
+                onChange={(event) =>
+                  setConversationText(
+                    event.target.value,
+                  )
+                }
+                placeholder="Es. Ho mangiato una carbonara e una mela"
+                rows={3}
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  void analyzeConversationMeal();
+                }}
+                disabled={
+                  conversationLoading ||
+                  !conversationText.trim()
+                }
+              >
+                {conversationLoading
+                  ? "Analizzo..."
+                  : "Analizza"}
+              </button>
+            </div>
+
+            {conversationError ? (
+              <p className={styles.conversationError}>
+                {conversationError}
+              </p>
+            ) : null}
+
+            {conversationSuccess ? (
+              <p className={styles.conversationSuccess}>
+                {conversationSuccess}
+              </p>
+            ) : null}
+
+
+            {conversationPreview ? (
+              <div className={styles.conversationPreview}>
+                <div className={styles.conversationPreviewTop}>
+                  <strong>Ho capito così</strong>
+
+                  {conversationPreview.needs_review ? (
+                    <span>
+                      Controlla le quantità stimate
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className={styles.conversationItems}>
+                  {conversationPreview.items.map(
+                    (item, index) => (
+                      <div
+                        key={`${item.name}-${index}`}
+                        className={styles.conversationItem}
+                      >
+                        <div>
+                          <strong>{item.name}</strong>
+                          <span>
+                            {roundNumber(item.quantity)}{" "}
+                            {item.unit}
+                            {item.uncertainty
+                              ? " · stimato"
+                              : ""}
+                          </span>
+                        </div>
+
+                        <span>
+                          {roundNumber(item.calories)} kcal
+                        </span>
+                      </div>
+                    ),
+                  )}
+                </div>
+
+                <div className={styles.conversationTotals}>
+                  <strong>
+                    {roundNumber(
+                      conversationPreview.totals.calories,
+                    )}{" "}
+                    kcal
+                  </strong>
+
+                  <span>
+                    {roundNumber(
+                      conversationPreview.totals.protein,
+                    )}{" "}
+                    g proteine ·{" "}
+                    {roundNumber(
+                      conversationPreview.totals.carbs,
+                    )}{" "}
+                    g carbo ·{" "}
+                    {roundNumber(
+                      conversationPreview.totals.fat,
+                    )}{" "}
+                    g grassi
+                  </span>
+                </div>
+
+                <div
+                  className={
+                    styles.conversationPreviewActions
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void confirmConversationMeal();
+                    }}
+                    disabled={conversationConfirming}
+                  >
+                    {conversationConfirming
+                      ? "Registro..."
+                      : "Conferma e registra"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConversationPreview(null)
+                    }
+                  >
+                    Modifica testo
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <div>
@@ -1386,6 +1777,83 @@ export function HomeShell() {
                               styles.registeredMealEditor
                             }
                           >
+                            {simpleMealEdit ? (
+                              <>
+                                <label>
+                                  <span>
+                                    {simpleMealEdit.is_per_100g
+                                      ? "Grammi"
+                                      : "Porzioni"}
+                                  </span>
+
+                                  <div
+                                    className={
+                                      styles.registeredMealQuantity
+                                    }
+                                  >
+                                    <input
+                                      type="number"
+                                      min={
+                                        simpleMealEdit.is_per_100g
+                                          ? "1"
+                                          : "0.25"
+                                      }
+                                      step={
+                                        simpleMealEdit.is_per_100g
+                                          ? "1"
+                                          : "0.25"
+                                      }
+                                      value={simpleMealQuantity}
+                                      onChange={(event) =>
+                                        setSimpleMealQuantity(
+                                          Number(
+                                            event.target.value,
+                                          ) || 0,
+                                        )
+                                      }
+                                    />
+
+                                    <span>
+                                      {simpleMealEdit.is_per_100g
+                                        ? "g"
+                                        : "porz."}
+                                    </span>
+                                  </div>
+                                </label>
+
+                                <div
+                                  className={
+                                    styles.registeredMealNutrition
+                                  }
+                                >
+                                  <strong>
+                                    {Math.round(
+                                      simpleMealEditNutrition()
+                                        .calories,
+                                    )} kcal
+                                  </strong>
+
+                                  <span>
+                                    {simpleMealEditNutrition()
+                                      .protein.toFixed(1)}{" "}
+                                    g proteine
+                                  </span>
+
+                                  <span>
+                                    {simpleMealEditNutrition()
+                                      .carbs.toFixed(1)}{" "}
+                                    g carbo
+                                  </span>
+
+                                  <span>
+                                    {simpleMealEditNutrition()
+                                      .fat.toFixed(1)}{" "}
+                                    g grassi
+                                  </span>
+                                </div>
+                              </>
+                            ) : null}
+
                             {mealEditIngredients.map(
                               (ingredient, index) => (
                                 <label
@@ -1475,9 +1943,15 @@ export function HomeShell() {
                                     actualMealForSlot(slot);
 
                                   if (actual) {
-                                    void saveMealEditor(
-                                      actual,
-                                    );
+                                    if (simpleMealEdit) {
+                                      void saveSimpleMealEditor(
+                                        actual,
+                                      );
+                                    } else {
+                                      void saveMealEditor(
+                                        actual,
+                                      );
+                                    }
                                   }
                                 }}
                               >

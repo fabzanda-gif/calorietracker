@@ -28,6 +28,12 @@ export interface LoggedMeal {
   category?: string | null;
   is_reusable?: boolean | null;
   notes?: string | null;
+  quantity?: number | null;
+  is_per_100g?: boolean | null;
+  base_calories?: number | null;
+  base_protein?: number | null;
+  base_carbs?: number | null;
+  base_fat?: number | null;
   structured_ingredients?: StructuredMealIngredient[];
   [key: string]: unknown;
 }
@@ -67,6 +73,13 @@ export interface MealCreateInput {
   carbs: number;
   fat: number;
   is_reusable?: boolean;
+  base_name?: string | null;
+  quantity?: number | null;
+  is_per_100g?: boolean | null;
+  base_calories?: number | null;
+  base_protein?: number | null;
+  base_carbs?: number | null;
+  base_fat?: number | null;
   structured_ingredients?: Array<{
     ingredient_id: string;
     quantity: number;
@@ -83,6 +96,13 @@ export interface MealUpdateInput {
   carbs?: number;
   fat?: number;
   is_reusable?: boolean;
+  base_name?: string | null;
+  quantity?: number | null;
+  is_per_100g?: boolean | null;
+  base_calories?: number | null;
+  base_protein?: number | null;
+  base_carbs?: number | null;
+  base_fat?: number | null;
   structured_ingredients?: Array<{
     ingredient_id: string;
     quantity: number;
@@ -156,6 +176,52 @@ export function deleteMeal(
     {
       method: "DELETE",
       accessToken,
+    },
+  );
+}
+
+
+export interface ConversationalMealPreviewItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  estimated: boolean;
+  uncertainty?: string | null;
+}
+
+export interface ConversationalMealPreview {
+  status: "preview";
+  meal_type: string;
+  original_text: string;
+  items: ConversationalMealPreviewItem[];
+  totals: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  needs_review: boolean;
+  requires_confirmation: boolean;
+}
+
+export function previewConversationalMeal(
+  text: string,
+  mealType: string,
+  accessToken?: string | null,
+): Promise<ConversationalMealPreview> {
+  return apiRequest<ConversationalMealPreview>(
+    "/meals/conversational/preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        text,
+        meal_type: mealType,
+      }),
     },
   );
 }
