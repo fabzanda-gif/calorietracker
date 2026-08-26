@@ -154,3 +154,23 @@
     flex-direction: column;
   }
 }
+
+.autoNutrition {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #ddddD6;
+}
+
+.autoNutrition strong {
+  font-size: 0.95rem;
+}
+
+.autoNutrition span {
+  color: #66665f;
+  font-size: 0.78rem;
+}

@@ -459,6 +459,22 @@ def create_meal(
         None,
     )
 
+    # Database calories column is INTEGER.
+    # Pydantic may serialize Decimal values as strings such as "210.0".
+    for field in (
+        "calories",
+        "protein",
+        "carbs",
+        "fat",
+    ):
+        if (
+            field in payload
+            and payload[field] is not None
+        ):
+            payload[field] = int(
+                round(float(payload[field]))
+            )
+
     try:
         if structured is not None:
             result = StructuredMealService(
@@ -557,6 +573,14 @@ def update_meal(
         None,
     )
 
+    if (
+        "calories" in payload
+        and payload["calories"] is not None
+    ):
+        payload["calories"] = int(
+            round(float(payload["calories"]))
+        )
+
     try:
         if structured is not None:
             result = StructuredMealService(
@@ -598,6 +622,11 @@ def update_meal(
         ) from exc
 
     except RepositoryError as exc:
+        print(
+            "UPDATE MEAL REPOSITORY ERROR:",
+            repr(exc),
+            flush=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),

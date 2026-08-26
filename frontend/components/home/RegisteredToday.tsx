@@ -68,6 +68,13 @@ export function RegisteredToday({
   const [fat, setFat] =
     useState("");
 
+  const [quantity, setQuantity] =
+    useState(1);
+
+  const [quantityAwareMeal, setQuantityAwareMeal] =
+    useState<LoggedMeal | null>(null);
+
+
   const [saving, setSaving] =
     useState(false);
 
@@ -105,6 +112,21 @@ export function RegisteredToday({
     });
 
     setName(meal.name ?? "");
+
+    const hasQuantityBase =
+      Number(meal.quantity) > 0 &&
+      Number(meal.base_calories) >= 0;
+
+    setQuantityAwareMeal(
+      hasQuantityBase ? meal : null,
+    );
+
+    setQuantity(
+      hasQuantityBase
+        ? Number(meal.quantity)
+        : 1,
+    );
+
     setCalories(
       String(
         roundNumber(meal.calories),
@@ -145,6 +167,9 @@ export function RegisteredToday({
       id: activity.id,
     });
 
+    setQuantityAwareMeal(null);
+    setQuantity(1);
+
     setName(activity.activity_name);
     setCalories(
       String(
@@ -160,7 +185,35 @@ export function RegisteredToday({
 
   function closeEditor() {
     setEditing(null);
+    setQuantityAwareMeal(null);
+    setQuantity(1);
     setMessage(null);
+  }
+
+
+  function quantityAwareNutrition() {
+    if (!quantityAwareMeal) {
+      return null;
+    }
+
+    const factor = quantityAwareMeal.is_per_100g
+      ? quantity / 100
+      : quantity;
+
+    return {
+      calories:
+        Number(quantityAwareMeal.base_calories ?? 0) *
+        factor,
+      protein:
+        Number(quantityAwareMeal.base_protein ?? 0) *
+        factor,
+      carbs:
+        Number(quantityAwareMeal.base_carbs ?? 0) *
+        factor,
+      fat:
+        Number(quantityAwareMeal.base_fat ?? 0) *
+        factor,
+    };
   }
 
 
@@ -213,20 +266,54 @@ export function RegisteredToday({
           accessToken,
         );
       } else {
-        await updateMeal(
-          editing.id,
-          {
-            name: cleanName,
-            calories: kcal,
-            protein:
-              Number(protein) || 0,
-            carbs:
-              Number(carbs) || 0,
-            fat:
-              Number(fat) || 0,
-          },
-          accessToken,
-        );
+        const automaticNutrition =
+          quantityAwareNutrition();
+
+        if (
+          quantityAwareMeal &&
+          automaticNutrition
+        ) {
+          if (
+            !Number.isFinite(quantity) ||
+            quantity <= 0
+          ) {
+            setMessage(
+              "Inserisci una quantità valida.",
+            );
+            return;
+          }
+
+          await updateMeal(
+            editing.id,
+            {
+              name: cleanName,
+              calories:
+                Math.round(automaticNutrition.calories),
+              protein:
+                automaticNutrition.protein,
+              carbs:
+                automaticNutrition.carbs,
+              fat:
+                automaticNutrition.fat,
+            },
+            accessToken,
+          );
+        } else {
+          await updateMeal(
+            editing.id,
+            {
+              name: cleanName,
+              calories: kcal,
+              protein:
+                Number(protein) || 0,
+              carbs:
+                Number(carbs) || 0,
+              fat:
+                Number(fat) || 0,
+            },
+            accessToken,
+          );
+        }
       }
 
       setEditing(null);
@@ -548,70 +635,133 @@ export function RegisteredToday({
             />
           </label>
 
-          <label>
-            <span>
-              {editing.kind === "activity"
-                ? "Calorie bruciate"
-                : "Calorie"}
-            </span>
-
-            <input
-              type="number"
-              min="0"
-              value={calories}
-              onChange={(event) => {
-                setCalories(
-                  event.target.value,
-                );
-              }}
-            />
-          </label>
-
-          {editing.kind === "meal" ? (
-            <div className={styles.macroGrid}>
+          {editing.kind === "meal" &&
+          quantityAwareMeal ? (
+            <>
               <label>
-                <span>Proteine</span>
+                <span>
+                  {quantityAwareMeal.is_per_100g
+                    ? "Grammi"
+                    : "Porzioni"}
+                </span>
+
+                <input
+                  type="number"
+                  min={
+                    quantityAwareMeal.is_per_100g
+                      ? "1"
+                      : "0.25"
+                  }
+                  step={
+                    quantityAwareMeal.is_per_100g
+                      ? "1"
+                      : "0.25"
+                  }
+                  value={quantity}
+                  onChange={(event) => {
+                    setQuantity(
+                      Number(event.target.value) || 0,
+                    );
+                  }}
+                />
+              </label>
+
+              {quantityAwareNutrition() ? (
+                <div className={styles.autoNutrition}>
+                  <strong>
+                    {Math.round(
+                      quantityAwareNutrition()!.calories,
+                    )} kcal
+                  </strong>
+
+                  <span>
+                    {quantityAwareNutrition()!
+                      .protein.toFixed(1)}{" "}
+                    g proteine
+                  </span>
+
+                  <span>
+                    {quantityAwareNutrition()!
+                      .carbs.toFixed(1)}{" "}
+                    g carbo
+                  </span>
+
+                  <span>
+                    {quantityAwareNutrition()!
+                      .fat.toFixed(1)}{" "}
+                    g grassi
+                  </span>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <label>
+                <span>
+                  {editing.kind === "activity"
+                    ? "Calorie bruciate"
+                    : "Calorie"}
+                </span>
+
                 <input
                   type="number"
                   min="0"
-                  value={protein}
+                  value={calories}
                   onChange={(event) => {
-                    setProtein(
+                    setCalories(
                       event.target.value,
                     );
                   }}
                 />
               </label>
 
-              <label>
-                <span>Carbo</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={carbs}
-                  onChange={(event) => {
-                    setCarbs(
-                      event.target.value,
-                    );
-                  }}
-                />
-              </label>
+              {editing.kind === "meal" ? (
+                <div className={styles.macroGrid}>
+                  <label>
+                    <span>Proteine</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={protein}
+                      onChange={(event) => {
+                        setProtein(
+                          event.target.value,
+                        );
+                      }}
+                    />
+                  </label>
 
-              <label>
-                <span>Grassi</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={fat}
-                  onChange={(event) => {
-                    setFat(
-                      event.target.value,
-                    );
-                  }}
-                />
-              </label>
-            </div>
-          ) : null}
+                  <label>
+                    <span>Carbo</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={carbs}
+                      onChange={(event) => {
+                        setCarbs(
+                          event.target.value,
+                        );
+                      }}
+                    />
+                  </label>
+
+                  <label>
+                    <span>Grassi</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={fat}
+                      onChange={(event) => {
+                        setFat(
+                          event.target.value,
+                        );
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </>
+          )}
 
           <button
             type="button"
