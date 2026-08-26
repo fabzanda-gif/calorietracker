@@ -23,11 +23,13 @@ import {
   getDay,
   getDayBudget,
   getMealOptions,
+  getNextMeal,
 } from "@/lib/api/day";
 import type {
   DayBudgetResponse,
   DayResponse,
   MealOptionsResponse,
+  NextMealResponse,
   RankedMealOption,
 } from "@/lib/api/types";
 
@@ -104,8 +106,13 @@ export function HomeShell() {
     useState<DayResponse | null>(null);
   const [budgetResult, setBudgetResult] =
     useState<DayBudgetResponse | null>(null);
+  const [nextMealOptions, setNextMealOptions] =
+    useState<MealOptionsResponse | null>(null);
   const [dinnerOptions, setDinnerOptions] =
     useState<MealOptionsResponse | null>(null);
+  const [nextMeal, setNextMeal] =
+    useState<NextMealResponse | null>(null);
+
   const [
     showDinnerAlternatives,
     setShowDinnerAlternatives,
@@ -190,7 +197,7 @@ export function HomeShell() {
         const [
           dayPayload,
           budgetPayload,
-          dinnerPayload,
+          nextMealPayload,
           mealsPayload,
           activitiesPayload,
         ] = await Promise.all([
@@ -202,10 +209,8 @@ export function HomeShell() {
             date,
             accessToken,
           ),
-          getMealOptions(
+          getNextMeal(
             date,
-            "dinner",
-            "auto",
             accessToken,
           ),
           getMealsForDate(
@@ -218,10 +223,26 @@ export function HomeShell() {
           ),
         ]);
 
+        const nextMealOptionsPayload =
+          nextMealPayload.next_slot
+            ? await getMealOptions(
+                date,
+                nextMealPayload.next_slot,
+                "auto",
+                accessToken,
+              )
+            : null;
+
         if (active) {
           setDay(dayPayload);
           setBudgetResult(budgetPayload);
-          setDinnerOptions(dinnerPayload);
+          setNextMeal(nextMealPayload);
+          setNextMealOptions(nextMealOptionsPayload);
+          setDinnerOptions(
+            nextMealPayload.next_slot === "dinner"
+              ? nextMealOptionsPayload
+              : null,
+          );
           setActualMeals(mealsPayload.items);
           setActualActivities(
             activitiesPayload.items,
@@ -294,16 +315,14 @@ export function HomeShell() {
     const [
       dayPayload,
       budgetPayload,
-      dinnerPayload,
+      nextMealPayload,
       mealsPayload,
       activitiesPayload,
     ] = await Promise.all([
       getDay(date, accessToken),
       getDayBudget(date, accessToken),
-      getMealOptions(
+      getNextMeal(
         date,
-        "dinner",
-        "auto",
         accessToken,
       ),
       getMealsForDate(
@@ -316,9 +335,25 @@ export function HomeShell() {
       ),
     ]);
 
+    const nextMealOptionsPayload =
+      nextMealPayload.next_slot
+        ? await getMealOptions(
+            date,
+            nextMealPayload.next_slot,
+            "auto",
+            accessToken,
+          )
+        : null;
+
     setDay(dayPayload);
     setBudgetResult(budgetPayload);
-    setDinnerOptions(dinnerPayload);
+    setNextMeal(nextMealPayload);
+    setNextMealOptions(nextMealOptionsPayload);
+    setDinnerOptions(
+      nextMealPayload.next_slot === "dinner"
+        ? nextMealOptionsPayload
+        : null,
+    );
     setActualMeals(mealsPayload.items);
     setActualActivities(
       activitiesPayload.items,
@@ -714,26 +749,26 @@ export function HomeShell() {
 
     try {
       const replannedRecommendation =
-        slot === "dinner" &&
-        dinnerOptions?.recommended
+        slot === nextMeal?.next_slot &&
+        nextMealOptions?.recommended
           ? {
               name:
-                dinnerOptions.recommended
+                nextMealOptions.recommended
                   .candidate.name,
               quantity:
-                dinnerOptions.recommended
+                nextMealOptions.recommended
                   .recommended_quantity,
               calories:
-                dinnerOptions.recommended
+                nextMealOptions.recommended
                   .candidate.calories,
               protein_g:
-                dinnerOptions.recommended
+                nextMealOptions.recommended
                   .candidate.protein_g,
               carbs_g:
-                dinnerOptions.recommended
+                nextMealOptions.recommended
                   .candidate.carbs_g,
               fat_g:
-                dinnerOptions.recommended
+                nextMealOptions.recommended
                   .candidate.fat_g,
             }
           : null;
@@ -1049,6 +1084,15 @@ export function HomeShell() {
                             ? "Previsto"
                             : "Da decidere"}
                       </span>
+
+                      {slot === nextMeal?.next_slot &&
+                      !actualMealForSlot(slot) ? (
+                        <span
+                          className={styles.nextMealBadge}
+                        >
+                          Prossimo
+                        </span>
+                      ) : null}
                     </div>
 
                     <strong
@@ -1092,10 +1136,10 @@ export function HomeShell() {
                       </p>
                     ) : null}
 
-                    {slot === "dinner" &&
+                    {slot === nextMeal?.next_slot &&
                     !actualMealForSlot(slot) &&
-                    dinnerOptions?.recommended ? (
-                      dinnerOptions.recommended.strategy ===
+                    nextMealOptions?.recommended ? (
+                      nextMealOptions.recommended.strategy ===
                       "routine" ? (
                         <div
                           className={
@@ -1116,7 +1160,7 @@ export function HomeShell() {
                               Già adatta alla giornata
                             </strong>
                             <p>
-                              La tua cena abituale va bene
+                              Il tuo pasto abituale va bene
                               così com'è oggi.
                             </p>
                           </div>
@@ -1137,7 +1181,7 @@ export function HomeShell() {
                                 styles.replanningBadge
                               }
                             >
-                              {dinnerOptions.recommended
+                              {nextMealOptions.recommended
                                 .strategy ===
                               "adapted_routine"
                                 ? "Adattata alla tua giornata"
@@ -1151,7 +1195,7 @@ export function HomeShell() {
                             }
                           >
                             {
-                              dinnerOptions.recommended
+                              nextMealOptions.recommended
                                 .candidate.name
                             }
                           </strong>
@@ -1161,23 +1205,23 @@ export function HomeShell() {
                               styles.replanningNutrition
                             }
                           >
-                            {typeof dinnerOptions.recommended
+                            {typeof nextMealOptions.recommended
                               .recommended_quantity === "number"
                               ? `${roundNumber(
-                                  dinnerOptions.recommended
+                                  nextMealOptions.recommended
                                     .recommended_quantity,
                                 )} porz. · `
                               : ""}
                             {roundNumber(
-                              dinnerOptions.recommended
+                              nextMealOptions.recommended
                                 .candidate.calories,
                             )}{" "}
                             kcal
-                            {typeof dinnerOptions
+                            {typeof nextMealOptions
                               .recommended.candidate
                               .protein_g === "number"
                               ? ` · ${roundNumber(
-                                  dinnerOptions.recommended
+                                  nextMealOptions.recommended
                                     .candidate.protein_g,
                                 )} g proteine`
                               : ""}
@@ -1189,7 +1233,7 @@ export function HomeShell() {
                             }
                           >
                             {
-                              dinnerOptions.recommended
+                              nextMealOptions.recommended
                                 .reason
                             }
                           </p>

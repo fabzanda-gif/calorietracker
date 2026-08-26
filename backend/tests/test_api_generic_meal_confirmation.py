@@ -207,3 +207,32 @@ def test_confirmation_can_log_replanned_quantity():
     assert item["protein"] == 32
     assert item["carbs"] == 99
     assert item["fat"] == 24
+
+
+def test_next_meal_route_starts_with_breakfast():
+    response = client.get(
+        "/days/2026-09-01/next-meal"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "date": "2026-09-01",
+        "next_slot": "breakfast",
+        "next_meal_type": "Colazione",
+    }
+
+
+def test_next_meal_route_advances_after_confirmation():
+    breakfast = client.post(
+        "/days/2026-09-01/meals/breakfast/confirm"
+    )
+
+    assert breakfast.status_code == 200
+
+    response = client.get(
+        "/days/2026-09-01/next-meal"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["next_slot"] == "lunch"
+    assert response.json()["next_meal_type"] == "Pranzo"

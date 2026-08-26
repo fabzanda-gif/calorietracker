@@ -1044,3 +1044,17 @@
   font-size: 0.74rem;
   line-height: 1.4;
 }
+
+
+.nextMealBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}

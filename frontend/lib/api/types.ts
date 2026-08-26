@@ -64,6 +64,12 @@ export interface DayBudget {
   protein_remaining_g: number | null;
 }
 
+export interface NextMealResponse {
+  date: string;
+  next_slot: "breakfast" | "lunch" | "dinner" | null;
+  next_meal_type: string | null;
+}
+
 export interface DayBudgetResponse {
   date: string;
   status: string;

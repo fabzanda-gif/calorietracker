@@ -4,6 +4,7 @@ import type {
   DayResponse,
   DecisionMode,
   MealOptionsResponse,
+  NextMealResponse,
 } from "./types";
 
 export function getDay(
@@ -12,6 +13,18 @@ export function getDay(
 ): Promise<DayResponse> {
   return apiRequest<DayResponse>(
     `/days/${encodeURIComponent(dayDate)}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function getNextMeal(
+  dayDate: string,
+  accessToken?: string | null,
+): Promise<NextMealResponse> {
+  return apiRequest<NextMealResponse>(
+    `/days/${encodeURIComponent(dayDate)}/next-meal`,
     {
       accessToken,
     },

@@ -52,6 +52,7 @@ from backend.services.meal_confirmation import (
 )
 from backend.services.meal_decision import MealDecisionService
 from backend.services.meal_memory import MealMemoryService
+from backend.services.next_meal_replanning import NextMealReplanningService
 from backend.services.meal_replanning import MealReplanningService
 from backend.services.order_candidates import OrderCandidateService
 from backend.services.order_personalization import (
@@ -176,6 +177,44 @@ def _build_eating_out_candidates(
         candidates=known,
         on_date=on_date,
     )
+
+
+@router.get("/{day_date}/next-meal")
+def get_next_meal(
+    day_date: Date,
+    current_user: CurrentUser = Depends(get_current_user),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+):
+    try:
+        meals = meals_repo.list_for_date_compatible(
+            user_id=current_user.id,
+            log_date=day_date,
+        )
+
+        next_slot = NextMealReplanningService().next_slot(
+            logged_meal_types=[
+                str(meal.get("meal_type") or "")
+                for meal in meals
+            ],
+        )
+
+        return {
+            "date": str(day_date),
+            "next_slot": next_slot,
+            "next_meal_type": (
+                MEAL_SLOT_TO_TYPE[next_slot]
+                if next_slot is not None
+                else None
+            ),
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/{day_date}/budget")

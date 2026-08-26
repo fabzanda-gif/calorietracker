@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
+    get_ingredients_repository,
     get_recipes_repository,
     get_recipe_ingredients_repository,
 )
@@ -57,6 +58,10 @@ fake_repo = FakeRecipesRepository()
 
 
 
+class FakeIngredientsRepository:
+    pass
+
+
 class FakeRecipeIngredientsRepository:
     def list_for_recipe(self, recipe_id):
         return []
@@ -73,6 +78,9 @@ def override_repo():
 def api_overrides():
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_recipes_repository] = override_repo
+    app.dependency_overrides[
+        get_ingredients_repository
+    ] = lambda: FakeIngredientsRepository()
     app.dependency_overrides[
         get_recipe_ingredients_repository
     ] = lambda: FakeRecipeIngredientsRepository()
