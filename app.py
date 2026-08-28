@@ -246,8 +246,8 @@ import plotly.graph_objects as go
 # LOCAL ASSETS
 # ==============================================================================
 ASSET_DIR = Path(__file__).resolve().parent
-APP_LOGO_FILE = ASSET_DIR / "LogoCoral.png"
-ZERO_LOGO_FILE = ASSET_DIR / "LogoZero.png"
+APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
+ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
 ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/ZeroMode.jpg"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
@@ -7015,9 +7015,9 @@ with st.sidebar:
     # --- LOGO / PERSONALITY MODE ---
     if is_zero_mode():
         # The dedicated asset already contains the ZERO wordmark.
-        st.sidebar.image(assets/LogoZero.png, use_container_width=True)
+        st.sidebar.image(ZERO_LOGO_URL, use_container_width=True)
     else:
-        st.sidebar.image("assets/LogoCoral.png", use_container_width=True)
+        st.sidebar.image("logo2.png", use_container_width=True)
 
     _zero_toggle_i18n = {
         "Italiano": "ZERO MODE",
