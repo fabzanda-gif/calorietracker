@@ -7017,7 +7017,7 @@ with st.sidebar:
         # The dedicated asset already contains the ZERO wordmark.
         st.sidebar.image(assets/LogoZero.png, use_container_width=True)
     else:
-        st.sidebar.image("assets/LogoStandard.jpeg", use_container_width=True)
+        st.sidebar.image("assets/LogoCoral.png", use_container_width=True)
 
     _zero_toggle_i18n = {
         "Italiano": "ZERO MODE",
