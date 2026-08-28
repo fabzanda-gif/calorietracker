@@ -1266,38 +1266,46 @@ def update_daily_log_via_supabase(log_date, values, access_token=None):
 
 
 def fetch_weight_history_from_db(cache_user_id, access_token=None):
+    """Return weight measurements stored in public.daily_logs.weight.
+
+    The legacy Supabase schema has never had a separate ``weight`` table.  A
+    weight measurement is a daily_logs row whose ``weight`` column is not NULL.
+    Filtering in Python keeps this compatible with multiple supabase-py /
+    postgrest versions used by Streamlit Cloud.
+    """
     _require_authenticated_user()
     response = (
-        supabase.table("weight")
+        supabase.table("daily_logs")
         .select("*")
         .eq("user_id", cache_user_id)
         .order("date", desc=True)
         .order("id", desc=True)
         .execute()
     )
-    return _response_data(response)
+    return [row for row in _response_data(response) if row.get("weight") is not None]
 
 
 def create_weight_via_supabase(log_date, weight, access_token=None):
-    _require_authenticated_user()
-    response = supabase.table("weight").insert({
-        "user_id": user_id,
-        "date": str(log_date),
-        "weight": float(weight),
-    }).execute()
-    data = _response_data(response)
-    return data[0] if data else None
+    """Store a weight measurement in daily_logs.weight for the selected day."""
+    return update_daily_log_via_supabase(
+        log_date,
+        {"weight": float(weight)},
+        access_token,
+    )
 
 
 def update_weight_via_supabase(row_id, *, log_date=None, weight=None, access_token=None):
+    """Edit only the weight fields of an existing daily_logs row."""
     _require_authenticated_user()
     payload = {}
     if log_date is not None:
         payload["date"] = str(log_date)
     if weight is not None:
         payload["weight"] = float(weight)
+    if not payload:
+        return None
     response = (
-        supabase.table("weight")
+        supabase.table("daily_logs")
         .update(payload)
         .eq("id", row_id)
         .eq("user_id", user_id)
@@ -1308,8 +1316,9 @@ def update_weight_via_supabase(row_id, *, log_date=None, weight=None, access_tok
 
 
 def delete_weight_via_supabase(row_id, access_token=None):
+    """Remove a weight measurement without deleting the rest of the daily log."""
     _require_authenticated_user()
-    supabase.table("weight").delete().eq("id", row_id).eq("user_id", user_id).execute()
+    supabase.table("daily_logs").update({"weight": None}).eq("id", row_id).eq("user_id", user_id).execute()
     return True
 
 
@@ -2715,8 +2724,25 @@ def get_quick_entries_from_meals():
     per porzione. Le righe legacy senza questi campi rimangono utilizzabili
     come porzioni fisse usando i valori totali salvati nel meal.
     """
-    rows, enhanced_schema = load_quick_meal_rows_cached(
-        user_id
+    rows = load_quick_meal_rows_cached(user_id)
+    # ``load_quick_meal_rows_cached`` returns the meal rows themselves.  Older
+    # code tried to unpack that list into ``rows, enhanced_schema``; with more
+    # than two meals this raised "too many values to unpack".  Detect the
+    # enhanced meal schema from the returned row keys instead.
+    enhanced_schema = any(
+        isinstance(row, dict)
+        and any(
+            key in row
+            for key in (
+                "base_name",
+                "base_calories",
+                "base_protein",
+                "base_carbs",
+                "base_fat",
+                "is_per_100g",
+            )
+        )
+        for row in rows
     )
 
     quick = {}
@@ -10451,29 +10477,52 @@ elif selected_page == t["t2"]:
         on_change=update_overview_date,
     )
 
+    # Load each data source independently.  One optional source failing must not
+    # erase meals/activities that were already loaded successfully.
+    daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
+    _summary_load_errors = []
+
     try:
         daily_log_res = load_daily_log_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        _summary_load_errors.append(f"daily_logs: {e}")
+
+    try:
         meals_data = load_daily_meals_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        _summary_load_errors.append(f"meals: {e}")
+
+    try:
         raw_activities = load_daily_activities_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        _summary_load_errors.append(f"activities: {e}")
+
+    try:
         all_weight_logs = load_weight_history_cached(
             user_id,
             st.session_state.get("auth_access_token"),
         )
     except Exception as e:
-        st.error(t["load_data_error"].format(error=e))
-        daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
+        _summary_load_errors.append(f"weight: {e}")
+
+    if _summary_load_errors:
+        st.error(
+            t["load_data_error"].format(
+                error=" | ".join(_summary_load_errors)
+            )
+        )
 
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
     total_cals_in = sum(_safe_float(m.get("calories")) for m in meals_data)
