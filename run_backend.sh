@@ -18,7 +18,7 @@ if not path.exists():
 
 text = path.read_text()
 
-for name in ("SUPABASE_URL", "SUPABASE_KEY"):
+for name in ("SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"):
     match = re.search(
         rf'^{name}\s*=\s*"([^"]+)"',
         text,

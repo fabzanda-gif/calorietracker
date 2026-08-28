@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.api.dependencies import (
@@ -15,9 +16,17 @@ def override_current_user():
     )
 
 
-app.dependency_overrides[get_current_user] = (
-    override_current_user
-)
+@pytest.fixture(autouse=True)
+def authenticated_user_override():
+    app.dependency_overrides[get_current_user] = (
+        override_current_user
+    )
+    yield
+    app.dependency_overrides.pop(
+        get_current_user,
+        None,
+    )
+
 
 client = TestClient(app)
 

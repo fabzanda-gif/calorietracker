@@ -1896,36 +1896,38 @@ export function HomeShell() {
                               ),
                             )}
 
-                            <div
-                              className={
-                                styles.registeredMealNutrition
-                              }
-                            >
-                              <strong>
-                                {Math.round(
-                                  mealEditNutrition()
-                                    .calories,
-                                )} kcal
-                              </strong>
+                            {!simpleMealEdit ? (
+                              <div
+                                className={
+                                  styles.registeredMealNutrition
+                                }
+                              >
+                                <strong>
+                                  {Math.round(
+                                    mealEditNutrition()
+                                      .calories,
+                                  )} kcal
+                                </strong>
 
-                              <span>
-                                {mealEditNutrition()
-                                  .protein.toFixed(1)}{" "}
-                                g proteine
-                              </span>
+                                <span>
+                                  {mealEditNutrition()
+                                    .protein.toFixed(1)}{" "}
+                                  g proteine
+                                </span>
 
-                              <span>
-                                {mealEditNutrition()
-                                  .carbs.toFixed(1)}{" "}
-                                g carbo
-                              </span>
+                                <span>
+                                  {mealEditNutrition()
+                                    .carbs.toFixed(1)}{" "}
+                                  g carbo
+                                </span>
 
-                              <span>
-                                {mealEditNutrition()
-                                  .fat.toFixed(1)}{" "}
-                                g grassi
-                              </span>
-                            </div>
+                                <span>
+                                  {mealEditNutrition()
+                                    .fat.toFixed(1)}{" "}
+                                  g grassi
+                                </span>
+                              </div>
+                            ) : null}
 
                             <div
                               className={

@@ -156,6 +156,12 @@ export function QuickAdd({
   const [fat, setFat] =
     useState("");
 
+  const [quantityMode, setQuantityMode] =
+    useState<"portion" | "grams">("portion");
+
+  const [mealQuantity, setMealQuantity] =
+    useState("1");
+
   const [ingredients, setIngredients] =
     useState<Ingredient[]>([]);
 
@@ -443,13 +449,41 @@ export function QuickAdd({
               ? "Spuntino"
               : mealType,
           name: cleanName,
-          calories: kcal,
-          protein:
+          quantity: Number(mealQuantity) || 1,
+          is_per_100g:
+            quantityMode === "grams",
+          base_name: cleanName,
+          base_calories: kcal,
+          base_protein:
             Number(protein) || 0,
-          carbs:
+          base_carbs:
             Number(carbs) || 0,
-          fat:
+          base_fat:
             Number(fat) || 0,
+          calories: Math.round(
+            kcal *
+              (quantityMode === "grams"
+                ? (Number(mealQuantity) || 1) / 100
+                : Number(mealQuantity) || 1),
+          ),
+          protein: Math.round(
+            (Number(protein) || 0) *
+              (quantityMode === "grams"
+                ? (Number(mealQuantity) || 1) / 100
+                : Number(mealQuantity) || 1),
+          ),
+          carbs: Math.round(
+            (Number(carbs) || 0) *
+              (quantityMode === "grams"
+                ? (Number(mealQuantity) || 1) / 100
+                : Number(mealQuantity) || 1),
+          ),
+          fat: Math.round(
+            (Number(fat) || 0) *
+              (quantityMode === "grams"
+                ? (Number(mealQuantity) || 1) / 100
+                : Number(mealQuantity) || 1),
+          ),
         },
         accessToken,
       );
@@ -835,7 +869,67 @@ export function QuickAdd({
           {mealEntryMode === "quick" ? (
             <>
               <label>
-                <span>Calorie</span>
+                <span>Unità</span>
+
+                <select
+                  value={quantityMode}
+                  onChange={(event) => {
+                    const nextMode =
+                      event.target.value === "grams"
+                        ? "grams"
+                        : "portion";
+
+                    setQuantityMode(nextMode);
+                    setMealQuantity(
+                      nextMode === "grams"
+                        ? "100"
+                        : "1",
+                    );
+                  }}
+                >
+                  <option value="portion">
+                    Porzioni
+                  </option>
+                  <option value="grams">
+                    Grammi
+                  </option>
+                </select>
+              </label>
+
+              <label>
+                <span>
+                  {quantityMode === "grams"
+                    ? "Grammi"
+                    : "Porzioni"}
+                </span>
+
+                <input
+                  type="number"
+                  min={
+                    quantityMode === "grams"
+                      ? "1"
+                      : "0.25"
+                  }
+                  step={
+                    quantityMode === "grams"
+                      ? "1"
+                      : "0.25"
+                  }
+                  value={mealQuantity}
+                  onChange={(event) => {
+                    setMealQuantity(
+                      event.target.value,
+                    );
+                  }}
+                />
+              </label>
+
+              <label>
+                <span>
+                  {quantityMode === "grams"
+                    ? "Calorie per 100 g"
+                    : "Calorie per porzione"}
+                </span>
 
                 <input
                   type="number"
@@ -852,7 +946,11 @@ export function QuickAdd({
 
               <div className={styles.macroGrid}>
                 <label>
-                  <span>Proteine</span>
+                  <span>
+                    {quantityMode === "grams"
+                      ? "Proteine per 100 g"
+                      : "Proteine per porzione"}
+                  </span>
                   <input
                     type="number"
                     min="0"
@@ -867,7 +965,11 @@ export function QuickAdd({
                 </label>
 
                 <label>
-                  <span>Carbo</span>
+                  <span>
+                    {quantityMode === "grams"
+                      ? "Carbo per 100 g"
+                      : "Carbo per porzione"}
+                  </span>
                   <input
                     type="number"
                     min="0"
@@ -882,7 +984,11 @@ export function QuickAdd({
                 </label>
 
                 <label>
-                  <span>Grassi</span>
+                  <span>
+                    {quantityMode === "grams"
+                      ? "Grassi per 100 g"
+                      : "Grassi per porzione"}
+                  </span>
                   <input
                     type="number"
                     min="0"

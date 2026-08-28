@@ -287,14 +287,15 @@ export function RegisteredToday({
             editing.id,
             {
               name: cleanName,
+              quantity,
               calories:
                 Math.round(automaticNutrition.calories),
               protein:
-                automaticNutrition.protein,
+                Math.round(automaticNutrition.protein),
               carbs:
-                automaticNutrition.carbs,
+                Math.round(automaticNutrition.carbs),
               fat:
-                automaticNutrition.fat,
+                Math.round(automaticNutrition.fat),
             },
             accessToken,
           );
