@@ -246,9 +246,9 @@ import plotly.graph_objects as go
 # LOCAL ASSETS
 # ==============================================================================
 ASSET_DIR = Path(__file__).resolve().parent
-APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
-ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
-ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/ZeroMode.jpg"
+APP_LOGO_FILE = ASSET_DIR / "assets" / "LogoCoral.png"
+SIDEBAR_LOGO_FILE = ASSET_DIR / "assets" / "LogoStandard.jpeg"
+ZERO_LOGO_FILE = ASSET_DIR / "assets" / "LogoZero.png"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
 WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
@@ -7014,10 +7014,9 @@ def tr_activity_plan(value): return _tr_value(ACTIVITY_PLAN_KEYS, value)
 with st.sidebar:
     # --- LOGO / PERSONALITY MODE ---
     if is_zero_mode():
-        # The dedicated asset already contains the ZERO wordmark.
-        st.sidebar.image(ZERO_LOGO_URL, use_container_width=True)
+        st.sidebar.image(str(ZERO_LOGO_FILE), use_container_width=True)
     else:
-        st.sidebar.image("logo2.png", use_container_width=True)
+        st.sidebar.image(str(SIDEBAR_LOGO_FILE), use_container_width=True)
 
     _zero_toggle_i18n = {
         "Italiano": "ZERO MODE",
