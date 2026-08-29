@@ -1480,92 +1480,105 @@ def update_daily_log_via_api(log_date, values, access_token):
     return _api_payload_item(response.json()) or response.json()
 
 
+def _weight_response_data(response):
+    """Normalize Supabase response data."""
+    data = getattr(response, "data", None)
+    return data if isinstance(data, list) else []
+
+
 def fetch_weight_history_from_api(cache_user_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/weight",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+    """
+    LEGACY STREAMLIT: il peso vive in daily_logs.weight.
+    Manteniamo il vecchio nome della funzione per non toccare tutti i call-site,
+    ma NON chiamiamo più FastAPI.
+    """
+    response = (
+        supabase.table("daily_logs")
+        .select("id,date,weight")
+        .eq("user_id", cache_user_id)
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return [
+        row for row in _weight_response_data(response)
+        if row.get("weight") is not None
+    ]
 
 
 def create_weight_via_api(log_date, weight, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
+    """
+    Salva il peso direttamente in daily_logs.weight.
+    Se esiste già il daily_log della data, lo aggiorna; altrimenti lo crea.
+    """
+    existing_response = (
+        supabase.table("daily_logs")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("date", str(log_date))
+        .limit(1)
+        .execute()
+    )
+    existing_rows = _weight_response_data(existing_response)
+
+    if existing_rows:
+        response = (
+            supabase.table("daily_logs")
+            .update({"weight": float(weight)})
+            .eq("id", existing_rows[0]["id"])
+            .eq("user_id", user_id)
+            .execute()
+        )
+    else:
+        response = (
+            supabase.table("daily_logs")
+            .insert({
+                "user_id": user_id,
+                "date": str(log_date),
+                "weight": float(weight),
+            })
+            .execute()
         )
 
-    response = requests.post(
-        f"{get_api_base_url()}/weight",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json={
-            "date": str(log_date),
-            "weight": float(weight),
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
+    rows = _weight_response_data(response)
+    return rows[0] if rows else None
 
 
 def update_weight_via_api(row_id, *, log_date=None, weight=None, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
+    """
+    Aggiorna direttamente la riga daily_logs che contiene il peso.
+    """
     payload = {}
     if log_date is not None:
         payload["date"] = str(log_date)
     if weight is not None:
         payload["weight"] = float(weight)
 
-    response = requests.patch(
-        f"{get_api_base_url()}/weight/{row_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=15,
-    )
+    if not payload:
+        return None
 
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
+    response = (
+        supabase.table("daily_logs")
+        .update(payload)
+        .eq("id", row_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    rows = _weight_response_data(response)
+    return rows[0] if rows else None
 
 
 def delete_weight_via_api(row_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/weight/{row_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
+    """
+    Non elimina il daily_log: azzera solo la colonna weight.
+    """
+    supabase.table("daily_logs").update(
+        {"weight": None}
+    ).eq(
+        "id", row_id
+    ).eq(
+        "user_id", user_id
+    ).execute()
     return True
 
 
