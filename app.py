@@ -1050,314 +1050,180 @@ def _safe_float(value):
 
 
 # ==============================================================================
-# TRANSITIONAL FASTAPI CLIENT
+# DIRECT SUPABASE DATA ACCESS
 # ==============================================================================
-# Step 4A: Streamlit reads meals through FastAPI instead of querying Supabase
-# directly. Other domains still use their current repositories for now.
+# Legacy Streamlit app: user data is read/written directly in Supabase.
+# Function names keep the old *_api suffix where necessary so the rest of the
+# existing UI does not need invasive changes.
+
+def _require_authenticated_user():
+    if not st.session_state.get("auth_access_token"):
+        raise RuntimeError("Sessione autenticata non disponibile.")
+    if not user_id:
+        raise RuntimeError("Utente autenticato non disponibile.")
 
 
-def get_api_base_url():
-    """
-    Resolve the FastAPI base URL.
-
-    Priority:
-    1) environment variable API_BASE_URL
-    2) optional Streamlit secret API_BASE_URL
-    3) local Codespaces/dev default
-    """
-    env_url = os.getenv("API_BASE_URL")
-    if env_url:
-        return env_url.rstrip("/")
-
-    try:
-        secret_url = st.secrets.get("API_BASE_URL")
-        if secret_url:
-            return str(secret_url).rstrip("/")
-    except Exception:
-        pass
-
-    return "http://127.0.0.1:8000"
+def _response_data(response):
+    data = getattr(response, "data", None)
+    return data if isinstance(data, list) else []
 
 
-def api_auth_headers():
-    """
-    Reuse the Supabase access token already stored by the Streamlit login.
-    """
-    token = st.session_state.get("auth_access_token")
-    if not token:
-        raise RuntimeError(
-            "Sessione autenticata non disponibile per FastAPI."
-        )
+# ---- MEALS -------------------------------------------------------------------
 
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json",
-    }
-
-
-def fetch_daily_meals_from_api(cache_user_id, cache_date, access_token):
-    """
-    Transitional read used by load_daily_meals_cached.
-
-    cache_user_id remains part of the function signature only to keep cache
-    isolation explicit. FastAPI ignores it and derives the real user from the
-    Bearer token.
-    """
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/meals/{cache_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_daily_meals_from_api(cache_user_id, cache_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", cache_user_id)
+        .eq("date", str(cache_date))
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    payload = response.json()
-    return payload.get("items") or []
+    return _response_data(response)
 
 
-def create_meal_via_api(payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+def create_meal_via_api(payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload["user_id"] = user_id
+    response = supabase.table("meals").insert(db_payload).execute()
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
 
-    response = requests.post(
-        f"{get_api_base_url()}/meals",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def update_meal_via_api(meal_id, payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload.pop("user_id", None)
+    response = (
+        supabase.table("meals")
+        .update(db_payload)
+        .eq("id", meal_id)
+        .eq("user_id", user_id)
+        .execute()
     )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    response.raise_for_status()
-    return response.json()
 
-
-def update_meal_via_api(meal_id, payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.patch(
-        f"{get_api_base_url()}/meals/{meal_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=15,
+def delete_meal_via_api(meal_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("meals")
+        .delete()
+        .eq("id", meal_id)
+        .eq("user_id", user_id)
+        .execute()
     )
-
-    response.raise_for_status()
-    return response.json()
-
-
-def delete_meal_via_api(meal_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/meals/{meal_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
     return True
 
 
-def fetch_daily_activities_from_api(cache_user_id, cache_date, access_token):
-    """
-    Transitional read used by load_daily_activities_cached.
-
-    cache_user_id remains part of the function signature only to keep cache
-    isolation explicit. FastAPI derives the authenticated user from the
-    Bearer token.
-    """
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/activities/{cache_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_meal_history_from_api(access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    payload = response.json()
-    return payload.get("items") or []
+    return _response_data(response)
 
 
-def fetch_meal_history_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/meals/history",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_meals_range_from_api(start_date, end_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", user_id)
+        .gte("date", str(start_date))
+        .lte("date", str(end_date))
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_meals_range_from_api(start_date, end_date, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/meals/range",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        params={
-            "start_date": str(start_date),
-            "end_date": str(end_date),
-        },
-        timeout=15,
+def fetch_meals_by_type_from_api(meal_type, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("meal_type", meal_type)
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_meals_by_type_from_api(meal_type, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+# ---- ACTIVITIES --------------------------------------------------------------
 
-    response = requests.get(
-        f"{get_api_base_url()}/meals/by-type/{meal_type}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_daily_activities_from_api(cache_user_id, cache_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("activities")
+        .select("*")
+        .eq("user_id", cache_user_id)
+        .eq("date", str(cache_date))
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_activities_range_from_api(start_date, end_date, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/activities/range",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        params={
-            "start_date": str(start_date),
-            "end_date": str(end_date),
-        },
-        timeout=15,
+def fetch_activities_range_from_api(start_date, end_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("activities")
+        .select("*")
+        .eq("user_id", user_id)
+        .gte("date", str(start_date))
+        .lte("date", str(end_date))
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def create_activity_via_api(payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+def create_activity_via_api(payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload["user_id"] = user_id
+    response = supabase.table("activities").insert(db_payload).execute()
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
 
-    response = requests.post(
-        f"{get_api_base_url()}/activities",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def update_activity_via_api(activity_id, payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload.pop("user_id", None)
+    response = (
+        supabase.table("activities")
+        .update(db_payload)
+        .eq("id", activity_id)
+        .eq("user_id", user_id)
+        .execute()
     )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    response.raise_for_status()
-    return response.json()
 
-
-def update_activity_via_api(activity_id, payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.patch(
-        f"{get_api_base_url()}/activities/{activity_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=15,
+def delete_activity_via_api(activity_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("activities")
+        .delete()
+        .eq("id", activity_id)
+        .eq("user_id", user_id)
+        .execute()
     )
-
-    response.raise_for_status()
-    return response.json()
-
-
-def delete_activity_via_api(activity_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/activities/{activity_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
     return True
 
 
@@ -1367,131 +1233,82 @@ def upsert_named_activity_via_api(
     log_date,
     activity_name,
     burned_calories,
-    access_token,
+    access_token=None,
 ):
     rows = fetch_daily_activities_from_api(
-        cache_user_id,
-        str(log_date),
-        access_token,
+        cache_user_id, str(log_date), access_token
     )
-
     existing = next(
         (
-            row for row in rows
+            row
+            for row in rows
             if str(row.get("activity_name") or "").strip().casefold()
             == str(activity_name).strip().casefold()
         ),
         None,
     )
-
     payload = {
         "date": str(log_date),
         "activity_name": activity_name,
         "burned_calories": int(burned_calories),
     }
-
     if existing and existing.get("id"):
         return update_activity_via_api(
-            existing["id"],
-            payload,
-            access_token,
+            existing["id"], payload, access_token
+        )
+    return create_activity_via_api(payload, access_token)
+
+
+# ---- DAILY LOGS --------------------------------------------------------------
+
+def fetch_daily_log_from_api(cache_user_id, cache_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("daily_logs")
+        .select("*")
+        .eq("user_id", cache_user_id)
+        .eq("date", str(cache_date))
+        .limit(1)
+        .execute()
+    )
+    rows = _response_data(response)
+    return rows[0] if rows else None
+
+
+def update_daily_log_via_api(log_date, values, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(values)
+    db_payload.pop("user_id", None)
+    db_payload.pop("date", None)
+
+    existing = fetch_daily_log_from_api(user_id, log_date, access_token)
+
+    if existing and existing.get("id"):
+        response = (
+            supabase.table("daily_logs")
+            .update(db_payload)
+            .eq("id", existing["id"])
+            .eq("user_id", user_id)
+            .execute()
+        )
+    else:
+        insert_payload = dict(db_payload)
+        insert_payload["user_id"] = user_id
+        insert_payload["date"] = str(log_date)
+        response = (
+            supabase.table("daily_logs")
+            .insert(insert_payload)
+            .execute()
         )
 
-    return create_activity_via_api(
-        payload,
-        access_token,
-    )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
 
+# ---- WEIGHT (stored in daily_logs.weight) ------------------------------------
 
-def _api_payload_items(payload):
-    """Normalize common FastAPI list response shapes."""
-    if isinstance(payload, list):
-        return payload
-    if not isinstance(payload, dict):
-        return []
-    for key in ("items", "data", "results"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            return value
-    return []
-
-
-def _api_payload_item(payload):
-    """Normalize common FastAPI single-item response shapes."""
-    if payload is None:
-        return None
-    if isinstance(payload, dict):
-        for key in ("item", "data", "result"):
-            value = payload.get(key)
-            if isinstance(value, dict):
-                return value
-        # A router may return the row itself.
-        if any(key in payload for key in ("id", "date", "weight", "steps", "day_type", "activity_plan")):
-            return payload
-    return None
-
-
-def fetch_daily_log_from_api(cache_user_id, cache_date, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/daily-logs/{cache_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    # A missing daily log is equivalent to no row for Streamlit.
-    if response.status_code == 404:
-        return None
-
-    response.raise_for_status()
-    return _api_payload_item(response.json())
-
-
-def update_daily_log_via_api(log_date, values, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    api_payload = dict(values)
-    api_payload.pop("user_id", None)
-    api_payload.pop("date", None)
-
-    response = requests.patch(
-        f"{get_api_base_url()}/daily-logs/{log_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
-
-
-def _weight_response_data(response):
-    """Normalize Supabase response data."""
-    data = getattr(response, "data", None)
-    return data if isinstance(data, list) else []
-
-
-def fetch_weight_history_from_api(cache_user_id, access_token):
-    """
-    LEGACY STREAMLIT: il peso vive in daily_logs.weight.
-    Manteniamo il vecchio nome della funzione per non toccare tutti i call-site,
-    ma NON chiamiamo più FastAPI.
-    """
+def fetch_weight_history_from_api(cache_user_id, access_token=None):
+    _require_authenticated_user()
     response = (
         supabase.table("daily_logs")
         .select("id,date,weight")
@@ -1501,59 +1318,33 @@ def fetch_weight_history_from_api(cache_user_id, access_token):
         .execute()
     )
     return [
-        row for row in _weight_response_data(response)
+        row
+        for row in _response_data(response)
         if row.get("weight") is not None
     ]
 
 
-def create_weight_via_api(log_date, weight, access_token):
-    """
-    Salva il peso direttamente in daily_logs.weight.
-    Se esiste già il daily_log della data, lo aggiorna; altrimenti lo crea.
-    """
-    existing_response = (
-        supabase.table("daily_logs")
-        .select("id")
-        .eq("user_id", user_id)
-        .eq("date", str(log_date))
-        .limit(1)
-        .execute()
+def create_weight_via_api(log_date, weight, access_token=None):
+    return update_daily_log_via_api(
+        log_date,
+        {"weight": float(weight)},
+        access_token,
     )
-    existing_rows = _weight_response_data(existing_response)
-
-    if existing_rows:
-        response = (
-            supabase.table("daily_logs")
-            .update({"weight": float(weight)})
-            .eq("id", existing_rows[0]["id"])
-            .eq("user_id", user_id)
-            .execute()
-        )
-    else:
-        response = (
-            supabase.table("daily_logs")
-            .insert({
-                "user_id": user_id,
-                "date": str(log_date),
-                "weight": float(weight),
-            })
-            .execute()
-        )
-
-    rows = _weight_response_data(response)
-    return rows[0] if rows else None
 
 
-def update_weight_via_api(row_id, *, log_date=None, weight=None, access_token):
-    """
-    Aggiorna direttamente la riga daily_logs che contiene il peso.
-    """
+def update_weight_via_api(
+    row_id,
+    *,
+    log_date=None,
+    weight=None,
+    access_token=None,
+):
+    _require_authenticated_user()
     payload = {}
     if log_date is not None:
         payload["date"] = str(log_date)
     if weight is not None:
         payload["weight"] = float(weight)
-
     if not payload:
         return None
 
@@ -1564,200 +1355,163 @@ def update_weight_via_api(row_id, *, log_date=None, weight=None, access_token):
         .eq("user_id", user_id)
         .execute()
     )
-    rows = _weight_response_data(response)
+    rows = _response_data(response)
     return rows[0] if rows else None
 
 
-def delete_weight_via_api(row_id, access_token):
-    """
-    Non elimina il daily_log: azzera solo la colonna weight.
-    """
-    supabase.table("daily_logs").update(
-        {"weight": None}
-    ).eq(
-        "id", row_id
-    ).eq(
-        "user_id", user_id
-    ).execute()
+def delete_weight_via_api(row_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("daily_logs")
+        .update({"weight": None})
+        .eq("id", row_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
     return True
 
 
-def weight_rows_for_range(cache_user_id, start_date, end_date, access_token):
-    """Filter API weight history locally to preserve existing report behaviour."""
+def weight_rows_for_range(
+    cache_user_id,
+    start_date,
+    end_date,
+    access_token=None,
+):
     rows = fetch_weight_history_from_api(cache_user_id, access_token)
     start_s = str(start_date)
     end_s = str(end_date)
     return [
-        row for row in rows
+        row
+        for row in rows
         if start_s <= str(row.get("date") or "") <= end_s
     ]
 
 
+# ---- RECIPES -----------------------------------------------------------------
 
-def fetch_personal_recipes_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/recipes",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_personal_recipes_from_api(access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_available_recipes_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/recipes/available",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_available_recipes_from_api(access_token=None):
+    _require_authenticated_user()
+    own = fetch_personal_recipes_from_api(access_token)
+    shared_response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("is_shared", True)
+        .order("id", desc=True)
+        .execute()
     )
+    shared = _response_data(shared_response)
 
-    response.raise_for_status()
-    return _api_payload_items(response.json())
-
-
-def fetch_shared_recipes_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
+    result = []
+    seen_ids = set()
+    for row in own + shared:
+        row_id = (
+            str(row.get("id"))
+            if row.get("id") is not None
+            else None
         )
+        if row_id and row_id in seen_ids:
+            continue
+        if row_id:
+            seen_ids.add(row_id)
+        result.append(row)
+    return result
 
-    response = requests.get(
-        f"{get_api_base_url()}/recipes/shared",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+
+def fetch_shared_recipes_from_api(access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("is_shared", True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_recipe_by_id_from_api(recipe_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/recipes/{recipe_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_recipe_by_id_from_api(recipe_id, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("id", recipe_id)
+        .limit(1)
+        .execute()
     )
-
-    if response.status_code == 404:
+    rows = _response_data(response)
+    if not rows:
         return None
 
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
+    row = rows[0]
+    if (
+        str(row.get("user_id")) != str(user_id)
+        and not bool(row.get("is_shared"))
+    ):
+        return None
+    return row
 
 
-def create_recipe_via_api(payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+def create_recipe_via_api(payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload["user_id"] = user_id
+    response = (
+        supabase.table("recipe_library")
+        .insert(db_payload)
+        .execute()
+    )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
 
-    response = requests.post(
-        f"{get_api_base_url()}/recipes",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def update_recipe_via_api(recipe_id, payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload.pop("user_id", None)
+    response = (
+        supabase.table("recipe_library")
+        .update(db_payload)
+        .eq("id", recipe_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    rows = _response_data(response)
+    return rows[0] if rows else None
+
+
+def set_recipe_sharing_via_api(
+    recipe_id,
+    is_shared,
+    access_token=None,
+):
+    return update_recipe_via_api(
+        recipe_id,
+        {"is_shared": bool(is_shared)},
+        access_token,
     )
 
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
 
-
-def update_recipe_via_api(recipe_id, payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
-
-    response = requests.patch(
-        f"{get_api_base_url()}/recipes/{recipe_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def delete_recipe_via_api(recipe_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("recipe_library")
+        .delete()
+        .eq("id", recipe_id)
+        .eq("user_id", user_id)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
-
-
-def set_recipe_sharing_via_api(recipe_id, is_shared, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.patch(
-        f"{get_api_base_url()}/recipes/{recipe_id}/sharing",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json={"is_shared": bool(is_shared)},
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
-
-
-def delete_recipe_via_api(recipe_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/recipes/{recipe_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
     return True
 
 
@@ -3056,8 +2810,22 @@ def get_quick_entries_from_meals():
     per porzione. Le righe legacy senza questi campi rimangono utilizzabili
     come porzioni fisse usando i valori totali salvati nel meal.
     """
-    rows, enhanced_schema = load_quick_meal_rows_cached(
-        user_id
+    rows = load_quick_meal_rows_cached(user_id)
+    enhanced_schema = any(
+        any(
+            key in row
+            for key in (
+                "base_name",
+                "quantity",
+                "is_per_100g",
+                "base_calories",
+                "base_protein",
+                "base_carbs",
+                "base_fat",
+            )
+        )
+        for row in rows
+        if isinstance(row, dict)
     )
 
     quick = {}
@@ -10791,29 +10559,45 @@ elif selected_page == t["t2"]:
         on_change=update_overview_date,
     )
 
+    daily_log_res = []
+    meals_data = []
+    raw_activities = []
+    all_weight_logs = []
+
     try:
         daily_log_res = load_daily_log_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        st.error(t["load_data_error"].format(error=e))
+
+    try:
         meals_data = load_daily_meals_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        st.error(t["load_data_error"].format(error=e))
+
+    try:
         raw_activities = load_daily_activities_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        st.error(t["load_data_error"].format(error=e))
+
+    try:
         all_weight_logs = load_weight_history_cached(
             user_id,
             st.session_state.get("auth_access_token"),
         )
     except Exception as e:
         st.error(t["load_data_error"].format(error=e))
-        daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
 
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
     total_cals_in = sum(_safe_float(m.get("calories")) for m in meals_data)
