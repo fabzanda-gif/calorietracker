@@ -9,8 +9,10 @@ import { useAuth } from "./AuthProvider";
 import styles from "./LoginCard.module.css";
 
 export function LoginCard() {
-  const { signInWithPassword } =
-    useAuth();
+  const {
+    signInWithPassword,
+    signInWithGoogle,
+  } = useAuth();
 
   const [email, setEmail] =
     useState("");
@@ -57,6 +59,33 @@ export function LoginCard() {
             Accedi con lo stesso account
             che usi su SanoSync.
           </p>
+        </div>
+
+        <button
+          className={styles.googleButton}
+          type="button"
+          disabled={submitting}
+          onClick={async () => {
+            setSubmitting(true);
+            setError(null);
+
+            try {
+              await signInWithGoogle();
+            } catch (err) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : "Accesso con Google non riuscito",
+              );
+              setSubmitting(false);
+            }
+          }}
+        >
+          Continua con Google
+        </button>
+
+        <div className={styles.divider}>
+          <span>oppure</span>
         </div>
 
         <form

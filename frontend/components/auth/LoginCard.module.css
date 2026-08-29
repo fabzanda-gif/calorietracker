@@ -88,3 +88,38 @@
   font-size: 0.9rem;
   line-height: 1.4;
 }
+
+.googleButton {
+  min-height: 50px;
+  border: 1px solid #d6d6cf;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #161616;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.googleButton:hover {
+  background: #fafaf8;
+}
+
+.googleButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #8a8a83;
+  font-size: 0.82rem;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: #e1e1db;
+}

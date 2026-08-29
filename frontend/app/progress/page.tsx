@@ -662,6 +662,26 @@ function DailyMetricsChart({
               Altro
             </span>
           </>
+        ) : metric === "activity" ? (
+          <>
+            <span>
+              <i
+                className={
+                  styles.legendActivityLow
+                }
+              />
+              Meno di 500 kcal
+            </span>
+
+            <span>
+              <i
+                className={
+                  styles.legendActivityHigh
+                }
+              />
+              500 kcal o più
+            </span>
+          </>
         ) : (
           <>
             <span>
@@ -997,9 +1017,13 @@ function DailyMetricsChart({
                   )}
                   rx="5"
                   className={
-                    overBudget
-                      ? styles.calorieBarOver
-                      : styles.calorieBar
+                    metric === "activity"
+                      ? value < 500
+                        ? styles.activityBarLow
+                        : styles.activityBarHigh
+                      : overBudget
+                        ? styles.calorieBarOver
+                        : styles.calorieBar
                   }
                 >
                   <title>
@@ -1010,6 +1034,11 @@ function DailyMetricsChart({
                     {Math.round(value)}
                     {" "}
                     {metricUnit(metric)}
+                    {metric === "activity"
+                      ? value < 500
+                        ? " · fascia < 500"
+                        : " · fascia ≥ 500"
+                      : ""}
                   </title>
                 </rect>
               );
@@ -1134,6 +1163,7 @@ export default function ProgressPage() {
         );
 
       setNutrition(response);
+      setError(null);
     } catch (err) {
       setError(
         err instanceof Error
@@ -1162,6 +1192,7 @@ export default function ProgressPage() {
           a.date.localeCompare(b.date),
         ),
       );
+      setError(null);
     } catch (err) {
       setError(
         err instanceof Error
@@ -1429,6 +1460,7 @@ export default function ProgressPage() {
         eyebrow: string;
         title: string;
         body: string;
+        tone: "navy" | "coral" | "neutral";
       }> = [];
 
       /*
@@ -1457,6 +1489,7 @@ export default function ProgressPage() {
               )} kg`,
           body:
             "Variazione tra la prima e l’ultima misurazione del periodo selezionato.",
+          tone: "navy",
         });
       }
 
@@ -1488,6 +1521,10 @@ export default function ProgressPage() {
             percentage >= 70
               ? `Nel ${percentage}% dei giorni con un budget disponibile sei rimasto entro il valore calcolato da SanoSync.`
               : `Sei rimasto entro budget nel ${percentage}% dei giorni per cui era disponibile un confronto.`,
+          tone:
+            percentage >= 70
+              ? "navy"
+              : "coral",
         });
       }
 
@@ -1543,6 +1580,10 @@ export default function ProgressPage() {
             )}% delle calorie`,
             body:
               "È il momento della giornata che pesa maggiormente sulla distribuzione calorica del periodo selezionato.",
+            tone:
+              dominant.value >= 50
+                ? "coral"
+                : "neutral",
           });
         }
       }
@@ -1561,6 +1602,7 @@ export default function ProgressPage() {
           )} g di proteine al giorno`,
           body:
             "Media giornaliera calcolata sui giorni registrati nel periodo nutrizionale selezionato.",
+          tone: "navy",
         });
       }
 
@@ -1572,6 +1614,10 @@ export default function ProgressPage() {
         nutritionMetric === "activity" &&
         metricStats.activeDays > 0
       ) {
+        const averageActivity =
+          metricStats.total /
+          metricStats.activeDays;
+
         result.push({
           eyebrow: "Attività",
           title: `${metricStats.activeDays} ${
@@ -1581,7 +1627,13 @@ export default function ProgressPage() {
           } nel periodo`,
           body: `${roundKcal(
             metricStats.total,
-          )} kcal di attività registrate complessivamente.`,
+          )} kcal registrate complessivamente · ${roundKcal(
+            averageActivity,
+          )} kcal per giorno attivo.`,
+          tone:
+            averageActivity >= 500
+              ? "navy"
+              : "coral",
         });
       }
 
@@ -2134,7 +2186,13 @@ export default function ProgressPage() {
               (insight, index) => (
                 <article
                   key={`${insight.eyebrow}-${index}`}
-                  className={styles.insightCard}
+                  className={`${styles.insightCard} ${
+                    insight.tone === "coral"
+                      ? styles.insightCardCoral
+                      : insight.tone === "navy"
+                        ? styles.insightCardNavy
+                        : styles.insightCardNeutral
+                  }`}
                 >
                   <span
                     className={

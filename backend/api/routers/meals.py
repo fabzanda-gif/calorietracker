@@ -15,6 +15,9 @@ from backend.services.meal_text_interpreter import (
 from backend.services.groq_meal_interpreter import (
     GroqMealInterpreter,
 )
+from backend.services.groq_meal_vision_interpreter import (
+    GroqMealVisionInterpreter,
+)
 
 from backend.api.dependencies import (
     CurrentUser,
@@ -96,6 +99,12 @@ class ConversationalMealPreviewRequest(BaseModel):
     meal_type: str
 
 
+class PhotoMealPreviewRequest(BaseModel):
+    image_base64: str = Field(min_length=1)
+    mime_type: str = "image/jpeg"
+    meal_type: str
+
+
 class MealUpdate(BaseModel):
     meal_type: str | None = None
     name: str | None = None
@@ -146,6 +155,44 @@ def preview_conversational_meal(
 
     return ConversationalMealLoggingService().build_preview(
         text=request.text,
+        meal_type=normalized["meal_type"],
+        interpreted_items=normalized["items"],
+    )
+
+
+
+@router.post("/photo/preview")
+def preview_photo_meal(
+    request: PhotoMealPreviewRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    import base64
+
+    try:
+        image_bytes = base64.b64decode(
+            request.image_base64,
+            validate=True,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid image_base64",
+        ) from exc
+
+    raw_interpretation = (
+        GroqMealVisionInterpreter().interpret(
+            image_bytes=image_bytes,
+            mime_type=request.mime_type,
+            meal_type=request.meal_type,
+        )
+    )
+
+    normalized = MealTextInterpreter().normalize(
+        raw_interpretation
+    )
+
+    return ConversationalMealLoggingService().build_preview(
+        text="[photo]",
         meal_type=normalized["meal_type"],
         interpreted_items=normalized["items"],
     )

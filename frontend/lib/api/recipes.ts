@@ -20,6 +20,7 @@ export interface StructuredRecipeIngredient {
 }
 
 export interface Recipe {
+  preparation?: string | null;
   id: string;
   name: string;
   meal_type?: string | null;

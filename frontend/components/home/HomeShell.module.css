@@ -263,8 +263,9 @@
 
 .mealCard {
   display: grid;
-  gap: 12px;
-  padding: 18px;
+  gap: 16px;
+  padding: 24px;
+  overflow: hidden;
 }
 
 .mealCardTop,
@@ -359,17 +360,21 @@
 
 @media (min-width: 768px) {
   .page {
-    padding-top: 34px;
+    width: min(100%, 1180px);
+    padding: 34px 28px 72px;
   }
 
   .mealList,
   .optionList {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
   }
 
   .mealCard,
   .optionCard {
     min-height: 180px;
+    height: 100%;
+    align-content: start;
   }
 }
 
@@ -1184,4 +1189,1441 @@
   margin-top: 10px;
   font-size: 0.84rem;
   font-weight: 700;
+}
+
+
+.conversationModeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.conversationModeSwitch button {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0.62;
+}
+
+.conversationModeSwitch button.conversationModeActive {
+  background: white;
+  opacity: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.conversationPhotoPicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 12px;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  background: white;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+
+.conversationPhotoPicker input {
+  display: none;
+}
+
+.conversationPhotoPreview {
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.conversationPhotoPreview img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+
+.registeredMealExtra {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e4e4dd;
+  border-radius: 14px;
+  background: #fafaf7;
+}
+
+.registeredMealExtraInfo {
+  display: grid;
+  gap: 3px;
+}
+
+.registeredMealExtraInfo strong {
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.registeredMealExtraInfo span {
+  color: #696963;
+  font-size: 0.8rem;
+}
+
+.registeredMealExtraActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.registeredMealExtraActions button {
+  padding: 8px 11px;
+  border: 1px solid #d9d9d2;
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.registeredMealExtraActions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.registeredMealExtraActions .registeredMealExtraDelete {
+  color: #8c3333;
+}
+
+
+/* Compact registered meals inside today's plan */
+.registeredMealList {
+  display: grid;
+  gap: 0;
+}
+
+.registeredMealRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid #ecece6;
+}
+
+.registeredMealRow:first-child {
+  padding-top: 2px;
+}
+
+.registeredMealRow:last-child {
+  border-bottom: 0;
+}
+
+.registeredMealRowInfo {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.registeredMealRowInfo strong {
+  font-size: 1rem;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+.registeredMealRowInfo span {
+  color: #686862;
+  font-size: 0.8rem;
+}
+
+.registeredMealRowActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.registeredMealRowActions button {
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 8px;
+  background: transparent;
+  color: #315b2c;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.registeredMealRowActions button:hover {
+  background: #f3f3ee;
+}
+
+.registeredMealRowActions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.registeredMealRowActions .registeredMealRowDelete {
+  color: #8c3333;
+}
+
+.registeredMealRowActions .registeredMealRowDelete:hover {
+  background: #fff2f2;
+}
+
+.registeredMealSlotTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: auto;
+  padding: 16px 0 0;
+  border-top: 1px solid #deded7;
+  font-size: 0.78rem;
+}
+
+.registeredMealSlotTotal span {
+  color: #74746e;
+}
+
+.registeredMealSlotTotal strong {
+  font-size: 0.86rem;
+  color: #22231f;
+}
+
+@media (max-width: 640px) {
+  .registeredMealRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .registeredMealRowActions {
+    width: 100%;
+  }
+
+  .registeredMealRowActions button {
+    padding-left: 0;
+    padding-right: 12px;
+  }
+
+  .registeredMealSlotTotal {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
+
+/* ==========================================================
+   Mockup alignment — I tuoi pasti
+   ========================================================== */
+
+.mealList {
+  gap: 18px;
+}
+
+.mealCard {
+  padding: 24px 26px 0;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.mealCardTop {
+  min-height: 34px;
+}
+
+.mealLabel {
+  font-size: 0.96rem;
+}
+
+.predictedBadge,
+.unknownBadge,
+.registeredMealBadge,
+.nextMealBadge {
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.registeredMealList {
+  gap: 0;
+}
+
+.registeredMealRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 17px 0;
+}
+
+.registeredMealRow + .registeredMealRow {
+  border-top: 1px solid #e5e5df;
+}
+
+.registeredMealRowInfo {
+  gap: 5px;
+}
+
+.registeredMealRowInfo strong {
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.registeredMealRowInfo span {
+  font-size: 0.84rem;
+  color: #65655f;
+}
+
+.registeredMealRowActions {
+  justify-content: flex-start;
+  gap: 22px;
+}
+
+.registeredMealRowActions button {
+  padding: 3px 0;
+  color: #286436;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.registeredMealRowActions button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.registeredMealRowActions .registeredMealRowDelete {
+  color: #aa2929;
+}
+
+.registeredMealSlotTotal {
+  margin: auto -26px 0;
+  padding: 15px 26px 17px;
+  border-top: 1px solid #e2e2dc;
+  background: #fafaf7;
+  font-size: 0.82rem;
+}
+
+.registeredMealSlotTotal strong {
+  font-size: 0.92rem;
+}
+
+@media (min-width: 768px) {
+  .mealList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .mealCard {
+    min-height: 310px;
+    height: 100%;
+    align-content: start;
+  }
+}
+
+@media (max-width: 767px) {
+  .mealCard {
+    padding: 20px 20px 0;
+  }
+
+  .registeredMealSlotTotal {
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+
+/* SANOSYNC HOME VISUAL V1 */
+
+/* ---------- pagina ---------- */
+
+.page {
+  width: min(100%, 1120px);
+}
+
+.kicker {
+  color: var(--ss-text-soft);
+}
+
+.sectionHeader h2 {
+  color: var(--ss-navy-950);
+}
+
+
+/* ---------- I tuoi pasti ---------- */
+
+.mealsSection {
+  margin-top: 30px;
+  padding: 20px;
+  gap: 14px;
+
+  border: 1px solid var(--ss-border);
+  border-radius: var(--ss-radius-lg);
+
+  background: var(--ss-surface);
+  box-shadow: var(--ss-shadow);
+}
+
+.mealsSection .sectionHeader {
+  padding: 0 2px;
+}
+
+.mealsSection .sectionHeader h2 {
+  font-size: 1.45rem;
+  line-height: 1.08;
+}
+
+.mealsSection .kicker {
+  margin-bottom: 5px;
+  font-size: 0.66rem;
+}
+
+.mealList {
+  gap: 12px;
+}
+
+.mealCard {
+  min-height: 0;
+  padding: 17px 18px 0;
+
+  border: 1px solid var(--ss-border);
+  border-radius: 16px;
+
+  background: var(--ss-surface);
+  box-shadow: none;
+}
+
+.mealCardTop {
+  min-height: 28px;
+  gap: 8px;
+}
+
+.mealLabel {
+  color: var(--ss-navy-950);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.predictedBadge,
+.unknownBadge,
+.registeredMealBadge {
+  padding: 4px 8px;
+  font-size: 0.64rem;
+  border-radius: 999px;
+}
+
+.predictedBadge,
+.registeredMealBadge {
+  background: var(--ss-coral-100);
+  color: #b84545;
+}
+
+.nextMealBadge {
+  padding: 4px 8px;
+  border: 1px solid #aab1bb;
+  border-radius: 999px;
+
+  background: #ffffff;
+  color: var(--ss-navy-900);
+
+  font-size: 0.63rem;
+  font-weight: 800;
+}
+
+.mealName {
+  color: var(--ss-navy-950);
+  font-size: 0.94rem;
+}
+
+.mealMeta {
+  color: var(--ss-text-soft);
+  font-size: 0.76rem;
+}
+
+
+/* ---------- pasti realmente registrati ---------- */
+
+.registeredMealRow {
+  gap: 7px;
+  padding: 12px 0;
+}
+
+.registeredMealRowInfo {
+  gap: 3px;
+}
+
+.registeredMealRowInfo strong {
+  color: var(--ss-navy-950);
+  font-size: 0.88rem;
+  line-height: 1.28;
+}
+
+.registeredMealRowInfo span {
+  color: var(--ss-text-soft);
+  font-size: 0.74rem;
+}
+
+.registeredMealRowActions {
+  gap: 16px;
+}
+
+.registeredMealRowActions button {
+  padding: 2px 0;
+
+  color: var(--ss-navy-800);
+
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.registeredMealRowActions button:hover {
+  color: var(--ss-coral-600);
+  background: transparent;
+}
+
+.registeredMealRowActions .registeredMealRowDelete {
+  color: #bf4646;
+}
+
+.registeredMealSlotTotal {
+  margin: auto -18px 0;
+  padding: 11px 18px 12px;
+
+  border-top: 1px solid var(--ss-border);
+  background: var(--ss-surface-soft);
+
+  font-size: 0.72rem;
+}
+
+.registeredMealSlotTotal span {
+  color: var(--ss-text-soft);
+}
+
+.registeredMealSlotTotal strong {
+  color: var(--ss-navy-950);
+  font-size: 0.78rem;
+}
+
+
+/* ---------- proposta / replanning ---------- */
+
+.replanningPreview,
+.replanningCompact {
+  border-color: #ffd6d1;
+  background: var(--ss-coral-050);
+}
+
+.replanningBadge,
+.replanningContextTitle {
+  color: var(--ss-coral-600);
+}
+
+.replanningMealName {
+  color: var(--ss-navy-950);
+}
+
+.replanningNutrition,
+.replanningReason,
+.replanningCompact p {
+  color: var(--ss-text-soft);
+}
+
+.replanningCompactIcon {
+  background: var(--ss-coral-100);
+  color: var(--ss-coral-600);
+}
+
+
+/* ---------- desktop ---------- */
+
+@media (min-width: 768px) {
+  .mealList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .mealCard {
+    min-height: 220px;
+    height: 100%;
+  }
+}
+
+
+/* ---------- mobile ---------- */
+
+@media (max-width: 767px) {
+  .mealsSection {
+    margin-left: -4px;
+    margin-right: -4px;
+    padding: 16px 12px;
+  }
+
+  .mealCard {
+    padding: 16px 16px 0;
+  }
+
+  .registeredMealSlotTotal {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+
+/* SANOSYNC COMPACT DAY HERO V1 */
+
+/* ----------------------------------------------------------
+   Introduzione giornata
+   ---------------------------------------------------------- */
+
+.dayIntro {
+  padding: 22px 0 16px;
+}
+
+.dayIntro h2 {
+  max-width: none;
+
+  font-size: clamp(2rem, 4.2vw, 3.25rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+
+  color: var(--ss-navy-950);
+}
+
+.subtitle {
+  margin-top: 9px;
+  font-size: 0.9rem;
+  color: var(--ss-text-soft);
+}
+
+
+/* ----------------------------------------------------------
+   Piano / budget
+   Da hero gigante a dashboard card compatta
+   ---------------------------------------------------------- */
+
+.budgetHero {
+  position: relative;
+
+  margin: 10px 0 14px;
+  padding: 18px 22px;
+
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      135deg,
+      var(--ss-navy-950) 0%,
+      var(--ss-navy-900) 100%
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 12px 28px rgba(16, 40, 70, 0.11);
+}
+
+.budgetTopline {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.67);
+}
+
+.budgetNumber {
+  margin-top: 12px;
+
+  font-size: clamp(2.8rem, 5.4vw, 4rem);
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+}
+
+.budgetUnit {
+  margin-top: 5px;
+
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.72rem;
+}
+
+
+/* progress */
+
+.progressTrack {
+  height: 6px;
+  margin-top: 15px;
+
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.progressFill {
+  background: var(--ss-coral-500);
+}
+
+
+/* breakdown */
+
+.budgetBreakdown {
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.budgetBreakdown div {
+  gap: 2px;
+}
+
+.budgetBreakdown span {
+  color: rgba(255, 255, 255, 0.57);
+  font-size: 0.63rem;
+}
+
+.budgetBreakdown strong {
+  font-size: 0.86rem;
+}
+
+
+/* ----------------------------------------------------------
+   Metriche sotto il piano
+   ---------------------------------------------------------- */
+
+.metricsGrid {
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.metricCard {
+  gap: 4px;
+  padding: 12px 15px;
+
+  border-radius: 14px;
+  border-color: var(--ss-border);
+
+  box-shadow: none;
+}
+
+.metricCard span {
+  font-size: 0.7rem;
+}
+
+.metricCard strong {
+  color: var(--ss-navy-950);
+  font-size: 1.05rem;
+}
+
+
+/* proteine */
+
+.proteinCard {
+  gap: 8px;
+
+  padding: 12px 15px;
+  margin-bottom: 22px;
+
+  border-radius: 14px;
+}
+
+.proteinTop span {
+  font-size: 0.68rem;
+}
+
+.proteinTop strong {
+  color: var(--ss-navy-950);
+  font-size: 0.9rem;
+}
+
+.proteinTrack {
+  height: 5px;
+}
+
+.proteinFill {
+  background: var(--ss-coral-500);
+}
+
+
+/* ----------------------------------------------------------
+   Desktop
+   ---------------------------------------------------------- */
+
+@media (min-width: 768px) {
+  .dayIntro {
+    padding-top: 24px;
+  }
+
+  .dayIntro h2 {
+    max-width: 650px;
+  }
+
+  .budgetHero {
+    padding: 18px 22px 16px;
+  }
+
+  .budgetNumber {
+    font-size: 3.6rem;
+  }
+}
+
+
+/* ----------------------------------------------------------
+   Mobile
+   ---------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  .dayIntro h2 {
+    max-width: 11ch;
+    font-size: 2.45rem;
+  }
+
+  .budgetHero {
+    padding: 17px;
+    border-radius: 18px;
+  }
+
+  .budgetNumber {
+    font-size: 3.2rem;
+  }
+
+  .budgetBreakdown {
+    gap: 8px;
+  }
+}
+
+
+/* SANOSYNC COMPACT AI V1 */
+
+.conversationCard {
+  display: grid;
+  gap: 12px;
+
+  margin: 18px 0 24px;
+  padding: 16px 18px;
+
+  border: 1px solid var(--ss-border);
+  border-radius: var(--ss-radius-lg);
+
+  background: var(--ss-surface);
+  box-shadow: var(--ss-shadow);
+}
+
+.conversationHeader h2 {
+  margin: 3px 0 5px;
+
+  color: var(--ss-navy-950);
+  font-size: 1.12rem;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.conversationHeader p {
+  max-width: 480px;
+  margin: 0;
+
+  color: var(--ss-text-soft);
+
+  font-size: 0.76rem;
+  line-height: 1.4;
+  opacity: 1;
+}
+
+.conversationEyebrow {
+  color: var(--ss-coral-600);
+
+  font-size: 0.63rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+
+/* Testo / Foto */
+
+.conversationModeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+
+  margin: 0;
+  padding: 3px;
+
+  border-radius: 11px;
+
+  background: #f0f1f2;
+}
+
+.conversationModeSwitch button {
+  min-height: 32px;
+  padding: 5px 9px;
+
+  border-radius: 8px;
+
+  color: var(--ss-text-soft);
+
+  font-size: 0.72rem;
+}
+
+.conversationModeSwitch button.conversationModeActive {
+  background: var(--ss-surface);
+  color: var(--ss-navy-950);
+
+  box-shadow:
+    0 1px 3px rgba(16, 40, 70, 0.08);
+}
+
+
+/* Input */
+
+.conversationControls {
+  display: grid;
+  gap: 7px;
+
+  margin-top: 0;
+}
+
+.conversationControls select,
+.conversationControls textarea {
+  padding: 8px 10px;
+
+  border: 1px solid var(--ss-border);
+  border-radius: 10px;
+
+  background: var(--ss-surface);
+
+  color: var(--ss-navy-950);
+
+  font-size: 0.76rem;
+}
+
+.conversationControls select {
+  min-height: 36px;
+}
+
+.conversationControls textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.conversationControls textarea::placeholder {
+  color: #9299a3;
+}
+
+
+/* Analizza */
+
+.conversationControls > button {
+  min-height: 36px;
+  padding: 7px 12px;
+
+  border-radius: 10px;
+
+  background: var(--ss-navy-950);
+  color: #ffffff;
+
+  font-size: 0.74rem;
+}
+
+.conversationControls > button:not(:disabled):hover {
+  background: var(--ss-navy-800);
+}
+
+.conversationControls > button:disabled {
+  background: #eceeed;
+  color: #a4a9ad;
+  opacity: 1;
+}
+
+
+/* Foto */
+
+.conversationPhotoPicker {
+  min-height: 48px;
+  padding: 9px;
+
+  border-color: #d8dce0;
+  border-radius: 10px;
+
+  background: var(--ss-surface-soft);
+  color: var(--ss-navy-900);
+
+  font-size: 0.75rem;
+}
+
+.conversationPhotoPreview {
+  max-height: 220px;
+  border-radius: 11px;
+}
+
+.conversationPhotoPreview img {
+  max-height: 220px;
+  object-fit: cover;
+}
+
+
+/* Preview AI */
+
+.conversationPreview {
+  margin-top: 4px;
+  padding-top: 10px;
+
+  border-top-color: var(--ss-border);
+}
+
+.conversationItem {
+  padding: 7px 0;
+}
+
+.conversationPreviewTop span,
+.conversationItem span,
+.conversationTotals span {
+  color: var(--ss-text-soft);
+  font-size: 0.7rem;
+  opacity: 1;
+}
+
+.conversationPreviewActions {
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.conversationPreviewActions button {
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 0.7rem;
+}
+
+
+/* Desktop: vera card compatta */
+
+@media (min-width: 860px) {
+  .conversationCard {
+    grid-template-columns:
+      minmax(240px, 0.72fr)
+      minmax(0, 1.65fr);
+
+    column-gap: 24px;
+    align-items: start;
+
+    padding: 17px 20px;
+  }
+
+  .conversationHeader {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+
+    padding-top: 3px;
+  }
+
+  .conversationModeSwitch {
+    grid-column: 2;
+  }
+
+  .conversationControls {
+    grid-column: 2;
+  }
+}
+
+
+/* Mobile */
+
+@media (max-width: 859px) {
+  .conversationCard {
+    padding: 15px;
+  }
+
+  .conversationHeader p {
+    font-size: 0.75rem;
+  }
+
+  .conversationControls textarea {
+    min-height: 72px;
+  }
+}
+
+
+/* SANOSYNC PLAN METRICS V1 */
+
+.planMetrics {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 0.7fr)
+    minmax(0, 0.8fr)
+    minmax(220px, 1.4fr);
+
+  gap: 0;
+
+  margin-top: 15px;
+  padding-top: 14px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.planMetric {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+
+  min-width: 0;
+  padding: 2px 18px;
+}
+
+.planMetric:first-child {
+  padding-left: 0;
+}
+
+.planMetric + .planMetric {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.planMetric > span,
+.planProteinTop > span {
+  color: rgba(255, 255, 255, 0.58);
+
+  font-size: 0.63rem;
+  font-weight: 650;
+}
+
+.planMetric > strong {
+  color: #ffffff;
+
+  font-size: 0.92rem;
+  line-height: 1.15;
+}
+
+.planProtein {
+  gap: 5px;
+}
+
+.planProteinTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planProteinTop small {
+  color: rgba(255, 255, 255, 0.55);
+
+  font-size: 0.6rem;
+  font-weight: 500;
+}
+
+.planProteinTrack {
+  overflow: hidden;
+
+  width: 100%;
+  height: 4px;
+
+  margin-top: 2px;
+
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.planProteinFill {
+  height: 100%;
+
+  border-radius: inherit;
+
+  background: var(--ss-coral-500);
+}
+
+
+/* Il Piano guadagna solo l'altezza realmente necessaria */
+
+.budgetHero {
+  padding-bottom: 15px;
+}
+
+
+/* Mobile */
+
+@media (max-width: 700px) {
+  .planMetrics {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 12px;
+  }
+
+  .planMetric {
+    padding: 0 12px;
+  }
+
+  .planMetric:first-child {
+    padding-left: 0;
+  }
+
+  .planProtein {
+    grid-column: 1 / -1;
+
+    padding: 12px 0 0;
+
+    border-left: 0 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+}
+
+
+/* SANOSYNC HOME DENSITY V2 */
+
+
+/* ==========================================================
+   PIANO DI OGGI
+   ========================================================== */
+
+.budgetHero {
+  padding: 17px 20px 15px;
+  border-radius: 18px;
+}
+
+.budgetTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  font-size: 0.65rem;
+  font-weight: 650;
+}
+
+.budgetNumber {
+  margin-top: 10px;
+
+  font-size: 3.35rem;
+  line-height: 0.92;
+}
+
+.budgetUnit {
+  margin-top: 3px;
+  font-size: 0.67rem;
+}
+
+.progressTrack {
+  height: 5px;
+  margin-top: 13px;
+}
+
+.budgetBreakdown {
+  margin-top: 10px;
+}
+
+.budgetBreakdown span {
+  font-size: 0.59rem;
+}
+
+.budgetBreakdown strong {
+  font-size: 0.78rem;
+}
+
+
+/* Metriche integrate */
+
+.planMetrics {
+  margin-top: 12px;
+  padding-top: 12px;
+
+  grid-template-columns:
+    minmax(100px, 0.65fr)
+    minmax(120px, 0.8fr)
+    minmax(220px, 1.5fr);
+}
+
+.planMetric {
+  gap: 3px;
+  padding: 1px 16px;
+}
+
+.planMetric > span,
+.planProteinTop > span {
+  font-size: 0.59rem;
+}
+
+.planMetric > strong {
+  font-size: 0.84rem;
+}
+
+.planProteinTop small {
+  font-size: 0.56rem;
+}
+
+.planProteinTrack {
+  height: 3px;
+  margin-top: 2px;
+}
+
+
+/* ==========================================================
+   I TUOI PASTI
+   ========================================================== */
+
+.mealsSection {
+  padding: 18px;
+  gap: 12px;
+}
+
+.mealsSection .sectionHeader h2 {
+  font-size: 1.32rem;
+}
+
+
+/*
+  Fondamentale:
+  le card NON vengono più forzate ad avere tutte
+  l'altezza della card più grande.
+*/
+
+@media (min-width: 768px) {
+  .mealList {
+    align-items: start;
+  }
+
+  .mealCard {
+    min-height: 0;
+    height: auto;
+  }
+}
+
+
+/* Card più dense */
+
+.mealCard {
+  padding: 14px 15px 0;
+  border-radius: 14px;
+}
+
+.mealCardTop {
+  min-height: 24px;
+}
+
+.mealLabel {
+  font-size: 0.8rem;
+}
+
+.registeredMealBadge,
+.predictedBadge,
+.unknownBadge,
+.nextMealBadge {
+  padding: 3px 7px;
+  font-size: 0.58rem;
+}
+
+.registeredMealRow {
+  padding: 10px 0;
+}
+
+.registeredMealRowInfo strong {
+  font-size: 0.81rem;
+}
+
+.registeredMealRowInfo span {
+  font-size: 0.68rem;
+}
+
+.registeredMealRowActions {
+  gap: 13px;
+}
+
+.registeredMealRowActions button {
+  font-size: 0.64rem;
+}
+
+
+/* Totale compatto */
+
+.registeredMealSlotTotal {
+  margin-left: -15px;
+  margin-right: -15px;
+
+  padding: 9px 15px 10px;
+}
+
+.registeredMealSlotTotal span {
+  font-size: 0.64rem;
+}
+
+.registeredMealSlotTotal strong {
+  font-size: 0.7rem;
+}
+
+
+/* Cena / proposta */
+
+.mealName {
+  font-size: 0.86rem;
+}
+
+.mealMeta {
+  font-size: 0.69rem;
+}
+
+.replanningPreview {
+  margin-top: 9px;
+  padding: 10px;
+  border-radius: 11px;
+}
+
+.replanningBadge {
+  font-size: 0.57rem;
+}
+
+.replanningMealName {
+  font-size: 0.78rem;
+}
+
+.replanningNutrition,
+.replanningReason {
+  font-size: 0.65rem;
+  line-height: 1.35;
+}
+
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media (max-width: 700px) {
+  .budgetHero {
+    padding: 16px;
+  }
+
+  .budgetNumber {
+    font-size: 3rem;
+  }
+
+  .planMetrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .planProtein {
+    grid-column: 1 / -1;
+  }
+
+  .mealCard {
+    padding: 14px 14px 0;
+  }
+
+  .registeredMealSlotTotal {
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+
+/* ============================================================
+   SANOSYNC HOME BRAND
+   ============================================================ */
+
+.homeLogo {
+  display: block;
+  width: auto;
+  height: 54px;
+  max-width: 220px;
+  object-fit: contain;
+  margin-bottom: 28px;
 }

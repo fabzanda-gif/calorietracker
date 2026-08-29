@@ -56,7 +56,11 @@ export function AppNav() {
           href="/"
           className={styles.brand}
         >
-          SANOSYNC
+          <img
+            src="/Logowhite.png"
+            alt="SanoSync"
+            className={styles.sanosyncLogo}
+          />
         </Link>
 
         <div className={styles.desktopLinks}>

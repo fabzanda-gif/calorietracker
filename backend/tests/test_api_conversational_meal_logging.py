@@ -117,3 +117,84 @@ def test_conversational_preview_builds_preview_from_interpretation(
     }
 
     assert payload["requires_confirmation"] is True
+
+
+def test_photo_preview_route_is_registered():
+    assert (
+        "/meals/photo/preview"
+        in app.openapi()["paths"]
+    )
+
+
+def test_photo_preview_builds_preview_from_interpretation(
+    monkeypatch,
+):
+    import base64
+
+    from backend.api.routers import meals as meals_router
+
+    def fake_interpret(
+        self,
+        *,
+        image_bytes,
+        mime_type,
+        meal_type,
+    ):
+        assert image_bytes == b"fake-image"
+        assert mime_type == "image/jpeg"
+
+        return {
+            "meal_type": meal_type,
+            "items": [
+                {
+                    "name": "Pasta al pomodoro",
+                    "quantity": 250,
+                    "unit": "g",
+                    "calories": 420,
+                    "protein": 14,
+                    "carbs": 72,
+                    "fat": 9,
+                    "estimated": True,
+                    "uncertainty": "photo",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        meals_router.GroqMealVisionInterpreter,
+        "interpret",
+        fake_interpret,
+    )
+
+    response = client.post(
+        "/meals/photo/preview",
+        json={
+            "image_base64": base64.b64encode(
+                b"fake-image"
+            ).decode("utf-8"),
+            "mime_type": "image/jpeg",
+            "meal_type": "Pranzo",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["meal_type"] == "Pranzo"
+    assert len(data["items"]) == 1
+    assert data["items"][0]["name"] == "Pasta al pomodoro"
+    assert data["items"][0]["calories"] == 420
+
+
+def test_photo_preview_rejects_invalid_base64():
+    response = client.post(
+        "/meals/photo/preview",
+        json={
+            "image_base64": "not-valid-base64!!!",
+            "mime_type": "image/jpeg",
+            "meal_type": "Pranzo",
+        },
+    )
+
+    assert response.status_code == 422

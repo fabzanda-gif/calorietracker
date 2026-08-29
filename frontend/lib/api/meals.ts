@@ -225,3 +225,24 @@ export function previewConversationalMeal(
     },
   );
 }
+
+
+export function previewPhotoMeal(
+  imageBase64: string,
+  mimeType: string,
+  mealType: string,
+  accessToken?: string | null,
+): Promise<ConversationalMealPreview> {
+  return apiRequest<ConversationalMealPreview>(
+    "/meals/photo/preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        image_base64: imageBase64,
+        mime_type: mimeType,
+        meal_type: mealType,
+      }),
+    },
+  );
+}

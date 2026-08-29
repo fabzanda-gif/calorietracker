@@ -722,7 +722,12 @@ export function QuickAdd({
             );
           }}
         >
-          + Pasto
+          <span className={styles.actionIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M7 3v7M4.5 3v4.5A2.5 2.5 0 0 0 7 10M9.5 3v4.5A2.5 2.5 0 0 1 7 10v11M16 3v18M16 3c2.5 2.2 3.5 5.2 3 9h-3" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>+ Pasto</span>
         </button>
 
         <button
@@ -741,7 +746,13 @@ export function QuickAdd({
             );
           }}
         >
-          + Snack
+          <span className={styles.actionIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12.3 7.2c-1.6-2.3-4.3-2.4-5.8-.8-2 2.1-1.5 7.3.6 10.7 1.2 2 2.4 3.6 4 3.6.7 0 1.2-.3 1.9-.3s1.2.3 1.9.3c1.6 0 2.8-1.6 4-3.6 2.1-3.4 2.6-8.6.6-10.7-1.5-1.6-4.2-1.5-5.8.8" />
+              <path d="M12.2 6.7c0-2 1.4-3.7 3.5-4.2.1 2.1-1.2 3.8-3.5 4.2Z" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>+ Snack</span>
         </button>
 
         <button
@@ -760,7 +771,13 @@ export function QuickAdd({
             );
           }}
         >
-          + Attività
+          <span className={styles.actionIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="15.5" cy="4.5" r="2" />
+              <path d="m13 8-2.2 3.2 3.2 2.3 1.8 3.3M13 8l3.2 2 2.8-.7M10.8 11.2 8 10M14 13.5l-3 2.2-1.5 4M15.8 16.8l2.8 3" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>+ Attività</span>
         </button>
       </div>
 

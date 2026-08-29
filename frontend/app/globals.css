@@ -33,3 +33,37 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+
+/* SANOSYNC DESIGN SYSTEM V1 */
+:root {
+  --ss-navy-950: #102846;
+  --ss-navy-900: #153354;
+  --ss-navy-800: #1d4268;
+  --ss-navy-700: #2a537a;
+
+  --ss-coral-600: #ef5e5c;
+  --ss-coral-500: #ff6b68;
+  --ss-coral-100: #fff0ee;
+  --ss-coral-050: #fff7f5;
+
+  --ss-bg: #f8f8f5;
+  --ss-surface: #ffffff;
+  --ss-surface-soft: #fbfbf8;
+
+  --ss-text: #142b47;
+  --ss-text-soft: #667286;
+  --ss-border: #e3e4e2;
+
+  --ss-radius-lg: 20px;
+  --ss-radius-md: 14px;
+  --ss-radius-sm: 10px;
+
+  --ss-shadow:
+    0 10px 30px rgba(16, 40, 70, 0.045);
+}
+
+body {
+  background: var(--ss-bg);
+  color: var(--ss-text);
+}
