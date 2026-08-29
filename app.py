@@ -2361,25 +2361,65 @@ Rules:
     )
     model_id = resolve_groq_text_model()
 
-    response = client.chat.completions.create(
-        model=model_id,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are SanoSync food-fit assistant. "
-                    "Return one valid JSON object only."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.35,
-        max_tokens=700,
-        stream=False,
-    )
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are SanoSync food-fit assistant. "
+                "Return exactly one valid JSON object only. "
+                "Do not output reasoning or markdown."
+            ),
+        },
+        {"role": "user", "content": prompt},
+    ]
 
-    raw = response.choices[0].message.content
-    data = _extract_json_object_tolerant(raw)
+    raw = None
+    strict_error = None
+
+    # First choice: Groq JSON Object Mode when supported by the selected model.
+    try:
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=700,
+            stream=False,
+        )
+        raw = response.choices[0].message.content
+    except Exception as exc:
+        strict_error = exc
+
+    # Some Groq models reject response_format. Retry without it rather than
+    # failing the user request.
+    if not raw:
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=messages,
+            temperature=0.2,
+            max_tokens=700,
+            stream=False,
+        )
+        raw = response.choices[0].message.content
+
+    try:
+        data = _extract_json_object_tolerant(raw)
+    except ValueError:
+        # Last chance: ask the model to repair its own malformed response.
+        try:
+            data = _repair_food_fit_json_with_groq(
+                client,
+                model_id,
+                raw,
+            )
+        except Exception as repair_exc:
+            if strict_error is not None:
+                print(f"SanoSync AI JSON mode error: {strict_error}")
+            print(f"SanoSync AI JSON repair error: {repair_exc}")
+            raise ValueError(
+                "La risposta AI non è stata restituita nel formato previsto. "
+                "Riprova tra qualche secondo."
+            ) from repair_exc
 
     estimated_kcal = max(0.0, _safe_float(data.get("estimated_kcal")))
     return {
@@ -8487,19 +8527,18 @@ def _normalize_ai_recipe_result(data, requested_servings):
 
 def _extract_json_object_tolerant(raw_text):
     """
-    Extract a JSON object from a model response without relying on Groq's
-    server-side response_format validation.
+    Extract the first valid JSON object from a model response.
 
-    This is deliberately defensive because some available Groq models may
-    prepend/append a tiny amount of text even when instructed to return JSON.
+    Handles markdown fences, <think> blocks, leading/trailing prose and
+    braces inside quoted JSON strings.
     """
     text = str(raw_text or "").strip()
+    if not text:
+        raise ValueError("La risposta AI è vuota.")
 
-    # Remove markdown fences.
+    # Remove markdown fences and provider reasoning blocks.
     text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
     text = re.sub(r"\s*```$", "", text).strip()
-
-    # Remove full reasoning blocks if a provider emits them.
     text = re.sub(
         r"<think>.*?</think>",
         "",
@@ -8507,20 +8546,87 @@ def _extract_json_object_tolerant(raw_text):
         flags=re.I | re.S,
     ).strip()
 
-    # First try the whole string.
+    # Whole response first.
     try:
-        return json.loads(text)
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
     except Exception:
         pass
 
-    # Then extract from first { to last }.
-    first = text.find("{")
-    last = text.rfind("}")
-    if first >= 0 and last > first:
-        candidate = text[first:last + 1]
-        return json.loads(candidate)
+    # Search every balanced {...} candidate while respecting JSON strings.
+    starts = [i for i, ch in enumerate(text) if ch == "{"]
+    for first in starts:
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for i in range(first, len(text)):
+            ch = text[i]
+
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[first:i + 1]
+                    try:
+                        data = json.loads(candidate)
+                        if isinstance(data, dict):
+                            return data
+                    except Exception:
+                        break
 
     raise ValueError("La risposta AI non contiene un oggetto JSON valido.")
+
+
+def _repair_food_fit_json_with_groq(client, model_id, raw_text):
+    """Repair one malformed food-fit response into the required JSON shape."""
+    repair_prompt = f"""
+Convert the response below into ONE valid JSON object only.
+
+Required top-level keys:
+food_name, estimated_kcal, estimated_protein_g, estimated_carbs_g,
+estimated_fat_g, confidence, message.
+
+Rules:
+- Do not add markdown fences.
+- Do not output commentary or reasoning.
+- Keep the original meaning and estimates when possible.
+- Numeric nutrition fields must be JSON numbers.
+- confidence must be "low", "medium", or "high".
+
+RESPONSE:
+{raw_text}
+""".strip()
+
+    repaired = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {
+                "role": "system",
+                "content": "Return exactly one valid JSON object and nothing else.",
+            },
+            {"role": "user", "content": repair_prompt},
+        ],
+        temperature=0,
+        max_tokens=900,
+        stream=False,
+    )
+    return _extract_json_object_tolerant(
+        repaired.choices[0].message.content
+    )
 
 
 def _repair_recipe_json_with_groq(client, model_id, raw_text):
