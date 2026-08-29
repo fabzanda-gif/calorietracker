@@ -26,7 +26,7 @@ app = FastAPI(
 
 default_origins = [
     "http://localhost:3000",
-    "https://glowing-cod-wv9qq5pr677pcqrj-3000.app.github.dev",
+    "https://ubiquitous-journey-p7g55w4jvrpvfwjp-3000.app.github.dev/",
 ]
 
 configured_origins = [
