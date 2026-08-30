@@ -4621,11 +4621,31 @@ def _oura_state_secret():
     return _oura_secret("OAUTH_STATE_SECRET")
 
 
-def build_oura_state(current_user_id):
+
+@st.cache_resource
+def _oura_pending_store():
+    # Server-side only. Keyed by the OAuth nonce and shared across Streamlit
+    # sessions/tabs in the running app process.
+    return {}
+
+
+def _oura_pending_cleanup(max_age_seconds=1200):
+    store = _oura_pending_store()
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    stale = [
+        key
+        for key, value in store.items()
+        if now_ts - int(value.get("ts") or 0) > int(max_age_seconds)
+    ]
+    for key in stale:
+        store.pop(key, None)
+
+
+def build_oura_state(current_user_id, nonce=None):
     payload = {
         "uid": str(current_user_id),
         "ts": int(datetime.now(timezone.utc).timestamp()),
-        "nonce": secrets.token_urlsafe(18),
+        "nonce": str(nonce or secrets.token_urlsafe(18)),
     }
     raw = json.dumps(
         payload,
@@ -4673,13 +4693,89 @@ def verify_oura_state(state_value, current_user_id, max_age_seconds=900):
         return False
 
 
+def decode_oura_state(state_value):
+    """Return the signed state payload after signature/age validation."""
+    body, supplied_sig = str(state_value).split(".", 1)
+    expected = hmac.new(
+        _oura_state_secret().encode("utf-8"),
+        body.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    expected_sig = (
+        base64.urlsafe_b64encode(expected)
+        .decode("ascii")
+        .rstrip("=")
+    )
+    if not hmac.compare_digest(supplied_sig, expected_sig):
+        raise RuntimeError("Firma OAuth Oura non valida.")
+
+    padded = body + "=" * (-len(body) % 4)
+    payload = json.loads(
+        base64.urlsafe_b64decode(padded).decode("utf-8")
+    )
+    issued_at = int(payload.get("ts") or 0)
+    age = int(datetime.now(timezone.utc).timestamp()) - issued_at
+    if age < 0 or age > 1200:
+        raise RuntimeError("Richiesta OAuth Oura scaduta.")
+    return payload
+
+
+def restore_sanosync_session_for_oura_callback(state_value):
+    """
+    Oura/Streamlit opens the authorization in a new tab. st.session_state is
+    therefore new on callback. Recover the SanoSync refresh token from a
+    short-lived server-side pending store and re-establish the Supabase session.
+    """
+    payload = decode_oura_state(state_value)
+    nonce = str(payload.get("nonce") or "")
+    expected_uid = str(payload.get("uid") or "")
+    if not nonce or not expected_uid:
+        raise RuntimeError("State OAuth Oura incompleto.")
+
+    _oura_pending_cleanup()
+    pending = _oura_pending_store().pop(nonce, None)
+    if not pending:
+        raise RuntimeError(
+            "Sessione SanoSync per il callback Oura non più disponibile. "
+            "Riprova a collegare Oura."
+        )
+    if str(pending.get("uid")) != expected_uid:
+        raise RuntimeError("Utente OAuth Oura non corrispondente.")
+
+    refresh_token = str(pending.get("refresh_token") or "")
+    if not refresh_token:
+        raise RuntimeError("Refresh token SanoSync non disponibile.")
+
+    response = supabase.auth.refresh_session(refresh_token)
+    restored_user = save_authenticated_session(response)
+    if str(restored_user.id) != expected_uid:
+        raise RuntimeError("Sessione SanoSync ripristinata per un altro utente.")
+    return restored_user
+
+
 def build_oura_authorization_url(current_user_id):
+    refresh_token = str(
+        st.session_state.get("auth_refresh_token") or ""
+    ).strip()
+    if not refresh_token:
+        raise RuntimeError(
+            "Sessione SanoSync non disponibile. Effettua nuovamente l'accesso."
+        )
+
+    _oura_pending_cleanup()
+    nonce = secrets.token_urlsafe(24)
+    _oura_pending_store()[nonce] = {
+        "uid": str(current_user_id),
+        "refresh_token": refresh_token,
+        "ts": int(datetime.now(timezone.utc).timestamp()),
+    }
+
     params = {
         "response_type": "code",
         "client_id": _oura_secret("OURA_CLIENT_ID"),
         "redirect_uri": get_oura_redirect_uri(),
         "scope": OURA_SCOPES,
-        "state": build_oura_state(current_user_id),
+        "state": build_oura_state(current_user_id, nonce=nonce),
     }
     return f"{OURA_AUTHORIZE_URL}?{urlencode(params)}"
 
@@ -4855,6 +4951,139 @@ def oura_get_personal_info(current_user_id):
     )
 
 
+
+def oura_get_daily_activity(
+    current_user_id,
+    start_date,
+    end_date=None,
+):
+    access_token, _ = get_valid_oura_access_token(current_user_id)
+    params = {
+        "start_date": str(start_date),
+        "end_date": str(end_date or start_date),
+    }
+    payload = _oura_request(
+        "GET",
+        f"{OURA_API_BASE}/daily_activity",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+        params=params,
+    )
+    rows = payload.get("data") if isinstance(payload, dict) else []
+    return rows if isinstance(rows, list) else []
+
+
+def sync_oura_steps_to_supabase(
+    current_user_id,
+    start_date,
+    end_date=None,
+):
+    """
+    Import Oura daily steps into daily_logs.steps.
+
+    SanoSync keeps its existing step-calorie rule (0.04 kcal/step). This avoids
+    double-counting Oura active_calories, which can also include workouts.
+    Padel/running remain step-conflicting exactly as in the manual UI.
+    """
+    rows = oura_get_daily_activity(
+        current_user_id,
+        start_date,
+        end_date or start_date,
+    )
+    synced = []
+
+    for item in rows:
+        day_value = str(item.get("day") or "").strip()
+        if not day_value:
+            continue
+
+        steps = int(item.get("steps") or 0)
+        update_daily_log_via_api(
+            day_value,
+            {"steps": steps},
+            st.session_state.get("auth_access_token"),
+        )
+
+        activities = fetch_daily_activities_from_api(
+            current_user_id,
+            day_value,
+            st.session_state.get("auth_access_token"),
+        )
+        conflicts = {"padel", "corsa", "running"}
+        has_conflict = any(
+            str(a.get("activity_name") or "").strip().casefold()
+            in conflicts
+            for a in activities
+        )
+
+        estimated_kcal = 0 if has_conflict else int(steps * 0.04)
+
+        upsert_named_activity_via_api(
+            cache_user_id=current_user_id,
+            log_date=day_value,
+            activity_name="Passi (Stima)",
+            burned_calories=estimated_kcal,
+            access_token=st.session_state.get("auth_access_token"),
+        )
+
+        synced.append(
+            {
+                "date": day_value,
+                "steps": steps,
+                "estimated_kcal": estimated_kcal,
+                "oura_active_calories": int(
+                    item.get("active_calories") or 0
+                ),
+            }
+        )
+
+    # Clear existing app caches so pages immediately show imported values.
+    try:
+        load_daily_log_cached.clear()
+    except Exception:
+        pass
+    try:
+        load_daily_activities_cached.clear()
+    except Exception:
+        pass
+
+    return synced
+
+
+def maybe_auto_sync_oura(current_user_id, interval_seconds=3600):
+    """
+    Sync today + yesterday at most once per hour per Streamlit session.
+    This runs when SanoSync is open; it is not a background daemon.
+    """
+    try:
+        connection = fetch_oura_connection(current_user_id)
+        if not connection:
+            return None
+
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        last_ts = int(
+            st.session_state.get("oura_last_auto_sync_ts") or 0
+        )
+        if now_ts - last_ts < int(interval_seconds):
+            return None
+
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        rows = sync_oura_steps_to_supabase(
+            current_user_id,
+            yesterday,
+            today,
+        )
+        st.session_state["oura_last_auto_sync_ts"] = now_ts
+        st.session_state["oura_last_auto_sync_count"] = len(rows)
+        return rows
+    except Exception as exc:
+        # Do not break the whole app if Oura is temporarily unavailable.
+        print(f"Oura auto-sync warning: {exc}")
+        return None
+
+
 def revoke_and_delete_oura_connection(current_user_id):
     connection = fetch_oura_connection(current_user_id)
     if connection and connection.get("access_token"):
@@ -4941,6 +5170,7 @@ def handle_oura_callback(current_user_id):
 
         st.query_params.clear()
         st.session_state["oura_callback_success"] = True
+        st.session_state.pop("oura_authorization_url", None)
         st.session_state["show_personal_settings"] = True
         st.rerun()
 
@@ -4956,6 +5186,23 @@ def handle_oura_callback(current_user_id):
 # ==============================================================================
 # 5. RESTORE SESSION / GOOGLE CALLBACK
 # ==============================================================================
+
+# Oura opens in a new browser tab, which creates a new Streamlit session.
+# Restore the SanoSync/Supabase session from the short-lived server-side pending
+# OAuth record before the normal login gate.
+if (
+    st.session_state.get("user") is None
+    and str(st.query_params.get("page") or "").strip().lower()
+    == "oura_callback"
+    and st.query_params.get("state")
+):
+    try:
+        restore_sanosync_session_for_oura_callback(
+            st.query_params.get("state")
+        )
+    except Exception as exc:
+        st.session_state["oura_callback_error"] = str(exc)
+
 # Gestiamo prima il callback PKCE, perché il code OAuth è monouso.
 if (
     st.session_state.get("user") is None
@@ -4990,6 +5237,10 @@ if (
     == "oura_callback"
 ):
     handle_oura_callback(user_id)
+
+# When SanoSync is open, keep Oura steps reasonably fresh without requiring a
+# manual button. Runs at most hourly per Streamlit session.
+maybe_auto_sync_oura(user_id)
 
 def get_logged_user_identity(user_obj):
     """Nome, email e avatar dai metadata Supabase (Google incluso)."""
@@ -8644,11 +8895,11 @@ def render_personal_settings_page():
             if _scope:
                 st.caption(f"Permessi concessi: {_scope}")
 
-            _oura_col1, _oura_col2 = st.columns(2)
+            _oura_col1, _oura_col2, _oura_col3 = st.columns(3)
 
             with _oura_col1:
                 if st.button(
-                    "🔄 Verifica connessione",
+                    "🔄 Verifica",
                     key="oura_test_connection",
                     use_container_width=True,
                 ):
@@ -8669,7 +8920,42 @@ def render_personal_settings_page():
 
             with _oura_col2:
                 if st.button(
-                    "Scollega Oura",
+                    "👣 Sincronizza ora",
+                    key="oura_sync_steps_now",
+                    use_container_width=True,
+                ):
+                    try:
+                        _today = date.today()
+                        _start = _today - timedelta(days=7)
+                        _synced = sync_oura_steps_to_supabase(
+                            user_id,
+                            _start,
+                            _today,
+                        )
+                        if _synced:
+                            _latest = sorted(
+                                _synced,
+                                key=lambda row: row["date"],
+                            )[-1]
+                            st.success(
+                                f"Oura sincronizzato: "
+                                f"{_latest['steps']} passi il "
+                                f"{_latest['date']} "
+                                f"({_latest['estimated_kcal']} kcal stimate)."
+                            )
+                        else:
+                            st.info(
+                                "Oura non ha restituito attività giornaliere "
+                                "per gli ultimi 7 giorni."
+                            )
+                    except Exception as exc:
+                        st.error(
+                            f"Sincronizzazione Oura non riuscita: {exc}"
+                        )
+
+            with _oura_col3:
+                if st.button(
+                    "Scollega",
                     key="oura_disconnect",
                     use_container_width=True,
                 ):
@@ -8681,6 +8967,13 @@ def render_personal_settings_page():
                         st.error(
                             f"Impossibile scollegare Oura: {exc}"
                         )
+
+            st.caption(
+                "I passi Oura vengono salvati in `daily_logs.steps`. "
+                "Le kcal dei passi usano la regola SanoSync già esistente: "
+                "0,04 kcal per passo, evitando il doppio conteggio con "
+                "Padel/Corsa."
+            )
         else:
             st.write(
                 "Collega il tuo Oura Ring a SanoSync. "
@@ -8692,12 +8985,24 @@ def render_personal_settings_page():
             )
 
             try:
-                _oura_auth_url = build_oura_authorization_url(user_id)
+                _oura_auth_url = st.session_state.get(
+                    "oura_authorization_url"
+                )
+                if not _oura_auth_url:
+                    _oura_auth_url = build_oura_authorization_url(user_id)
+                    st.session_state["oura_authorization_url"] = (
+                        _oura_auth_url
+                    )
+
                 st.link_button(
                     "💍 Connetti Oura",
                     _oura_auth_url,
                     use_container_width=True,
                     type="primary",
+                )
+                st.caption(
+                    "Oura si apre in una nuova scheda. Al termine "
+                    "l'associazione viene salvata automaticamente."
                 )
             except Exception as exc:
                 st.error(
