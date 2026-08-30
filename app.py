@@ -4803,35 +4803,55 @@ def _oura_request(method, url, **kwargs):
         return {}
 
 
+def _oura_scalar(value):
+    """Normalize Streamlit query-param values to one plain string."""
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else ""
+    return str(value or "").strip()
+
+
 def exchange_oura_code(code_value):
+    """
+    Exchange the one-time authorization code for tokens.
+
+    Oura explicitly supports HTTP Basic client authentication. Using it here
+    avoids sending two client credentials inside the form payload and leaves
+    requests to generate the form Content-Type/encoding itself.
+    """
+    code_value = _oura_scalar(code_value)
+    if not code_value:
+        raise RuntimeError("Authorization code Oura mancante.")
+
     return _oura_request(
         "POST",
         OURA_TOKEN_URL,
+        auth=(
+            _oura_secret("OURA_CLIENT_ID"),
+            _oura_secret("OURA_CLIENT_SECRET"),
+        ),
         data={
             "grant_type": "authorization_code",
-            "code": str(code_value),
+            "code": code_value,
             "redirect_uri": get_oura_redirect_uri(),
-            "client_id": _oura_secret("OURA_CLIENT_ID"),
-            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
-        },
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
         },
     )
 
 
 def refresh_oura_tokens(refresh_token):
+    refresh_token = _oura_scalar(refresh_token)
+    if not refresh_token:
+        raise RuntimeError("Refresh token Oura mancante.")
+
     return _oura_request(
         "POST",
         OURA_TOKEN_URL,
+        auth=(
+            _oura_secret("OURA_CLIENT_ID"),
+            _oura_secret("OURA_CLIENT_SECRET"),
+        ),
         data={
             "grant_type": "refresh_token",
-            "refresh_token": str(refresh_token),
-            "client_id": _oura_secret("OURA_CLIENT_ID"),
-            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
-        },
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
+            "refresh_token": refresh_token,
         },
     )
 
@@ -5120,8 +5140,8 @@ def handle_oura_callback(current_user_id):
         st.session_state["show_personal_settings"] = True
         st.rerun()
 
-    code_value = st.query_params.get("code")
-    state_value = st.query_params.get("state")
+    code_value = _oura_scalar(st.query_params.get("code"))
+    state_value = _oura_scalar(st.query_params.get("state"))
 
     if not code_value or not state_value:
         st.query_params.clear()
@@ -5176,7 +5196,10 @@ def handle_oura_callback(current_user_id):
 
     except Exception as exc:
         st.query_params.clear()
-        st.session_state["oura_callback_error"] = str(exc)
+        st.session_state["oura_callback_error"] = (
+            f"{exc} — Il codice OAuth è monouso: premi di nuovo "
+            f"'Connetti Oura' per creare una nuova autorizzazione."
+        )
         st.session_state["show_personal_settings"] = True
         st.rerun()
 
