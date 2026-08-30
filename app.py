@@ -4612,8 +4612,9 @@ def _oura_secret(name):
 
 
 def get_oura_redirect_uri():
-    # Must exactly match the redirect registered in Oura.
-    return "https://sanosync.streamlit.app/?page=oura_callback"
+    # Keep the OAuth callback URL clean. Oura will append code/scope/state.
+    # This value must exactly match the Redirect URI registered in Oura.
+    return "https://sanosync.streamlit.app/"
 
 
 def _oura_state_secret():
@@ -4811,13 +4812,7 @@ def _oura_scalar(value):
 
 
 def exchange_oura_code(code_value):
-    """
-    Exchange the one-time authorization code for tokens.
-
-    Oura explicitly supports HTTP Basic client authentication. Using it here
-    avoids sending two client credentials inside the form payload and leaves
-    requests to generate the form Content-Type/encoding itself.
-    """
+    """Exchange an Oura authorization code exactly once."""
     code_value = _oura_scalar(code_value)
     if not code_value:
         raise RuntimeError("Authorization code Oura mancante.")
@@ -4825,17 +4820,14 @@ def exchange_oura_code(code_value):
     return _oura_request(
         "POST",
         OURA_TOKEN_URL,
-        auth=(
-            _oura_secret("OURA_CLIENT_ID"),
-            _oura_secret("OURA_CLIENT_SECRET"),
-        ),
         data={
             "grant_type": "authorization_code",
             "code": code_value,
+            "client_id": _oura_secret("OURA_CLIENT_ID"),
+            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
             "redirect_uri": get_oura_redirect_uri(),
         },
     )
-
 
 def refresh_oura_tokens(refresh_token):
     refresh_token = _oura_scalar(refresh_token)
@@ -4845,16 +4837,13 @@ def refresh_oura_tokens(refresh_token):
     return _oura_request(
         "POST",
         OURA_TOKEN_URL,
-        auth=(
-            _oura_secret("OURA_CLIENT_ID"),
-            _oura_secret("OURA_CLIENT_SECRET"),
-        ),
         data={
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
+            "client_id": _oura_secret("OURA_CLIENT_ID"),
+            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
         },
     )
-
 
 def fetch_oura_connection(current_user_id):
     response = (
@@ -5124,13 +5113,14 @@ def revoke_and_delete_oura_connection(current_user_id):
 
 
 def handle_oura_callback(current_user_id):
-    if (
-        str(st.query_params.get("page") or "").strip().lower()
-        != "oura_callback"
-    ):
+    # Oura returns to the app root and appends code/scope/state.
+    state_value = _oura_scalar(st.query_params.get("state"))
+    code_value = _oura_scalar(st.query_params.get("code"))
+    oauth_error = st.query_params.get("error")
+
+    if not state_value or (not code_value and not oauth_error):
         return False
 
-    oauth_error = st.query_params.get("error")
     if oauth_error:
         description = st.query_params.get("error_description")
         st.query_params.clear()
@@ -5139,9 +5129,6 @@ def handle_oura_callback(current_user_id):
         )
         st.session_state["show_personal_settings"] = True
         st.rerun()
-
-    code_value = _oura_scalar(st.query_params.get("code"))
-    state_value = _oura_scalar(st.query_params.get("state"))
 
     if not code_value or not state_value:
         st.query_params.clear()
@@ -5156,6 +5143,21 @@ def handle_oura_callback(current_user_id):
         st.session_state["oura_callback_error"] = (
             "Verifica di sicurezza OAuth Oura non riuscita."
         )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    # Streamlit can rerun the callback page. Never exchange the same one-time
+    # OAuth code again if the connection was already persisted successfully.
+    try:
+        _existing_oura = fetch_oura_connection(current_user_id)
+    except Exception:
+        _existing_oura = None
+
+    if _existing_oura:
+        st.query_params.clear()
+        st.session_state["oura_callback_success"] = True
+        st.session_state.pop("oura_callback_error", None)
+        st.session_state.pop("oura_authorization_url", None)
         st.session_state["show_personal_settings"] = True
         st.rerun()
 
@@ -5216,9 +5218,12 @@ def handle_oura_callback(current_user_id):
 # OAuth record before the normal login gate.
 if (
     st.session_state.get("user") is None
-    and str(st.query_params.get("page") or "").strip().lower()
-    == "oura_callback"
     and st.query_params.get("state")
+    and (
+        st.query_params.get("code")
+        or st.query_params.get("error")
+    )
+    and not st.query_params.get("auth_flow")
 ):
     try:
         restore_sanosync_session_for_oura_callback(
@@ -5257,8 +5262,12 @@ u_meta = user.user_metadata or {}
 # Oura returns here after authorization. At this point the SanoSync user
 # session has already been restored, so we can safely bind Oura to user_id.
 if (
-    str(st.query_params.get("page") or "").strip().lower()
-    == "oura_callback"
+    st.query_params.get("state")
+    and (
+        st.query_params.get("code")
+        or st.query_params.get("error")
+    )
+    and not st.query_params.get("auth_flow")
 ):
     handle_oura_callback(user_id)
 
