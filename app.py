@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import requests
 import traceback
 import re
@@ -11,6 +11,7 @@ from html import escape
 import uuid
 import base64
 import hashlib
+import hmac
 import secrets
 import io
 import os
@@ -4382,6 +4383,576 @@ def show_login_page():
                 print(traceback.format_exc())
 
 
+
+# ==============================================================================
+# PUBLIC LEGAL PAGES + OURA OAUTH
+# ==============================================================================
+
+OURA_AUTHORIZE_URL = "https://cloud.ouraring.com/oauth/authorize"
+OURA_TOKEN_URL = "https://api.ouraring.com/oauth/token"
+OURA_REVOKE_URL = "https://api.ouraring.com/oauth/revoke"
+OURA_API_BASE = "https://api.ouraring.com/v2/usercollection"
+OURA_SCOPES = "personal daily workout"
+
+
+def render_public_legal_page(page_name):
+    """Public Privacy Policy / Terms pages used by the Oura application."""
+    page_name = str(page_name or "").strip().lower()
+
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] { display:none !important; }
+        [data-testid="collapsedControl"] { display:none !important; }
+        .sano-legal-wrap {
+            max-width: 900px;
+            margin: 1rem auto 4rem auto;
+        }
+        .sano-legal-wrap h1 { color:#1A2942; }
+        .sano-legal-wrap h2 {
+            color:#1A2942;
+            margin-top:1.8rem;
+        }
+        .sano-legal-meta {
+            color:#6B7280;
+            margin-bottom:1.8rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="sano-legal-wrap">', unsafe_allow_html=True)
+
+    if page_name == "privacy":
+        st.title("SanoSync — Privacy Policy")
+        st.markdown(
+            '<div class="sano-legal-meta">Ultimo aggiornamento: 30 agosto 2026</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+SanoSync è un'applicazione per il monitoraggio personale di alimentazione,
+attività, peso e benessere. Questa informativa descrive come vengono trattati
+i dati quando utilizzi SanoSync e, se scegli di collegarlo, il tuo account Oura.
+
+## Dati trattati
+
+SanoSync può trattare i dati del tuo account necessari per autenticazione e
+profilo, i dati che inserisci nell'app (per esempio alimenti, attività e peso)
+e i dati che autorizzi esplicitamente tramite Oura.
+
+Quando colleghi Oura, SanoSync richiede solo gli ambiti necessari alle
+funzioni dell'app: **personal**, **daily** e **workout**. In base ai permessi
+effettivamente concessi, questi dati possono comprendere informazioni
+personali e corporee, riepiloghi giornalieri relativi ad attività, sonno e
+readiness, e riepiloghi degli allenamenti.
+
+## Perché utilizziamo questi dati
+
+I dati vengono utilizzati esclusivamente per fornire le funzionalità richieste
+dall'utente: mostrare e integrare i propri dati di benessere, alimentazione e
+attività all'interno di SanoSync, calcolare riepiloghi personali e mantenere
+la connessione autorizzata con Oura.
+
+SanoSync non vende i dati Oura e non li utilizza per pubblicità
+comportamentale.
+
+## Collegamento con Oura
+
+Il collegamento avviene tramite OAuth 2.0. SanoSync non riceve né conserva la
+password dell'account Oura. Oura restituisce a SanoSync token di
+autorizzazione che consentono l'accesso soltanto ai dati e agli scope
+approvati dall'utente.
+
+L'utente può scollegare Oura da SanoSync e può anche revocare l'accesso dalle
+impostazioni del proprio account Oura.
+
+## Conservazione e sicurezza
+
+I dati applicativi e le informazioni necessarie a mantenere la connessione
+Oura sono conservati nell'infrastruttura utilizzata da SanoSync con controlli
+di accesso associati all'account autenticato. I dati vengono conservati solo
+per il tempo necessario a fornire il servizio o fino alla cancellazione o
+revoca richiesta dall'utente, salvo eventuali obblighi di legge.
+
+## Condivisione
+
+I dati possono essere trattati dai fornitori tecnici strettamente necessari al
+funzionamento dell'applicazione (hosting, database e servizi API), nei limiti
+necessari all'erogazione del servizio. SanoSync non autorizza tali fornitori a
+utilizzare i dati per finalità proprie incompatibili con il servizio.
+
+## Diritti, revoca e cancellazione
+
+Puoi smettere di condividere i dati Oura scollegando l'integrazione. Puoi
+inoltre chiedere accesso, correzione o cancellazione dei dati associati al tuo
+account contattando SanoSync all'indirizzo indicato sotto.
+
+## Servizio di benessere, non medico
+
+SanoSync è destinato al monitoraggio personale e al benessere generale. Non
+fornisce diagnosi, trattamenti o consulenza medica e non sostituisce un
+professionista sanitario.
+
+## Contatti
+
+Per domande sulla privacy o richieste relative ai dati:
+
+**fab.zanda@gmail.com**
+
+Sito: **https://sanosync.streamlit.app/**
+"""
+        )
+
+    elif page_name == "terms":
+        st.title("SanoSync — Terms of Service")
+        st.markdown(
+            '<div class="sano-legal-meta">Ultimo aggiornamento: 30 agosto 2026</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+Utilizzando SanoSync accetti i presenti Termini di Servizio.
+
+## Finalità del servizio
+
+SanoSync offre strumenti per registrare e visualizzare alimentazione,
+attività, peso e altre informazioni relative al benessere personale.
+Alcune funzionalità possono utilizzare servizi esterni, incluso Oura, quando
+l'utente decide volontariamente di collegarli.
+
+## Account e sicurezza
+
+Sei responsabile dell'utilizzo del tuo account e della protezione dei tuoi
+metodi di accesso. Non devi utilizzare SanoSync per accedere a dati di altre
+persone senza autorizzazione.
+
+## Integrazione Oura
+
+Il collegamento con Oura è facoltativo. Collegando il tuo account autorizzi
+SanoSync ad accedere esclusivamente agli scope Oura che approvi durante la
+procedura OAuth. Puoi revocare tale autorizzazione in qualsiasi momento.
+
+La disponibilità, accuratezza e continuità dei dati provenienti da Oura
+dipendono anche dai servizi Oura, dalla sincronizzazione del dispositivo,
+dall'abbonamento dell'utente e dalle autorizzazioni concesse.
+
+## Uso consentito
+
+Non puoi utilizzare il servizio per attività illegali, per compromettere la
+sicurezza dell'applicazione, per tentare accessi non autorizzati o per
+interferire con il funzionamento del servizio.
+
+## Informazioni sul benessere
+
+I risultati, le stime nutrizionali, i punteggi e le altre informazioni fornite
+da SanoSync hanno finalità informative e di benessere generale. Non
+costituiscono diagnosi, prescrizioni o consulenza medica.
+
+## Disponibilità del servizio
+
+SanoSync può essere aggiornato, modificato o temporaneamente non disponibile.
+Non viene garantita l'assenza assoluta di errori o interruzioni.
+
+## Servizi di terze parti
+
+L'utilizzo di Oura e di altri servizi di terze parti resta soggetto anche ai
+termini e alle informative di tali servizi. SanoSync non controlla la
+disponibilità o le modifiche apportate da terze parti alle proprie API.
+
+## Interruzione del collegamento
+
+Puoi scollegare Oura in qualsiasi momento dalle impostazioni di SanoSync.
+L'accesso futuro ai dati Oura verrà così interrotto. Puoi inoltre richiedere
+la cancellazione dei dati associati contattando SanoSync.
+
+## Modifiche ai termini
+
+Questi termini possono essere aggiornati per riflettere modifiche del servizio
+o requisiti normativi. La data dell'ultima revisione è indicata in alto.
+
+## Contatti
+
+Per domande sui presenti termini:
+
+**fab.zanda@gmail.com**
+
+Sito: **https://sanosync.streamlit.app/**
+"""
+        )
+
+    st.markdown("---")
+    st.link_button(
+        "← Torna a SanoSync",
+        "https://sanosync.streamlit.app/",
+        use_container_width=False,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+_public_page = str(st.query_params.get("page") or "").strip().lower()
+if _public_page in {"privacy", "terms"}:
+    render_public_legal_page(_public_page)
+    st.stop()
+
+
+def _oura_secret(name):
+    try:
+        value = str(st.secrets[name]).strip()
+    except Exception:
+        value = ""
+    if not value:
+        raise RuntimeError(
+            f"Secret Streamlit mancante: {name}"
+        )
+    return value
+
+
+def get_oura_redirect_uri():
+    # Must exactly match the redirect registered in Oura.
+    return "https://sanosync.streamlit.app/?page=oura_callback"
+
+
+def _oura_state_secret():
+    # Reuse the existing server-only OAuth state secret.
+    return _oura_secret("OAUTH_STATE_SECRET")
+
+
+def build_oura_state(current_user_id):
+    payload = {
+        "uid": str(current_user_id),
+        "ts": int(datetime.now(timezone.utc).timestamp()),
+        "nonce": secrets.token_urlsafe(18),
+    }
+    raw = json.dumps(
+        payload,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    body = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    signature = hmac.new(
+        _oura_state_secret().encode("utf-8"),
+        body.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    sig = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{body}.{sig}"
+
+
+def verify_oura_state(state_value, current_user_id, max_age_seconds=900):
+    try:
+        body, supplied_sig = str(state_value).split(".", 1)
+        expected = hmac.new(
+            _oura_state_secret().encode("utf-8"),
+            body.encode("ascii"),
+            hashlib.sha256,
+        ).digest()
+        expected_sig = (
+            base64.urlsafe_b64encode(expected)
+            .decode("ascii")
+            .rstrip("=")
+        )
+        if not hmac.compare_digest(supplied_sig, expected_sig):
+            return False
+
+        padded = body + "=" * (-len(body) % 4)
+        payload = json.loads(
+            base64.urlsafe_b64decode(padded).decode("utf-8")
+        )
+
+        if str(payload.get("uid")) != str(current_user_id):
+            return False
+
+        issued_at = int(payload.get("ts") or 0)
+        age = int(datetime.now(timezone.utc).timestamp()) - issued_at
+        return 0 <= age <= int(max_age_seconds)
+    except Exception:
+        return False
+
+
+def build_oura_authorization_url(current_user_id):
+    params = {
+        "response_type": "code",
+        "client_id": _oura_secret("OURA_CLIENT_ID"),
+        "redirect_uri": get_oura_redirect_uri(),
+        "scope": OURA_SCOPES,
+        "state": build_oura_state(current_user_id),
+    }
+    return f"{OURA_AUTHORIZE_URL}?{urlencode(params)}"
+
+
+def _oura_request(method, url, **kwargs):
+    response = requests.request(
+        method,
+        url,
+        timeout=20,
+        **kwargs,
+    )
+    if response.status_code >= 400:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise RuntimeError(
+            f"Oura API {response.status_code}: {detail}"
+        )
+    if not response.content:
+        return {}
+    try:
+        return response.json()
+    except Exception:
+        return {}
+
+
+def exchange_oura_code(code_value):
+    return _oura_request(
+        "POST",
+        OURA_TOKEN_URL,
+        data={
+            "grant_type": "authorization_code",
+            "code": str(code_value),
+            "redirect_uri": get_oura_redirect_uri(),
+            "client_id": _oura_secret("OURA_CLIENT_ID"),
+            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
+        },
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
+
+
+def refresh_oura_tokens(refresh_token):
+    return _oura_request(
+        "POST",
+        OURA_TOKEN_URL,
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": str(refresh_token),
+            "client_id": _oura_secret("OURA_CLIENT_ID"),
+            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
+        },
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
+
+
+def fetch_oura_connection(current_user_id):
+    response = (
+        supabase.table("oura_connections")
+        .select("*")
+        .eq("user_id", str(current_user_id))
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    return rows[0] if rows else None
+
+
+def save_oura_connection(
+    current_user_id,
+    token_data,
+    *,
+    granted_scope=None,
+    oura_user_id=None,
+):
+    access_token = str(token_data.get("access_token") or "").strip()
+    refresh_token = str(token_data.get("refresh_token") or "").strip()
+    if not access_token or not refresh_token:
+        raise RuntimeError(
+            "Oura non ha restituito access_token e refresh_token."
+        )
+
+    expires_in = int(token_data.get("expires_in") or 86400)
+    expires_at = (
+        datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    ).isoformat()
+
+    payload = {
+        "user_id": str(current_user_id),
+        "oura_user_id": (
+            str(oura_user_id)
+            if oura_user_id not in (None, "")
+            else None
+        ),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": str(token_data.get("token_type") or "bearer"),
+        "scope": str(
+            token_data.get("scope")
+            or granted_scope
+            or OURA_SCOPES
+        ),
+        "expires_at": expires_at,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    response = (
+        supabase.table("oura_connections")
+        .upsert(payload, on_conflict="user_id")
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    return rows[0] if rows else payload
+
+
+def delete_oura_connection(current_user_id):
+    (
+        supabase.table("oura_connections")
+        .delete()
+        .eq("user_id", str(current_user_id))
+        .execute()
+    )
+
+
+def _oura_token_expiring(connection, leeway_seconds=120):
+    expires_at = connection.get("expires_at")
+    if not expires_at:
+        return True
+    try:
+        parsed = datetime.fromisoformat(
+            str(expires_at).replace("Z", "+00:00")
+        )
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed <= (
+            datetime.now(timezone.utc)
+            + timedelta(seconds=leeway_seconds)
+        )
+    except Exception:
+        return True
+
+
+def get_valid_oura_access_token(current_user_id):
+    connection = fetch_oura_connection(current_user_id)
+    if not connection:
+        raise RuntimeError("Oura non è collegato.")
+
+    if not _oura_token_expiring(connection):
+        return str(connection["access_token"]), connection
+
+    token_data = refresh_oura_tokens(connection.get("refresh_token"))
+    refreshed = save_oura_connection(
+        current_user_id,
+        token_data,
+        granted_scope=connection.get("scope"),
+        oura_user_id=connection.get("oura_user_id"),
+    )
+    return str(refreshed["access_token"]), refreshed
+
+
+def oura_get_personal_info(current_user_id):
+    access_token, _ = get_valid_oura_access_token(current_user_id)
+    return _oura_request(
+        "GET",
+        f"{OURA_API_BASE}/personal_info",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+    )
+
+
+def revoke_and_delete_oura_connection(current_user_id):
+    connection = fetch_oura_connection(current_user_id)
+    if connection and connection.get("access_token"):
+        try:
+            _oura_request(
+                "GET",
+                OURA_REVOKE_URL,
+                params={
+                    "access_token": str(connection["access_token"]),
+                },
+            )
+        except Exception as exc:
+            # Local disconnect must still work if Oura is temporarily
+            # unreachable; the user can also revoke from Oura directly.
+            print(f"Oura revoke warning: {exc}")
+
+    delete_oura_connection(current_user_id)
+
+
+def handle_oura_callback(current_user_id):
+    if (
+        str(st.query_params.get("page") or "").strip().lower()
+        != "oura_callback"
+    ):
+        return False
+
+    oauth_error = st.query_params.get("error")
+    if oauth_error:
+        description = st.query_params.get("error_description")
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = (
+            str(description or oauth_error)
+        )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    code_value = st.query_params.get("code")
+    state_value = st.query_params.get("state")
+
+    if not code_value or not state_value:
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = (
+            "Callback Oura incompleto: code/state mancanti."
+        )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    if not verify_oura_state(state_value, current_user_id):
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = (
+            "Verifica di sicurezza OAuth Oura non riuscita."
+        )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    try:
+        token_data = exchange_oura_code(code_value)
+
+        access_token = str(token_data.get("access_token") or "")
+        if not access_token:
+            raise RuntimeError(
+                "Oura non ha restituito un access token."
+            )
+
+        personal = _oura_request(
+            "GET",
+            f"{OURA_API_BASE}/personal_info",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+            },
+        )
+
+        oura_user_id = (
+            personal.get("id")
+            or personal.get("user_id")
+        )
+
+        save_oura_connection(
+            current_user_id,
+            token_data,
+            granted_scope=st.query_params.get("scope"),
+            oura_user_id=oura_user_id,
+        )
+
+        st.query_params.clear()
+        st.session_state["oura_callback_success"] = True
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    except Exception as exc:
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = str(exc)
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    return True
+
+
 # ==============================================================================
 # 5. RESTORE SESSION / GOOGLE CALLBACK
 # ==============================================================================
@@ -4411,6 +4982,15 @@ if st.session_state.get("user") is None:
 user = st.session_state["user"]
 user_id = user.id
 u_meta = user.user_metadata or {}
+
+# Oura returns here after authorization. At this point the SanoSync user
+# session has already been restored, so we can safely bind Oura to user_id.
+if (
+    str(st.query_params.get("page") or "").strip().lower()
+    == "oura_callback"
+):
+    handle_oura_callback(user_id)
+
 def get_logged_user_identity(user_obj):
     """Nome, email e avatar dai metadata Supabase (Google incluso)."""
     metadata = getattr(user_obj, "user_metadata", None) or {}
@@ -8027,6 +8607,116 @@ def render_personal_settings_page():
             help=si["mode_help"],
             key="settings_preferred_app_mode",
         )
+
+    # ------------------------------------------------------------------
+    # OURA
+    # ------------------------------------------------------------------
+    with st.container(border=True):
+        st.markdown("### 💍 Oura")
+
+        if st.session_state.pop("oura_callback_success", False):
+            st.success("Oura collegato correttamente.")
+
+        _oura_callback_error = st.session_state.pop(
+            "oura_callback_error",
+            None,
+        )
+        if _oura_callback_error:
+            st.error(
+                f"Connessione Oura non riuscita: {_oura_callback_error}"
+            )
+
+        try:
+            _oura_connection = fetch_oura_connection(user_id)
+        except Exception as exc:
+            _oura_connection = None
+            if "oura_connections" in str(exc):
+                st.error(
+                    "La tabella Supabase `oura_connections` non esiste ancora. "
+                    "Esegui prima lo script SQL fornito per l'integrazione Oura."
+                )
+            else:
+                st.error(f"Impossibile leggere la connessione Oura: {exc}")
+
+        if _oura_connection:
+            st.success("✅ Account Oura collegato")
+            _scope = str(_oura_connection.get("scope") or "")
+            if _scope:
+                st.caption(f"Permessi concessi: {_scope}")
+
+            _oura_col1, _oura_col2 = st.columns(2)
+
+            with _oura_col1:
+                if st.button(
+                    "🔄 Verifica connessione",
+                    key="oura_test_connection",
+                    use_container_width=True,
+                ):
+                    try:
+                        _personal = oura_get_personal_info(user_id)
+                        _oura_name = (
+                            _personal.get("email")
+                            or _personal.get("id")
+                            or "account Oura"
+                        )
+                        st.success(
+                            f"Connessione attiva: {_oura_name}"
+                        )
+                    except Exception as exc:
+                        st.error(
+                            f"Verifica Oura non riuscita: {exc}"
+                        )
+
+            with _oura_col2:
+                if st.button(
+                    "Scollega Oura",
+                    key="oura_disconnect",
+                    use_container_width=True,
+                ):
+                    try:
+                        revoke_and_delete_oura_connection(user_id)
+                        st.success("Oura scollegato.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(
+                            f"Impossibile scollegare Oura: {exc}"
+                        )
+        else:
+            st.write(
+                "Collega il tuo Oura Ring a SanoSync. "
+                "Richiediamo solo i permessi `personal`, `daily` e `workout`."
+            )
+            st.caption(
+                "La password Oura non viene condivisa con SanoSync. "
+                "L'autorizzazione avviene direttamente su Oura tramite OAuth 2.0."
+            )
+
+            try:
+                _oura_auth_url = build_oura_authorization_url(user_id)
+                st.link_button(
+                    "💍 Connetti Oura",
+                    _oura_auth_url,
+                    use_container_width=True,
+                    type="primary",
+                )
+            except Exception as exc:
+                st.error(
+                    f"Configurazione Oura incompleta: {exc}"
+                )
+
+        _legal_c1, _legal_c2 = st.columns(2)
+        with _legal_c1:
+            st.link_button(
+                "Privacy Policy",
+                "https://sanosync.streamlit.app/?page=privacy",
+                use_container_width=True,
+            )
+        with _legal_c2:
+            st.link_button(
+                "Terms of Service",
+                "https://sanosync.streamlit.app/?page=terms",
+                use_container_width=True,
+            )
 
     # ------------------------------------------------------------------
     # GOAL PROTEICO — SEMPRE ULTIMA SEZIONE
