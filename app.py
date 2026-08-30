@@ -5190,6 +5190,7 @@ def handle_oura_callback(current_user_id):
 
         st.query_params.clear()
         st.session_state["oura_callback_success"] = True
+        st.session_state.pop("oura_callback_error", None)
         st.session_state.pop("oura_authorization_url", None)
         st.session_state["show_personal_settings"] = True
         st.rerun()
@@ -8888,17 +8889,14 @@ def render_personal_settings_page():
     with st.container(border=True):
         st.markdown("### 💍 Oura")
 
-        if st.session_state.pop("oura_callback_success", False):
-            st.success("Oura collegato correttamente.")
-
+        _oura_just_connected = st.session_state.pop(
+            "oura_callback_success",
+            False,
+        )
         _oura_callback_error = st.session_state.pop(
             "oura_callback_error",
             None,
         )
-        if _oura_callback_error:
-            st.error(
-                f"Connessione Oura non riuscita: {_oura_callback_error}"
-            )
 
         try:
             _oura_connection = fetch_oura_connection(user_id)
@@ -8912,8 +8910,26 @@ def render_personal_settings_page():
             else:
                 st.error(f"Impossibile leggere la connessione Oura: {exc}")
 
+        # The database is the source of truth. If a connection exists, an older
+        # callback error from a previous attempt must not be shown.
+        if _oura_connection:
+            _oura_callback_error = None
+            st.session_state.pop("oura_callback_error", None)
+            st.session_state.pop("oura_authorization_url", None)
+
+        if _oura_just_connected and _oura_connection:
+            st.success("Oura collegato correttamente.")
+
+        if _oura_callback_error and not _oura_connection:
+            st.error(
+                f"Connessione Oura non riuscita: {_oura_callback_error}"
+            )
+
         if _oura_connection:
             st.success("✅ Account Oura collegato")
+            st.caption(
+                "Connessione salvata in Supabase per questo account SanoSync."
+            )
             _scope = str(_oura_connection.get("scope") or "")
             if _scope:
                 st.caption(f"Permessi concessi: {_scope}")
