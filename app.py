@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import pydeck as pdk
 from datetime import date, datetime, timedelta, timezone
 import requests
 import traceback
@@ -1445,6 +1446,21 @@ def parse_gpx_activity(file_bytes, filename="activity.gpx"):
         sum(cad_values) / len(cad_values) if cad_values else None
     )
 
+    # Keep a reasonably detailed route for maps without storing thousands
+    # of redundant GPS points in Supabase.
+    raw_route = [
+        {"lat": round(float(p["lat"]), 6), "lon": round(float(p["lon"]), 6)}
+        for p in points
+    ]
+    max_route_points = 1200
+    if len(raw_route) > max_route_points:
+        step = max(1, math.ceil(len(raw_route) / max_route_points))
+        route_points = raw_route[::step]
+        if route_points[-1] != raw_route[-1]:
+            route_points.append(raw_route[-1])
+    else:
+        route_points = raw_route
+
     creator_cf = creator.casefold()
     cadence_factor = 1.0
     if (
@@ -1498,6 +1514,7 @@ def parse_gpx_activity(file_bytes, filename="activity.gpx"):
         ),
         "estimated_steps": max(0, int(round(estimated_steps))),
         "point_count": len(points),
+        "route_points": route_points,
     }
 
 
@@ -1564,6 +1581,109 @@ def _format_duration(seconds):
         f"{hours}:{minutes:02d}:{secs:02d}"
         if hours else f"{minutes}:{secs:02d}"
     )
+
+
+def fetch_gpx_activity_log(current_user_id, limit=50):
+    _require_authenticated_user()
+    response = (
+        supabase.table("activities")
+        .select("*")
+        .eq("user_id", current_user_id)
+        .eq("source", "gpx")
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .limit(int(limit))
+        .execute()
+    )
+    return _response_data(response)
+
+
+def _route_points_from_activity(activity):
+    raw = activity.get("route_points") or []
+    route = []
+    for point in raw:
+        try:
+            if isinstance(point, dict):
+                lat = float(point.get("lat"))
+                lon = float(point.get("lon"))
+            elif isinstance(point, (list, tuple)) and len(point) >= 2:
+                lat = float(point[0])
+                lon = float(point[1])
+            else:
+                continue
+            route.append({"lat": lat, "lon": lon})
+        except Exception:
+            continue
+    return route
+
+
+def render_gpx_route_map(route_points, *, height=430):
+    route = _route_points_from_activity({"route_points": route_points})
+    if len(route) < 2:
+        st.info("Mappa non disponibile per questa attività.")
+        return
+
+    lats = [p["lat"] for p in route]
+    lons = [p["lon"] for p in route]
+    center_lat = sum(lats) / len(lats)
+    center_lon = sum(lons) / len(lons)
+    span = max(max(lats) - min(lats), max(lons) - min(lons))
+
+    if span < 0.01:
+        zoom = 14
+    elif span < 0.03:
+        zoom = 13
+    elif span < 0.08:
+        zoom = 12
+    elif span < 0.18:
+        zoom = 11
+    elif span < 0.40:
+        zoom = 10
+    else:
+        zoom = 9
+
+    path = [[p["lon"], p["lat"]] for p in route]
+
+    deck = pdk.Deck(
+        map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+        initial_view_state=pdk.ViewState(
+            latitude=center_lat,
+            longitude=center_lon,
+            zoom=zoom,
+            pitch=0,
+        ),
+        layers=[
+            pdk.Layer(
+                "PathLayer",
+                data=[{"path": path}],
+                get_path="path",
+                get_width=5,
+                width_min_pixels=3,
+                pickable=False,
+            ),
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=[
+                    {
+                        "lon": route[0]["lon"],
+                        "lat": route[0]["lat"],
+                        "label": "Partenza",
+                    },
+                    {
+                        "lon": route[-1]["lon"],
+                        "lat": route[-1]["lat"],
+                        "label": "Arrivo",
+                    },
+                ],
+                get_position="[lon, lat]",
+                get_radius=18,
+                radius_min_pixels=5,
+                pickable=True,
+            ),
+        ],
+        tooltip={"text": "{label}"},
+    )
+    st.pydeck_chart(deck, use_container_width=True, height=height)
 
 
 # ---- DAILY LOGS --------------------------------------------------------------
@@ -16082,6 +16202,9 @@ elif selected_page == t["t5"]:
                     f"**{gpx_kcal} kcal**"
                 )
 
+                with st.expander("🗺️ Anteprima percorso", expanded=False):
+                    render_gpx_route_map(gpx_data["route_points"], height=360)
+
                 step_based = gpx_activity_type in {
                     "Corsa", "Camminata", "Trekking"
                 }
@@ -16105,14 +16228,51 @@ elif selected_page == t["t5"]:
                         "posso importare kcal/distanza, ma non l'offset passi."
                     )
 
-                existing_source = any(
-                    str(a.get("source_ref") or "")
-                    == gpx_data["source_ref"]
-                    for a in day_activities
+                gpx_day_activities = (
+                    day_activities
+                    if gpx_date == act_date
+                    else fetch_daily_activities_from_api(
+                        user_id,
+                        str(gpx_date),
+                        st.session_state.get("auth_access_token"),
+                    )
+                )
+                existing_activity = next(
+                    (
+                        a for a in gpx_day_activities
+                        if str(a.get("source_ref") or "")
+                        == gpx_data["source_ref"]
+                    ),
+                    None,
                 )
 
-                if existing_source:
+                if existing_activity and existing_activity.get("route_points"):
                     st.warning("Questo GPX risulta già importato.")
+                elif existing_activity and st.button(
+                    "🗺️ Aggiungi la mappa al GPX già importato",
+                    key=f"backfill_gpx_map_{gpx_data['source_ref'][:16]}",
+                    use_container_width=True,
+                ):
+                    update_activity_via_api(
+                        existing_activity["id"],
+                        {
+                            "route_points": gpx_data["route_points"],
+                            "distance_km": float(gpx_data["distance_km"]),
+                            "duration_seconds": int(gpx_data["duration_seconds"]),
+                            "avg_hr": (
+                                float(gpx_data["avg_hr"])
+                                if gpx_data["avg_hr"] is not None else None
+                            ),
+                            "avg_cadence": (
+                                float(gpx_data["avg_step_cadence"])
+                                if gpx_data["avg_step_cadence"] is not None
+                                else None
+                            ),
+                        },
+                        st.session_state.get("auth_access_token"),
+                    )
+                    st.success("Mappa aggiunta all'attività già importata.")
+                    st.rerun()
                 elif st.button(
                     "📥 Importa GPX in Attività",
                     key=f"import_gpx_{gpx_data['source_ref'][:16]}",
@@ -16147,6 +16307,7 @@ elif selected_page == t["t5"]:
                                 if gpx_data["avg_step_cadence"] is not None
                                 else None
                             ),
+                            "route_points": gpx_data["route_points"],
                         },
                         st.session_state.get("auth_access_token"),
                     )
@@ -16173,6 +16334,111 @@ elif selected_page == t["t5"]:
 
             except Exception as exc:
                 st.error(f"Impossibile leggere/importare il GPX: {exc}")
+
+
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown("### 📚 Registro attività GPX")
+        st.caption(
+            "Le ultime attività importate da file GPX. "
+            "Selezionane una per vedere dettagli e percorso."
+        )
+
+        try:
+            gpx_log_rows = fetch_gpx_activity_log(user_id, limit=50)
+        except Exception as exc:
+            gpx_log_rows = []
+            st.error(f"Impossibile caricare il registro GPX: {exc}")
+
+        if not gpx_log_rows:
+            st.info("Non ci sono ancora attività GPX nel registro.")
+        else:
+            log_table_rows = []
+            for row in gpx_log_rows:
+                log_table_rows.append(
+                    {
+                        "Data": row.get("date"),
+                        "Attività": row.get("activity_name") or "GPX",
+                        "Distanza km": row.get("distance_km"),
+                        "Durata": _format_duration(
+                            row.get("duration_seconds") or 0
+                        ),
+                        "Passi attività": row.get("activity_steps") or 0,
+                        "Kcal": row.get("burned_calories") or 0,
+                        "FC media": row.get("avg_hr"),
+                    }
+                )
+
+            st.dataframe(
+                pd.DataFrame(log_table_rows),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            def _gpx_log_label(row):
+                date_label = str(row.get("date") or "—")
+                activity_label = str(row.get("activity_name") or "Attività GPX")
+                kcal_label = int(row.get("burned_calories") or 0)
+                return f"{date_label} · {activity_label} · {kcal_label} kcal"
+
+            selected_index = st.selectbox(
+                "Apri attività",
+                options=list(range(len(gpx_log_rows))),
+                format_func=lambda idx: _gpx_log_label(gpx_log_rows[idx]),
+                key="gpx_activity_log_selected",
+            )
+            selected_activity = gpx_log_rows[selected_index]
+
+            lm1, lm2, lm3, lm4 = st.columns(4)
+            distance_value = selected_activity.get("distance_km")
+            lm1.metric(
+                "Distanza",
+                (
+                    f"{float(distance_value):.2f} km"
+                    if distance_value is not None else "—"
+                ),
+            )
+            lm2.metric(
+                "Durata",
+                _format_duration(selected_activity.get("duration_seconds") or 0),
+            )
+            lm3.metric(
+                "Passi attività",
+                f"{int(selected_activity.get('activity_steps') or 0):,}".replace(
+                    ",", "."
+                ),
+            )
+            lm4.metric(
+                "Kcal",
+                int(selected_activity.get("burned_calories") or 0),
+            )
+
+            detail_bits = []
+            if selected_activity.get("avg_hr") is not None:
+                detail_bits.append(
+                    f"FC media {float(selected_activity['avg_hr']):.0f} bpm"
+                )
+            if selected_activity.get("avg_cadence") is not None:
+                detail_bits.append(
+                    f"Cadenza {float(selected_activity['avg_cadence']):.0f} passi/min"
+                )
+            if selected_activity.get("source_file_name"):
+                detail_bits.append(
+                    f"File: {selected_activity['source_file_name']}"
+                )
+            if detail_bits:
+                st.caption(" · ".join(detail_bits))
+
+            route = _route_points_from_activity(selected_activity)
+            if route:
+                render_gpx_route_map(route, height=460)
+            else:
+                st.info(
+                    "Questa attività è stata importata prima del supporto mappe. "
+                    "Ricarica lo stesso GPX nell'importatore qui sopra e usa "
+                    "“Aggiungi la mappa al GPX già importato”."
+                )
 
 
 # ============================================================
