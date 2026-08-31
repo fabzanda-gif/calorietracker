@@ -923,6 +923,20 @@ DEFICIT_PRESET_LABELS = {
             "of selecteer een afvalpreset. Je kunt de waarde hieronder altijd handmatig wijzigen."
         ),
     },
+    "Português": {
+        "maintenance": "Manutenção do peso · 0 kcal",
+        "custom": "Personalizado",
+        "slow": "Lento · 250 kcal",
+        "medium": "Médio · 500 kcal",
+        "fast": "Rápido · 750 kcal",
+        "title": "🎯 Objetivo calórico",
+        "speed": "Objetivo de peso",
+        "field": "Défice calórico base",
+        "help": (
+            "Escolha Manutenção do peso para um défice de 0 kcal, "
+            "ou selecione um objetivo de perda de peso."
+        ),
+    },
     "Français": {
         "maintenance": "Maintien du poids · 0 kcal",
         "custom": "Personnalisé",
@@ -2533,6 +2547,7 @@ def generate_sanosync_coach_message(
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
 
     context_lines = [
@@ -2727,6 +2742,20 @@ CAN_I_EAT_I18N = {
         "estimate": "AI-schatting",
         "remaining_after": "Geschatte marge daarna",
     },
+    "Português": {
+        "title": "✨ SanoSync AI · Posso comer isto?",
+        "label": "O que gostaria de comer?",
+        "placeholder": "Ex. Posso comer uma pizza esta noite?",
+        "help": (
+            "O SanoSync AI considera as calorias já registadas hoje, "
+            "o orçamento do dia, o défice ou manutenção e o objetivo de proteína."
+        ),
+        "button": "✨ Perguntar ao SanoSync AI",
+        "thinking": "A verificar como isto pode encaixar no seu dia…",
+        "error": "Não foi possível avaliar este alimento: {error}",
+        "estimate": "Estimativa da IA",
+        "remaining_after": "Margem estimada depois",
+    },
     "Français": {
         "title": "✨ SanoSync AI · Puis-je manger ça ?",
         "label": "Qu'aimeriez-vous manger ?",
@@ -2768,6 +2797,7 @@ def generate_can_i_eat_advice(
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
 
     target_intake = max(
@@ -3033,6 +3063,7 @@ def translate_activity_display(value, lang):
         "English": {"Bici": "Bike", "Bici Elettrica": "Electric Bike", "Passi (Stima)": "Steps (Estimate)", "BMR (Base)": "BMR (Base)"},
         "Nederlands": {"Bici": "Fiets", "Bici Elettrica": "Elektrische fiets", "Passi (Stima)": "Stappen (Schatting)", "BMR (Base)": "BMR (Basis)"},
         "Français": {"Bici": "Vélo", "Bici Elettrica": "Vélo électrique", "Passi (Stima)": "Pas (Estimation)", "BMR (Base)": "BMR (Base)"},
+        "Português": {"Bici": "Bicicleta", "Bici Elettrica": "Bicicleta elétrica", "Passi (Stima)": "Passos (Estimativa)", "BMR (Base)": "BMR (Base)"},
     }
     return maps.get(lang, maps["Italiano"]).get(str(value), str(value))
 
@@ -3069,6 +3100,7 @@ LANGUAGE_FLAGS = {
     "English": "🇬🇧",
     "Nederlands": "🇳🇱",
     "Français": "🇫🇷",
+    "Português": "🇵🇹",
 }
 
 
@@ -4499,9 +4531,53 @@ def show_login_page():
             else "Italiano"
         )
 
+    LOGIN_I18N["Português"] = {
+        **LOGIN_I18N["English"],
+        "language": "🌐 Idioma",
+        "logout": "🚪 Sair",
+        "title": "🍑 Tudo sob controlo",
+        "subtitle": "Alimentação, atividade, peso e progresso num só lugar.",
+        "continue": "Inicie sessão para continuar",
+        "google": "Continuar com Google",
+        "facebook": "Continuar com Facebook",
+        "divider": "ou inicie sessão com e-mail e palavra-passe",
+        "login": "Iniciar sessão",
+        "signup": "Registar",
+        "email": "E-mail",
+        "password": "Palavra-passe",
+        "password_min": "Palavra-passe (mín. 6 caracteres)",
+        "login_btn": "Entrar",
+        "signup_btn": "Criar conta",
+        "office_lunch_title": "Almoço no escritório",
+        "office_lunch_enabled": "Costuma almoçar no escritório?",
+        "office_lunch_no": "Não",
+        "office_lunch_yes": "Sim",
+        "protein_goal_title": "Objetivo de proteína",
+        "protein_goal_enabled": "Definir um objetivo diário de proteína?",
+        "protein_goal_no": "Não",
+        "protein_goal_yes": "Sim",
+        "protein_goal_g": "Objetivo diário de proteína (g)",
+        "credentials_required": "Introduza o e-mail e a palavra-passe.",
+        "invalid_credentials": "Credenciais inválidas.",
+        "auth_error": "Erro de autenticação: {error}",
+        "physical_title": "📋 Dados físicos iniciais",
+        "name": "Nome",
+        "gender": "Sexo",
+        "male": "Homem",
+        "female": "Mulher",
+        "gender_placeholder": "Selecione o sexo...",
+        "birth_date": "Data de nascimento",
+        "height": "Altura (cm)",
+        "current_weight": "Peso atual (kg)",
+        "target_weight": "Peso objetivo (kg)",
+        "physical_required": "Preencha todos os dados físicos.",
+        "signup_success": "✅ Conta criada e sessão iniciada.",
+        "google_callback_error": "Login Google não concluído: {error}",
+    }
+
     current_login_lang = st.selectbox(
         LOGIN_I18N[st.session_state["login_lang_selector"]]["language"],
-        ["Italiano", "English", "Nederlands", "Français"],
+        ["Italiano", "English", "Nederlands", "Français", "Português"],
         key="login_lang_selector",
         format_func=format_language_option,
     )
@@ -5951,6 +6027,24 @@ if profile_incomplete:
             "error": "Erreur : {error}",
         },
     }
+    _profile_i18n["Português"] = {
+        "warning": "⚠️ Para começar, complete os dados do seu perfil.",
+        "title": "📋 Configuração do perfil",
+        "gender": "Sexo",
+        "male": "Homem",
+        "female": "Mulher",
+        "birth": "Data de nascimento",
+        "height": "Altura (cm)",
+        "current_weight": "Peso atual (kg)",
+        "target_weight": "Peso objetivo (kg)",
+        "age": "Idade",
+        "years": "anos",
+        "estimated_bmr": "BMR estimado",
+        "target_deficit": "Défice objetivo",
+        "save": "Guardar e começar",
+        "saved": "✅ Perfil atualizado! BMR atual: {bmr} kcal/dia.",
+        "error": "Erro: {error}",
+    }
     _pi = _profile_i18n.get(_profile_lang, _profile_i18n["Italiano"])
     st.warning(_pi["warning"])
 
@@ -6911,6 +7005,13 @@ with st.sidebar:
         },
     }
 
+    _profile_menu_i18n["Português"] = {
+        "menu": "👤",
+        "settings": "👤 Perfil",
+        "language": "🌐 Idioma",
+        "logout": "🚪 Sair",
+    }
+
     _menu_lang = st.session_state.get("lang_selector", "Italiano")
     _pm = _profile_menu_i18n.get(
         _menu_lang,
@@ -6925,12 +7026,14 @@ with st.sidebar:
         "English",
         "Nederlands",
         "Français",
+        "Português",
     ]
     _language_flags = {
         "Italiano": "🇮🇹",
         "English": "🇬🇧",
         "Nederlands": "🇳🇱",
         "Français": "🇫🇷",
+        "Português": "🇵🇹",
     }
 
     _current_menu_lang = st.session_state.get(
@@ -7142,6 +7245,12 @@ with st.sidebar:
                 "afternoon": "Bon après-midi {name}!",
                 "evening": "Bonsoir {name}!",
             },
+        }
+
+        _greetings["Português"] = {
+            "morning": "Bom dia, {name}!",
+            "afternoon": "Boa tarde, {name}!",
+            "evening": "Boa noite, {name}!",
         }
 
         _welcome = _greetings.get(
@@ -8136,6 +8245,107 @@ translations["English"].update({"plan_saved":"✅ Plan saved for {date}.","budge
 translations["Nederlands"].update({"plan_saved":"✅ Plan opgeslagen voor {date}.","budget_estimated":"Geschat budget","already_logged":"al gelogd","dinner_available":"Beschikbaar voor avondeten","dinner_already_logged":"✅ Avondeten al gelogd: geen suggestie nodig.","office_allocated":"Kantoor al toegewezen","dinner_label":"Avondeten","lunch_label":"Lunch","office_lunch_history":"Kantoorlunch in geschiedenis","suggested_dinner":"Aanbevolen avondeten","suggested_lunch":"Aanbevolen lunch","no_dinner_near":"Geen herhaalbaar avondeten in je geschiedenis ligt dicht genoeg bij het doel.","no_dinner_history":"Er zijn nog niet genoeg herhaalbare avondmaaltijden in je geschiedenis.","no_home_lunch":"Geen herhaalbare Thuis-lunch beschikbaar in je geschiedenis.","no_dinner":"Geen herhaalbaar avondeten beschikbaar in je geschiedenis.","planning_formula":"De planning gebruikt +0 kcal (rust), +500 kcal (matig actief), +1000 kcal (actief). De grafiekdrempel blijft: rust <300 extra kcal, intensief ≥800 kcal."})
 translations["Français"].update({"plan_saved":"✅ Plan enregistré pour le {date}.","budget_estimated":"Budget estimé","already_logged":"déjà enregistrées","dinner_available":"Disponible pour le dîner","dinner_already_logged":"✅ Dîner déjà enregistré : aucune suggestion nécessaire.","office_allocated":"Bureau déjà alloué","dinner_label":"Dîner","lunch_label":"Déjeuner","office_lunch_history":"Déjeuner bureau dans l'historique","suggested_dinner":"Dîner suggéré","suggested_lunch":"Déjeuner suggéré","no_dinner_near":"Aucun dîner reproductible de l'historique n'est assez proche de la cible.","no_dinner_history":"Pas encore assez de dîners reproductibles dans l'historique.","no_home_lunch":"Aucun déjeuner Maison reproductible disponible dans l'historique.","no_dinner":"Aucun dîner reproductible disponible dans l'historique.","planning_formula":"La planification utilise +0 kcal (repos), +500 kcal (modérément actif), +1000 kcal (actif). Le seuil du graphique reste : repos <300 kcal supplémentaires, activité intense ≥800 kcal."})
 
+
+translations["Português"] = dict(translations["English"])
+translations["Português"].update({
+    "t1": "🚀 Registo",
+    "t2": "📊 Resumo",
+    "t3": "📈 Peso",
+    "t4": "🍳 Receitas",
+    "t5": "🏃 Atividade",
+    "meal": "Tipo de refeição",
+    "meal_name": "Nome da refeição",
+    "add_meal": "Adicionar refeição",
+    "extra_act": "Atividade extra",
+    "extra_cals": "Calorias extra queimadas",
+    "insert_weight": "Introduzir peso (kg)",
+    "save_weight": "Guardar peso",
+    "recipe_name": "Nome da receita",
+    "save_recipe": "Guardar receita",
+    "recipe_saved": "✅ Receita guardada!",
+    "lang_label": "🌐 Idioma",
+    "logout": "🚪 Sair",
+    "search_food": "🔍 Pesquisar por nome ou código de barras",
+    "search_btn": "🚀 Pesquisar",
+    "select_recipe": "Selecionar uma receita",
+    "no_recipes": "Nenhuma receita guardada.",
+    "calc_mode": "Registo baseado em:",
+    "per_100g": "Por 100 g",
+    "per_portion": "Por porção",
+    "qty_label": "Quantidade (g ou porções)",
+    "num_portions": "Número de porções",
+    "inserted": "✅ Registado",
+    "daily_summary": "📊 Resumo diário",
+    "summary_date": "📅 Data do resumo",
+    "logged_foods": "🍽️ Alimentos registados",
+    "no_meals": "Não existem refeições registadas nesta data.",
+    "burned_acts": "#### 🏃 Calorias queimadas e atividades",
+    "weight_tracking": "⚖️ Registo de peso",
+    "log_today_weight": "📥 Registar peso de hoje",
+    "update_target": "🎯 Atualizar objetivo",
+    "save_target": "Guardar objetivo",
+    "target_updated": "✅ Objetivo atualizado!",
+    "quick_entries": "⚡ Registos rápidos",
+    "saved_entries": "📋 Itens guardados",
+    "register_activity": "🏃 Registar atividade e movimento",
+    "act_date": "📅 Data",
+    "steps_title": "👣 Passos (total)",
+    "update_steps": "💾 Atualizar passos",
+    "steps_updated": "Passos atualizados!",
+    "bike_title": "🚲 Bicicleta (sessão)",
+    "bike_min": "Minutos de bicicleta",
+    "add_bike": "💾 Adicionar bicicleta",
+    "other_act": "🏋️ Outra atividade",
+    "activity_label": "Atividade",
+    "add_act_btn": "💾 Adicionar",
+    "tab1_title": "🍽️ Alimentação e refeições",
+    "input_source_lbl": "Fonte de registo",
+    "opt_ai": "✨ IA",
+    "opt_off": "🔍 Base OpenFood",
+    "opt_quick": "🍳 Registo rápido",
+    "opt_scan": "📸 Foto com IA",
+    "scan_title": "📸 Foto com IA",
+    "scan_mode": "Origem da imagem",
+    "scan_camera": "📷 Câmara",
+    "scan_upload": "🖼️ Galeria / Ficheiro",
+    "scan_analyze": "✨ Analisar com IA",
+    "scan_analyzing": "A analisar a refeição…",
+    "card_kcal_in": "Calorias ingeridas",
+    "card_kcal_burn": "Calorias queimadas",
+    "card_balance": "Balanço",
+    "card_weight": "Peso",
+    "status_move_title": "👣 Estado do movimento",
+    "weight_forecast_title": "🔮 Previsão do objetivo",
+    "meal_breakfast": "Pequeno-almoço",
+    "meal_lunch": "Almoço",
+    "meal_dinner": "Jantar",
+    "meal_snack": "Lanche",
+    "cat_home": "Casa",
+    "cat_work": "Trabalho",
+    "cat_restaurant": "Restaurante",
+    "cat_once": "Pontual",
+    "day_home": "Trabalho a partir de casa",
+    "day_office": "Escritório",
+    "day_free": "Dia livre",
+    "act_rest": "Descanso",
+    "act_moderate": "Moderadamente ativo",
+    "act_active": "Ativo",
+    "col_activity": "Atividade",
+    "col_burned": "Kcal queimadas",
+    "save_weight_ui": "💾 Guardar peso",
+    "plan_saved": "✅ Plano guardado para {date}.",
+    "budget_estimated": "Orçamento estimado",
+    "already_logged": "já registadas",
+    "dinner_label": "Jantar",
+    "lunch_label": "Almoço",
+    "suggested_dinner": "Jantar sugerido",
+    "suggested_lunch": "Almoço sugerido",
+    "period_days": "dias",
+    "generic_error": "Erro: {error}",
+    "trend": "Projeção",
+    "real_weight": "Peso real",
+})
+
 MEAL_TYPE_KEYS = {"Colazione": "meal_breakfast", "Pranzo": "meal_lunch", "Cena": "meal_dinner", "Snack": "meal_snack"}
 CATEGORY_KEYS = {"Casa": "cat_home", "Lavoro": "cat_work", "Ristorante": "cat_restaurant", "Una-tantum": "cat_once"}
 DAY_TYPE_KEYS = {"Lavoro da casa": "day_home", "Ufficio": "day_office", "Giornata libera": "day_free"}
@@ -8416,6 +8626,22 @@ with st.sidebar:
             "activity_other": "Autre"
         },
     }
+    _ui_extra["Português"] = {
+        **_ui_extra["English"],
+        "total_steps": "Total de passos",
+        "add_bike": "💾 Adicionar bicicleta",
+        "other_activities": "Outras atividades",
+        "bike_and_ebike": "🚲 Bicicleta e bicicleta elétrica",
+        "bike_minutes": "Minutos de bicicleta",
+        "burned_kcal_field": "Kcal queimadas",
+        "enter_one_minute": "Introduza pelo menos 1 minuto.",
+        "step_word": "passos",
+        "activity_gym": "Ginásio",
+        "activity_swim": "Natação",
+        "activity_other": "Outra",
+    }
+    ZERO_COPY["Português"] = {}
+
     ux = _ui_extra.get(current_lang, _ui_extra["Italiano"])
 
     # ZERO changes remarks, not functional terminology.
@@ -9044,12 +9270,50 @@ SETTINGS_I18N = {
 
 
 
+
+SETTINGS_I18N["Português"] = {
+    **SETTINGS_I18N["English"],
+    "title": "👤 Perfil",
+    "subtitle": "O seu perfil SanoSync, preferências e objetivos.",
+    "back": "← Voltar à aplicação",
+    "account": "Dados pessoais",
+    "email": "E-mail",
+    "name": "Nome",
+    "gender": "Sexo",
+    "male": "Homem",
+    "female": "Mulher",
+    "birth": "Data de nascimento",
+    "height": "Altura (cm)",
+    "current_weight": "Peso atual (kg)",
+    "target_weight": "Peso objetivo (kg)",
+    "language": "🌐 Idioma",
+    "deficit_title": "🎯 Objetivo calórico",
+    "deficit_speed": "Velocidade de perda de peso",
+    "deficit_field": "Défice calórico diário (kcal)",
+    "save": "💾 Guardar definições",
+    "saved": "✅ Definições atualizadas.",
+    "error": "Erro ao guardar: {error}",
+    "office_title": "🏢 Almoço no escritório",
+    "office_enabled": "Mostrar refeições e funcionalidades de planeamento do escritório?",
+    "office_no": "Não",
+    "office_yes": "Sim",
+    "protein_title": "🥩 Objetivo de proteína",
+    "protein_enabled": "Usar um objetivo diário de proteína?",
+    "protein_no": "Não",
+    "protein_yes": "Sim",
+    "protein_g": "Objetivo diário de proteína (g)",
+    "mode_title": "🎨 Modo predefinido",
+    "mode_label": "Que versão deve estar ativa quando inicia sessão?",
+    "mode_standard": "SanoSync Standard",
+    "mode_zero": "SanoSync ZERO MODE",
+}
+
 def render_personal_settings_page():
     # ------------------------------------------------------------------
     # LINGUA SEMPRE IN ALTO
     # La select aggiorna subito l'interfaccia, senza aspettare "Salva".
     # ------------------------------------------------------------------
-    _settings_languages = ["Italiano", "English", "Nederlands", "Français"]
+    _settings_languages = ["Italiano", "English", "Nederlands", "Français", "Português"]
 
     settings_lang = st.session_state.get("settings_language_live")
     if settings_lang not in _settings_languages:
@@ -9724,6 +9988,7 @@ def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
 
     client = OpenAI(
@@ -10785,6 +11050,7 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
 
     schema_example = """
