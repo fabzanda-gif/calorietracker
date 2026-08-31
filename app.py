@@ -248,7 +248,7 @@ import plotly.graph_objects as go
 # ==============================================================================
 ASSET_DIR = Path(__file__).resolve().parent
 APP_LOGO_FILE = ASSET_DIR / "assets" / "LogoCoral.png"
-SIDEBAR_LOGO_FILE = ASSET_DIR / "assets" / "LogoStandard.jpeg"
+SIDEBAR_LOGO_FILE = ASSET_DIR / "assets" / "LogoCoral.png"
 ZERO_LOGO_FILE = ASSET_DIR / "assets" / "LogoZero.png"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
