@@ -14,6 +14,8 @@ import hashlib
 import hmac
 import secrets
 import io
+import math
+import xml.etree.ElementTree as ET
 import os
 from pathlib import Path
 from urllib.parse import urlencode
@@ -1258,6 +1260,310 @@ def upsert_named_activity_via_api(
             existing["id"], payload, access_token
         )
     return create_activity_via_api(payload, access_token)
+
+
+# ---- GPX + STEP OFFSET --------------------------------------------------------
+
+_STEP_CONFLICT_TOKENS = (
+    "corsa", "running", "cammin", "walk", "trekking", "hiking", "padel",
+)
+
+
+def _is_step_conflicting_activity(activity_name):
+    name = str(activity_name or "").strip().casefold()
+    return any(token in name for token in _STEP_CONFLICT_TOKENS)
+
+
+def calculate_step_calorie_offset(total_steps, activities):
+    """Subtract steps already represented by structured activities."""
+    total_steps = max(0, int(total_steps or 0))
+    consumed_steps = 0
+    has_unknown_overlap = False
+
+    for activity in activities or []:
+        name = activity.get("activity_name")
+        if not _is_step_conflicting_activity(name):
+            continue
+
+        try:
+            activity_steps = max(
+                0, int(activity.get("activity_steps") or 0)
+            )
+        except Exception:
+            activity_steps = 0
+
+        if activity_steps > 0:
+            consumed_steps += activity_steps
+        elif str(name or "").strip().casefold() != "passi (stima)":
+            # Old manually-entered Padel/Corsa rows do not tell us how many
+            # daily steps they already contain. Keep the conservative old rule.
+            has_unknown_overlap = True
+
+    eligible_steps = (
+        0
+        if has_unknown_overlap
+        else max(0, total_steps - consumed_steps)
+    )
+    return {
+        "total_steps": total_steps,
+        "activity_steps": min(consumed_steps, total_steps),
+        "eligible_steps": eligible_steps,
+        "estimated_kcal": int(eligible_steps * 0.04),
+        "has_unknown_overlap": has_unknown_overlap,
+    }
+
+
+def recalculate_step_calories_for_day(
+    current_user_id,
+    log_date,
+    *,
+    total_steps=None,
+):
+    if total_steps is None:
+        daily_log = fetch_daily_log_from_api(
+            current_user_id,
+            str(log_date),
+            st.session_state.get("auth_access_token"),
+        )
+        total_steps = int((daily_log or {}).get("steps") or 0)
+
+    activities = fetch_daily_activities_from_api(
+        current_user_id,
+        str(log_date),
+        st.session_state.get("auth_access_token"),
+    )
+    info = calculate_step_calorie_offset(total_steps, activities)
+
+    upsert_named_activity_via_api(
+        cache_user_id=current_user_id,
+        log_date=log_date,
+        activity_name="Passi (Stima)",
+        burned_calories=info["estimated_kcal"],
+        access_token=st.session_state.get("auth_access_token"),
+    )
+    return info
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    radius_km = 6371.0088
+    lat1_r = math.radians(lat1)
+    lat2_r = math.radians(lat2)
+    dlat = lat2_r - lat1_r
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1_r) * math.cos(lat2_r)
+        * math.sin(dlon / 2) ** 2
+    )
+    return 2 * radius_km * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _parse_gpx_time(value):
+    value = str(value or "").strip()
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def parse_gpx_activity(file_bytes, filename="activity.gpx"):
+    """Parse GPX locally, including Zepp/Amazfit Garmin extensions."""
+    if not file_bytes:
+        raise ValueError("Il file GPX è vuoto.")
+    if len(file_bytes) > 15 * 1024 * 1024:
+        raise ValueError("Il file GPX supera il limite di 15 MB.")
+
+    try:
+        root = ET.fromstring(file_bytes)
+    except Exception as exc:
+        raise ValueError(f"GPX non valido: {exc}") from exc
+
+    creator = str(root.attrib.get("creator") or "").strip()
+    points = []
+
+    for node in root.iter():
+        if str(node.tag).split("}")[-1].lower() != "trkpt":
+            continue
+        try:
+            lat = float(node.attrib["lat"])
+            lon = float(node.attrib["lon"])
+        except Exception:
+            continue
+
+        point = {
+            "lat": lat, "lon": lon, "time": None, "hr": None,
+            "cad": None, "speed": None,
+        }
+        for child in node.iter():
+            local = str(child.tag).split("}")[-1].lower()
+            value = str(child.text or "").strip()
+            if not value:
+                continue
+            if local == "time":
+                point["time"] = _parse_gpx_time(value)
+            elif local in {"hr", "cad", "speed"}:
+                try:
+                    point[local] = float(value)
+                except Exception:
+                    pass
+        points.append(point)
+
+    if len(points) < 2:
+        raise ValueError(
+            "Il GPX non contiene abbastanza punti traccia per essere analizzato."
+        )
+
+    distance_km = 0.0
+    for previous, current in zip(points, points[1:]):
+        segment = _haversine_km(
+            previous["lat"], previous["lon"],
+            current["lat"], current["lon"],
+        )
+        if segment <= 1.0:
+            distance_km += segment
+
+    timed = [p for p in points if p.get("time") is not None]
+    start_time = timed[0]["time"] if timed else None
+    end_time = timed[-1]["time"] if timed else None
+    duration_seconds = (
+        max(0, int((end_time - start_time).total_seconds()))
+        if start_time and end_time else 0
+    )
+
+    hr_values = [
+        p["hr"] for p in points
+        if p.get("hr") is not None and p["hr"] > 0
+    ]
+    cad_values = [
+        p["cad"] for p in points
+        if p.get("cad") is not None and p["cad"] > 0
+    ]
+    avg_hr = sum(hr_values) / len(hr_values) if hr_values else None
+    avg_cad_raw = (
+        sum(cad_values) / len(cad_values) if cad_values else None
+    )
+
+    creator_cf = creator.casefold()
+    cadence_factor = 1.0
+    if (
+        avg_cad_raw
+        and ("amazfit" in creator_cf or "zepp" in creator_cf)
+        and avg_cad_raw < 120
+    ):
+        # Zepp/Amazfit running GPX commonly stores strides/minute.
+        cadence_factor = 2.0
+
+    estimated_steps = 0.0
+    for previous, current in zip(points, points[1:]):
+        t1, t2 = previous.get("time"), current.get("time")
+        if not t1 or not t2:
+            continue
+        seconds = (t2 - t1).total_seconds()
+        if seconds <= 0 or seconds > 120:
+            continue
+        samples = [
+            c for c in (previous.get("cad"), current.get("cad"))
+            if c is not None and c >= 0
+        ]
+        if samples:
+            estimated_steps += (
+                (sum(samples) / len(samples))
+                * cadence_factor
+                * seconds / 60.0
+            )
+
+    if estimated_steps <= 0 and avg_cad_raw and duration_seconds > 0:
+        estimated_steps = (
+            avg_cad_raw * cadence_factor * duration_seconds / 60.0
+        )
+
+    return {
+        "filename": str(filename or "activity.gpx"),
+        "creator": creator,
+        "source_ref": hashlib.sha256(file_bytes).hexdigest(),
+        "start_time": start_time,
+        "date": start_time.date() if start_time else None,
+        "duration_seconds": duration_seconds,
+        "distance_km": round(distance_km, 3),
+        "avg_hr": round(avg_hr, 1) if avg_hr is not None else None,
+        "avg_cadence_raw": (
+            round(avg_cad_raw, 1) if avg_cad_raw is not None else None
+        ),
+        "cadence_factor": cadence_factor,
+        "avg_step_cadence": (
+            round(avg_cad_raw * cadence_factor, 1)
+            if avg_cad_raw is not None else None
+        ),
+        "estimated_steps": max(0, int(round(estimated_steps))),
+        "point_count": len(points),
+    }
+
+
+def nearest_weight_for_date(current_user_id, target_date):
+    response = (
+        supabase.table("daily_logs")
+        .select("date,weight")
+        .eq("user_id", current_user_id)
+        .order("date", desc=True)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    candidates = []
+
+    for row in rows:
+        if row.get("weight") is None or not row.get("date"):
+            continue
+        try:
+            row_date = date.fromisoformat(str(row["date"]))
+            weight = float(row["weight"])
+            if weight > 0:
+                candidates.append(
+                    (abs((row_date - target_date).days), row_date, weight)
+                )
+        except Exception:
+            continue
+
+    if not candidates:
+        return None, None
+
+    candidates.sort(key=lambda item: (item[0], -item[1].toordinal()))
+    _, weight_date, weight = candidates[0]
+    return weight, weight_date
+
+
+_GPX_KCAL_COEFFICIENTS = {
+    "Corsa": 1.00,
+    "Camminata": 0.53,
+    "Trekking": 0.65,
+    "Bici": 0.30,
+    "Altro": 0.70,
+}
+
+
+def estimate_gpx_kcal(activity_type, distance_km, weight_kg):
+    coefficient = _GPX_KCAL_COEFFICIENTS.get(
+        str(activity_type), _GPX_KCAL_COEFFICIENTS["Altro"]
+    )
+    return max(
+        0,
+        int(round(
+            float(distance_km or 0)
+            * float(weight_kg or 0)
+            * coefficient
+        )),
+    )
+
+
+def _format_duration(seconds):
+    seconds = max(0, int(seconds or 0))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return (
+        f"{hours}:{minutes:02d}:{secs:02d}"
+        if hours else f"{minutes}:{secs:02d}"
+    )
 
 
 # ---- DAILY LOGS --------------------------------------------------------------
@@ -5014,33 +5320,20 @@ def sync_oura_steps_to_supabase(
             st.session_state.get("auth_access_token"),
         )
 
-        activities = fetch_daily_activities_from_api(
+        step_info = recalculate_step_calories_for_day(
             current_user_id,
             day_value,
-            st.session_state.get("auth_access_token"),
+            total_steps=steps,
         )
-        conflicts = {"padel", "corsa", "running"}
-        has_conflict = any(
-            str(a.get("activity_name") or "").strip().casefold()
-            in conflicts
-            for a in activities
-        )
-
-        estimated_kcal = 0 if has_conflict else int(steps * 0.04)
-
-        upsert_named_activity_via_api(
-            cache_user_id=current_user_id,
-            log_date=day_value,
-            activity_name="Passi (Stima)",
-            burned_calories=estimated_kcal,
-            access_token=st.session_state.get("auth_access_token"),
-        )
+        estimated_kcal = step_info["estimated_kcal"]
 
         synced.append(
             {
                 "date": day_value,
                 "steps": steps,
                 "estimated_kcal": estimated_kcal,
+                "eligible_steps": step_info["eligible_steps"],
+                "activity_steps": step_info["activity_steps"],
                 "oura_active_calories": int(
                     item.get("active_calories") or 0
                 ),
@@ -15568,30 +15861,31 @@ elif selected_page == t["t5"]:
                         st.session_state.get("auth_access_token"),
                     )
                     
-                    # I passi sono incompatibili SOLO con attività che già
-                    # incorporano gli stessi passi/spostamenti: Padel e Corsa.
-                    # Bici/E-Bike e le altre attività possono invece sommarsi.
-                    step_conflicting_activities = {"padel", "corsa", "running"}
-                    has_step_conflict = any(
-                        str(a.get("activity_name") or "").strip().casefold()
-                        in step_conflicting_activities
-                        for a in day_activities
+                    # Sottraiamo dai passi totali quelli già attribuiti
+                    # ad attività strutturate (per esempio una corsa GPX).
+                    step_info = recalculate_step_calories_for_day(
+                        user_id,
+                        act_date,
+                        total_steps=int(new_steps),
                     )
-                    estim_cals = 0 if has_step_conflict else int(new_steps * 0.04)
-                    
-                    upsert_named_activity_via_api(
-                        cache_user_id=user_id,
-                        log_date=act_date,
-                        activity_name="Passi (Stima)",
-                        burned_calories=estim_cals,
-                        access_token=st.session_state.get("auth_access_token"),
-                    )
-                    
+                    estim_cals = step_info["estimated_kcal"]
+
                     refresh_daily_logs(act_date)
                     
                     queue_ui_sound("steps_saved")
                     st.toast(ux["steps_updated_toast"].format(kcal=estim_cals), icon="👣")
-                    st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)")
+                    if step_info["activity_steps"] > 0:
+                        st.success(
+                            f"✅ {t['steps_updated']} "
+                            f"({step_info['eligible_steps']} passi calorici su "
+                            f"{step_info['total_steps']}; "
+                            f"{step_info['activity_steps']} già inclusi nelle attività; "
+                            f"{estim_cals} kcal stimate)"
+                        )
+                    else:
+                        st.success(
+                            f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)"
+                        )
                     st.rerun()
                 except Exception as e:
                     err_text = str(e)
@@ -15672,16 +15966,13 @@ elif selected_page == t["t5"]:
                         st.session_state.get("auth_access_token"),
                     )
                     
-                    # Padel e Corsa sono incompatibili con le kcal dei passi,
-                    # perché i passi di quelle attività sarebbero già compresi.
-                    # Palestra/Nuoto/Altro restano invece cumulabili con i passi.
-                    if str(extra_act).strip().casefold() in {"padel", "corsa", "running"}:
-                        upsert_named_activity_via_api(
-                            cache_user_id=user_id,
-                            log_date=act_date,
-                            activity_name="Passi (Stima)",
-                            burned_calories=0,
-                            access_token=st.session_state.get("auth_access_token"),
+                    # Per attività manuali senza un numero preciso di passi
+                    # manteniamo il comportamento conservativo anti-doppio conteggio.
+                    if _is_step_conflicting_activity(extra_act):
+                        recalculate_step_calories_for_day(
+                            user_id,
+                            act_date,
+                            total_steps=int(day_steps),
                         )
 
                     refresh_daily_logs(act_date)
@@ -15691,6 +15982,197 @@ elif selected_page == t["t5"]:
                     st.toast(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals), icon="🎯")
                     st.success(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals))
                     st.rerun()
+
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown("### 🗺️ Importa attività GPX")
+        st.caption(
+            "Carica una traccia .gpx da Zepp/Amazfit, Garmin o altre app. "
+            "Il file viene analizzato localmente da SanoSync."
+        )
+
+        gpx_file = st.file_uploader(
+            "File GPX",
+            type=["gpx"],
+            key=f"gpx_uploader_{act_date}",
+        )
+
+        if gpx_file is not None:
+            try:
+                gpx_data = parse_gpx_activity(
+                    gpx_file.getvalue(),
+                    filename=gpx_file.name,
+                )
+                gpx_date = gpx_data.get("date") or act_date
+
+                if gpx_date != act_date:
+                    st.info(
+                        f"Il GPX risulta del {gpx_date}. "
+                        "Verrà salvato in quella data."
+                    )
+
+                gm1, gm2, gm3, gm4 = st.columns(4)
+                gm1.metric("Distanza", f"{gpx_data['distance_km']:.2f} km")
+                gm2.metric(
+                    "Durata",
+                    _format_duration(gpx_data["duration_seconds"]),
+                )
+                gm3.metric(
+                    "Passi attività",
+                    f"{gpx_data['estimated_steps']:,}".replace(",", "."),
+                )
+                gm4.metric(
+                    "FC media",
+                    (
+                        f"{gpx_data['avg_hr']:.0f} bpm"
+                        if gpx_data["avg_hr"] is not None else "—"
+                    ),
+                )
+
+                if gpx_data.get("avg_step_cadence") is not None:
+                    cadence_text = (
+                        f"Cadenza media: "
+                        f"{gpx_data['avg_step_cadence']:.0f} passi/min."
+                    )
+                    if gpx_data.get("cadence_factor") == 2.0:
+                        cadence_text += (
+                            " Zepp/Amazfit sembra esportarla per singolo lato; "
+                            "SanoSync l'ha convertita in passi/min."
+                        )
+                    st.caption(cadence_text)
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    gpx_activity_type = st.selectbox(
+                        "Tipo attività",
+                        ["Corsa", "Camminata", "Trekking", "Bici", "Altro"],
+                        key=f"gpx_type_{gpx_data['source_ref'][:12]}",
+                    )
+
+                nearest_weight, nearest_weight_date = nearest_weight_for_date(
+                    user_id, gpx_date
+                )
+                with c2:
+                    gpx_weight = st.number_input(
+                        "Peso per la stima kcal (kg)",
+                        min_value=30.0,
+                        max_value=250.0,
+                        value=round(float(nearest_weight or 70.0), 1),
+                        step=0.1,
+                        key=f"gpx_weight_{gpx_data['source_ref'][:12]}",
+                    )
+
+                if nearest_weight is not None:
+                    st.caption(
+                        f"Peso dal log più vicino: {nearest_weight:.1f} kg "
+                        f"({nearest_weight_date})."
+                    )
+
+                gpx_kcal = estimate_gpx_kcal(
+                    gpx_activity_type,
+                    gpx_data["distance_km"],
+                    gpx_weight,
+                )
+
+                st.markdown(
+                    f"**Anteprima:** {gpx_activity_type} · "
+                    f"{gpx_data['distance_km']:.2f} km · "
+                    f"{_format_duration(gpx_data['duration_seconds'])} · "
+                    f"**{gpx_kcal} kcal**"
+                )
+
+                step_based = gpx_activity_type in {
+                    "Corsa", "Camminata", "Trekking"
+                }
+                if step_based and gpx_data["estimated_steps"] > 0:
+                    preview_activities = list(day_activities) + [{
+                        "activity_name": gpx_activity_type,
+                        "activity_steps": gpx_data["estimated_steps"],
+                    }]
+                    preview_offset = calculate_step_calorie_offset(
+                        day_steps, preview_activities
+                    )
+                    st.info(
+                        f"Offset passi: {day_steps} totali − "
+                        f"{preview_offset['activity_steps']} già nelle attività "
+                        f"= {preview_offset['eligible_steps']} passi calorici "
+                        f"({preview_offset['estimated_kcal']} kcal)."
+                    )
+                elif step_based:
+                    st.warning(
+                        "Questo GPX non contiene una cadenza utilizzabile: "
+                        "posso importare kcal/distanza, ma non l'offset passi."
+                    )
+
+                existing_source = any(
+                    str(a.get("source_ref") or "")
+                    == gpx_data["source_ref"]
+                    for a in day_activities
+                )
+
+                if existing_source:
+                    st.warning("Questo GPX risulta già importato.")
+                elif st.button(
+                    "📥 Importa GPX in Attività",
+                    key=f"import_gpx_{gpx_data['source_ref'][:16]}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    activity_steps = (
+                        gpx_data["estimated_steps"] if step_based else 0
+                    )
+                    create_activity_via_api(
+                        {
+                            "date": str(gpx_date),
+                            "activity_name": (
+                                f"{gpx_activity_type} GPX · "
+                                f"{gpx_data['distance_km']:.2f} km"
+                            ),
+                            "burned_calories": int(gpx_kcal),
+                            "activity_steps": int(activity_steps),
+                            "distance_km": float(gpx_data["distance_km"]),
+                            "duration_seconds": int(
+                                gpx_data["duration_seconds"]
+                            ),
+                            "source": "gpx",
+                            "source_file_name": gpx_data["filename"],
+                            "source_ref": gpx_data["source_ref"],
+                            "avg_hr": (
+                                float(gpx_data["avg_hr"])
+                                if gpx_data["avg_hr"] is not None else None
+                            ),
+                            "avg_cadence": (
+                                float(gpx_data["avg_step_cadence"])
+                                if gpx_data["avg_step_cadence"] is not None
+                                else None
+                            ),
+                        },
+                        st.session_state.get("auth_access_token"),
+                    )
+
+                    daily_log = fetch_daily_log_from_api(
+                        user_id,
+                        str(gpx_date),
+                        st.session_state.get("auth_access_token"),
+                    )
+                    offset = recalculate_step_calories_for_day(
+                        user_id,
+                        gpx_date,
+                        total_steps=int((daily_log or {}).get("steps") or 0),
+                    )
+
+                    refresh_daily_logs(gpx_date)
+                    queue_ui_sound("activity_saved")
+                    st.success(
+                        f"GPX importato: {gpx_kcal} kcal · "
+                        f"{activity_steps} passi attività · "
+                        f"{offset['eligible_steps']} passi calorici residui."
+                    )
+                    st.rerun()
+
+            except Exception as exc:
+                st.error(f"Impossibile leggere/importare il GPX: {exc}")
 
 
 # ============================================================
