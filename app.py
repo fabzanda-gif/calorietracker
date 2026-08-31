@@ -8346,6 +8346,149 @@ translations["Português"].update({
     "real_weight": "Peso real",
 })
 
+
+translations["Português"].update({
+    # Registro / tabelas
+    "col_meal": "Refeição",
+    "col_category": "Categoria",
+    "col_name": "Nome",
+    "col_date": "Data",
+    "select_meal_edit": "🍽️ Selecione a refeição para editar",
+    "select_meal_placeholder": "Selecione uma refeição...",
+    "meal_type_label": "Tipo de refeição",
+    "category_label": "Categoria",
+    "quantity_g": "Quantidade (g)",
+    "portions": "Porções",
+    "edit_meal_help": "Pode editar gramas ou porções. As calorias e os macronutrientes são recalculados automaticamente.",
+    "save_changes": "💾 Guardar alterações",
+    "delete_this_meal": "Elimine definitivamente **{name}** se já não quiser manter esta refeição.",
+    "meal_updated": "✅ Refeição atualizada: **{meal} · {category} · {qty} {unit}**.",
+
+    # Resumo / balanço / previsão
+    "over_target": "⚠️ Está cerca de {kcal} kcal acima do objetivo de défice.",
+    "end_day": "🔮 Fim do dia: ~{kcal} kcal se não registar mais atividade.",
+    "details": "Detalhes:",
+    "deficit": "défice",
+    "surplus": "excedente",
+    "extra": "extra",
+    "can_eat_more": "🎯 Ainda pode consumir {kcal} kcal e terminar o dia com cerca de {target} kcal de défice.",
+    "exact_target": "🎯 Está exatamente no objetivo para um défice de cerca de {target} kcal.",
+    "day_total": "🔥 Total do dia: {kcal} kcal.",
+    "no_extra": "Não existem calorias extra registadas neste dia.",
+    "weight_msg_default": "📈 Continue assim para se aproximar do seu objetivo.",
+    "weight_msg_val": lambda i, d_ini, t, d_tgt: f"Inicial: {i} kg ({d_ini:+.1f}) | Objetivo: {t} kg ({d_tgt:+.1f})",
+    "balance_days": lambda d: f"⏳ Ao ritmo atual, estima-se cerca de {d} dias para atingir o objetivo.",
+    "balance_surplus": "⚠️ Com excedente calórico não é possível estimar os dias até ao objetivo.",
+    "weight_forecast_title": "🔮 Previsão para atingir o objetivo",
+    "forecast_days": lambda d, date_str: f"🎯 Ao ritmo atual ({d} dias estimados), poderá atingir o objetivo por volta de **{date_str}**.",
+    "forecast_steady": "📉 Mantendo esta tendência, o objetivo está a aproximar-se.",
+    "forecast_flat_up": "💡 A tendência atual está estável ou a subir; a projeção só é ativada quando existe uma tendência de perda de peso.",
+
+    # Plano diário
+    "day_plan_title": "### 🧭 Plano do dia",
+    "plan_day": "Dia a planear",
+    "today": "Hoje",
+    "tomorrow": "Amanhã",
+    "morning_plan": "Bom dia! Defina o tipo de dia e o nível de atividade previsto para planear as refeições.",
+    "day_type": "Tipo de dia",
+    "activity_expected": "Atividade prevista",
+    "save_day_plan": "💾 Guardar plano diário",
+    "plan_saved": "✅ Plano guardado para {date}.",
+    "budget_estimated": "Orçamento estimado",
+    "already_logged": "já registadas",
+    "dinner_available": "Disponível para o jantar",
+    "dinner_already_logged": "✅ Jantar já registado: não é necessária nenhuma sugestão.",
+    "office_allocated": "Escritório já contabilizado",
+    "office_lunch_history": "Almoço de escritório no histórico",
+    "no_dinner_near": "Nenhum jantar repetível do histórico está suficientemente próximo do objetivo.",
+    "no_dinner_history": "Ainda não existem jantares repetíveis suficientes no histórico.",
+    "no_home_lunch": "Não existe almoço repetível de Casa disponível no histórico.",
+    "no_dinner": "Não existe jantar repetível disponível no histórico.",
+    "planning_formula": "O planeamento utiliza +0 kcal (repouso), +500 kcal (moderadamente ativo) e +1000 kcal (ativo). O limite do gráfico mantém-se: repouso <300 kcal extra; atividade intensa ≥800 kcal.",
+
+    # Peso
+    "weight_manage": "#### ⚖️ Gestão do peso",
+    "new_weight": "Novo peso (kg)",
+    "weight_date": "Data do peso",
+    "weight_edit_select": "Peso a editar ou eliminar",
+    "weight_select_placeholder": "Selecione um peso...",
+    "date_label": "Data",
+    "weight_saved": "✅ Peso guardado!",
+    "weight_edited": "✅ Peso atualizado!",
+    "weight_deleted": "✅ Peso eliminado.",
+    "target_weight_label": "Peso objetivo (kg)",
+    "weight_lost_30": "📉 Peso perdido · 30 dias",
+    "deficit_per_kg": "⚡ Défice / kg perdido",
+    "estimated_target_date": "🎯 Data estimada para o objetivo",
+    "need_two_weights": "São necessários pelo menos dois registos de peso e dados alimentares no último mês.",
+    "first_last_diff": "Diferença entre a primeira e a última medição dos últimos 30 dias.",
+    "need_positive_deficit": "É necessário um défice médio positivo para estimar a data do objetivo.",
+    "target_reached": "Atingido 🎯",
+    "target_reached_caption": "O peso mais recente já está no objetivo ou abaixo dele.",
+    "estimate_based": "Estimativa baseada num défice médio de {deficit} kcal/dia ({days} dias registados).",
+    "view_label": "Vista",
+    "view_weight": "Peso",
+    "view_kcal": "Calorias",
+    "view_macros": "Macronutrientes",
+    "view_meals": "Refeições",
+    "period_label": "Período",
+    "no_weight_period": "Não existem pesos registados nos últimos {days} dias.",
+    "ingested_kcal": "Calorias ingeridas",
+    "burned_kcal": "Calorias queimadas",
+    "protein_full": "Proteína",
+    "carbs_full": "Hidratos de carbono",
+    "fats_full": "Gordura",
+    "grams": "gramas",
+    "goal": "Objetivo",
+    "no_food_data": "Sem dados alimentares",
+
+    # Receitas
+    "recipes_title": "🍲 Receitas",
+    "recipes_caption": "As receitas são privadas por predefinição. Pode optar por partilhar receitas individuais com outros utilizadores.",
+    "available_recipes": "### 📋 Receitas disponíveis",
+    "no_composed_recipes": "Não foram encontradas receitas compostas nas refeições.",
+    "create_meal_ingredients": "### ➕ Criar uma refeição a partir de ingredientes",
+    "recipe_name_placeholder": "Ex. Massa com molho de tomate",
+    "notes_optional": "Notas (opcional)",
+    "notes_placeholder": "Ex. preparação, substituições, temperos...",
+    "add_ingredient_title": "#### 🥕 Adicionar ingrediente",
+    "ingredient_source": "Fonte do ingrediente",
+    "manual_entry": "Introdução manual",
+    "ingredient_search": "Pesquisar ingrediente",
+    "searching_ingredient": "A pesquisar ingrediente...",
+    "min_2_chars": "Introduza pelo menos 2 caracteres.",
+    "results": "Resultados",
+    "ingredient_name": "Nome do ingrediente",
+    "ingredient_qty": "Quantidade do ingrediente (g)",
+    "add_ingredient": "➕ Adicionar ingrediente",
+    "select_or_enter_ingredient": "Introduza ou selecione um ingrediente.",
+    "ingredient_added": "✅ {name} adicionado.",
+    "ingredients_title": "#### 📋 Ingredientes",
+    "ingredient_col": "Ingrediente",
+    "remove_ingredient": "Remover ingrediente",
+    "remove_ingredient_btn": "🗑️ Remover ingrediente",
+    "total_meal": "Total da refeição",
+    "per_100g_label": "Por 100 g",
+    "save_as_meal": "💾 Guardar como refeição",
+    "enter_name": "Introduza um nome.",
+    "composed_saved": "✅ Refeição composta guardada!",
+    "add_one_ingredient": "Adicione pelo menos um ingrediente para criar a refeição.",
+    "my_recipes": "### 👤 As minhas receitas",
+    "shared_recipes": "### 🌍 Receitas partilhadas",
+    "no_my_recipes": "Ainda não criou nenhuma receita.",
+    "no_shared_recipes": "Não existem receitas partilhadas disponíveis.",
+    "recipe_servings": "🍽️ Porções previstas",
+    "recipe_servings_help": "Indique quantas porções rende a receita completa. Depois poderá registar 0,5 / 1 / 1,5 porções e as calorias/macronutrientes serão ajustados automaticamente.",
+    "per_serving": "Por porção",
+    "total_recipe": "Receita completa",
+    "serving_weight": "cerca de {grams} g por porção",
+
+    # Atividade
+    "bike_type": "Tipo de bicicleta",
+    "normal_bike": "Bicicleta normal",
+    "ebike": "Bicicleta elétrica",
+})
+
 MEAL_TYPE_KEYS = {"Colazione": "meal_breakfast", "Pranzo": "meal_lunch", "Cena": "meal_dinner", "Snack": "meal_snack"}
 CATEGORY_KEYS = {"Casa": "cat_home", "Lavoro": "cat_work", "Ristorante": "cat_restaurant", "Una-tantum": "cat_once"}
 DAY_TYPE_KEYS = {"Lavoro da casa": "day_home", "Ufficio": "day_office", "Giornata libera": "day_free"}
@@ -8628,13 +8771,41 @@ with st.sidebar:
     }
     _ui_extra["Português"] = {
         **_ui_extra["English"],
+        "meal_placeholder": "Selecione uma refeição...",
+        "activity": "Atividade",
+        "bmr_base": "BMR (Base)",
+        "bike": "Bicicleta",
+        "steps_est": "Passos (Estimativa)",
+        "over_target": "⚠️ Está cerca de {kcal} kcal acima do objetivo de défice.",
+        "end_day": "🔮 Fim do dia: ~{kcal} kcal se não registar mais atividade.",
+        "details": "Detalhes:",
+        "deficit": "défice",
+        "surplus": "excedente",
+        "extra": "extra",
+        "movement_status": "👣 Estado do movimento",
+        "activity_logged": "🏋️ Atividade registada",
+        "activity_logged_note": "🌟 Ótimo! Concluiu uma atividade física estruturada hoje.",
+        "extra_burned": "🔥 Kcal extra queimadas",
+        "extra_burned_note": "Total de calorias registadas através de atividades no dia selecionado.",
+        "steps": "👣 Passos",
+        "steps_note": "Calorias atribuídas aos passos.",
+        "padel_note": "Calorias registadas como Padel.",
+        "bike_note": "Total de Bicicleta e Bicicleta elétrica.",
         "total_steps": "Total de passos",
         "add_bike": "💾 Adicionar bicicleta",
+        "notes_ph": "Ex. sem lactose, marca preferida, preparação, temperos...",
+        "can_eat_more": "🎯 Ainda pode consumir {kcal} kcal e terminar o dia com cerca de {target} kcal de défice.",
+        "exact_target": "🎯 Está exatamente no objetivo para um défice de cerca de {target} kcal.",
+        "day_total": "🔥 Total do dia: {kcal} kcal.",
+        "no_extra": "Não existem calorias extra registadas neste dia.",
         "other_activities": "Outras atividades",
         "bike_and_ebike": "🚲 Bicicleta e bicicleta elétrica",
         "bike_minutes": "Minutos de bicicleta",
         "burned_kcal_field": "Kcal queimadas",
         "enter_one_minute": "Introduza pelo menos 1 minuto.",
+        "bike_added": "✅ Adicionados {minutes} min de {activity} ({kcal} kcal)!",
+        "steps_updated_toast": "✅ Passos atualizados! ({kcal} kcal)",
+        "activity_saved": "✅ {activity} registada com sucesso! ({kcal} kcal)",
         "step_word": "passos",
         "activity_gym": "Ginásio",
         "activity_swim": "Natação",
@@ -9293,6 +9464,7 @@ SETTINGS_I18N["Português"] = {
     "save": "💾 Guardar definições",
     "saved": "✅ Definições atualizadas.",
     "error": "Erro ao guardar: {error}",
+    "hint": "A sua fotografia de perfil é gerida pelo fornecedor de início de sessão (por exemplo, Google/Facebook).",
     "office_title": "🏢 Almoço no escritório",
     "office_enabled": "Mostrar refeições e funcionalidades de planeamento do escritório?",
     "office_no": "Não",
@@ -9324,7 +9496,7 @@ def render_personal_settings_page():
     si = SETTINGS_I18N.get(settings_lang, SETTINGS_I18N["Italiano"])
 
     new_language = st.selectbox(
-        "🌐 Language / Lingua / Taal / Langue",
+        "🌐 Idioma" if settings_lang == "Português" else "🌐 Language / Lingua / Taal / Langue",
         _settings_languages,
         index=_settings_languages.index(settings_lang),
         key="settings_language_live",
@@ -9660,13 +9832,13 @@ def render_personal_settings_page():
             )
             _scope = str(_oura_connection.get("scope") or "")
             if _scope:
-                st.caption(f"Permessi concessi: {_scope}")
+                st.caption(f"Permissões concedidas: {_scope}" if settings_lang == "Português" else f"Permessi concessi: {_scope}")
 
             _oura_col1, _oura_col2, _oura_col3 = st.columns(3)
 
             with _oura_col1:
                 if st.button(
-                    "🔄 Verifica",
+                    ("🔄 Verificar" if settings_lang == "Português" else "🔄 Verifica"),
                     key="oura_test_connection",
                     use_container_width=True,
                 ):
@@ -9678,16 +9850,16 @@ def render_personal_settings_page():
                             or "account Oura"
                         )
                         st.success(
-                            f"Connessione attiva: {_oura_name}"
+                            f"Ligação ativa: {_oura_name}" if settings_lang == "Português" else f"Connessione attiva: {_oura_name}"
                         )
                     except Exception as exc:
                         st.error(
-                            f"Verifica Oura non riuscita: {exc}"
+                            f"Falha na verificação Oura: {exc}" if settings_lang == "Português" else f"Verifica Oura non riuscita: {exc}"
                         )
 
             with _oura_col2:
                 if st.button(
-                    "👣 Sincronizza ora",
+                    ("👣 Sincronizar agora" if settings_lang == "Português" else "👣 Sincronizza ora"),
                     key="oura_sync_steps_now",
                     use_container_width=True,
                 ):
@@ -9705,34 +9877,34 @@ def render_personal_settings_page():
                                 key=lambda row: row["date"],
                             )[-1]
                             st.success(
-                                f"Oura sincronizzato: "
-                                f"{_latest['steps']} passi il "
+                                f"Oura sincronizado: " if settings_lang == "Português" else f"Oura sincronizzato: "
+                                f"{_latest['steps']} passos em " if settings_lang == "Português" else f"{_latest['steps']} passi il "
                                 f"{_latest['date']} "
-                                f"({_latest['estimated_kcal']} kcal stimate)."
+                                f"({_latest['estimated_kcal']} kcal estimadas)." if settings_lang == "Português" else f"({_latest['estimated_kcal']} kcal stimate)."
                             )
                         else:
                             st.info(
-                                "Oura non ha restituito attività giornaliere "
-                                "per gli ultimi 7 giorni."
+                                "A Oura não devolveu atividades diárias " if settings_lang == "Português" else "Oura non ha restituito attività giornaliere "
+                                "nos últimos 7 dias." if settings_lang == "Português" else "per gli ultimi 7 giorni."
                             )
                     except Exception as exc:
                         st.error(
-                            f"Sincronizzazione Oura non riuscita: {exc}"
+                            f"Falha na sincronização Oura: {exc}" if settings_lang == "Português" else f"Sincronizzazione Oura non riuscita: {exc}"
                         )
 
             with _oura_col3:
                 if st.button(
-                    "Scollega",
+                    ("Desligar" if settings_lang == "Português" else "Scollega"),
                     key="oura_disconnect",
                     use_container_width=True,
                 ):
                     try:
                         revoke_and_delete_oura_connection(user_id)
-                        st.success("Oura scollegato.")
+                        st.success("Oura desligado." if settings_lang == "Português" else "Oura scollegato.")
                         st.rerun()
                     except Exception as exc:
                         st.error(
-                            f"Impossibile scollegare Oura: {exc}"
+                            f"Não foi possível desligar a Oura: {exc}" if settings_lang == "Português" else f"Impossibile scollegare Oura: {exc}"
                         )
 
             st.caption(
@@ -9743,12 +9915,12 @@ def render_personal_settings_page():
             )
         else:
             st.write(
-                "Collega il tuo Oura Ring a SanoSync. "
-                "Richiediamo solo i permessi `personal`, `daily` e `workout`."
+                "Ligue o seu Oura Ring ao SanoSync. " if settings_lang == "Português" else "Collega il tuo Oura Ring a SanoSync. "
+                "Solicitamos apenas as permissões `personal`, `daily` e `workout`." if settings_lang == "Português" else "Richiediamo solo i permessi `personal`, `daily` e `workout`."
             )
             st.caption(
-                "La password Oura non viene condivisa con SanoSync. "
-                "L'autorizzazione avviene direttamente su Oura tramite OAuth 2.0."
+                "A palavra-passe da Oura não é partilhada com o SanoSync. " if settings_lang == "Português" else "La password Oura non viene condivisa con SanoSync. "
+                "A autorização é efetuada diretamente na Oura através de OAuth 2.0." if settings_lang == "Português" else "L'autorizzazione avviene direttamente su Oura tramite OAuth 2.0."
             )
 
             try:
@@ -9759,18 +9931,18 @@ def render_personal_settings_page():
                 st.session_state.pop("oura_authorization_url", None)
 
                 st.link_button(
-                    "💍 Connetti Oura",
+                    ("💍 Ligar Oura" if settings_lang == "Português" else "💍 Connetti Oura"),
                     _oura_auth_url,
                     use_container_width=True,
                     type="primary",
                 )
                 st.caption(
-                    "Oura si apre in una nuova scheda. Al termine "
-                    "l'associazione viene salvata automaticamente."
+                    "A Oura abre num novo separador. No final, " if settings_lang == "Português" else "Oura si apre in una nuova scheda. Al termine "
+                    "a ligação é guardada automaticamente." if settings_lang == "Português" else "l'associazione viene salvata automaticamente."
                 )
             except Exception as exc:
                 st.error(
-                    f"Configurazione Oura incompleta: {exc}"
+                    f"Configuração Oura incompleta: {exc}" if settings_lang == "Português" else f"Configurazione Oura incompleta: {exc}"
                 )
 
         _legal_c1, _legal_c2 = st.columns(2)
@@ -11570,6 +11742,16 @@ if selected_page == t["t1"]:
                     "voice_error": "Kon de audio niet transcriberen: {error}",
                     "default_name": "AI-maaltijd",
                 },
+                "Português": {
+                    "caption": "Escreva o que comeu. O SanoSync AI reconhece ingredientes e quantidades; nome, kcal e macronutrientes são preenchidos automaticamente.",
+                    "placeholder": "Ex. 250 g frango, 120 g arroz, 200 g curgete, 10 g azeite",
+                    "portions": "Porções",
+                    "analyze": "✨ Calcular com SanoSync AI",
+                    "spinner": "O SanoSync AI está a reconstruir a refeição…",
+                    "error": "Erro na análise: {error}",
+                    "voice_error": "Não foi possível transcrever o áudio: {error}",
+                    "default_name": "Refeição IA",
+                },
                 "Français": {
                     "caption": "Décrivez ce que vous avez mangé. SanoSync AI reconnaît les ingrédients et les quantités ; le nom, les calories et les macros sont remplis automatiquement.",
                     "placeholder": "Ex. 250g poulet, 120g riz, 200g courgettes, 10g huile",
@@ -13368,6 +13550,18 @@ elif selected_page == t["t2"]:
             "macro_unit": "g",
             "kcal_unit": "kcal",
         },
+        "Português": {
+            "title": "🍩 Distribuição diária",
+            "selector": "Visualizar",
+            "macros": "Macronutrientes",
+            "meals": "Kcal por refeição",
+            "protein": "Proteína",
+            "carbs": "Hidratos de carbono",
+            "fat": "Gordura",
+            "no_data": "Não existem dados disponíveis para esta data.",
+            "macro_unit": "g",
+            "kcal_unit": "kcal",
+        },
         "Français": {
             "title": "🍩 Répartition journalière",
             "selector": "Afficher",
@@ -13719,6 +13913,14 @@ elif selected_page == t["t3"]:
             "history_caption": "Corrigeer of verwijder een bestaande meting.",
             "target_title": "🎯 Doelgewicht",
             "target_caption": "Het doel wordt gebruikt voor prognoses en onderhoudsberekeningen.",
+        },
+        "Português": {
+            "register_title": "⚖️ Registar peso",
+            "register_caption": "Adicione uma nova medição. O valor predefinido é o último peso registado.",
+            "history_title": "🕘 Histórico e edição",
+            "history_caption": "Corrija ou elimine uma medição já registada.",
+            "target_title": "🎯 Peso objetivo",
+            "target_caption": "O objetivo é utilizado nas projeções e no cálculo de manutenção.",
         },
         "Français": {
             "register_title": "⚖️ Enregistrer le poids",
@@ -14506,10 +14708,20 @@ elif selected_page == t["t3"]:
             timeline_html = (
                 '<div style="border:1px solid #E8ECF2;border-radius:12px;padding:8px 10px;overflow-x:auto;">'
                 '<div style="font-size:12px;color:#667085;margin-bottom:4px;">'
-                f'Dettagli: 👍 deficit ≥{int(round(float(user_deficit_target_kcal)))} · '
-                f'😐 deficit 0–{max(0, int(round(float(user_deficit_target_kcal))) - 1)} · '
-                '👎 surplus &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
-                '</div>'
+                + (
+                    (
+                        f'Detalhes: 👍 défice ≥{int(round(float(user_deficit_target_kcal)))} · '
+                        f'😐 défice 0–{max(0, int(round(float(user_deficit_target_kcal))) - 1)} · '
+                        '👎 excedente &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
+                    )
+                    if current_lang == "Português"
+                    else (
+                        f'Dettagli: 👍 deficit ≥{int(round(float(user_deficit_target_kcal)))} · '
+                        f'😐 deficit 0–{max(0, int(round(float(user_deficit_target_kcal))) - 1)} · '
+                        '👎 surplus &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
+                    )
+                )
+                + '</div>'
                 f'<div style="display:flex;gap:2px;min-width:{max(100, len(detail_cells)*50)}px;">'
                 + "".join(detail_cells) +
                 '</div></div>'
@@ -14611,6 +14823,42 @@ elif selected_page == t["t4"]:
             "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
             "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}",
             "ingredient_voice_error": "Kon de audio niet transcriberen: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","ingredient_entry_mode":"Hoe wil je ingrediënten invoeren?","ingredient_entry_manual":"✍️ Handmatig","ingredient_entry_ai":"✨ Met SanoSync AI","manual_add":"➕ Ingrediënt toevoegen","manual_name":"Ingrediënt","manual_qty":"Hoeveelheid (g)","manual_kcal":"Kcal","manual_pro":"Eiwit","manual_carbs":"Koolh.","manual_fat":"Vet","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ AI-recept geladen om te bewerken. Controleer ingrediënten en waarden voor je opslaat.",
+        },
+        "Português": {
+            "my": "👤 As minhas receitas",
+            "shared": "🌍 Receitas partilhadas",
+            "generator": "✨ Gerador de Receitas IA",
+            "builder": "➕ Criar uma refeição a partir de ingredientes",
+            "generator_caption": "Defina os seus objetivos. Se indicar ingredientes disponíveis, o SanoSync irá utilizá-los como base e acrescentar apenas o necessário para criar uma receita coerente.",
+            "available": "Ingredientes que pretende utilizar (opcional)",
+            "available_help": "Se indicar ingredientes, o gerador funciona automaticamente em modo aproveitar o frigorífico. Inclua também as quantidades quando as souber.",
+            "ingredient_ai_label": "✨ **SanoSync AI · Calcular a partir dos ingredientes**",
+            "ingredient_ai_placeholder": "Ex. 250 g frango, 120 g arroz, 200 g curgete, 10 g azeite",
+            "ingredient_ai_help": "Introduza livremente os ingredientes e as quantidades. O SanoSync AI reconhece os alimentos, estima kcal e macronutrientes e preenche a tabela automaticamente.",
+            "ingredient_ai_button": "✨ Analisar com SanoSync AI",
+            "ingredient_ai_spinner": "A analisar os ingredientes…",
+            "ingredient_ai_done": "✅ Ingredientes preenchidos automaticamente.",
+            "ingredient_ai_empty": "Introduza pelo menos um ingrediente.",
+            "ingredient_ai_error": "Erro na análise dos ingredientes: {error}",
+            "ingredient_voice_error": "Não foi possível transcrever o áudio: {error}",
+            "creation_mode": "Como pretende criar a receita?",
+            "mode_known": "🍳 Já sei o que quero cozinhar",
+            "mode_ai": "✨ Quero ajuda da IA",
+            "ingredient_entry_mode": "Como pretende introduzir os ingredientes?",
+            "ingredient_entry_manual": "✍️ Manualmente",
+            "ingredient_entry_ai": "✨ Com SanoSync AI",
+            "manual_add": "➕ Adicionar ingrediente",
+            "manual_name": "Ingrediente",
+            "manual_qty": "Quantidade (g)",
+            "manual_kcal": "Kcal",
+            "manual_pro": "Proteína",
+            "manual_carbs": "Hidratos",
+            "manual_fat": "Gordura",
+            "mode_known_help": "Introduza os ingredientes que decidiu utilizar: o SanoSync calculará automaticamente kcal e macronutrientes.",
+            "mode_ai_help": "Descreva os seus objetivos e deixe o SanoSync propor uma receita completa.",
+            "ai_starting_ingredients": "✨ Ingredientes de partida para a IA (opcional)",
+            "ai_starting_help": "Se os indicar, a IA irá utilizá-los como base e acrescentará apenas o necessário.",
+            "ai_generated_loaded": "✅ Receita IA carregada para edição. Reveja os ingredientes e os valores antes de guardar.",
         },
         "Français": {
             "my": "👤 Mes recettes",
@@ -15281,6 +15529,7 @@ elif selected_page == t["t4"]:
                 "English": "▸ Optional details · notes and photo",
                 "Nederlands": "▸ Optionele details · notities en foto",
                 "Français": "▸ Détails optionnels · notes et photo",
+                "Português": "▸ Detalhes opcionais · notas e fotografia",
             }
             with st.expander(
                 _optional_details_labels.get(
@@ -16414,10 +16663,11 @@ elif selected_page == t["t5"]:
 
     st.markdown("<br>", unsafe_allow_html=True)
     with st.container(border=True):
-        st.markdown("### 🗺️ Importa attività GPX")
+        st.markdown("### 🗺️ Importar atividade GPX" if current_lang == "Português" else "### 🗺️ Importa attività GPX")
         st.caption(
-            "Carica una traccia .gpx da Zepp/Amazfit, Garmin o altre app. "
-            "Il file viene analizzato localmente da SanoSync."
+            "Carregue um ficheiro .gpx do Zepp/Amazfit, Garmin ou outra aplicação. O ficheiro é analisado localmente pelo SanoSync."
+            if current_lang == "Português"
+            else "Carica una traccia .gpx da Zepp/Amazfit, Garmin o altre app. Il file viene analizzato localmente da SanoSync."
         )
 
         gpx_flash_message = st.session_state.pop(
@@ -16431,7 +16681,7 @@ elif selected_page == t["t5"]:
             st.session_state.get("gpx_upload_generation", 0)
         )
         gpx_file = st.file_uploader(
-            "File GPX",
+            ("Ficheiro GPX" if current_lang == "Português" else "File GPX"),
             type=["gpx"],
             key=f"gpx_uploader_{act_date}_{gpx_upload_generation}",
         )
@@ -16451,17 +16701,17 @@ elif selected_page == t["t5"]:
                     )
 
                 gm1, gm2, gm3, gm4 = st.columns(4)
-                gm1.metric("Distanza", f"{gpx_data['distance_km']:.2f} km")
+                gm1.metric(("Distância" if current_lang == "Português" else "Distanza"), f"{gpx_data['distance_km']:.2f} km")
                 gm2.metric(
-                    "Durata",
+                    ("Duração" if current_lang == "Português" else "Durata"),
                     _format_duration(gpx_data["duration_seconds"]),
                 )
                 gm3.metric(
-                    "Passi attività",
+                    ("Passos da atividade" if current_lang == "Português" else "Passi attività"),
                     f"{gpx_data['estimated_steps']:,}".replace(",", "."),
                 )
                 gm4.metric(
-                    "FC media",
+                    ("FC média" if current_lang == "Português" else "FC media"),
                     (
                         f"{gpx_data['avg_hr']:.0f} bpm"
                         if gpx_data["avg_hr"] is not None else "—"
@@ -16483,7 +16733,7 @@ elif selected_page == t["t5"]:
                 c1, c2 = st.columns(2)
                 with c1:
                     gpx_activity_type = st.selectbox(
-                        "Tipo attività",
+                        ("Tipo de atividade" if current_lang == "Português" else "Tipo attività"),
                         ["Corsa", "Camminata", "Trekking", "Bici", "Altro"],
                         key=f"gpx_type_{gpx_data['source_ref'][:12]}",
                     )
@@ -16493,7 +16743,7 @@ elif selected_page == t["t5"]:
                 )
                 with c2:
                     gpx_weight = st.number_input(
-                        "Peso per la stima kcal (kg)",
+                        ("Peso para estimar kcal (kg)" if current_lang == "Português" else "Peso per la stima kcal (kg)"),
                         min_value=30.0,
                         max_value=250.0,
                         value=round(float(nearest_weight or 70.0), 1),
@@ -16520,7 +16770,7 @@ elif selected_page == t["t5"]:
                     f"**{gpx_kcal} kcal**"
                 )
 
-                with st.expander("🗺️ Anteprima percorso", expanded=False):
+                with st.expander(("🗺️ Pré-visualização do percurso" if current_lang == "Português" else "🗺️ Anteprima percorso"), expanded=False):
                     render_gpx_route_map(gpx_data["route_points"], height=360)
 
                 step_based = gpx_activity_type in {
@@ -16580,7 +16830,7 @@ elif selected_page == t["t5"]:
                 ):
                     st.warning("Questo GPX risulta già importato.")
                 elif existing_activity and st.button(
-                    "📈 Aggiorna mappa e grafici del GPX già importato",
+                    ("📈 Atualizar mapa e gráficos do GPX já importado" if current_lang == "Português" else "📈 Aggiorna mappa e grafici del GPX già importato"),
                     key=f"backfill_gpx_details_{gpx_data['source_ref'][:16]}",
                     use_container_width=True,
                 ):
@@ -16611,7 +16861,7 @@ elif selected_page == t["t5"]:
                     )
                     st.rerun()
                 elif st.button(
-                    "📥 Importa GPX in Attività",
+                    ("📥 Importar GPX para Atividades" if current_lang == "Português" else "📥 Importa GPX in Attività"),
                     key=f"import_gpx_{gpx_data['source_ref'][:16]}",
                     type="primary",
                     use_container_width=True,
@@ -16679,10 +16929,11 @@ elif selected_page == t["t5"]:
 
     st.markdown("<br>", unsafe_allow_html=True)
     with st.container(border=True):
-        st.markdown("### 📚 Registro attività GPX")
+        st.markdown(("### 📚 Registo de atividades GPX" if current_lang == "Português" else "### 📚 Registro attività GPX"))
         st.caption(
-            "Le ultime attività importate da file GPX. "
-            "Selezionane una per vedere dettagli e percorso."
+            "As últimas atividades importadas de ficheiros GPX. Selecione uma para ver os detalhes e o percurso."
+            if current_lang == "Português"
+            else "Le ultime attività importate da file GPX. Selezionane una per vedere dettagli e percorso."
         )
 
         try:
@@ -16701,12 +16952,12 @@ elif selected_page == t["t5"]:
                         "Data": row.get("date"),
                         "Attività": row.get("activity_name") or "GPX",
                         "Distanza km": row.get("distance_km"),
-                        "Durata": _format_duration(
+                        ("Duração" if current_lang == "Português" else "Durata"): _format_duration(
                             row.get("duration_seconds") or 0
                         ),
-                        "Passi attività": row.get("activity_steps") or 0,
+                        ("Passos da atividade" if current_lang == "Português" else "Passi attività"): row.get("activity_steps") or 0,
                         "Kcal": row.get("burned_calories") or 0,
-                        "FC media": row.get("avg_hr"),
+                        ("FC média" if current_lang == "Português" else "FC media"): row.get("avg_hr"),
                     }
                 )
 
@@ -16723,7 +16974,7 @@ elif selected_page == t["t5"]:
                 return f"{date_label} · {activity_label} · {kcal_label} kcal"
 
             selected_index = st.selectbox(
-                "Apri attività",
+                ("Abrir atividade" if current_lang == "Português" else "Apri attività"),
                 options=list(range(len(gpx_log_rows))),
                 format_func=lambda idx: _gpx_log_label(gpx_log_rows[idx]),
                 key="gpx_activity_log_selected",
@@ -16733,24 +16984,24 @@ elif selected_page == t["t5"]:
             selected_activity_id = selected_activity.get("id")
             selected_activity_date = selected_activity.get("date")
 
-            with st.expander("📊 Informazioni attività", expanded=False):
+            with st.expander(("📊 Informações da atividade" if current_lang == "Português" else "📊 Informazioni attività"), expanded=False):
                 lm1, lm2, lm3, lm4 = st.columns(4)
                 distance_value = selected_activity.get("distance_km")
                 lm1.metric(
-                    "Distanza",
+                    ("Distância" if current_lang == "Português" else "Distanza"),
                     (
                         f"{float(distance_value):.2f} km"
                         if distance_value is not None else "—"
                     ),
                 )
                 lm2.metric(
-                    "Durata",
+                    ("Duração" if current_lang == "Português" else "Durata"),
                     _format_duration(
                         selected_activity.get("duration_seconds") or 0
                     ),
                 )
                 lm3.metric(
-                    "Passi attività",
+                    ("Passos da atividade" if current_lang == "Português" else "Passi attività"),
                     f"{int(selected_activity.get('activity_steps') or 0):,}".replace(
                         ",", "."
                     ),
@@ -16809,11 +17060,11 @@ elif selected_page == t["t5"]:
                     )
 
                     if not hr_df.empty or not cadence_df.empty:
-                        st.markdown("#### Andamento durante l'attività")
+                        st.markdown(("#### Evolução durante a atividade" if current_lang == "Português" else "#### Andamento durante l'attività"))
                         chart_tabs = st.tabs(
                             [
-                                "❤️ Frequenza cardiaca",
-                                "👟 Cadenza passi",
+                                ("❤️ Frequência cardíaca" if current_lang == "Português" else "❤️ Frequenza cardiaca"),
+                                ("👟 Cadência dos passos" if current_lang == "Português" else "👟 Cadenza passi"),
                             ]
                         )
 
@@ -16825,7 +17076,7 @@ elif selected_page == t["t5"]:
                                     ].set_index("Minuti"),
                                     use_container_width=True,
                                     height=280,
-                                    x_label="Minuti",
+                                    x_label=("Minutos" if current_lang == "Português" else "Minuti"),
                                     y_label="bpm",
                                 )
                             else:
@@ -16842,7 +17093,7 @@ elif selected_page == t["t5"]:
                                     ].set_index("Minuti"),
                                     use_container_width=True,
                                     height=280,
-                                    x_label="Minuti",
+                                    x_label=("Minutos" if current_lang == "Português" else "Minuti"),
                                     y_label="passi/min",
                                 )
                             else:
@@ -16858,7 +17109,7 @@ elif selected_page == t["t5"]:
                     )
 
             route = _route_points_from_activity(selected_activity)
-            with st.expander("🗺️ Mappa percorso", expanded=False):
+            with st.expander(("🗺️ Mapa do percurso" if current_lang == "Português" else "🗺️ Mappa percorso"), expanded=False):
                 if route:
                     render_gpx_route_map(route, height=460)
                 else:
@@ -16868,17 +17119,17 @@ elif selected_page == t["t5"]:
                         "sopra e usa “Aggiorna mappa e grafici del GPX già importato”."
                     )
 
-            with st.expander("🗑️ Elimina attività", expanded=False):
+            with st.expander(("🗑️ Eliminar atividade" if current_lang == "Português" else "🗑️ Elimina attività"), expanded=False):
                 st.warning(
                     "L'eliminazione rimuove questa attività dal registro e "
                     "ricalcola automaticamente le kcal dei passi del giorno."
                 )
                 confirm_delete = st.checkbox(
-                    "Confermo di voler eliminare questa attività",
+                    ("Confirmo que pretendo eliminar esta atividade" if current_lang == "Português" else "Confermo di voler eliminare questa attività"),
                     key=f"confirm_delete_gpx_{selected_activity_id}",
                 )
                 if st.button(
-                    "Elimina definitivamente",
+                    ("Eliminar definitivamente" if current_lang == "Português" else "Elimina definitivamente"),
                     key=f"delete_gpx_{selected_activity_id}",
                     type="primary",
                     disabled=not confirm_delete,
