@@ -16112,10 +16112,20 @@ elif selected_page == t["t5"]:
             "Il file viene analizzato localmente da SanoSync."
         )
 
+        gpx_flash_message = st.session_state.pop(
+            "gpx_last_action_message",
+            None,
+        )
+        if gpx_flash_message:
+            st.success(gpx_flash_message)
+
+        gpx_upload_generation = int(
+            st.session_state.get("gpx_upload_generation", 0)
+        )
         gpx_file = st.file_uploader(
             "File GPX",
             type=["gpx"],
-            key=f"gpx_uploader_{act_date}",
+            key=f"gpx_uploader_{act_date}_{gpx_upload_generation}",
         )
 
         if gpx_file is not None:
@@ -16271,7 +16281,12 @@ elif selected_page == t["t5"]:
                         },
                         st.session_state.get("auth_access_token"),
                     )
-                    st.success("Mappa aggiunta all'attività già importata.")
+                    st.session_state["gpx_upload_generation"] = (
+                        gpx_upload_generation + 1
+                    )
+                    st.session_state["gpx_last_action_message"] = (
+                        "✅ Mappa aggiunta all'attività GPX già importata."
+                    )
                     st.rerun()
                 elif st.button(
                     "📥 Importa GPX in Attività",
@@ -16325,8 +16340,11 @@ elif selected_page == t["t5"]:
 
                     refresh_daily_logs(gpx_date)
                     queue_ui_sound("activity_saved")
-                    st.success(
-                        f"GPX importato: {gpx_kcal} kcal · "
+                    st.session_state["gpx_upload_generation"] = (
+                        gpx_upload_generation + 1
+                    )
+                    st.session_state["gpx_last_action_message"] = (
+                        f"✅ GPX importato: {gpx_kcal} kcal · "
                         f"{activity_steps} passi attività · "
                         f"{offset['eligible_steps']} passi calorici residui."
                     )
@@ -16390,55 +16408,119 @@ elif selected_page == t["t5"]:
             )
             selected_activity = gpx_log_rows[selected_index]
 
-            lm1, lm2, lm3, lm4 = st.columns(4)
-            distance_value = selected_activity.get("distance_km")
-            lm1.metric(
-                "Distanza",
-                (
-                    f"{float(distance_value):.2f} km"
-                    if distance_value is not None else "—"
-                ),
-            )
-            lm2.metric(
-                "Durata",
-                _format_duration(selected_activity.get("duration_seconds") or 0),
-            )
-            lm3.metric(
-                "Passi attività",
-                f"{int(selected_activity.get('activity_steps') or 0):,}".replace(
-                    ",", "."
-                ),
-            )
-            lm4.metric(
-                "Kcal",
-                int(selected_activity.get("burned_calories") or 0),
-            )
+            selected_activity_id = selected_activity.get("id")
+            selected_activity_date = selected_activity.get("date")
 
-            detail_bits = []
-            if selected_activity.get("avg_hr") is not None:
-                detail_bits.append(
-                    f"FC media {float(selected_activity['avg_hr']):.0f} bpm"
+            with st.expander("📊 Informazioni attività", expanded=False):
+                lm1, lm2, lm3, lm4 = st.columns(4)
+                distance_value = selected_activity.get("distance_km")
+                lm1.metric(
+                    "Distanza",
+                    (
+                        f"{float(distance_value):.2f} km"
+                        if distance_value is not None else "—"
+                    ),
                 )
-            if selected_activity.get("avg_cadence") is not None:
-                detail_bits.append(
-                    f"Cadenza {float(selected_activity['avg_cadence']):.0f} passi/min"
+                lm2.metric(
+                    "Durata",
+                    _format_duration(
+                        selected_activity.get("duration_seconds") or 0
+                    ),
                 )
-            if selected_activity.get("source_file_name"):
-                detail_bits.append(
-                    f"File: {selected_activity['source_file_name']}"
+                lm3.metric(
+                    "Passi attività",
+                    f"{int(selected_activity.get('activity_steps') or 0):,}".replace(
+                        ",", "."
+                    ),
                 )
-            if detail_bits:
-                st.caption(" · ".join(detail_bits))
+                lm4.metric(
+                    "Kcal",
+                    int(selected_activity.get("burned_calories") or 0),
+                )
+
+                detail_bits = []
+                if selected_activity.get("avg_hr") is not None:
+                    detail_bits.append(
+                        f"FC media "
+                        f"{float(selected_activity['avg_hr']):.0f} bpm"
+                    )
+                if selected_activity.get("avg_cadence") is not None:
+                    detail_bits.append(
+                        f"Cadenza "
+                        f"{float(selected_activity['avg_cadence']):.0f} "
+                        f"passi/min"
+                    )
+                if selected_activity.get("source_file_name"):
+                    detail_bits.append(
+                        f"File: {selected_activity['source_file_name']}"
+                    )
+                if detail_bits:
+                    st.caption(" · ".join(detail_bits))
 
             route = _route_points_from_activity(selected_activity)
-            if route:
-                render_gpx_route_map(route, height=460)
-            else:
-                st.info(
-                    "Questa attività è stata importata prima del supporto mappe. "
-                    "Ricarica lo stesso GPX nell'importatore qui sopra e usa "
-                    "“Aggiungi la mappa al GPX già importato”."
+            with st.expander("🗺️ Mappa percorso", expanded=False):
+                if route:
+                    render_gpx_route_map(route, height=460)
+                else:
+                    st.info(
+                        "Questa attività è stata importata prima del supporto "
+                        "mappe. Ricarica lo stesso GPX nell'importatore qui "
+                        "sopra e usa “Aggiungi la mappa al GPX già importato”."
+                    )
+
+            with st.expander("🗑️ Elimina attività", expanded=False):
+                st.warning(
+                    "L'eliminazione rimuove questa attività dal registro e "
+                    "ricalcola automaticamente le kcal dei passi del giorno."
                 )
+                confirm_delete = st.checkbox(
+                    "Confermo di voler eliminare questa attività",
+                    key=f"confirm_delete_gpx_{selected_activity_id}",
+                )
+                if st.button(
+                    "Elimina definitivamente",
+                    key=f"delete_gpx_{selected_activity_id}",
+                    type="primary",
+                    disabled=not confirm_delete,
+                    use_container_width=True,
+                ):
+                    delete_activity_via_api(
+                        selected_activity_id,
+                        st.session_state.get("auth_access_token"),
+                    )
+
+                    # Recalculate the step-calorie offset because removing a
+                    # GPX activity frees its activity_steps again.
+                    if selected_activity_date:
+                        deleted_day_log = fetch_daily_log_from_api(
+                            user_id,
+                            str(selected_activity_date),
+                            st.session_state.get("auth_access_token"),
+                        )
+                        recalculate_step_calories_for_day(
+                            user_id,
+                            selected_activity_date,
+                            total_steps=int(
+                                (deleted_day_log or {}).get("steps") or 0
+                            ),
+                        )
+                        try:
+                            deleted_date_obj = date.fromisoformat(
+                                str(selected_activity_date)
+                            )
+                            refresh_daily_logs(deleted_date_obj)
+                        except Exception:
+                            pass
+
+                    st.session_state.pop(
+                        f"confirm_delete_gpx_{selected_activity_id}",
+                        None,
+                    )
+                    st.session_state["gpx_last_action_message"] = (
+                        "🗑️ Attività GPX eliminata."
+                    )
+                    st.rerun()
+
 
 
 # ============================================================
