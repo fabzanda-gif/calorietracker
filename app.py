@@ -1471,6 +1471,47 @@ def parse_gpx_activity(file_bytes, filename="activity.gpx"):
         # Zepp/Amazfit running GPX commonly stores strides/minute.
         cadence_factor = 2.0
 
+    # Compact GPX time series used by the activity charts.
+    sensor_source = []
+    if start_time is not None:
+        for p in points:
+            point_time = p.get("time")
+            if point_time is None:
+                continue
+            elapsed_min = max(
+                0.0,
+                (point_time - start_time).total_seconds() / 60.0,
+            )
+            hr_value = p.get("hr")
+            cad_value = p.get("cad")
+            sensor_source.append(
+                {
+                    "minute": round(elapsed_min, 2),
+                    "hr": (
+                        round(float(hr_value), 1)
+                        if hr_value is not None and hr_value > 0
+                        else None
+                    ),
+                    "cadence": (
+                        round(float(cad_value) * cadence_factor, 1)
+                        if cad_value is not None and cad_value > 0
+                        else None
+                    ),
+                }
+            )
+
+    max_sensor_points = 700
+    if len(sensor_source) > max_sensor_points:
+        sensor_step = max(
+            1,
+            math.ceil(len(sensor_source) / max_sensor_points),
+        )
+        sensor_series = sensor_source[::sensor_step]
+        if sensor_series[-1] != sensor_source[-1]:
+            sensor_series.append(sensor_source[-1])
+    else:
+        sensor_series = sensor_source
+
     estimated_steps = 0.0
     for previous, current in zip(points, points[1:]):
         t1, t2 = previous.get("time"), current.get("time")
@@ -1515,6 +1556,7 @@ def parse_gpx_activity(file_bytes, filename="activity.gpx"):
         "estimated_steps": max(0, int(round(estimated_steps))),
         "point_count": len(points),
         "route_points": route_points,
+        "sensor_series": sensor_series,
     }
 
 
@@ -16256,17 +16298,31 @@ elif selected_page == t["t5"]:
                     None,
                 )
 
-                if existing_activity and existing_activity.get("route_points"):
+                existing_has_map = bool(
+                    existing_activity
+                    and existing_activity.get("route_points")
+                )
+                existing_has_charts = bool(
+                    existing_activity
+                    and existing_activity.get("sensor_series")
+                )
+
+                if (
+                    existing_activity
+                    and existing_has_map
+                    and existing_has_charts
+                ):
                     st.warning("Questo GPX risulta già importato.")
                 elif existing_activity and st.button(
-                    "🗺️ Aggiungi la mappa al GPX già importato",
-                    key=f"backfill_gpx_map_{gpx_data['source_ref'][:16]}",
+                    "📈 Aggiorna mappa e grafici del GPX già importato",
+                    key=f"backfill_gpx_details_{gpx_data['source_ref'][:16]}",
                     use_container_width=True,
                 ):
                     update_activity_via_api(
                         existing_activity["id"],
                         {
                             "route_points": gpx_data["route_points"],
+                            "sensor_series": gpx_data["sensor_series"],
                             "distance_km": float(gpx_data["distance_km"]),
                             "duration_seconds": int(gpx_data["duration_seconds"]),
                             "avg_hr": (
@@ -16285,7 +16341,7 @@ elif selected_page == t["t5"]:
                         gpx_upload_generation + 1
                     )
                     st.session_state["gpx_last_action_message"] = (
-                        "✅ Mappa aggiunta all'attività GPX già importata."
+                        "✅ Mappa e grafici aggiunti all'attività GPX."
                     )
                     st.rerun()
                 elif st.button(
@@ -16457,6 +16513,84 @@ elif selected_page == t["t5"]:
                 if detail_bits:
                     st.caption(" · ".join(detail_bits))
 
+                sensor_series = selected_activity.get("sensor_series") or []
+                sensor_rows = []
+                for sample in sensor_series:
+                    if not isinstance(sample, dict):
+                        continue
+                    try:
+                        minute_value = float(sample.get("minute"))
+                    except Exception:
+                        continue
+                    sensor_rows.append(
+                        {
+                            "Minuti": minute_value,
+                            "Frequenza cardiaca": sample.get("hr"),
+                            "Cadenza": sample.get("cadence"),
+                        }
+                    )
+
+                if sensor_rows:
+                    sensor_df = (
+                        pd.DataFrame(sensor_rows)
+                        .sort_values("Minuti")
+                    )
+                    hr_df = sensor_df.dropna(
+                        subset=["Frequenza cardiaca"]
+                    )
+                    cadence_df = sensor_df.dropna(
+                        subset=["Cadenza"]
+                    )
+
+                    if not hr_df.empty or not cadence_df.empty:
+                        st.markdown("#### Andamento durante l'attività")
+                        chart_tabs = st.tabs(
+                            [
+                                "❤️ Frequenza cardiaca",
+                                "👟 Cadenza passi",
+                            ]
+                        )
+
+                        with chart_tabs[0]:
+                            if not hr_df.empty:
+                                st.line_chart(
+                                    hr_df[
+                                        ["Minuti", "Frequenza cardiaca"]
+                                    ].set_index("Minuti"),
+                                    use_container_width=True,
+                                    height=280,
+                                    x_label="Minuti",
+                                    y_label="bpm",
+                                )
+                            else:
+                                st.info(
+                                    "Il GPX non contiene dati di frequenza "
+                                    "cardiaca utilizzabili."
+                                )
+
+                        with chart_tabs[1]:
+                            if not cadence_df.empty:
+                                st.line_chart(
+                                    cadence_df[
+                                        ["Minuti", "Cadenza"]
+                                    ].set_index("Minuti"),
+                                    use_container_width=True,
+                                    height=280,
+                                    x_label="Minuti",
+                                    y_label="passi/min",
+                                )
+                            else:
+                                st.info(
+                                    "Il GPX non contiene dati di cadenza "
+                                    "utilizzabili."
+                                )
+                else:
+                    st.info(
+                        "Grafici non ancora disponibili per questa attività. "
+                        "Ricarica lo stesso GPX nell'importatore e usa "
+                        "“Aggiorna mappa e grafici del GPX già importato”."
+                    )
+
             route = _route_points_from_activity(selected_activity)
             with st.expander("🗺️ Mappa percorso", expanded=False):
                 if route:
@@ -16465,7 +16599,7 @@ elif selected_page == t["t5"]:
                     st.info(
                         "Questa attività è stata importata prima del supporto "
                         "mappe. Ricarica lo stesso GPX nell'importatore qui "
-                        "sopra e usa “Aggiungi la mappa al GPX già importato”."
+                        "sopra e usa “Aggiorna mappa e grafici del GPX già importato”."
                     )
 
             with st.expander("🗑️ Elimina attività", expanded=False):
