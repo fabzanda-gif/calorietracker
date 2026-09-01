@@ -16,12 +16,12 @@ const ITEMS = [
   {
     href: "/inventory",
     label: "Cosa mangio?",
-    icon: "♨",
+    icon: "▦",
   },
   {
     href: "/recipes",
     label: "Ricette",
-    icon: "♨",
+    icon: "⌑",
   },
   {
     href: "/progress",
@@ -68,11 +68,11 @@ export function AppNav() {
         aria-label="Navigazione principale"
       >
         <div className={styles.brandBlock}>
-          <div className={styles.logoMark} aria-hidden="true">
-            S
-          </div>
-
-          <div className={styles.brandName}>SanoSync</div>
+          <img
+            src="/assets/LogoCoral.png"
+            alt="SanoSync"
+            className={styles.brandLogo}
+          />
         </div>
 
         <nav className={styles.desktopLinks}>

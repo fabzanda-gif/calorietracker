@@ -4319,23 +4319,45 @@
   }
 }
 
-
 /* ============================================================
-   SANOSYNC HOME — DESKTOP DEFINITIVO
+   SANOSYNC HOME — DESKTOP LAYOUT
+   Unica configurazione autorevole
    ============================================================ */
+
+.largeBodyLogo {
+  position: absolute;
+  top: 18px;
+  left: 28px;
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  display: block;
+  z-index: 2;
+}
+
+.conversationAiLogo {
+  display: block;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.conversationEyebrow:has(.conversationAiLogo) {
+  display: block;
+  margin: 0 0 10px;
+  letter-spacing: normal;
+}
 
 @media (min-width: 1100px) {
   .page {
     display: block;
     position: relative;
-
     width: calc(100vw - 236px);
     max-width: none;
     min-width: 0;
-
     margin: 0 0 0 236px;
     padding: 42px 34px 80px;
-
     box-sizing: border-box;
   }
 
@@ -4350,44 +4372,31 @@
 
   .desktopHomeGrid {
     display: grid;
-
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 380px);
+    column-gap: 24px;
+    row-gap: 24px;
+    align-items: start;
     width: 100%;
     min-width: 0;
-    max-width: none;
-
-    grid-template-columns:
-      minmax(0, 1fr)
-      330px;
-
-    gap: 24px;
-
-    align-items: start;
   }
 
   .desktopHomeGrid > * {
     min-width: 0;
   }
 
-  /* SINISTRA — PASTI */
   .desktopHomeGrid .mealsSection {
     grid-column: 1;
     grid-row: 1;
-
     width: 100%;
     min-width: 0;
   }
 
   .desktopHomeGrid .mealList {
     display: grid;
-
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 16px;
     width: 100%;
     min-width: 0;
-
-    grid-template-columns:
-      repeat(4, minmax(0, 1fr));
-
-    gap: 12px;
-
     align-items: start;
   }
 
@@ -4396,67 +4405,93 @@
     min-width: 0;
     height: auto;
     min-height: 0;
-
+    padding: 18px;
     box-sizing: border-box;
   }
 
-  /* DESTRA — SANOSYNC AI */
   .desktopHomeGrid .conversationCard {
     grid-column: 2;
     grid-row: 1;
-
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
     width: 100%;
     min-width: 0;
-
     margin: 0;
-    padding: 20px;
+    padding: 24px;
+    box-sizing: border-box;
+    position: sticky;
+    top: 24px;
+    align-self: start;
+  }
 
+  .desktopHomeGrid .conversationHeader h2 {
+    font-size: 1.45rem;
+    line-height: 1.12;
+  }
+
+  .desktopHomeGrid .conversationHeader p {
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .desktopHomeGrid .conversationControls textarea {
+    min-height: 112px;
+  }
+
+  .desktopHomeGrid .registeredMealEditor {
+    width: 100%;
+    min-width: 0;
+    max-height: none;
+    overflow: visible;
     box-sizing: border-box;
   }
 
-  .desktopHomeGrid .conversationCard textarea {
-    width: 100%;
-    min-height: 116px;
-
-    box-sizing: border-box;
+  .desktopHomeGrid .registeredMealQuantity {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  /* Le sezioni successive restano sotto la griglia */
-  .decisionSection {
+  .desktopHomeGrid .registeredMealEditActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .desktopHomeGrid .decisionSection {
+    grid-column: 1 / -1;
     width: 100%;
-    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .homeBrand {
+    left: -155px;
+    top: 42px;
+    width: 150px;
+  }
+
+  .homeBrandLogo {
+    width: 142px;
+    height: auto;
   }
 }
 
-/* ============================================================
-   DESKTOP LARGO
-   ============================================================ */
-
-@media (min-width: 1450px) {
+@media (min-width: 1800px) {
   .desktopHomeGrid {
-    grid-template-columns:
-      minmax(0, 1fr)
-      360px;
-
-    gap: 28px;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 30px;
   }
 
   .desktopHomeGrid .mealList {
-    gap: 14px;
+    grid-template-columns: repeat(4, minmax(230px, 1fr));
+    gap: 16px;
   }
-}
 
+  .homeBrand {
+    left: -165px;
+    width: 160px;
+  }
 
-/* LARGE BODY LOGO */
-.largeBodyLogo {
-  position: absolute;
-  top: 18px;
-  left: 28px;
-  width: 150px;
-  height: 150px;
-  object-fit: contain;
-  display: block;
-  z-index: 2;
+  .homeBrandLogo {
+    width: 150px;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -4474,425 +4509,5 @@
     width: 105px;
     height: 105px;
     margin: 0 auto 12px;
-  }
-}
-
-
-/* CONVERSATION AI LOGO */
-.conversationAiLogo {
-  display: block;
-  width: 58px;
-  height: 58px;
-  object-fit: contain;
-  object-position: center;
-}
-
-.conversationEyebrow:has(.conversationAiLogo) {
-  display: block;
-  margin: 0 0 10px;
-  letter-spacing: normal;
-}
-
-/* Fix altezza card pasti: ogni card mantiene la propria altezza naturale */
-@media (min-width: 900px) {
-  .desktopHomeGrid .mealList {
-    align-items: start;
-  }
-
-  .desktopHomeGrid .mealCard {
-    height: auto;
-    min-height: 0;
-    box-sizing: border-box;
-  }
-
-  .desktopHomeGrid .registeredMealEditor {
-    max-height: 330px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
-/* ============================================================
-   DESKTOP HOME — sfruttiamo meglio la larghezza disponibile
-   ============================================================ */
-
-@media (min-width: 1100px) {
-
-  /* Contenitore principale più ampio */
-  .page {
-    width: min(100% - 48px, 1400px);
-    max-width: 1400px;
-    margin-inline: auto;
-  }
-
-  /* Header e contenuti superiori seguono la nuova larghezza */
-  .header {
-    width: 100%;
-  }
-
-  /* Budget a tutta la larghezza disponibile */
-  .budgetHero {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  /*
-   * Area principale:
-   * pasti larghi + AI laterale più generosa
-   */
-  .desktopHomeGrid {
-    width: 100%;
-    grid-template-columns:
-      minmax(0, 1fr)
-      minmax(360px, 390px);
-    gap: 28px;
-    align-items: start;
-  }
-
-  /*
-   * La sezione pasti sfrutta tutto lo spazio rimasto.
-   */
-  .desktopHomeGrid .mealsSection {
-    width: 100%;
-    min-width: 0;
-  }
-
-  /*
-   * Quattro card realmente utilizzabili.
-   */
-  .desktopHomeGrid .mealList {
-    width: 100%;
-    grid-template-columns:
-      repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    align-items: start;
-  }
-
-  .desktopHomeGrid .mealCard {
-    width: 100%;
-    min-width: 0;
-    height: auto;
-    min-height: 0;
-    box-sizing: border-box;
-  }
-
-  /*
-   * AI più presente visivamente, senza diventare enorme.
-   */
-  .desktopHomeGrid .conversationCard {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: 24px;
-  }
-
-  .desktopHomeGrid .conversationCard textarea {
-    min-height: 128px;
-  }
-
-  /*
-   * Evita che l'editor della cena allarghi o deformi la griglia.
-   */
-  .desktopHomeGrid .registeredMealEditor {
-    max-height: 330px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
-/* Schermi molto larghi: sfruttiamo ancora meglio lo spazio */
-@media (min-width: 1450px) {
-
-  .page {
-    width: min(100% - 64px, 1480px);
-    max-width: 1480px;
-  }
-
-  .desktopHomeGrid {
-    grid-template-columns:
-      minmax(0, 1fr)
-      400px;
-    gap: 32px;
-  }
-
-  .desktopHomeGrid .mealList {
-    gap: 16px;
-  }
-}
-
-/* ============================================================
-   FINAL HOME BRAND POSITION
-   ============================================================ */
-
-@media (min-width: 1100px) {
-  .homeBrand {
-    left: -155px;
-    top: 42px;
-    width: 150px;
-  }
-
-  .homeBrandLogo {
-    width: 142px;
-    height: auto;
-  }
-}
-
-@media (min-width: 1450px) {
-  .homeBrand {
-    left: -165px;
-    top: 42px;
-    width: 160px;
-  }
-
-  .homeBrandLogo {
-    width: 150px;
-  }
-}
-
-/* ============================================================
-   SANOSYNC HOME — FINAL DESKTOP LAYOUT
-   Single authoritative override
-   ============================================================ */
-
-@media (min-width: 1100px) {
-  .page {
-    display: block;
-    width: min(calc(100% - 48px), 1400px);
-    max-width: 1400px;
-    margin-inline: auto;
-    padding: 42px 34px 80px;
-    box-sizing: border-box;
-  }
-
-  .header,
-  .dayIntro,
-  .budgetHero,
-  .errorCard {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .desktopHomeGrid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 390px;
-    gap: 28px;
-    align-items: start;
-    width: 100%;
-  }
-
-  .desktopHomeGrid > * {
-    min-width: 0;
-  }
-
-  .desktopHomeGrid .mealsSection {
-    grid-column: 1;
-    grid-row: 1;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .desktopHomeGrid .conversationCard {
-    grid-column: 2;
-    grid-row: 1;
-    width: 100%;
-    min-width: 0;
-    margin-top: 0;
-    align-self: start;
-    box-sizing: border-box;
-    position: sticky;
-    top: 24px;
-  }
-
-  .desktopHomeGrid .mealList {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    width: 100%;
-    align-items: start;
-  }
-
-  .desktopHomeGrid .mealCard {
-    width: 100%;
-    min-width: 0;
-    height: auto;
-    min-height: 0;
-    box-sizing: border-box;
-  }
-
-  .desktopHomeGrid .decisionSection {
-    grid-column: 1;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .desktopHomeGrid .conversationCard textarea {
-    min-height: 128px;
-  }
-
-  .desktopHomeGrid .registeredMealEditor {
-    max-height: 330px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
-@media (min-width: 1450px) {
-  .page {
-    width: min(calc(100% - 64px), 1480px);
-    max-width: 1480px;
-  }
-
-  .desktopHomeGrid {
-    grid-template-columns: minmax(0, 1fr) 400px;
-    gap: 32px;
-  }
-
-  .desktopHomeGrid .mealList {
-    gap: 16px;
-  }
-}
-
-/* ============================================================
-   SANOSYNC HOME — FINAL DESKTOP COMPOSITION
-   Sidebar: 236px
-   ============================================================ */
-
-@media (min-width: 1100px) {
-  .page {
-    width: calc(100vw - 236px);
-    max-width: none;
-    min-width: 0;
-
-    margin-left: 236px;
-    margin-right: 0;
-
-    padding: 42px 34px 80px;
-    box-sizing: border-box;
-  }
-
-  /*
-   * Budget e parte introduttiva restano full width.
-   */
-  .header,
-  .dayIntro,
-  .budgetHero,
-  .errorCard {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  /*
-   * Area operativa:
-   *
-   * ┌──────────────────────────────┬───────────────┐
-   * │ I TUOI PASTI                 │ SanoSync AI   │
-   * │ 4 card                       │               │
-   * └──────────────────────────────┴───────────────┘
-   */
-  .desktopHomeGrid {
-    display: grid;
-
-    width: 100%;
-    max-width: none;
-    min-width: 0;
-
-    grid-template-columns:
-      minmax(0, 1fr)
-      360px;
-
-    column-gap: 24px;
-    row-gap: 24px;
-
-    align-items: start;
-  }
-
-  .desktopHomeGrid > * {
-    min-width: 0;
-  }
-
-  .desktopHomeGrid .mealsSection {
-    grid-column: 1;
-    grid-row: 1;
-
-    width: 100%;
-    min-width: 0;
-  }
-
-  .desktopHomeGrid .conversationCard {
-    grid-column: 2;
-    grid-row: 1;
-
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-
-    margin: 0;
-    padding: 20px;
-  }
-
-  /*
-   * Quattro pasti sempre nella colonna principale.
-   */
-  .desktopHomeGrid .mealList {
-    display: grid;
-
-    width: 100%;
-    min-width: 0;
-
-    grid-template-columns:
-      repeat(4, minmax(0, 1fr));
-
-    gap: 12px;
-
-    align-items: start;
-  }
-
-  .desktopHomeGrid .mealCard {
-    width: 100%;
-    min-width: 0;
-    min-height: 0;
-    height: auto;
-
-    box-sizing: border-box;
-    padding: 16px;
-  }
-
-  .desktopHomeGrid .mealName {
-    font-size: 0.98rem;
-    line-height: 1.28;
-  }
-
-  .desktopHomeGrid .mealMeta {
-    font-size: 0.78rem;
-  }
-
-  /*
-   * AI compatta ma leggibile.
-   */
-  .desktopHomeGrid .conversationHeader h2 {
-    font-size: 1.2rem;
-    line-height: 1.08;
-  }
-
-  .desktopHomeGrid .conversationHeader p {
-    font-size: 0.8rem;
-    line-height: 1.35;
-  }
-
-  .desktopHomeGrid .conversationControls {
-    gap: 10px;
-  }
-
-  .desktopHomeGrid .conversationControls textarea {
-    min-height: 116px;
-  }
-
-  /*
-   * Le alternative/resoconto rimangono sotto la griglia,
-   * senza interferire con le due colonne principali.
-   */
-  .decisionSection {
-    width: 100%;
-    box-sizing: border-box;
   }
 }

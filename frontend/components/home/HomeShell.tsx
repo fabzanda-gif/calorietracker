@@ -1264,13 +1264,6 @@ export function HomeShell() {
       <AppNav />
 
       <main className={styles.page}>
-        <div className={styles.homeBrand} aria-label="SanoSync">
-          <img
-            src="/assets/LogoCoral.png"
-            alt="SanoSync"
-            className={styles.homeBrandLogo}
-          />
-        </div>
       <header className={styles.header}>
         <div>
           <h1>
