@@ -15,6 +15,7 @@ class GroqMealItem(BaseModel):
     name: str
     quantity: float
     unit: str
+    quantity_g: float
     calories: float
     protein: float = 0
     carbs: float = 0
@@ -79,7 +80,9 @@ class GroqMealInterpreter:
                             "una quantità non è esplicita, usa una stima "
                             "ragionevole e imposta uncertainty='quantity'. "
                             "Quantity, calories and macros must always refer "
-                            "to the same total portion. Keep calories "
+                            "to the same total portion. Always estimate the "
+                            "total weight in grams as quantity_g, even when "
+                            "the user gives pieces or portions. Keep calories "
                             "consistent with the estimated macros and portion."
                         ),
                     },

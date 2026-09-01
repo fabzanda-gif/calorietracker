@@ -109,6 +109,32 @@ def test_update_meal_is_user_scoped():
     )
 
 
+def test_update_meal_normalizes_scaled_nutrition_values():
+    response = client.patch(
+        "/meals/meal-1",
+        json={
+            "quantity": 1.5,
+            "calories": 200.4,
+            "protein": 12.6,
+            "carbs": 30.5,
+            "fat": 7.4,
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake_repo.last_update == (
+        "meal-1",
+        "authenticated-user",
+        {
+            "quantity": 1.5,
+            "calories": 200,
+            "protein": 13,
+            "carbs": 30,
+            "fat": 7,
+        },
+    )
+
+
 def test_update_meal_rejects_empty_body():
     response = client.patch("/meals/meal-1", json={})
     assert response.status_code == 400

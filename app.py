@@ -1,7 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-from datetime import date, datetime
+import pydeck as pdk
+from datetime import date, datetime, timedelta, timezone
 import requests
 import traceback
 import re
@@ -11,8 +12,11 @@ from html import escape
 import uuid
 import base64
 import hashlib
+import hmac
 import secrets
 import io
+import math
+import xml.etree.ElementTree as ET
 import os
 from pathlib import Path
 from urllib.parse import urlencode
@@ -246,9 +250,9 @@ import plotly.graph_objects as go
 # LOCAL ASSETS
 # ==============================================================================
 ASSET_DIR = Path(__file__).resolve().parent
-APP_LOGO_FILE = ASSET_DIR / "Gemini_Generated_Image_oxrwohoxrwohoxrw.jpeg"
-ZERO_LOGO_FILE = ASSET_DIR / "sanosync_zero.jpg"
-ZERO_LOGO_URL = "https://raw.githubusercontent.com/fabzanda-gif/calorietracker/main/assets/ZeroMode.jpg"
+APP_LOGO_FILE = ASSET_DIR / "assets" / "LogoCoral.png"
+SIDEBAR_LOGO_FILE = ASSET_DIR / "assets" / "LogoCoral.png"
+ZERO_LOGO_FILE = ASSET_DIR / "assets" / "LogoZero.png"
 
 WEIGHT_SOUND_BIG_LOSS = ASSET_DIR / "assets/sounds/bmw-check-oshibka.mp3"
 WEIGHT_SOUND_SMALL_LOSS = ASSET_DIR / "assets/sounds/26f8b9_sonic_ring_sound_effect.mp3"
@@ -919,6 +923,20 @@ DEFICIT_PRESET_LABELS = {
             "of selecteer een afvalpreset. Je kunt de waarde hieronder altijd handmatig wijzigen."
         ),
     },
+    "Português": {
+        "maintenance": "Manutenção do peso · 0 kcal",
+        "custom": "Personalizado",
+        "slow": "Lento · 250 kcal",
+        "medium": "Médio · 500 kcal",
+        "fast": "Rápido · 750 kcal",
+        "title": "🎯 Objetivo calórico",
+        "speed": "Objetivo de peso",
+        "field": "Défice calórico base",
+        "help": (
+            "Escolha Manutenção do peso para um défice de 0 kcal, "
+            "ou selecione um objetivo de perda de peso."
+        ),
+    },
     "Français": {
         "maintenance": "Maintien du poids · 0 kcal",
         "custom": "Personnalisé",
@@ -1050,314 +1068,180 @@ def _safe_float(value):
 
 
 # ==============================================================================
-# TRANSITIONAL FASTAPI CLIENT
+# DIRECT SUPABASE DATA ACCESS
 # ==============================================================================
-# Step 4A: Streamlit reads meals through FastAPI instead of querying Supabase
-# directly. Other domains still use their current repositories for now.
+# Legacy Streamlit app: user data is read/written directly in Supabase.
+# Function names keep the old *_api suffix where necessary so the rest of the
+# existing UI does not need invasive changes.
+
+def _require_authenticated_user():
+    if not st.session_state.get("auth_access_token"):
+        raise RuntimeError("Sessione autenticata non disponibile.")
+    if not user_id:
+        raise RuntimeError("Utente autenticato non disponibile.")
 
 
-def get_api_base_url():
-    """
-    Resolve the FastAPI base URL.
-
-    Priority:
-    1) environment variable API_BASE_URL
-    2) optional Streamlit secret API_BASE_URL
-    3) local Codespaces/dev default
-    """
-    env_url = os.getenv("API_BASE_URL")
-    if env_url:
-        return env_url.rstrip("/")
-
-    try:
-        secret_url = st.secrets.get("API_BASE_URL")
-        if secret_url:
-            return str(secret_url).rstrip("/")
-    except Exception:
-        pass
-
-    return "http://127.0.0.1:8000"
+def _response_data(response):
+    data = getattr(response, "data", None)
+    return data if isinstance(data, list) else []
 
 
-def api_auth_headers():
-    """
-    Reuse the Supabase access token already stored by the Streamlit login.
-    """
-    token = st.session_state.get("auth_access_token")
-    if not token:
-        raise RuntimeError(
-            "Sessione autenticata non disponibile per FastAPI."
-        )
+# ---- MEALS -------------------------------------------------------------------
 
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json",
-    }
-
-
-def fetch_daily_meals_from_api(cache_user_id, cache_date, access_token):
-    """
-    Transitional read used by load_daily_meals_cached.
-
-    cache_user_id remains part of the function signature only to keep cache
-    isolation explicit. FastAPI ignores it and derives the real user from the
-    Bearer token.
-    """
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/meals/{cache_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_daily_meals_from_api(cache_user_id, cache_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", cache_user_id)
+        .eq("date", str(cache_date))
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    payload = response.json()
-    return payload.get("items") or []
+    return _response_data(response)
 
 
-def create_meal_via_api(payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+def create_meal_via_api(payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload["user_id"] = user_id
+    response = supabase.table("meals").insert(db_payload).execute()
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
 
-    response = requests.post(
-        f"{get_api_base_url()}/meals",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def update_meal_via_api(meal_id, payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload.pop("user_id", None)
+    response = (
+        supabase.table("meals")
+        .update(db_payload)
+        .eq("id", meal_id)
+        .eq("user_id", user_id)
+        .execute()
     )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    response.raise_for_status()
-    return response.json()
 
-
-def update_meal_via_api(meal_id, payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.patch(
-        f"{get_api_base_url()}/meals/{meal_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=15,
+def delete_meal_via_api(meal_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("meals")
+        .delete()
+        .eq("id", meal_id)
+        .eq("user_id", user_id)
+        .execute()
     )
-
-    response.raise_for_status()
-    return response.json()
-
-
-def delete_meal_via_api(meal_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/meals/{meal_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
     return True
 
 
-def fetch_daily_activities_from_api(cache_user_id, cache_date, access_token):
-    """
-    Transitional read used by load_daily_activities_cached.
-
-    cache_user_id remains part of the function signature only to keep cache
-    isolation explicit. FastAPI derives the authenticated user from the
-    Bearer token.
-    """
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/activities/{cache_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_meal_history_from_api(access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    payload = response.json()
-    return payload.get("items") or []
+    return _response_data(response)
 
 
-def fetch_meal_history_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/meals/history",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_meals_range_from_api(start_date, end_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", user_id)
+        .gte("date", str(start_date))
+        .lte("date", str(end_date))
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_meals_range_from_api(start_date, end_date, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/meals/range",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        params={
-            "start_date": str(start_date),
-            "end_date": str(end_date),
-        },
-        timeout=15,
+def fetch_meals_by_type_from_api(meal_type, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("meals")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("meal_type", meal_type)
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_meals_by_type_from_api(meal_type, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+# ---- ACTIVITIES --------------------------------------------------------------
 
-    response = requests.get(
-        f"{get_api_base_url()}/meals/by-type/{meal_type}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_daily_activities_from_api(cache_user_id, cache_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("activities")
+        .select("*")
+        .eq("user_id", cache_user_id)
+        .eq("date", str(cache_date))
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_activities_range_from_api(start_date, end_date, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/activities/range",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        params={
-            "start_date": str(start_date),
-            "end_date": str(end_date),
-        },
-        timeout=15,
+def fetch_activities_range_from_api(start_date, end_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("activities")
+        .select("*")
+        .eq("user_id", user_id)
+        .gte("date", str(start_date))
+        .lte("date", str(end_date))
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def create_activity_via_api(payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+def create_activity_via_api(payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload["user_id"] = user_id
+    response = supabase.table("activities").insert(db_payload).execute()
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
 
-    response = requests.post(
-        f"{get_api_base_url()}/activities",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def update_activity_via_api(activity_id, payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload.pop("user_id", None)
+    response = (
+        supabase.table("activities")
+        .update(db_payload)
+        .eq("id", activity_id)
+        .eq("user_id", user_id)
+        .execute()
     )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    response.raise_for_status()
-    return response.json()
 
-
-def update_activity_via_api(activity_id, payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.patch(
-        f"{get_api_base_url()}/activities/{activity_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=15,
+def delete_activity_via_api(activity_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("activities")
+        .delete()
+        .eq("id", activity_id)
+        .eq("user_id", user_id)
+        .execute()
     )
-
-    response.raise_for_status()
-    return response.json()
-
-
-def delete_activity_via_api(activity_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/activities/{activity_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
     return True
 
 
@@ -1367,384 +1251,750 @@ def upsert_named_activity_via_api(
     log_date,
     activity_name,
     burned_calories,
-    access_token,
+    access_token=None,
 ):
     rows = fetch_daily_activities_from_api(
-        cache_user_id,
-        str(log_date),
-        access_token,
+        cache_user_id, str(log_date), access_token
     )
-
     existing = next(
         (
-            row for row in rows
+            row
+            for row in rows
             if str(row.get("activity_name") or "").strip().casefold()
             == str(activity_name).strip().casefold()
         ),
         None,
     )
-
     payload = {
         "date": str(log_date),
         "activity_name": activity_name,
         "burned_calories": int(burned_calories),
     }
-
     if existing and existing.get("id"):
         return update_activity_via_api(
-            existing["id"],
-            payload,
-            access_token,
+            existing["id"], payload, access_token
+        )
+    return create_activity_via_api(payload, access_token)
+
+
+# ---- GPX + STEP OFFSET --------------------------------------------------------
+
+_STEP_CONFLICT_TOKENS = (
+    "corsa", "running", "cammin", "walk", "trekking", "hiking", "padel",
+)
+
+
+def _is_step_conflicting_activity(activity_name):
+    name = str(activity_name or "").strip().casefold()
+    return any(token in name for token in _STEP_CONFLICT_TOKENS)
+
+
+def calculate_step_calorie_offset(total_steps, activities):
+    """Subtract steps already represented by structured activities."""
+    total_steps = max(0, int(total_steps or 0))
+    consumed_steps = 0
+    has_unknown_overlap = False
+
+    for activity in activities or []:
+        name = activity.get("activity_name")
+        if not _is_step_conflicting_activity(name):
+            continue
+
+        try:
+            activity_steps = max(
+                0, int(activity.get("activity_steps") or 0)
+            )
+        except Exception:
+            activity_steps = 0
+
+        if activity_steps > 0:
+            consumed_steps += activity_steps
+        elif str(name or "").strip().casefold() != "passi (stima)":
+            # Old manually-entered Padel/Corsa rows do not tell us how many
+            # daily steps they already contain. Keep the conservative old rule.
+            has_unknown_overlap = True
+
+    eligible_steps = (
+        0
+        if has_unknown_overlap
+        else max(0, total_steps - consumed_steps)
+    )
+    return {
+        "total_steps": total_steps,
+        "activity_steps": min(consumed_steps, total_steps),
+        "eligible_steps": eligible_steps,
+        "estimated_kcal": int(eligible_steps * 0.04),
+        "has_unknown_overlap": has_unknown_overlap,
+    }
+
+
+def recalculate_step_calories_for_day(
+    current_user_id,
+    log_date,
+    *,
+    total_steps=None,
+):
+    if total_steps is None:
+        daily_log = fetch_daily_log_from_api(
+            current_user_id,
+            str(log_date),
+            st.session_state.get("auth_access_token"),
+        )
+        total_steps = int((daily_log or {}).get("steps") or 0)
+
+    activities = fetch_daily_activities_from_api(
+        current_user_id,
+        str(log_date),
+        st.session_state.get("auth_access_token"),
+    )
+    info = calculate_step_calorie_offset(total_steps, activities)
+
+    upsert_named_activity_via_api(
+        cache_user_id=current_user_id,
+        log_date=log_date,
+        activity_name="Passi (Stima)",
+        burned_calories=info["estimated_kcal"],
+        access_token=st.session_state.get("auth_access_token"),
+    )
+    return info
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    radius_km = 6371.0088
+    lat1_r = math.radians(lat1)
+    lat2_r = math.radians(lat2)
+    dlat = lat2_r - lat1_r
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1_r) * math.cos(lat2_r)
+        * math.sin(dlon / 2) ** 2
+    )
+    return 2 * radius_km * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _parse_gpx_time(value):
+    value = str(value or "").strip()
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def parse_gpx_activity(file_bytes, filename="activity.gpx"):
+    """Parse GPX locally, including Zepp/Amazfit Garmin extensions."""
+    if not file_bytes:
+        raise ValueError("Il file GPX è vuoto.")
+    if len(file_bytes) > 15 * 1024 * 1024:
+        raise ValueError("Il file GPX supera il limite di 15 MB.")
+
+    try:
+        root = ET.fromstring(file_bytes)
+    except Exception as exc:
+        raise ValueError(f"GPX non valido: {exc}") from exc
+
+    creator = str(root.attrib.get("creator") or "").strip()
+    points = []
+
+    for node in root.iter():
+        if str(node.tag).split("}")[-1].lower() != "trkpt":
+            continue
+        try:
+            lat = float(node.attrib["lat"])
+            lon = float(node.attrib["lon"])
+        except Exception:
+            continue
+
+        point = {
+            "lat": lat, "lon": lon, "time": None, "hr": None,
+            "cad": None, "speed": None,
+        }
+        for child in node.iter():
+            local = str(child.tag).split("}")[-1].lower()
+            value = str(child.text or "").strip()
+            if not value:
+                continue
+            if local == "time":
+                point["time"] = _parse_gpx_time(value)
+            elif local in {"hr", "cad", "speed"}:
+                try:
+                    point[local] = float(value)
+                except Exception:
+                    pass
+        points.append(point)
+
+    if len(points) < 2:
+        raise ValueError(
+            "Il GPX non contiene abbastanza punti traccia per essere analizzato."
         )
 
-    return create_activity_via_api(
-        payload,
+    distance_km = 0.0
+    for previous, current in zip(points, points[1:]):
+        segment = _haversine_km(
+            previous["lat"], previous["lon"],
+            current["lat"], current["lon"],
+        )
+        if segment <= 1.0:
+            distance_km += segment
+
+    timed = [p for p in points if p.get("time") is not None]
+    start_time = timed[0]["time"] if timed else None
+    end_time = timed[-1]["time"] if timed else None
+    duration_seconds = (
+        max(0, int((end_time - start_time).total_seconds()))
+        if start_time and end_time else 0
+    )
+
+    hr_values = [
+        p["hr"] for p in points
+        if p.get("hr") is not None and p["hr"] > 0
+    ]
+    cad_values = [
+        p["cad"] for p in points
+        if p.get("cad") is not None and p["cad"] > 0
+    ]
+    avg_hr = sum(hr_values) / len(hr_values) if hr_values else None
+    avg_cad_raw = (
+        sum(cad_values) / len(cad_values) if cad_values else None
+    )
+
+    # Keep a reasonably detailed route for maps without storing thousands
+    # of redundant GPS points in Supabase.
+    raw_route = [
+        {"lat": round(float(p["lat"]), 6), "lon": round(float(p["lon"]), 6)}
+        for p in points
+    ]
+    max_route_points = 1200
+    if len(raw_route) > max_route_points:
+        step = max(1, math.ceil(len(raw_route) / max_route_points))
+        route_points = raw_route[::step]
+        if route_points[-1] != raw_route[-1]:
+            route_points.append(raw_route[-1])
+    else:
+        route_points = raw_route
+
+    creator_cf = creator.casefold()
+    cadence_factor = 1.0
+    if (
+        avg_cad_raw
+        and ("amazfit" in creator_cf or "zepp" in creator_cf)
+        and avg_cad_raw < 120
+    ):
+        # Zepp/Amazfit running GPX commonly stores strides/minute.
+        cadence_factor = 2.0
+
+    # Compact GPX time series used by the activity charts.
+    sensor_source = []
+    if start_time is not None:
+        for p in points:
+            point_time = p.get("time")
+            if point_time is None:
+                continue
+            elapsed_min = max(
+                0.0,
+                (point_time - start_time).total_seconds() / 60.0,
+            )
+            hr_value = p.get("hr")
+            cad_value = p.get("cad")
+            sensor_source.append(
+                {
+                    "minute": round(elapsed_min, 2),
+                    "hr": (
+                        round(float(hr_value), 1)
+                        if hr_value is not None and hr_value > 0
+                        else None
+                    ),
+                    "cadence": (
+                        round(float(cad_value) * cadence_factor, 1)
+                        if cad_value is not None and cad_value > 0
+                        else None
+                    ),
+                }
+            )
+
+    max_sensor_points = 700
+    if len(sensor_source) > max_sensor_points:
+        sensor_step = max(
+            1,
+            math.ceil(len(sensor_source) / max_sensor_points),
+        )
+        sensor_series = sensor_source[::sensor_step]
+        if sensor_series[-1] != sensor_source[-1]:
+            sensor_series.append(sensor_source[-1])
+    else:
+        sensor_series = sensor_source
+
+    estimated_steps = 0.0
+    for previous, current in zip(points, points[1:]):
+        t1, t2 = previous.get("time"), current.get("time")
+        if not t1 or not t2:
+            continue
+        seconds = (t2 - t1).total_seconds()
+        if seconds <= 0 or seconds > 120:
+            continue
+        samples = [
+            c for c in (previous.get("cad"), current.get("cad"))
+            if c is not None and c >= 0
+        ]
+        if samples:
+            estimated_steps += (
+                (sum(samples) / len(samples))
+                * cadence_factor
+                * seconds / 60.0
+            )
+
+    if estimated_steps <= 0 and avg_cad_raw and duration_seconds > 0:
+        estimated_steps = (
+            avg_cad_raw * cadence_factor * duration_seconds / 60.0
+        )
+
+    return {
+        "filename": str(filename or "activity.gpx"),
+        "creator": creator,
+        "source_ref": hashlib.sha256(file_bytes).hexdigest(),
+        "start_time": start_time,
+        "date": start_time.date() if start_time else None,
+        "duration_seconds": duration_seconds,
+        "distance_km": round(distance_km, 3),
+        "avg_hr": round(avg_hr, 1) if avg_hr is not None else None,
+        "avg_cadence_raw": (
+            round(avg_cad_raw, 1) if avg_cad_raw is not None else None
+        ),
+        "cadence_factor": cadence_factor,
+        "avg_step_cadence": (
+            round(avg_cad_raw * cadence_factor, 1)
+            if avg_cad_raw is not None else None
+        ),
+        "estimated_steps": max(0, int(round(estimated_steps))),
+        "point_count": len(points),
+        "route_points": route_points,
+        "sensor_series": sensor_series,
+    }
+
+
+def nearest_weight_for_date(current_user_id, target_date):
+    response = (
+        supabase.table("daily_logs")
+        .select("date,weight")
+        .eq("user_id", current_user_id)
+        .order("date", desc=True)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    candidates = []
+
+    for row in rows:
+        if row.get("weight") is None or not row.get("date"):
+            continue
+        try:
+            row_date = date.fromisoformat(str(row["date"]))
+            weight = float(row["weight"])
+            if weight > 0:
+                candidates.append(
+                    (abs((row_date - target_date).days), row_date, weight)
+                )
+        except Exception:
+            continue
+
+    if not candidates:
+        return None, None
+
+    candidates.sort(key=lambda item: (item[0], -item[1].toordinal()))
+    _, weight_date, weight = candidates[0]
+    return weight, weight_date
+
+
+_GPX_KCAL_COEFFICIENTS = {
+    "Corsa": 1.00,
+    "Camminata": 0.53,
+    "Trekking": 0.65,
+    "Bici": 0.30,
+    "Altro": 0.70,
+}
+
+
+def estimate_gpx_kcal(activity_type, distance_km, weight_kg):
+    coefficient = _GPX_KCAL_COEFFICIENTS.get(
+        str(activity_type), _GPX_KCAL_COEFFICIENTS["Altro"]
+    )
+    return max(
+        0,
+        int(round(
+            float(distance_km or 0)
+            * float(weight_kg or 0)
+            * coefficient
+        )),
+    )
+
+
+def _format_duration(seconds):
+    seconds = max(0, int(seconds or 0))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return (
+        f"{hours}:{minutes:02d}:{secs:02d}"
+        if hours else f"{minutes}:{secs:02d}"
+    )
+
+
+def fetch_gpx_activity_log(current_user_id, limit=50):
+    _require_authenticated_user()
+    response = (
+        supabase.table("activities")
+        .select("*")
+        .eq("user_id", current_user_id)
+        .eq("source", "gpx")
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .limit(int(limit))
+        .execute()
+    )
+    return _response_data(response)
+
+
+def _route_points_from_activity(activity):
+    raw = activity.get("route_points") or []
+    route = []
+    for point in raw:
+        try:
+            if isinstance(point, dict):
+                lat = float(point.get("lat"))
+                lon = float(point.get("lon"))
+            elif isinstance(point, (list, tuple)) and len(point) >= 2:
+                lat = float(point[0])
+                lon = float(point[1])
+            else:
+                continue
+            route.append({"lat": lat, "lon": lon})
+        except Exception:
+            continue
+    return route
+
+
+def render_gpx_route_map(route_points, *, height=430):
+    route = _route_points_from_activity({"route_points": route_points})
+    if len(route) < 2:
+        st.info("Mappa non disponibile per questa attività.")
+        return
+
+    lats = [p["lat"] for p in route]
+    lons = [p["lon"] for p in route]
+    center_lat = sum(lats) / len(lats)
+    center_lon = sum(lons) / len(lons)
+    span = max(max(lats) - min(lats), max(lons) - min(lons))
+
+    if span < 0.01:
+        zoom = 14
+    elif span < 0.03:
+        zoom = 13
+    elif span < 0.08:
+        zoom = 12
+    elif span < 0.18:
+        zoom = 11
+    elif span < 0.40:
+        zoom = 10
+    else:
+        zoom = 9
+
+    path = [[p["lon"], p["lat"]] for p in route]
+
+    deck = pdk.Deck(
+        map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+        initial_view_state=pdk.ViewState(
+            latitude=center_lat,
+            longitude=center_lon,
+            zoom=zoom,
+            pitch=0,
+        ),
+        layers=[
+            pdk.Layer(
+                "PathLayer",
+                data=[{"path": path}],
+                get_path="path",
+                get_width=5,
+                width_min_pixels=3,
+                pickable=False,
+            ),
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=[
+                    {
+                        "lon": route[0]["lon"],
+                        "lat": route[0]["lat"],
+                        "label": "Partenza",
+                    },
+                    {
+                        "lon": route[-1]["lon"],
+                        "lat": route[-1]["lat"],
+                        "label": "Arrivo",
+                    },
+                ],
+                get_position="[lon, lat]",
+                get_radius=18,
+                radius_min_pixels=5,
+                pickable=True,
+            ),
+        ],
+        tooltip={"text": "{label}"},
+    )
+    st.pydeck_chart(deck, use_container_width=True, height=height)
+
+
+# ---- DAILY LOGS --------------------------------------------------------------
+
+def fetch_daily_log_from_api(cache_user_id, cache_date, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("daily_logs")
+        .select("*")
+        .eq("user_id", cache_user_id)
+        .eq("date", str(cache_date))
+        .limit(1)
+        .execute()
+    )
+    rows = _response_data(response)
+    return rows[0] if rows else None
+
+
+def update_daily_log_via_api(log_date, values, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(values)
+    db_payload.pop("user_id", None)
+    db_payload.pop("date", None)
+
+    existing = fetch_daily_log_from_api(user_id, log_date, access_token)
+
+    if existing and existing.get("id"):
+        response = (
+            supabase.table("daily_logs")
+            .update(db_payload)
+            .eq("id", existing["id"])
+            .eq("user_id", user_id)
+            .execute()
+        )
+    else:
+        insert_payload = dict(db_payload)
+        insert_payload["user_id"] = user_id
+        insert_payload["date"] = str(log_date)
+        response = (
+            supabase.table("daily_logs")
+            .insert(insert_payload)
+            .execute()
+        )
+
+    rows = _response_data(response)
+    return rows[0] if rows else None
+
+
+# ---- WEIGHT (stored in daily_logs.weight) ------------------------------------
+
+def fetch_weight_history_from_api(cache_user_id, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("daily_logs")
+        .select("id,date,weight")
+        .eq("user_id", cache_user_id)
+        .order("date", desc=True)
+        .order("id", desc=True)
+        .execute()
+    )
+    return [
+        row
+        for row in _response_data(response)
+        if row.get("weight") is not None
+    ]
+
+
+def create_weight_via_api(log_date, weight, access_token=None):
+    return update_daily_log_via_api(
+        log_date,
+        {"weight": float(weight)},
         access_token,
     )
 
 
-
-def _api_payload_items(payload):
-    """Normalize common FastAPI list response shapes."""
-    if isinstance(payload, list):
-        return payload
-    if not isinstance(payload, dict):
-        return []
-    for key in ("items", "data", "results"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            return value
-    return []
-
-
-def _api_payload_item(payload):
-    """Normalize common FastAPI single-item response shapes."""
-    if payload is None:
-        return None
-    if isinstance(payload, dict):
-        for key in ("item", "data", "result"):
-            value = payload.get(key)
-            if isinstance(value, dict):
-                return value
-        # A router may return the row itself.
-        if any(key in payload for key in ("id", "date", "weight", "steps", "day_type", "activity_plan")):
-            return payload
-    return None
-
-
-def fetch_daily_log_from_api(cache_user_id, cache_date, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/daily-logs/{cache_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    # A missing daily log is equivalent to no row for Streamlit.
-    if response.status_code == 404:
-        return None
-
-    response.raise_for_status()
-    return _api_payload_item(response.json())
-
-
-def update_daily_log_via_api(log_date, values, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    api_payload = dict(values)
-    api_payload.pop("user_id", None)
-    api_payload.pop("date", None)
-
-    response = requests.patch(
-        f"{get_api_base_url()}/daily-logs/{log_date}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
-
-
-def fetch_weight_history_from_api(cache_user_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/weight",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
-
-
-def create_weight_via_api(log_date, weight, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.post(
-        f"{get_api_base_url()}/weight",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json={
-            "date": str(log_date),
-            "weight": float(weight),
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
-
-
-def update_weight_via_api(row_id, *, log_date=None, weight=None, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
+def update_weight_via_api(
+    row_id,
+    *,
+    log_date=None,
+    weight=None,
+    access_token=None,
+):
+    _require_authenticated_user()
     payload = {}
     if log_date is not None:
         payload["date"] = str(log_date)
     if weight is not None:
         payload["weight"] = float(weight)
+    if not payload:
+        return None
 
-    response = requests.patch(
-        f"{get_api_base_url()}/weight/{row_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=15,
+    response = (
+        supabase.table("daily_logs")
+        .update(payload)
+        .eq("id", row_id)
+        .eq("user_id", user_id)
+        .execute()
     )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
 
-
-def delete_weight_via_api(row_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/weight/{row_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def delete_weight_via_api(row_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("daily_logs")
+        .update({"weight": None})
+        .eq("id", row_id)
+        .eq("user_id", user_id)
+        .execute()
     )
-
-    response.raise_for_status()
     return True
 
 
-def weight_rows_for_range(cache_user_id, start_date, end_date, access_token):
-    """Filter API weight history locally to preserve existing report behaviour."""
+def weight_rows_for_range(
+    cache_user_id,
+    start_date,
+    end_date,
+    access_token=None,
+):
     rows = fetch_weight_history_from_api(cache_user_id, access_token)
     start_s = str(start_date)
     end_s = str(end_date)
     return [
-        row for row in rows
+        row
+        for row in rows
         if start_s <= str(row.get("date") or "") <= end_s
     ]
 
 
+# ---- RECIPES -----------------------------------------------------------------
 
-def fetch_personal_recipes_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/recipes",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_personal_recipes_from_api(access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_available_recipes_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/recipes/available",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_available_recipes_from_api(access_token=None):
+    _require_authenticated_user()
+    own = fetch_personal_recipes_from_api(access_token)
+    shared_response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("is_shared", True)
+        .order("id", desc=True)
+        .execute()
     )
+    shared = _response_data(shared_response)
 
-    response.raise_for_status()
-    return _api_payload_items(response.json())
-
-
-def fetch_shared_recipes_from_api(access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
+    result = []
+    seen_ids = set()
+    for row in own + shared:
+        row_id = (
+            str(row.get("id"))
+            if row.get("id") is not None
+            else None
         )
+        if row_id and row_id in seen_ids:
+            continue
+        if row_id:
+            seen_ids.add(row_id)
+        result.append(row)
+    return result
 
-    response = requests.get(
-        f"{get_api_base_url()}/recipes/shared",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+
+def fetch_shared_recipes_from_api(access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("is_shared", True)
+        .order("id", desc=True)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_items(response.json())
+    return _response_data(response)
 
 
-def fetch_recipe_by_id_from_api(recipe_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.get(
-        f"{get_api_base_url()}/recipes/{recipe_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
+def fetch_recipe_by_id_from_api(recipe_id, access_token=None):
+    _require_authenticated_user()
+    response = (
+        supabase.table("recipe_library")
+        .select("*")
+        .eq("id", recipe_id)
+        .limit(1)
+        .execute()
     )
-
-    if response.status_code == 404:
+    rows = _response_data(response)
+    if not rows:
         return None
 
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
+    row = rows[0]
+    if (
+        str(row.get("user_id")) != str(user_id)
+        and not bool(row.get("is_shared"))
+    ):
+        return None
+    return row
 
 
-def create_recipe_via_api(payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
+def create_recipe_via_api(payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload["user_id"] = user_id
+    response = (
+        supabase.table("recipe_library")
+        .insert(db_payload)
+        .execute()
+    )
+    rows = _response_data(response)
+    return rows[0] if rows else None
 
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
 
-    response = requests.post(
-        f"{get_api_base_url()}/recipes",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def update_recipe_via_api(recipe_id, payload, access_token=None):
+    _require_authenticated_user()
+    db_payload = dict(payload)
+    db_payload.pop("user_id", None)
+    response = (
+        supabase.table("recipe_library")
+        .update(db_payload)
+        .eq("id", recipe_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    rows = _response_data(response)
+    return rows[0] if rows else None
+
+
+def set_recipe_sharing_via_api(
+    recipe_id,
+    is_shared,
+    access_token=None,
+):
+    return update_recipe_via_api(
+        recipe_id,
+        {"is_shared": bool(is_shared)},
+        access_token,
     )
 
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
 
-
-def update_recipe_via_api(recipe_id, payload, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    api_payload = dict(payload)
-    api_payload.pop("user_id", None)
-
-    response = requests.patch(
-        f"{get_api_base_url()}/recipes/{recipe_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=api_payload,
-        timeout=15,
+def delete_recipe_via_api(recipe_id, access_token=None):
+    _require_authenticated_user()
+    (
+        supabase.table("recipe_library")
+        .delete()
+        .eq("id", recipe_id)
+        .eq("user_id", user_id)
+        .execute()
     )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
-
-
-def set_recipe_sharing_via_api(recipe_id, is_shared, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.patch(
-        f"{get_api_base_url()}/recipes/{recipe_id}/sharing",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json={"is_shared": bool(is_shared)},
-        timeout=15,
-    )
-
-    response.raise_for_status()
-    return _api_payload_item(response.json()) or response.json()
-
-
-def delete_recipe_via_api(recipe_id, access_token):
-    if not access_token:
-        raise RuntimeError(
-            "Access token mancante per la richiesta FastAPI."
-        )
-
-    response = requests.delete(
-        f"{get_api_base_url()}/recipes/{recipe_id}",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
-        timeout=15,
-    )
-
-    response.raise_for_status()
     return True
 
 
@@ -2297,6 +2547,7 @@ def generate_sanosync_coach_message(
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
 
     context_lines = [
@@ -2491,6 +2742,20 @@ CAN_I_EAT_I18N = {
         "estimate": "AI-schatting",
         "remaining_after": "Geschatte marge daarna",
     },
+    "Português": {
+        "title": "✨ SanoSync AI · Posso comer isto?",
+        "label": "O que gostaria de comer?",
+        "placeholder": "Ex. Posso comer uma pizza esta noite?",
+        "help": (
+            "O SanoSync AI considera as calorias já registadas hoje, "
+            "o orçamento do dia, o défice ou manutenção e o objetivo de proteína."
+        ),
+        "button": "✨ Perguntar ao SanoSync AI",
+        "thinking": "A verificar como isto pode encaixar no seu dia…",
+        "error": "Não foi possível avaliar este alimento: {error}",
+        "estimate": "Estimativa da IA",
+        "remaining_after": "Margem estimada depois",
+    },
     "Français": {
         "title": "✨ SanoSync AI · Puis-je manger ça ?",
         "label": "Qu'aimeriez-vous manger ?",
@@ -2532,6 +2797,7 @@ def generate_can_i_eat_advice(
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
 
     target_intake = max(
@@ -2594,25 +2860,65 @@ Rules:
     )
     model_id = resolve_groq_text_model()
 
-    response = client.chat.completions.create(
-        model=model_id,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are SanoSync food-fit assistant. "
-                    "Return one valid JSON object only."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.35,
-        max_tokens=700,
-        stream=False,
-    )
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are SanoSync food-fit assistant. "
+                "Return exactly one valid JSON object only. "
+                "Do not output reasoning or markdown."
+            ),
+        },
+        {"role": "user", "content": prompt},
+    ]
 
-    raw = response.choices[0].message.content
-    data = _extract_json_object_tolerant(raw)
+    raw = None
+    strict_error = None
+
+    # First choice: Groq JSON Object Mode when supported by the selected model.
+    try:
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=700,
+            stream=False,
+        )
+        raw = response.choices[0].message.content
+    except Exception as exc:
+        strict_error = exc
+
+    # Some Groq models reject response_format. Retry without it rather than
+    # failing the user request.
+    if not raw:
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=messages,
+            temperature=0.2,
+            max_tokens=700,
+            stream=False,
+        )
+        raw = response.choices[0].message.content
+
+    try:
+        data = _extract_json_object_tolerant(raw)
+    except ValueError:
+        # Last chance: ask the model to repair its own malformed response.
+        try:
+            data = _repair_food_fit_json_with_groq(
+                client,
+                model_id,
+                raw,
+            )
+        except Exception as repair_exc:
+            if strict_error is not None:
+                print(f"SanoSync AI JSON mode error: {strict_error}")
+            print(f"SanoSync AI JSON repair error: {repair_exc}")
+            raise ValueError(
+                "La risposta AI non è stata restituita nel formato previsto. "
+                "Riprova tra qualche secondo."
+            ) from repair_exc
 
     estimated_kcal = max(0.0, _safe_float(data.get("estimated_kcal")))
     return {
@@ -2757,6 +3063,7 @@ def translate_activity_display(value, lang):
         "English": {"Bici": "Bike", "Bici Elettrica": "Electric Bike", "Passi (Stima)": "Steps (Estimate)", "BMR (Base)": "BMR (Base)"},
         "Nederlands": {"Bici": "Fiets", "Bici Elettrica": "Elektrische fiets", "Passi (Stima)": "Stappen (Schatting)", "BMR (Base)": "BMR (Basis)"},
         "Français": {"Bici": "Vélo", "Bici Elettrica": "Vélo électrique", "Passi (Stima)": "Pas (Estimation)", "BMR (Base)": "BMR (Base)"},
+        "Português": {"Bici": "Bicicleta", "Bici Elettrica": "Bicicleta elétrica", "Passi (Stima)": "Passos (Estimativa)", "BMR (Base)": "BMR (Base)"},
     }
     return maps.get(lang, maps["Italiano"]).get(str(value), str(value))
 
@@ -2793,6 +3100,7 @@ LANGUAGE_FLAGS = {
     "English": "🇬🇧",
     "Nederlands": "🇳🇱",
     "Français": "🇫🇷",
+    "Português": "🇵🇹",
 }
 
 
@@ -3043,8 +3351,22 @@ def get_quick_entries_from_meals():
     per porzione. Le righe legacy senza questi campi rimangono utilizzabili
     come porzioni fisse usando i valori totali salvati nel meal.
     """
-    rows, enhanced_schema = load_quick_meal_rows_cached(
-        user_id
+    rows = load_quick_meal_rows_cached(user_id)
+    enhanced_schema = any(
+        any(
+            key in row
+            for key in (
+                "base_name",
+                "quantity",
+                "is_per_100g",
+                "base_calories",
+                "base_protein",
+                "base_carbs",
+                "base_fat",
+            )
+        )
+        for row in rows
+        if isinstance(row, dict)
     )
 
     quick = {}
@@ -4209,9 +4531,53 @@ def show_login_page():
             else "Italiano"
         )
 
+    LOGIN_I18N["Português"] = {
+        **LOGIN_I18N["English"],
+        "language": "🌐 Idioma",
+        "logout": "🚪 Sair",
+        "title": "🍑 Tudo sob controlo",
+        "subtitle": "Alimentação, atividade, peso e progresso num só lugar.",
+        "continue": "Inicie sessão para continuar",
+        "google": "Continuar com Google",
+        "facebook": "Continuar com Facebook",
+        "divider": "ou inicie sessão com e-mail e palavra-passe",
+        "login": "Iniciar sessão",
+        "signup": "Registar",
+        "email": "E-mail",
+        "password": "Palavra-passe",
+        "password_min": "Palavra-passe (mín. 6 caracteres)",
+        "login_btn": "Entrar",
+        "signup_btn": "Criar conta",
+        "office_lunch_title": "Almoço no escritório",
+        "office_lunch_enabled": "Costuma almoçar no escritório?",
+        "office_lunch_no": "Não",
+        "office_lunch_yes": "Sim",
+        "protein_goal_title": "Objetivo de proteína",
+        "protein_goal_enabled": "Definir um objetivo diário de proteína?",
+        "protein_goal_no": "Não",
+        "protein_goal_yes": "Sim",
+        "protein_goal_g": "Objetivo diário de proteína (g)",
+        "credentials_required": "Introduza o e-mail e a palavra-passe.",
+        "invalid_credentials": "Credenciais inválidas.",
+        "auth_error": "Erro de autenticação: {error}",
+        "physical_title": "📋 Dados físicos iniciais",
+        "name": "Nome",
+        "gender": "Sexo",
+        "male": "Homem",
+        "female": "Mulher",
+        "gender_placeholder": "Selecione o sexo...",
+        "birth_date": "Data de nascimento",
+        "height": "Altura (cm)",
+        "current_weight": "Peso atual (kg)",
+        "target_weight": "Peso objetivo (kg)",
+        "physical_required": "Preencha todos os dados físicos.",
+        "signup_success": "✅ Conta criada e sessão iniciada.",
+        "google_callback_error": "Login Google não concluído: {error}",
+    }
+
     current_login_lang = st.selectbox(
         LOGIN_I18N[st.session_state["login_lang_selector"]]["language"],
-        ["Italiano", "English", "Nederlands", "Français"],
+        ["Italiano", "English", "Nederlands", "Français", "Português"],
         key="login_lang_selector",
         format_func=format_language_option,
     )
@@ -4561,9 +4927,842 @@ def show_login_page():
                 print(traceback.format_exc())
 
 
+
+# ==============================================================================
+# PUBLIC LEGAL PAGES + OURA OAUTH
+# ==============================================================================
+
+OURA_AUTHORIZE_URL = "https://cloud.ouraring.com/oauth/authorize"
+OURA_TOKEN_URL = "https://api.ouraring.com/oauth/token"
+OURA_REVOKE_URL = "https://api.ouraring.com/oauth/revoke"
+OURA_API_BASE = "https://api.ouraring.com/v2/usercollection"
+OURA_SCOPES = "personal daily workout"
+
+
+def render_public_legal_page(page_name):
+    """Public Privacy Policy / Terms pages used by the Oura application."""
+    page_name = str(page_name or "").strip().lower()
+
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] { display:none !important; }
+        [data-testid="collapsedControl"] { display:none !important; }
+        .sano-legal-wrap {
+            max-width: 900px;
+            margin: 1rem auto 4rem auto;
+        }
+        .sano-legal-wrap h1 { color:#1A2942; }
+        .sano-legal-wrap h2 {
+            color:#1A2942;
+            margin-top:1.8rem;
+        }
+        .sano-legal-meta {
+            color:#6B7280;
+            margin-bottom:1.8rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="sano-legal-wrap">', unsafe_allow_html=True)
+
+    if page_name == "privacy":
+        st.title("SanoSync — Privacy Policy")
+        st.markdown(
+            '<div class="sano-legal-meta">Ultimo aggiornamento: 30 agosto 2026</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+SanoSync è un'applicazione per il monitoraggio personale di alimentazione,
+attività, peso e benessere. Questa informativa descrive come vengono trattati
+i dati quando utilizzi SanoSync e, se scegli di collegarlo, il tuo account Oura.
+
+## Dati trattati
+
+SanoSync può trattare i dati del tuo account necessari per autenticazione e
+profilo, i dati che inserisci nell'app (per esempio alimenti, attività e peso)
+e i dati che autorizzi esplicitamente tramite Oura.
+
+Quando colleghi Oura, SanoSync richiede solo gli ambiti necessari alle
+funzioni dell'app: **personal**, **daily** e **workout**. In base ai permessi
+effettivamente concessi, questi dati possono comprendere informazioni
+personali e corporee, riepiloghi giornalieri relativi ad attività, sonno e
+readiness, e riepiloghi degli allenamenti.
+
+## Perché utilizziamo questi dati
+
+I dati vengono utilizzati esclusivamente per fornire le funzionalità richieste
+dall'utente: mostrare e integrare i propri dati di benessere, alimentazione e
+attività all'interno di SanoSync, calcolare riepiloghi personali e mantenere
+la connessione autorizzata con Oura.
+
+SanoSync non vende i dati Oura e non li utilizza per pubblicità
+comportamentale.
+
+## Collegamento con Oura
+
+Il collegamento avviene tramite OAuth 2.0. SanoSync non riceve né conserva la
+password dell'account Oura. Oura restituisce a SanoSync token di
+autorizzazione che consentono l'accesso soltanto ai dati e agli scope
+approvati dall'utente.
+
+L'utente può scollegare Oura da SanoSync e può anche revocare l'accesso dalle
+impostazioni del proprio account Oura.
+
+## Conservazione e sicurezza
+
+I dati applicativi e le informazioni necessarie a mantenere la connessione
+Oura sono conservati nell'infrastruttura utilizzata da SanoSync con controlli
+di accesso associati all'account autenticato. I dati vengono conservati solo
+per il tempo necessario a fornire il servizio o fino alla cancellazione o
+revoca richiesta dall'utente, salvo eventuali obblighi di legge.
+
+## Condivisione
+
+I dati possono essere trattati dai fornitori tecnici strettamente necessari al
+funzionamento dell'applicazione (hosting, database e servizi API), nei limiti
+necessari all'erogazione del servizio. SanoSync non autorizza tali fornitori a
+utilizzare i dati per finalità proprie incompatibili con il servizio.
+
+## Diritti, revoca e cancellazione
+
+Puoi smettere di condividere i dati Oura scollegando l'integrazione. Puoi
+inoltre chiedere accesso, correzione o cancellazione dei dati associati al tuo
+account contattando SanoSync all'indirizzo indicato sotto.
+
+## Servizio di benessere, non medico
+
+SanoSync è destinato al monitoraggio personale e al benessere generale. Non
+fornisce diagnosi, trattamenti o consulenza medica e non sostituisce un
+professionista sanitario.
+
+## Contatti
+
+Per domande sulla privacy o richieste relative ai dati:
+
+**fab.zanda@gmail.com**
+
+Sito: **https://sanosync.streamlit.app/**
+"""
+        )
+
+    elif page_name == "terms":
+        st.title("SanoSync — Terms of Service")
+        st.markdown(
+            '<div class="sano-legal-meta">Ultimo aggiornamento: 30 agosto 2026</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+Utilizzando SanoSync accetti i presenti Termini di Servizio.
+
+## Finalità del servizio
+
+SanoSync offre strumenti per registrare e visualizzare alimentazione,
+attività, peso e altre informazioni relative al benessere personale.
+Alcune funzionalità possono utilizzare servizi esterni, incluso Oura, quando
+l'utente decide volontariamente di collegarli.
+
+## Account e sicurezza
+
+Sei responsabile dell'utilizzo del tuo account e della protezione dei tuoi
+metodi di accesso. Non devi utilizzare SanoSync per accedere a dati di altre
+persone senza autorizzazione.
+
+## Integrazione Oura
+
+Il collegamento con Oura è facoltativo. Collegando il tuo account autorizzi
+SanoSync ad accedere esclusivamente agli scope Oura che approvi durante la
+procedura OAuth. Puoi revocare tale autorizzazione in qualsiasi momento.
+
+La disponibilità, accuratezza e continuità dei dati provenienti da Oura
+dipendono anche dai servizi Oura, dalla sincronizzazione del dispositivo,
+dall'abbonamento dell'utente e dalle autorizzazioni concesse.
+
+## Uso consentito
+
+Non puoi utilizzare il servizio per attività illegali, per compromettere la
+sicurezza dell'applicazione, per tentare accessi non autorizzati o per
+interferire con il funzionamento del servizio.
+
+## Informazioni sul benessere
+
+I risultati, le stime nutrizionali, i punteggi e le altre informazioni fornite
+da SanoSync hanno finalità informative e di benessere generale. Non
+costituiscono diagnosi, prescrizioni o consulenza medica.
+
+## Disponibilità del servizio
+
+SanoSync può essere aggiornato, modificato o temporaneamente non disponibile.
+Non viene garantita l'assenza assoluta di errori o interruzioni.
+
+## Servizi di terze parti
+
+L'utilizzo di Oura e di altri servizi di terze parti resta soggetto anche ai
+termini e alle informative di tali servizi. SanoSync non controlla la
+disponibilità o le modifiche apportate da terze parti alle proprie API.
+
+## Interruzione del collegamento
+
+Puoi scollegare Oura in qualsiasi momento dalle impostazioni di SanoSync.
+L'accesso futuro ai dati Oura verrà così interrotto. Puoi inoltre richiedere
+la cancellazione dei dati associati contattando SanoSync.
+
+## Modifiche ai termini
+
+Questi termini possono essere aggiornati per riflettere modifiche del servizio
+o requisiti normativi. La data dell'ultima revisione è indicata in alto.
+
+## Contatti
+
+Per domande sui presenti termini:
+
+**fab.zanda@gmail.com**
+
+Sito: **https://sanosync.streamlit.app/**
+"""
+        )
+
+    st.markdown("---")
+    st.link_button(
+        "← Torna a SanoSync",
+        "https://sanosync.streamlit.app/",
+        use_container_width=False,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+_public_page = str(st.query_params.get("page") or "").strip().lower()
+if _public_page in {"privacy", "terms"}:
+    render_public_legal_page(_public_page)
+    st.stop()
+
+
+def _oura_secret(name):
+    try:
+        value = str(st.secrets[name]).strip()
+    except Exception:
+        value = ""
+    if not value:
+        raise RuntimeError(
+            f"Secret Streamlit mancante: {name}"
+        )
+    return value
+
+
+def get_oura_redirect_uri():
+    # Keep the OAuth callback URL clean. Oura will append code/scope/state.
+    # This value must exactly match the Redirect URI registered in Oura.
+    return "https://sanosync.streamlit.app/"
+
+
+def _oura_state_secret():
+    # Reuse the existing server-only OAuth state secret.
+    return _oura_secret("OAUTH_STATE_SECRET")
+
+
+
+@st.cache_resource
+def _oura_pending_store():
+    # Server-side only. Keyed by the OAuth nonce and shared across Streamlit
+    # sessions/tabs in the running app process.
+    return {}
+
+
+def _oura_pending_cleanup(max_age_seconds=1200):
+    store = _oura_pending_store()
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    stale = [
+        key
+        for key, value in store.items()
+        if now_ts - int(value.get("ts") or 0) > int(max_age_seconds)
+    ]
+    for key in stale:
+        store.pop(key, None)
+
+
+def build_oura_state(current_user_id, nonce=None):
+    payload = {
+        "uid": str(current_user_id),
+        "ts": int(datetime.now(timezone.utc).timestamp()),
+        "nonce": str(nonce or secrets.token_urlsafe(18)),
+    }
+    raw = json.dumps(
+        payload,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    body = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    signature = hmac.new(
+        _oura_state_secret().encode("utf-8"),
+        body.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    sig = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{body}.{sig}"
+
+
+def verify_oura_state(state_value, current_user_id, max_age_seconds=900):
+    try:
+        body, supplied_sig = str(state_value).split(".", 1)
+        expected = hmac.new(
+            _oura_state_secret().encode("utf-8"),
+            body.encode("ascii"),
+            hashlib.sha256,
+        ).digest()
+        expected_sig = (
+            base64.urlsafe_b64encode(expected)
+            .decode("ascii")
+            .rstrip("=")
+        )
+        if not hmac.compare_digest(supplied_sig, expected_sig):
+            return False
+
+        padded = body + "=" * (-len(body) % 4)
+        payload = json.loads(
+            base64.urlsafe_b64decode(padded).decode("utf-8")
+        )
+
+        if str(payload.get("uid")) != str(current_user_id):
+            return False
+
+        issued_at = int(payload.get("ts") or 0)
+        age = int(datetime.now(timezone.utc).timestamp()) - issued_at
+        return 0 <= age <= int(max_age_seconds)
+    except Exception:
+        return False
+
+
+def decode_oura_state(state_value):
+    """Return the signed state payload after signature/age validation."""
+    body, supplied_sig = str(state_value).split(".", 1)
+    expected = hmac.new(
+        _oura_state_secret().encode("utf-8"),
+        body.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    expected_sig = (
+        base64.urlsafe_b64encode(expected)
+        .decode("ascii")
+        .rstrip("=")
+    )
+    if not hmac.compare_digest(supplied_sig, expected_sig):
+        raise RuntimeError("Firma OAuth Oura non valida.")
+
+    padded = body + "=" * (-len(body) % 4)
+    payload = json.loads(
+        base64.urlsafe_b64decode(padded).decode("utf-8")
+    )
+    issued_at = int(payload.get("ts") or 0)
+    age = int(datetime.now(timezone.utc).timestamp()) - issued_at
+    if age < 0 or age > 1200:
+        raise RuntimeError("Richiesta OAuth Oura scaduta.")
+    return payload
+
+
+def restore_sanosync_session_for_oura_callback(state_value):
+    """
+    Oura/Streamlit opens the authorization in a new tab. st.session_state is
+    therefore new on callback. Recover the SanoSync refresh token from a
+    short-lived server-side pending store and re-establish the Supabase session.
+    """
+    payload = decode_oura_state(state_value)
+    nonce = str(payload.get("nonce") or "")
+    expected_uid = str(payload.get("uid") or "")
+    if not nonce or not expected_uid:
+        raise RuntimeError("State OAuth Oura incompleto.")
+
+    _oura_pending_cleanup()
+    pending = _oura_pending_store().pop(nonce, None)
+    if not pending:
+        raise RuntimeError(
+            "Sessione SanoSync per il callback Oura non più disponibile. "
+            "Riprova a collegare Oura."
+        )
+    if str(pending.get("uid")) != expected_uid:
+        raise RuntimeError("Utente OAuth Oura non corrispondente.")
+
+    refresh_token = str(pending.get("refresh_token") or "")
+    if not refresh_token:
+        raise RuntimeError("Refresh token SanoSync non disponibile.")
+
+    response = supabase.auth.refresh_session(refresh_token)
+    restored_user = save_authenticated_session(response)
+    if str(restored_user.id) != expected_uid:
+        raise RuntimeError("Sessione SanoSync ripristinata per un altro utente.")
+    return restored_user
+
+
+def build_oura_authorization_url(current_user_id):
+    refresh_token = str(
+        st.session_state.get("auth_refresh_token") or ""
+    ).strip()
+    if not refresh_token:
+        raise RuntimeError(
+            "Sessione SanoSync non disponibile. Effettua nuovamente l'accesso."
+        )
+
+    _oura_pending_cleanup()
+    nonce = secrets.token_urlsafe(24)
+    _oura_pending_store()[nonce] = {
+        "uid": str(current_user_id),
+        "refresh_token": refresh_token,
+        "ts": int(datetime.now(timezone.utc).timestamp()),
+    }
+
+    params = {
+        "response_type": "code",
+        "client_id": _oura_secret("OURA_CLIENT_ID"),
+        "redirect_uri": get_oura_redirect_uri(),
+        "scope": OURA_SCOPES,
+        "state": build_oura_state(current_user_id, nonce=nonce),
+    }
+    return f"{OURA_AUTHORIZE_URL}?{urlencode(params)}"
+
+
+def _oura_request(method, url, **kwargs):
+    response = requests.request(
+        method,
+        url,
+        timeout=20,
+        **kwargs,
+    )
+    if response.status_code >= 400:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise RuntimeError(
+            f"Oura API {response.status_code}: {detail}"
+        )
+    if not response.content:
+        return {}
+    try:
+        return response.json()
+    except Exception:
+        return {}
+
+
+def _oura_scalar(value):
+    """Normalize Streamlit query-param values to one plain string."""
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else ""
+    return str(value or "").strip()
+
+
+def exchange_oura_code(code_value):
+    """Exchange an Oura authorization code exactly once."""
+    code_value = _oura_scalar(code_value)
+    if not code_value:
+        raise RuntimeError("Authorization code Oura mancante.")
+
+    return _oura_request(
+        "POST",
+        OURA_TOKEN_URL,
+        data={
+            "grant_type": "authorization_code",
+            "code": code_value,
+            "client_id": _oura_secret("OURA_CLIENT_ID"),
+            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
+            "redirect_uri": get_oura_redirect_uri(),
+        },
+    )
+
+def refresh_oura_tokens(refresh_token):
+    refresh_token = _oura_scalar(refresh_token)
+    if not refresh_token:
+        raise RuntimeError("Refresh token Oura mancante.")
+
+    return _oura_request(
+        "POST",
+        OURA_TOKEN_URL,
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": _oura_secret("OURA_CLIENT_ID"),
+            "client_secret": _oura_secret("OURA_CLIENT_SECRET"),
+        },
+    )
+
+def fetch_oura_connection(current_user_id):
+    response = (
+        supabase.table("oura_connections")
+        .select("*")
+        .eq("user_id", str(current_user_id))
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    return rows[0] if rows else None
+
+
+def save_oura_connection(
+    current_user_id,
+    token_data,
+    *,
+    granted_scope=None,
+    oura_user_id=None,
+):
+    access_token = str(token_data.get("access_token") or "").strip()
+    refresh_token = str(token_data.get("refresh_token") or "").strip()
+    if not access_token or not refresh_token:
+        raise RuntimeError(
+            "Oura non ha restituito access_token e refresh_token."
+        )
+
+    expires_in = int(token_data.get("expires_in") or 86400)
+    expires_at = (
+        datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    ).isoformat()
+
+    payload = {
+        "user_id": str(current_user_id),
+        "oura_user_id": (
+            str(oura_user_id)
+            if oura_user_id not in (None, "")
+            else None
+        ),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": str(token_data.get("token_type") or "bearer"),
+        "scope": str(
+            token_data.get("scope")
+            or granted_scope
+            or OURA_SCOPES
+        ),
+        "expires_at": expires_at,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    response = (
+        supabase.table("oura_connections")
+        .upsert(payload, on_conflict="user_id")
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    return rows[0] if rows else payload
+
+
+def delete_oura_connection(current_user_id):
+    (
+        supabase.table("oura_connections")
+        .delete()
+        .eq("user_id", str(current_user_id))
+        .execute()
+    )
+
+
+def _oura_token_expiring(connection, leeway_seconds=120):
+    expires_at = connection.get("expires_at")
+    if not expires_at:
+        return True
+    try:
+        parsed = datetime.fromisoformat(
+            str(expires_at).replace("Z", "+00:00")
+        )
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed <= (
+            datetime.now(timezone.utc)
+            + timedelta(seconds=leeway_seconds)
+        )
+    except Exception:
+        return True
+
+
+def get_valid_oura_access_token(current_user_id):
+    connection = fetch_oura_connection(current_user_id)
+    if not connection:
+        raise RuntimeError("Oura non è collegato.")
+
+    if not _oura_token_expiring(connection):
+        return str(connection["access_token"]), connection
+
+    token_data = refresh_oura_tokens(connection.get("refresh_token"))
+    refreshed = save_oura_connection(
+        current_user_id,
+        token_data,
+        granted_scope=connection.get("scope"),
+        oura_user_id=connection.get("oura_user_id"),
+    )
+    return str(refreshed["access_token"]), refreshed
+
+
+def oura_get_personal_info(current_user_id):
+    access_token, _ = get_valid_oura_access_token(current_user_id)
+    return _oura_request(
+        "GET",
+        f"{OURA_API_BASE}/personal_info",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+    )
+
+
+
+def oura_get_daily_activity(
+    current_user_id,
+    start_date,
+    end_date=None,
+):
+    access_token, _ = get_valid_oura_access_token(current_user_id)
+    params = {
+        "start_date": str(start_date),
+        "end_date": str(end_date or start_date),
+    }
+    payload = _oura_request(
+        "GET",
+        f"{OURA_API_BASE}/daily_activity",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+        params=params,
+    )
+    rows = payload.get("data") if isinstance(payload, dict) else []
+    return rows if isinstance(rows, list) else []
+
+
+def sync_oura_steps_to_supabase(
+    current_user_id,
+    start_date,
+    end_date=None,
+):
+    """
+    Import Oura daily steps into daily_logs.steps.
+
+    SanoSync keeps its existing step-calorie rule (0.04 kcal/step). This avoids
+    double-counting Oura active_calories, which can also include workouts.
+    Padel/running remain step-conflicting exactly as in the manual UI.
+    """
+    rows = oura_get_daily_activity(
+        current_user_id,
+        start_date,
+        end_date or start_date,
+    )
+    synced = []
+
+    for item in rows:
+        day_value = str(item.get("day") or "").strip()
+        if not day_value:
+            continue
+
+        steps = int(item.get("steps") or 0)
+        update_daily_log_via_api(
+            day_value,
+            {"steps": steps},
+            st.session_state.get("auth_access_token"),
+        )
+
+        step_info = recalculate_step_calories_for_day(
+            current_user_id,
+            day_value,
+            total_steps=steps,
+        )
+        estimated_kcal = step_info["estimated_kcal"]
+
+        synced.append(
+            {
+                "date": day_value,
+                "steps": steps,
+                "estimated_kcal": estimated_kcal,
+                "eligible_steps": step_info["eligible_steps"],
+                "activity_steps": step_info["activity_steps"],
+                "oura_active_calories": int(
+                    item.get("active_calories") or 0
+                ),
+            }
+        )
+
+    # Clear existing app caches so pages immediately show imported values.
+    try:
+        load_daily_log_cached.clear()
+    except Exception:
+        pass
+    try:
+        load_daily_activities_cached.clear()
+    except Exception:
+        pass
+
+    return synced
+
+
+def maybe_auto_sync_oura(current_user_id, interval_seconds=3600):
+    """
+    Sync today + yesterday at most once per hour per Streamlit session.
+    This runs when SanoSync is open; it is not a background daemon.
+    """
+    try:
+        connection = fetch_oura_connection(current_user_id)
+        if not connection:
+            return None
+
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        last_ts = int(
+            st.session_state.get("oura_last_auto_sync_ts") or 0
+        )
+        if now_ts - last_ts < int(interval_seconds):
+            return None
+
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        rows = sync_oura_steps_to_supabase(
+            current_user_id,
+            yesterday,
+            today,
+        )
+        st.session_state["oura_last_auto_sync_ts"] = now_ts
+        st.session_state["oura_last_auto_sync_count"] = len(rows)
+        return rows
+    except Exception as exc:
+        # Do not break the whole app if Oura is temporarily unavailable.
+        print(f"Oura auto-sync warning: {exc}")
+        return None
+
+
+def revoke_and_delete_oura_connection(current_user_id):
+    connection = fetch_oura_connection(current_user_id)
+    if connection and connection.get("access_token"):
+        try:
+            _oura_request(
+                "GET",
+                OURA_REVOKE_URL,
+                params={
+                    "access_token": str(connection["access_token"]),
+                },
+            )
+        except Exception as exc:
+            # Local disconnect must still work if Oura is temporarily
+            # unreachable; the user can also revoke from Oura directly.
+            print(f"Oura revoke warning: {exc}")
+
+    delete_oura_connection(current_user_id)
+
+
+def handle_oura_callback(current_user_id):
+    # Oura returns to the app root and appends code/scope/state.
+    state_value = _oura_scalar(st.query_params.get("state"))
+    code_value = _oura_scalar(st.query_params.get("code"))
+    oauth_error = st.query_params.get("error")
+
+    if not state_value or (not code_value and not oauth_error):
+        return False
+
+    if oauth_error:
+        description = st.query_params.get("error_description")
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = (
+            str(description or oauth_error)
+        )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    if not code_value or not state_value:
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = (
+            "Callback Oura incompleto: code/state mancanti."
+        )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    if not verify_oura_state(state_value, current_user_id):
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = (
+            "Verifica di sicurezza OAuth Oura non riuscita."
+        )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    # Streamlit can rerun the callback page. Never exchange the same one-time
+    # OAuth code again if the connection was already persisted successfully.
+    try:
+        _existing_oura = fetch_oura_connection(current_user_id)
+    except Exception:
+        _existing_oura = None
+
+    if _existing_oura:
+        st.query_params.clear()
+        st.session_state["oura_callback_success"] = True
+        st.session_state.pop("oura_callback_error", None)
+        st.session_state.pop("oura_authorization_url", None)
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    try:
+        token_data = exchange_oura_code(code_value)
+
+        access_token = str(token_data.get("access_token") or "")
+        if not access_token:
+            raise RuntimeError(
+                "Oura non ha restituito un access token."
+            )
+
+        personal = _oura_request(
+            "GET",
+            f"{OURA_API_BASE}/personal_info",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+            },
+        )
+
+        oura_user_id = (
+            personal.get("id")
+            or personal.get("user_id")
+        )
+
+        save_oura_connection(
+            current_user_id,
+            token_data,
+            granted_scope=st.query_params.get("scope"),
+            oura_user_id=oura_user_id,
+        )
+
+        st.query_params.clear()
+        st.session_state["oura_callback_success"] = True
+        st.session_state.pop("oura_callback_error", None)
+        st.session_state.pop("oura_authorization_url", None)
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    except Exception as exc:
+        st.query_params.clear()
+        st.session_state["oura_callback_error"] = (
+            f"{exc} — Il codice OAuth è monouso: premi di nuovo "
+            f"'Connetti Oura' per creare una nuova autorizzazione."
+        )
+        st.session_state["show_personal_settings"] = True
+        st.rerun()
+
+    return True
+
+
 # ==============================================================================
 # 5. RESTORE SESSION / GOOGLE CALLBACK
 # ==============================================================================
+
+# Oura opens in a new browser tab, which creates a new Streamlit session.
+# Restore the SanoSync/Supabase session from the short-lived server-side pending
+# OAuth record before the normal login gate.
+if (
+    st.session_state.get("user") is None
+    and st.query_params.get("state")
+    and (
+        st.query_params.get("code")
+        or st.query_params.get("error")
+    )
+    and not st.query_params.get("auth_flow")
+):
+    try:
+        restore_sanosync_session_for_oura_callback(
+            st.query_params.get("state")
+        )
+    except Exception as exc:
+        st.session_state["oura_callback_error"] = str(exc)
+
 # Gestiamo prima il callback PKCE, perché il code OAuth è monouso.
 if (
     st.session_state.get("user") is None
@@ -4590,6 +5789,23 @@ if st.session_state.get("user") is None:
 user = st.session_state["user"]
 user_id = user.id
 u_meta = user.user_metadata or {}
+
+# Oura returns here after authorization. At this point the SanoSync user
+# session has already been restored, so we can safely bind Oura to user_id.
+if (
+    st.query_params.get("state")
+    and (
+        st.query_params.get("code")
+        or st.query_params.get("error")
+    )
+    and not st.query_params.get("auth_flow")
+):
+    handle_oura_callback(user_id)
+
+# When SanoSync is open, keep Oura steps reasonably fresh without requiring a
+# manual button. Runs at most hourly per Streamlit session.
+maybe_auto_sync_oura(user_id)
+
 def get_logged_user_identity(user_obj):
     """Nome, email e avatar dai metadata Supabase (Google incluso)."""
     metadata = getattr(user_obj, "user_metadata", None) or {}
@@ -4810,6 +6026,24 @@ if profile_incomplete:
             "saved": "✅ Profil mis à jour ! BMR actuel : {bmr} kcal/jour.",
             "error": "Erreur : {error}",
         },
+    }
+    _profile_i18n["Português"] = {
+        "warning": "⚠️ Para começar, complete os dados do seu perfil.",
+        "title": "📋 Configuração do perfil",
+        "gender": "Sexo",
+        "male": "Homem",
+        "female": "Mulher",
+        "birth": "Data de nascimento",
+        "height": "Altura (cm)",
+        "current_weight": "Peso atual (kg)",
+        "target_weight": "Peso objetivo (kg)",
+        "age": "Idade",
+        "years": "anos",
+        "estimated_bmr": "BMR estimado",
+        "target_deficit": "Défice objetivo",
+        "save": "Guardar e começar",
+        "saved": "✅ Perfil atualizado! BMR atual: {bmr} kcal/dia.",
+        "error": "Erro: {error}",
     }
     _pi = _profile_i18n.get(_profile_lang, _profile_i18n["Italiano"])
     st.warning(_pi["warning"])
@@ -5771,6 +7005,13 @@ with st.sidebar:
         },
     }
 
+    _profile_menu_i18n["Português"] = {
+        "menu": "👤",
+        "settings": "👤 Perfil",
+        "language": "🌐 Idioma",
+        "logout": "🚪 Sair",
+    }
+
     _menu_lang = st.session_state.get("lang_selector", "Italiano")
     _pm = _profile_menu_i18n.get(
         _menu_lang,
@@ -5785,12 +7026,14 @@ with st.sidebar:
         "English",
         "Nederlands",
         "Français",
+        "Português",
     ]
     _language_flags = {
         "Italiano": "🇮🇹",
         "English": "🇬🇧",
         "Nederlands": "🇳🇱",
         "Français": "🇫🇷",
+        "Português": "🇵🇹",
     }
 
     _current_menu_lang = st.session_state.get(
@@ -6002,6 +7245,12 @@ with st.sidebar:
                 "afternoon": "Bon après-midi {name}!",
                 "evening": "Bonsoir {name}!",
             },
+        }
+
+        _greetings["Português"] = {
+            "morning": "Bom dia, {name}!",
+            "afternoon": "Boa tarde, {name}!",
+            "evening": "Boa noite, {name}!",
         }
 
         _welcome = _greetings.get(
@@ -6996,6 +8245,250 @@ translations["English"].update({"plan_saved":"✅ Plan saved for {date}.","budge
 translations["Nederlands"].update({"plan_saved":"✅ Plan opgeslagen voor {date}.","budget_estimated":"Geschat budget","already_logged":"al gelogd","dinner_available":"Beschikbaar voor avondeten","dinner_already_logged":"✅ Avondeten al gelogd: geen suggestie nodig.","office_allocated":"Kantoor al toegewezen","dinner_label":"Avondeten","lunch_label":"Lunch","office_lunch_history":"Kantoorlunch in geschiedenis","suggested_dinner":"Aanbevolen avondeten","suggested_lunch":"Aanbevolen lunch","no_dinner_near":"Geen herhaalbaar avondeten in je geschiedenis ligt dicht genoeg bij het doel.","no_dinner_history":"Er zijn nog niet genoeg herhaalbare avondmaaltijden in je geschiedenis.","no_home_lunch":"Geen herhaalbare Thuis-lunch beschikbaar in je geschiedenis.","no_dinner":"Geen herhaalbaar avondeten beschikbaar in je geschiedenis.","planning_formula":"De planning gebruikt +0 kcal (rust), +500 kcal (matig actief), +1000 kcal (actief). De grafiekdrempel blijft: rust <300 extra kcal, intensief ≥800 kcal."})
 translations["Français"].update({"plan_saved":"✅ Plan enregistré pour le {date}.","budget_estimated":"Budget estimé","already_logged":"déjà enregistrées","dinner_available":"Disponible pour le dîner","dinner_already_logged":"✅ Dîner déjà enregistré : aucune suggestion nécessaire.","office_allocated":"Bureau déjà alloué","dinner_label":"Dîner","lunch_label":"Déjeuner","office_lunch_history":"Déjeuner bureau dans l'historique","suggested_dinner":"Dîner suggéré","suggested_lunch":"Déjeuner suggéré","no_dinner_near":"Aucun dîner reproductible de l'historique n'est assez proche de la cible.","no_dinner_history":"Pas encore assez de dîners reproductibles dans l'historique.","no_home_lunch":"Aucun déjeuner Maison reproductible disponible dans l'historique.","no_dinner":"Aucun dîner reproductible disponible dans l'historique.","planning_formula":"La planification utilise +0 kcal (repos), +500 kcal (modérément actif), +1000 kcal (actif). Le seuil du graphique reste : repos <300 kcal supplémentaires, activité intense ≥800 kcal."})
 
+
+translations["Português"] = dict(translations["English"])
+translations["Português"].update({
+    "t1": "🚀 Registo",
+    "t2": "📊 Resumo",
+    "t3": "📈 Peso",
+    "t4": "🍳 Receitas",
+    "t5": "🏃 Atividade",
+    "meal": "Tipo de refeição",
+    "meal_name": "Nome da refeição",
+    "add_meal": "Adicionar refeição",
+    "extra_act": "Atividade extra",
+    "extra_cals": "Calorias extra queimadas",
+    "insert_weight": "Introduzir peso (kg)",
+    "save_weight": "Guardar peso",
+    "recipe_name": "Nome da receita",
+    "save_recipe": "Guardar receita",
+    "recipe_saved": "✅ Receita guardada!",
+    "lang_label": "🌐 Idioma",
+    "logout": "🚪 Sair",
+    "search_food": "🔍 Pesquisar por nome ou código de barras",
+    "search_btn": "🚀 Pesquisar",
+    "select_recipe": "Selecionar uma receita",
+    "no_recipes": "Nenhuma receita guardada.",
+    "calc_mode": "Registo baseado em:",
+    "per_100g": "Por 100 g",
+    "per_portion": "Por porção",
+    "qty_label": "Quantidade (g ou porções)",
+    "num_portions": "Número de porções",
+    "inserted": "✅ Registado",
+    "daily_summary": "📊 Resumo diário",
+    "summary_date": "📅 Data do resumo",
+    "logged_foods": "🍽️ Alimentos registados",
+    "no_meals": "Não existem refeições registadas nesta data.",
+    "burned_acts": "#### 🏃 Calorias queimadas e atividades",
+    "weight_tracking": "⚖️ Registo de peso",
+    "log_today_weight": "📥 Registar peso de hoje",
+    "update_target": "🎯 Atualizar objetivo",
+    "save_target": "Guardar objetivo",
+    "target_updated": "✅ Objetivo atualizado!",
+    "quick_entries": "⚡ Registos rápidos",
+    "saved_entries": "📋 Itens guardados",
+    "register_activity": "🏃 Registar atividade e movimento",
+    "act_date": "📅 Data",
+    "steps_title": "👣 Passos (total)",
+    "update_steps": "💾 Atualizar passos",
+    "steps_updated": "Passos atualizados!",
+    "bike_title": "🚲 Bicicleta (sessão)",
+    "bike_min": "Minutos de bicicleta",
+    "add_bike": "💾 Adicionar bicicleta",
+    "other_act": "🏋️ Outra atividade",
+    "activity_label": "Atividade",
+    "add_act_btn": "💾 Adicionar",
+    "tab1_title": "🍽️ Alimentação e refeições",
+    "input_source_lbl": "Fonte de registo",
+    "opt_ai": "✨ IA",
+    "opt_off": "🔍 Base OpenFood",
+    "opt_quick": "🍳 Registo rápido",
+    "opt_scan": "📸 Foto com IA",
+    "scan_title": "📸 Foto com IA",
+    "scan_mode": "Origem da imagem",
+    "scan_camera": "📷 Câmara",
+    "scan_upload": "🖼️ Galeria / Ficheiro",
+    "scan_analyze": "✨ Analisar com IA",
+    "scan_analyzing": "A analisar a refeição…",
+    "card_kcal_in": "Calorias ingeridas",
+    "card_kcal_burn": "Calorias queimadas",
+    "card_balance": "Balanço",
+    "card_weight": "Peso",
+    "status_move_title": "👣 Estado do movimento",
+    "weight_forecast_title": "🔮 Previsão do objetivo",
+    "meal_breakfast": "Pequeno-almoço",
+    "meal_lunch": "Almoço",
+    "meal_dinner": "Jantar",
+    "meal_snack": "Lanche",
+    "cat_home": "Casa",
+    "cat_work": "Trabalho",
+    "cat_restaurant": "Restaurante",
+    "cat_once": "Pontual",
+    "day_home": "Trabalho a partir de casa",
+    "day_office": "Escritório",
+    "day_free": "Dia livre",
+    "act_rest": "Descanso",
+    "act_moderate": "Moderadamente ativo",
+    "act_active": "Ativo",
+    "col_activity": "Atividade",
+    "col_burned": "Kcal queimadas",
+    "save_weight_ui": "💾 Guardar peso",
+    "plan_saved": "✅ Plano guardado para {date}.",
+    "budget_estimated": "Orçamento estimado",
+    "already_logged": "já registadas",
+    "dinner_label": "Jantar",
+    "lunch_label": "Almoço",
+    "suggested_dinner": "Jantar sugerido",
+    "suggested_lunch": "Almoço sugerido",
+    "period_days": "dias",
+    "generic_error": "Erro: {error}",
+    "trend": "Projeção",
+    "real_weight": "Peso real",
+})
+
+
+translations["Português"].update({
+    # Registro / tabelas
+    "col_meal": "Refeição",
+    "col_category": "Categoria",
+    "col_name": "Nome",
+    "col_date": "Data",
+    "select_meal_edit": "🍽️ Selecione a refeição para editar",
+    "select_meal_placeholder": "Selecione uma refeição...",
+    "meal_type_label": "Tipo de refeição",
+    "category_label": "Categoria",
+    "quantity_g": "Quantidade (g)",
+    "portions": "Porções",
+    "edit_meal_help": "Pode editar gramas ou porções. As calorias e os macronutrientes são recalculados automaticamente.",
+    "save_changes": "💾 Guardar alterações",
+    "delete_this_meal": "Elimine definitivamente **{name}** se já não quiser manter esta refeição.",
+    "meal_updated": "✅ Refeição atualizada: **{meal} · {category} · {qty} {unit}**.",
+
+    # Resumo / balanço / previsão
+    "over_target": "⚠️ Está cerca de {kcal} kcal acima do objetivo de défice.",
+    "end_day": "🔮 Fim do dia: ~{kcal} kcal se não registar mais atividade.",
+    "details": "Detalhes:",
+    "deficit": "défice",
+    "surplus": "excedente",
+    "extra": "extra",
+    "can_eat_more": "🎯 Ainda pode consumir {kcal} kcal e terminar o dia com cerca de {target} kcal de défice.",
+    "exact_target": "🎯 Está exatamente no objetivo para um défice de cerca de {target} kcal.",
+    "day_total": "🔥 Total do dia: {kcal} kcal.",
+    "no_extra": "Não existem calorias extra registadas neste dia.",
+    "weight_msg_default": "📈 Continue assim para se aproximar do seu objetivo.",
+    "weight_msg_val": lambda i, d_ini, t, d_tgt: f"Inicial: {i} kg ({d_ini:+.1f}) | Objetivo: {t} kg ({d_tgt:+.1f})",
+    "balance_days": lambda d: f"⏳ Ao ritmo atual, estima-se cerca de {d} dias para atingir o objetivo.",
+    "balance_surplus": "⚠️ Com excedente calórico não é possível estimar os dias até ao objetivo.",
+    "weight_forecast_title": "🔮 Previsão para atingir o objetivo",
+    "forecast_days": lambda d, date_str: f"🎯 Ao ritmo atual ({d} dias estimados), poderá atingir o objetivo por volta de **{date_str}**.",
+    "forecast_steady": "📉 Mantendo esta tendência, o objetivo está a aproximar-se.",
+    "forecast_flat_up": "💡 A tendência atual está estável ou a subir; a projeção só é ativada quando existe uma tendência de perda de peso.",
+
+    # Plano diário
+    "day_plan_title": "### 🧭 Plano do dia",
+    "plan_day": "Dia a planear",
+    "today": "Hoje",
+    "tomorrow": "Amanhã",
+    "morning_plan": "Bom dia! Defina o tipo de dia e o nível de atividade previsto para planear as refeições.",
+    "day_type": "Tipo de dia",
+    "activity_expected": "Atividade prevista",
+    "save_day_plan": "💾 Guardar plano diário",
+    "plan_saved": "✅ Plano guardado para {date}.",
+    "budget_estimated": "Orçamento estimado",
+    "already_logged": "já registadas",
+    "dinner_available": "Disponível para o jantar",
+    "dinner_already_logged": "✅ Jantar já registado: não é necessária nenhuma sugestão.",
+    "office_allocated": "Escritório já contabilizado",
+    "office_lunch_history": "Almoço de escritório no histórico",
+    "no_dinner_near": "Nenhum jantar repetível do histórico está suficientemente próximo do objetivo.",
+    "no_dinner_history": "Ainda não existem jantares repetíveis suficientes no histórico.",
+    "no_home_lunch": "Não existe almoço repetível de Casa disponível no histórico.",
+    "no_dinner": "Não existe jantar repetível disponível no histórico.",
+    "planning_formula": "O planeamento utiliza +0 kcal (repouso), +500 kcal (moderadamente ativo) e +1000 kcal (ativo). O limite do gráfico mantém-se: repouso <300 kcal extra; atividade intensa ≥800 kcal.",
+
+    # Peso
+    "weight_manage": "#### ⚖️ Gestão do peso",
+    "new_weight": "Novo peso (kg)",
+    "weight_date": "Data do peso",
+    "weight_edit_select": "Peso a editar ou eliminar",
+    "weight_select_placeholder": "Selecione um peso...",
+    "date_label": "Data",
+    "weight_saved": "✅ Peso guardado!",
+    "weight_edited": "✅ Peso atualizado!",
+    "weight_deleted": "✅ Peso eliminado.",
+    "target_weight_label": "Peso objetivo (kg)",
+    "weight_lost_30": "📉 Peso perdido · 30 dias",
+    "deficit_per_kg": "⚡ Défice / kg perdido",
+    "estimated_target_date": "🎯 Data estimada para o objetivo",
+    "need_two_weights": "São necessários pelo menos dois registos de peso e dados alimentares no último mês.",
+    "first_last_diff": "Diferença entre a primeira e a última medição dos últimos 30 dias.",
+    "need_positive_deficit": "É necessário um défice médio positivo para estimar a data do objetivo.",
+    "target_reached": "Atingido 🎯",
+    "target_reached_caption": "O peso mais recente já está no objetivo ou abaixo dele.",
+    "estimate_based": "Estimativa baseada num défice médio de {deficit} kcal/dia ({days} dias registados).",
+    "view_label": "Vista",
+    "view_weight": "Peso",
+    "view_kcal": "Calorias",
+    "view_macros": "Macronutrientes",
+    "view_meals": "Refeições",
+    "period_label": "Período",
+    "no_weight_period": "Não existem pesos registados nos últimos {days} dias.",
+    "ingested_kcal": "Calorias ingeridas",
+    "burned_kcal": "Calorias queimadas",
+    "protein_full": "Proteína",
+    "carbs_full": "Hidratos de carbono",
+    "fats_full": "Gordura",
+    "grams": "gramas",
+    "goal": "Objetivo",
+    "no_food_data": "Sem dados alimentares",
+
+    # Receitas
+    "recipes_title": "🍲 Receitas",
+    "recipes_caption": "As receitas são privadas por predefinição. Pode optar por partilhar receitas individuais com outros utilizadores.",
+    "available_recipes": "### 📋 Receitas disponíveis",
+    "no_composed_recipes": "Não foram encontradas receitas compostas nas refeições.",
+    "create_meal_ingredients": "### ➕ Criar uma refeição a partir de ingredientes",
+    "recipe_name_placeholder": "Ex. Massa com molho de tomate",
+    "notes_optional": "Notas (opcional)",
+    "notes_placeholder": "Ex. preparação, substituições, temperos...",
+    "add_ingredient_title": "#### 🥕 Adicionar ingrediente",
+    "ingredient_source": "Fonte do ingrediente",
+    "manual_entry": "Introdução manual",
+    "ingredient_search": "Pesquisar ingrediente",
+    "searching_ingredient": "A pesquisar ingrediente...",
+    "min_2_chars": "Introduza pelo menos 2 caracteres.",
+    "results": "Resultados",
+    "ingredient_name": "Nome do ingrediente",
+    "ingredient_qty": "Quantidade do ingrediente (g)",
+    "add_ingredient": "➕ Adicionar ingrediente",
+    "select_or_enter_ingredient": "Introduza ou selecione um ingrediente.",
+    "ingredient_added": "✅ {name} adicionado.",
+    "ingredients_title": "#### 📋 Ingredientes",
+    "ingredient_col": "Ingrediente",
+    "remove_ingredient": "Remover ingrediente",
+    "remove_ingredient_btn": "🗑️ Remover ingrediente",
+    "total_meal": "Total da refeição",
+    "per_100g_label": "Por 100 g",
+    "save_as_meal": "💾 Guardar como refeição",
+    "enter_name": "Introduza um nome.",
+    "composed_saved": "✅ Refeição composta guardada!",
+    "add_one_ingredient": "Adicione pelo menos um ingrediente para criar a refeição.",
+    "my_recipes": "### 👤 As minhas receitas",
+    "shared_recipes": "### 🌍 Receitas partilhadas",
+    "no_my_recipes": "Ainda não criou nenhuma receita.",
+    "no_shared_recipes": "Não existem receitas partilhadas disponíveis.",
+    "recipe_servings": "🍽️ Porções previstas",
+    "recipe_servings_help": "Indique quantas porções rende a receita completa. Depois poderá registar 0,5 / 1 / 1,5 porções e as calorias/macronutrientes serão ajustados automaticamente.",
+    "per_serving": "Por porção",
+    "total_recipe": "Receita completa",
+    "serving_weight": "cerca de {grams} g por porção",
+
+    # Atividade
+    "bike_type": "Tipo de bicicleta",
+    "normal_bike": "Bicicleta normal",
+    "ebike": "Bicicleta elétrica",
+})
+
 MEAL_TYPE_KEYS = {"Colazione": "meal_breakfast", "Pranzo": "meal_lunch", "Cena": "meal_dinner", "Snack": "meal_snack"}
 CATEGORY_KEYS = {"Casa": "cat_home", "Lavoro": "cat_work", "Ristorante": "cat_restaurant", "Una-tantum": "cat_once"}
 DAY_TYPE_KEYS = {"Lavoro da casa": "day_home", "Ufficio": "day_office", "Giornata libera": "day_free"}
@@ -7014,10 +8507,9 @@ def tr_activity_plan(value): return _tr_value(ACTIVITY_PLAN_KEYS, value)
 with st.sidebar:
     # --- LOGO / PERSONALITY MODE ---
     if is_zero_mode():
-        # The dedicated asset already contains the ZERO wordmark.
-        st.sidebar.image(ZERO_LOGO_URL, use_container_width=True)
+        st.sidebar.image(str(ZERO_LOGO_FILE), use_container_width=True)
     else:
-        st.sidebar.image("logo2.png", use_container_width=True)
+        st.sidebar.image(str(SIDEBAR_LOGO_FILE), use_container_width=True)
 
     _zero_toggle_i18n = {
         "Italiano": "ZERO MODE",
@@ -7277,6 +8769,50 @@ with st.sidebar:
             "activity_other": "Autre"
         },
     }
+    _ui_extra["Português"] = {
+        **_ui_extra["English"],
+        "meal_placeholder": "Selecione uma refeição...",
+        "activity": "Atividade",
+        "bmr_base": "BMR (Base)",
+        "bike": "Bicicleta",
+        "steps_est": "Passos (Estimativa)",
+        "over_target": "⚠️ Está cerca de {kcal} kcal acima do objetivo de défice.",
+        "end_day": "🔮 Fim do dia: ~{kcal} kcal se não registar mais atividade.",
+        "details": "Detalhes:",
+        "deficit": "défice",
+        "surplus": "excedente",
+        "extra": "extra",
+        "movement_status": "👣 Estado do movimento",
+        "activity_logged": "🏋️ Atividade registada",
+        "activity_logged_note": "🌟 Ótimo! Concluiu uma atividade física estruturada hoje.",
+        "extra_burned": "🔥 Kcal extra queimadas",
+        "extra_burned_note": "Total de calorias registadas através de atividades no dia selecionado.",
+        "steps": "👣 Passos",
+        "steps_note": "Calorias atribuídas aos passos.",
+        "padel_note": "Calorias registadas como Padel.",
+        "bike_note": "Total de Bicicleta e Bicicleta elétrica.",
+        "total_steps": "Total de passos",
+        "add_bike": "💾 Adicionar bicicleta",
+        "notes_ph": "Ex. sem lactose, marca preferida, preparação, temperos...",
+        "can_eat_more": "🎯 Ainda pode consumir {kcal} kcal e terminar o dia com cerca de {target} kcal de défice.",
+        "exact_target": "🎯 Está exatamente no objetivo para um défice de cerca de {target} kcal.",
+        "day_total": "🔥 Total do dia: {kcal} kcal.",
+        "no_extra": "Não existem calorias extra registadas neste dia.",
+        "other_activities": "Outras atividades",
+        "bike_and_ebike": "🚲 Bicicleta e bicicleta elétrica",
+        "bike_minutes": "Minutos de bicicleta",
+        "burned_kcal_field": "Kcal queimadas",
+        "enter_one_minute": "Introduza pelo menos 1 minuto.",
+        "bike_added": "✅ Adicionados {minutes} min de {activity} ({kcal} kcal)!",
+        "steps_updated_toast": "✅ Passos atualizados! ({kcal} kcal)",
+        "activity_saved": "✅ {activity} registada com sucesso! ({kcal} kcal)",
+        "step_word": "passos",
+        "activity_gym": "Ginásio",
+        "activity_swim": "Natação",
+        "activity_other": "Outra",
+    }
+    ZERO_COPY["Português"] = {}
+
     ux = _ui_extra.get(current_lang, _ui_extra["Italiano"])
 
     # ZERO changes remarks, not functional terminology.
@@ -7905,12 +9441,51 @@ SETTINGS_I18N = {
 
 
 
+
+SETTINGS_I18N["Português"] = {
+    **SETTINGS_I18N["English"],
+    "title": "👤 Perfil",
+    "subtitle": "O seu perfil SanoSync, preferências e objetivos.",
+    "back": "← Voltar à aplicação",
+    "account": "Dados pessoais",
+    "email": "E-mail",
+    "name": "Nome",
+    "gender": "Sexo",
+    "male": "Homem",
+    "female": "Mulher",
+    "birth": "Data de nascimento",
+    "height": "Altura (cm)",
+    "current_weight": "Peso atual (kg)",
+    "target_weight": "Peso objetivo (kg)",
+    "language": "🌐 Idioma",
+    "deficit_title": "🎯 Objetivo calórico",
+    "deficit_speed": "Velocidade de perda de peso",
+    "deficit_field": "Défice calórico diário (kcal)",
+    "save": "💾 Guardar definições",
+    "saved": "✅ Definições atualizadas.",
+    "error": "Erro ao guardar: {error}",
+    "hint": "A sua fotografia de perfil é gerida pelo fornecedor de início de sessão (por exemplo, Google/Facebook).",
+    "office_title": "🏢 Almoço no escritório",
+    "office_enabled": "Mostrar refeições e funcionalidades de planeamento do escritório?",
+    "office_no": "Não",
+    "office_yes": "Sim",
+    "protein_title": "🥩 Objetivo de proteína",
+    "protein_enabled": "Usar um objetivo diário de proteína?",
+    "protein_no": "Não",
+    "protein_yes": "Sim",
+    "protein_g": "Objetivo diário de proteína (g)",
+    "mode_title": "🎨 Modo predefinido",
+    "mode_label": "Que versão deve estar ativa quando inicia sessão?",
+    "mode_standard": "SanoSync Standard",
+    "mode_zero": "SanoSync ZERO MODE",
+}
+
 def render_personal_settings_page():
     # ------------------------------------------------------------------
     # LINGUA SEMPRE IN ALTO
     # La select aggiorna subito l'interfaccia, senza aspettare "Salva".
     # ------------------------------------------------------------------
-    _settings_languages = ["Italiano", "English", "Nederlands", "Français"]
+    _settings_languages = ["Italiano", "English", "Nederlands", "Français", "Português"]
 
     settings_lang = st.session_state.get("settings_language_live")
     if settings_lang not in _settings_languages:
@@ -7921,7 +9496,7 @@ def render_personal_settings_page():
     si = SETTINGS_I18N.get(settings_lang, SETTINGS_I18N["Italiano"])
 
     new_language = st.selectbox(
-        "🌐 Language / Lingua / Taal / Langue",
+        "🌐 Idioma" if settings_lang == "Português" else "🌐 Language / Lingua / Taal / Langue",
         _settings_languages,
         index=_settings_languages.index(settings_lang),
         key="settings_language_live",
@@ -8209,6 +9784,182 @@ def render_personal_settings_page():
         )
 
     # ------------------------------------------------------------------
+    # OURA
+    # ------------------------------------------------------------------
+    with st.container(border=True):
+        st.markdown("### 💍 Oura")
+
+        _oura_just_connected = st.session_state.pop(
+            "oura_callback_success",
+            False,
+        )
+        _oura_callback_error = st.session_state.pop(
+            "oura_callback_error",
+            None,
+        )
+
+        try:
+            _oura_connection = fetch_oura_connection(user_id)
+        except Exception as exc:
+            _oura_connection = None
+            if "oura_connections" in str(exc):
+                st.error(
+                    "La tabella Supabase `oura_connections` non esiste ancora. "
+                    "Esegui prima lo script SQL fornito per l'integrazione Oura."
+                )
+            else:
+                st.error(f"Impossibile leggere la connessione Oura: {exc}")
+
+        # The database is the source of truth. If a connection exists, an older
+        # callback error from a previous attempt must not be shown.
+        if _oura_connection:
+            _oura_callback_error = None
+            st.session_state.pop("oura_callback_error", None)
+            st.session_state.pop("oura_authorization_url", None)
+
+        if _oura_just_connected and _oura_connection:
+            st.success("Oura collegato correttamente.")
+
+        if _oura_callback_error and not _oura_connection:
+            st.error(
+                f"Connessione Oura non riuscita: {_oura_callback_error}"
+            )
+
+        if _oura_connection:
+            st.success("✅ Account Oura collegato")
+            st.caption(
+                "Connessione salvata in Supabase per questo account SanoSync."
+            )
+            _scope = str(_oura_connection.get("scope") or "")
+            if _scope:
+                st.caption(f"Permissões concedidas: {_scope}" if settings_lang == "Português" else f"Permessi concessi: {_scope}")
+
+            _oura_col1, _oura_col2, _oura_col3 = st.columns(3)
+
+            with _oura_col1:
+                if st.button(
+                    ("🔄 Verificar" if settings_lang == "Português" else "🔄 Verifica"),
+                    key="oura_test_connection",
+                    use_container_width=True,
+                ):
+                    try:
+                        _personal = oura_get_personal_info(user_id)
+                        _oura_name = (
+                            _personal.get("email")
+                            or _personal.get("id")
+                            or "account Oura"
+                        )
+                        st.success(
+                            f"Ligação ativa: {_oura_name}" if settings_lang == "Português" else f"Connessione attiva: {_oura_name}"
+                        )
+                    except Exception as exc:
+                        st.error(
+                            f"Falha na verificação Oura: {exc}" if settings_lang == "Português" else f"Verifica Oura non riuscita: {exc}"
+                        )
+
+            with _oura_col2:
+                if st.button(
+                    ("👣 Sincronizar agora" if settings_lang == "Português" else "👣 Sincronizza ora"),
+                    key="oura_sync_steps_now",
+                    use_container_width=True,
+                ):
+                    try:
+                        _today = date.today()
+                        _start = _today - timedelta(days=7)
+                        _synced = sync_oura_steps_to_supabase(
+                            user_id,
+                            _start,
+                            _today,
+                        )
+                        if _synced:
+                            _latest = sorted(
+                                _synced,
+                                key=lambda row: row["date"],
+                            )[-1]
+                            st.success(
+                                f"Oura sincronizado: " if settings_lang == "Português" else f"Oura sincronizzato: "
+                                f"{_latest['steps']} passos em " if settings_lang == "Português" else f"{_latest['steps']} passi il "
+                                f"{_latest['date']} "
+                                f"({_latest['estimated_kcal']} kcal estimadas)." if settings_lang == "Português" else f"({_latest['estimated_kcal']} kcal stimate)."
+                            )
+                        else:
+                            st.info(
+                                "A Oura não devolveu atividades diárias " if settings_lang == "Português" else "Oura non ha restituito attività giornaliere "
+                                "nos últimos 7 dias." if settings_lang == "Português" else "per gli ultimi 7 giorni."
+                            )
+                    except Exception as exc:
+                        st.error(
+                            f"Falha na sincronização Oura: {exc}" if settings_lang == "Português" else f"Sincronizzazione Oura non riuscita: {exc}"
+                        )
+
+            with _oura_col3:
+                if st.button(
+                    ("Desligar" if settings_lang == "Português" else "Scollega"),
+                    key="oura_disconnect",
+                    use_container_width=True,
+                ):
+                    try:
+                        revoke_and_delete_oura_connection(user_id)
+                        st.success("Oura desligado." if settings_lang == "Português" else "Oura scollegato.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(
+                            f"Não foi possível desligar a Oura: {exc}" if settings_lang == "Português" else f"Impossibile scollegare Oura: {exc}"
+                        )
+
+            st.caption(
+                "I passi Oura vengono salvati in `daily_logs.steps`. "
+                "Le kcal dei passi usano la regola SanoSync già esistente: "
+                "0,04 kcal per passo, evitando il doppio conteggio con "
+                "Padel/Corsa."
+            )
+        else:
+            st.write(
+                "Ligue o seu Oura Ring ao SanoSync. " if settings_lang == "Português" else "Collega il tuo Oura Ring a SanoSync. "
+                "Solicitamos apenas as permissões `personal`, `daily` e `workout`." if settings_lang == "Português" else "Richiediamo solo i permessi `personal`, `daily` e `workout`."
+            )
+            st.caption(
+                "A palavra-passe da Oura não é partilhada com o SanoSync. " if settings_lang == "Português" else "La password Oura non viene condivisa con SanoSync. "
+                "A autorização é efetuada diretamente na Oura através de OAuth 2.0." if settings_lang == "Português" else "L'autorizzazione avviene direttamente su Oura tramite OAuth 2.0."
+            )
+
+            try:
+                # Genera SEMPRE un nuovo URL OAuth.
+                # Non riusare URL creati prima del cambio Redirect URI
+                # nella console sviluppatori Oura.
+                _oura_auth_url = build_oura_authorization_url(user_id)
+                st.session_state.pop("oura_authorization_url", None)
+
+                st.link_button(
+                    ("💍 Ligar Oura" if settings_lang == "Português" else "💍 Connetti Oura"),
+                    _oura_auth_url,
+                    use_container_width=True,
+                    type="primary",
+                )
+                st.caption(
+                    "A Oura abre num novo separador. No final, " if settings_lang == "Português" else "Oura si apre in una nuova scheda. Al termine "
+                    "a ligação é guardada automaticamente." if settings_lang == "Português" else "l'associazione viene salvata automaticamente."
+                )
+            except Exception as exc:
+                st.error(
+                    f"Configuração Oura incompleta: {exc}" if settings_lang == "Português" else f"Configurazione Oura incompleta: {exc}"
+                )
+
+        _legal_c1, _legal_c2 = st.columns(2)
+        with _legal_c1:
+            st.link_button(
+                "Privacy Policy",
+                "https://sanosync.streamlit.app/?page=privacy",
+                use_container_width=True,
+            )
+        with _legal_c2:
+            st.link_button(
+                "Terms of Service",
+                "https://sanosync.streamlit.app/?page=terms",
+                use_container_width=True,
+            )
+
+    # ------------------------------------------------------------------
     # GOAL PROTEICO — SEMPRE ULTIMA SEZIONE
     # ------------------------------------------------------------------
     with st.container(border=True):
@@ -8409,6 +10160,7 @@ def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
 
     client = OpenAI(
@@ -8707,19 +10459,18 @@ def _normalize_ai_recipe_result(data, requested_servings):
 
 def _extract_json_object_tolerant(raw_text):
     """
-    Extract a JSON object from a model response without relying on Groq's
-    server-side response_format validation.
+    Extract the first valid JSON object from a model response.
 
-    This is deliberately defensive because some available Groq models may
-    prepend/append a tiny amount of text even when instructed to return JSON.
+    Handles markdown fences, <think> blocks, leading/trailing prose and
+    braces inside quoted JSON strings.
     """
     text = str(raw_text or "").strip()
+    if not text:
+        raise ValueError("La risposta AI è vuota.")
 
-    # Remove markdown fences.
+    # Remove markdown fences and provider reasoning blocks.
     text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
     text = re.sub(r"\s*```$", "", text).strip()
-
-    # Remove full reasoning blocks if a provider emits them.
     text = re.sub(
         r"<think>.*?</think>",
         "",
@@ -8727,20 +10478,87 @@ def _extract_json_object_tolerant(raw_text):
         flags=re.I | re.S,
     ).strip()
 
-    # First try the whole string.
+    # Whole response first.
     try:
-        return json.loads(text)
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
     except Exception:
         pass
 
-    # Then extract from first { to last }.
-    first = text.find("{")
-    last = text.rfind("}")
-    if first >= 0 and last > first:
-        candidate = text[first:last + 1]
-        return json.loads(candidate)
+    # Search every balanced {...} candidate while respecting JSON strings.
+    starts = [i for i, ch in enumerate(text) if ch == "{"]
+    for first in starts:
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for i in range(first, len(text)):
+            ch = text[i]
+
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[first:i + 1]
+                    try:
+                        data = json.loads(candidate)
+                        if isinstance(data, dict):
+                            return data
+                    except Exception:
+                        break
 
     raise ValueError("La risposta AI non contiene un oggetto JSON valido.")
+
+
+def _repair_food_fit_json_with_groq(client, model_id, raw_text):
+    """Repair one malformed food-fit response into the required JSON shape."""
+    repair_prompt = f"""
+Convert the response below into ONE valid JSON object only.
+
+Required top-level keys:
+food_name, estimated_kcal, estimated_protein_g, estimated_carbs_g,
+estimated_fat_g, confidence, message.
+
+Rules:
+- Do not add markdown fences.
+- Do not output commentary or reasoning.
+- Keep the original meaning and estimates when possible.
+- Numeric nutrition fields must be JSON numbers.
+- confidence must be "low", "medium", or "high".
+
+RESPONSE:
+{raw_text}
+""".strip()
+
+    repaired = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {
+                "role": "system",
+                "content": "Return exactly one valid JSON object and nothing else.",
+            },
+            {"role": "user", "content": repair_prompt},
+        ],
+        temperature=0,
+        max_tokens=900,
+        stream=False,
+    )
+    return _extract_json_object_tolerant(
+        repaired.choices[0].message.content
+    )
 
 
 def _repair_recipe_json_with_groq(client, model_id, raw_text):
@@ -9381,13 +11199,13 @@ def render_ai_spotlight_css():
 
 def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
     """
-    Convert free ingredient text into recipe_builder_ingredients.
+    Convert free meal/ingredient text into recipe_builder_ingredients.
 
-    Groq occasionally rejects response_format=json_object before returning any
-    content (json_validate_failed). We therefore:
-      1. try strict JSON mode;
-      2. retry without response_format using an even simpler prompt;
-      3. extract the first JSON object from the model text.
+    Robust flow:
+      1. strict JSON mode;
+      2. normal completion fallback;
+      3. tolerant JSON extraction + flexible schema normalization;
+      4. one repair pass when the model replied but the payload is unusable.
     """
     raw_text = str(ingredient_text or "").strip()
     if not raw_text:
@@ -9404,7 +11222,14 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
         "English": "English",
         "Nederlands": "Dutch",
         "Français": "French",
+        "Português": "Portuguese",
     }.get(language, "Italian")
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    model_id = resolve_groq_text_model()
 
     schema_example = """
 {
@@ -9422,73 +11247,197 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
 """.strip()
 
     prompt = f"""
-Extract ONLY the ingredients explicitly present in this text:
+Interpret the user's meal description and return the foods that should be
+logged by SanoSync.
 
+User text:
 {raw_text}
 
-Return one JSON object matching this example:
+Return ONE valid JSON object matching this shape:
 {schema_example}
 
-Requirements:
-- ingredient names must be in {language_name};
-- preserve user quantities;
-- kg -> g;
-- estimate grams for common units only when grams were not supplied;
+Rules:
+- names must be in {language_name};
+- preserve explicit quantities when possible;
+- convert kg to g;
+- if the user gives a COUNT instead of grams (for example "3 spring rolls"),
+  estimate a realistic TOTAL gram weight for that count;
+- a prepared food may remain ONE food item when splitting it into ingredients
+  would be artificial or unreliable;
 - use realistic average nutrition values per 100 g;
-- do NOT add ingredients;
+- do not invent extra foods that are not implied by the text;
 - every numeric value must be a JSON number;
-- no markdown, no prose, no reasoning.
+- no markdown, prose or reasoning.
 """.strip()
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.groq.com/openai/v1",
-    )
+    def _normalise_payload(data):
+        """Accept a few common model shapes and convert them to ingredients."""
+        if not isinstance(data, dict):
+            return []
 
-    def _extract_json_object(text):
-        cleaned = str(text or "").strip()
-        cleaned = re.sub(
-            r"^```(?:json)?\s*",
-            "",
-            cleaned,
-            flags=re.I,
+        items = (
+            data.get("ingredients")
+            or data.get("foods")
+            or data.get("items")
+            or data.get("meal_items")
+            or data.get("food_items")
+            or []
         )
-        cleaned = re.sub(r"\s*```$", "", cleaned).strip()
 
-        try:
-            return json.loads(cleaned)
-        except Exception:
-            pass
+        # Some models return one single food object at top level.
+        if not items and any(
+            key in data
+            for key in (
+                "name",
+                "food_name",
+                "item",
+                "ingredient",
+            )
+        ):
+            items = [data]
 
-        # Fallback for a model that wrapped the JSON in one sentence.
-        first = cleaned.find("{")
-        last = cleaned.rfind("}")
-        if first >= 0 and last > first:
-            return json.loads(cleaned[first:last + 1])
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            return []
 
-        raise ValueError(
-            "La risposta AI non contiene un oggetto JSON leggibile."
-        )
+        result = []
+        for item in items:
+            if isinstance(item, str):
+                item = {"name": item}
+            if not isinstance(item, dict):
+                continue
+
+            name = str(
+                item.get("name")
+                or item.get("food_name")
+                or item.get("item")
+                or item.get("ingredient")
+                or ""
+            ).strip()
+
+            quantity_g = max(
+                0.0,
+                _safe_float(
+                    item.get("quantity_g")
+                    or item.get("grams")
+                    or item.get("weight_g")
+                    or item.get("amount_g")
+                    or item.get("total_grams")
+                ),
+            )
+
+            kcal_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("calories_per_100g")
+                    or item.get("kcal_per_100g")
+                    or item.get("calories_100g")
+                    or item.get("kcal_100g")
+                ),
+            )
+            protein_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("protein_per_100g")
+                    or item.get("protein_100g")
+                    or item.get("protein")
+                ),
+            )
+            carbs_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("carbs_per_100g")
+                    or item.get("carbohydrates_per_100g")
+                    or item.get("carbs_100g")
+                    or item.get("carbs")
+                ),
+            )
+            fat_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("fat_per_100g")
+                    or item.get("fats_per_100g")
+                    or item.get("fat_100g")
+                    or item.get("fat")
+                ),
+            )
+
+            # If the model returned TOTAL macros/calories instead of per-100g,
+            # convert them when a usable gram quantity exists.
+            if quantity_g > 0:
+                factor = 100.0 / quantity_g
+                if kcal_100 <= 0:
+                    total_kcal = _safe_float(
+                        item.get("calories")
+                        or item.get("kcal")
+                        or item.get("total_calories")
+                        or item.get("total_kcal")
+                    )
+                    if total_kcal > 0:
+                        kcal_100 = total_kcal * factor
+
+                if protein_100 <= 0:
+                    total_protein = _safe_float(
+                        item.get("protein_g")
+                        or item.get("total_protein_g")
+                    )
+                    if total_protein > 0:
+                        protein_100 = total_protein * factor
+
+                if carbs_100 <= 0:
+                    total_carbs = _safe_float(
+                        item.get("carbs_g")
+                        or item.get("carbohydrates_g")
+                        or item.get("total_carbs_g")
+                    )
+                    if total_carbs > 0:
+                        carbs_100 = total_carbs * factor
+
+                if fat_100 <= 0:
+                    total_fat = _safe_float(
+                        item.get("fat_g")
+                        or item.get("total_fat_g")
+                    )
+                    if total_fat > 0:
+                        fat_100 = total_fat * factor
+
+            if not name or quantity_g <= 0:
+                continue
+
+            result.append(
+                {
+                    "name": name,
+                    "quantity_g": round(quantity_g, 1),
+                    "calories_per_100g": round(kcal_100, 2),
+                    "protein_per_100g": round(protein_100, 2),
+                    "carbs_per_100g": round(carbs_100, 2),
+                    "fat_per_100g": round(fat_100, 2),
+                    "source": "ai",
+                }
+            )
+
+        return result
 
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a food ingredient parser. "
-                "Return only a single valid JSON object. "
+                "You are a food logging parser for SanoSync. "
+                "Return only one valid JSON object. "
                 "Never expose reasoning."
             ),
         },
         {"role": "user", "content": prompt},
     ]
 
-    raw = None
+    raw_candidates = []
     first_error = None
 
-    # Attempt 1 — strict JSON mode.
+    # Attempt 1: strict JSON mode.
     try:
         response = client.chat.completions.create(
-            model=resolve_groq_text_model(),
+            model=model_id,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0,
@@ -9496,107 +11445,116 @@ Requirements:
             stream=False,
         )
         raw = response.choices[0].message.content
+        if raw:
+            raw_candidates.append(raw)
     except Exception as exc:
         first_error = exc
 
-    # Attempt 2 — Groq may reject JSON validation server-side.
-    if not raw:
-        retry_prompt = f"""
-Ingredient text:
-{raw_text}
-
-Output ONLY JSON. No code fence.
-
-Exact top-level shape:
-{{"ingredients":[{{"name":"...","quantity_g":100,"calories_per_100g":0,"protein_per_100g":0,"carbs_per_100g":0,"fat_per_100g":0}}]}}
-
-Names in {language_name}. Include only ingredients in the input.
-""".strip()
-
+    # Attempt 2: normal completion if strict JSON mode failed/returned nothing.
+    if not raw_candidates:
         try:
             response = client.chat.completions.create(
-                model=resolve_groq_text_model(),
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Return valid JSON only. "
-                            "Do not explain anything."
-                        ),
-                    },
-                    {"role": "user", "content": retry_prompt},
-                ],
+                model=model_id,
+                messages=messages,
                 temperature=0,
                 max_tokens=1800,
                 stream=False,
             )
             raw = response.choices[0].message.content
+            if raw:
+                raw_candidates.append(raw)
         except Exception as retry_exc:
             if first_error is not None:
                 raise RuntimeError(
-                    "SanoSync AI non è riuscita a strutturare gli "
-                    "ingredienti dopo due tentativi. "
-                    f"Primo errore: {first_error}. "
-                    f"Retry: {retry_exc}"
+                    "SanoSync AI non è riuscita a strutturare il pasto "
+                    "dopo due tentativi. "
+                    f"Primo errore: {first_error}. Retry: {retry_exc}"
                 ) from retry_exc
             raise
 
-    data = _extract_json_object(raw)
-    items = data.get("ingredients") or []
-    result = []
+    # Try every returned payload with the tolerant JSON extractor already used
+    # elsewhere in SanoSync.
+    last_raw = raw_candidates[-1] if raw_candidates else ""
+    for raw in raw_candidates:
+        try:
+            data = _extract_json_object_tolerant(raw)
+            result = _normalise_payload(data)
+            if result:
+                return result
+        except Exception:
+            pass
 
-    for item in items:
-        if not isinstance(item, dict):
-            continue
+    # Attempt 3: repair a response that was valid text/JSON but not in the
+    # structure the app could consume.
+    repair_prompt = f"""
+The user described this meal:
+{raw_text}
 
-        name = str(item.get("name") or "").strip()
-        quantity_g = max(
-            0.0,
-            _safe_float(item.get("quantity_g")),
+A previous model response was:
+{last_raw}
+
+Convert it into ONE valid JSON object only.
+
+Required exact top-level shape:
+{{"ingredients":[{{"name":"...","quantity_g":100,"calories_per_100g":0,"protein_per_100g":0,"carbs_per_100g":0,"fat_per_100g":0}}]}}
+
+Important:
+- output names in {language_name};
+- if the meal is a prepared item such as spring rolls, pizza, sandwich, sushi,
+  dumplings, etc., it is acceptable to return ONE prepared-food item rather
+  than inventing its internal recipe;
+- if the user gave a count but no grams, estimate a realistic TOTAL gram weight;
+- preserve the user's quantity/count semantically;
+- provide realistic average nutrition values per 100 g;
+- JSON only, no markdown and no explanation.
+""".strip()
+
+    try:
+        repaired = client.chat.completions.create(
+            model=model_id,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Return valid JSON only. No reasoning.",
+                },
+                {"role": "user", "content": repair_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+            max_tokens=1800,
+            stream=False,
         )
-
-        if not name or quantity_g <= 0:
-            continue
-
-        result.append(
-            {
-                "name": name,
-                "quantity_g": quantity_g,
-                "calories_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("calories_per_100g")
-                    ),
-                ),
-                "protein_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("protein_per_100g")
-                    ),
-                ),
-                "carbs_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("carbs_per_100g")
-                    ),
-                ),
-                "fat_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("fat_per_100g")
-                    ),
-                ),
-                "source": "ai",
-            }
+        repaired_raw = repaired.choices[0].message.content
+    except Exception:
+        repaired = client.chat.completions.create(
+            model=model_id,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Return valid JSON only. No reasoning.",
+                },
+                {"role": "user", "content": repair_prompt},
+            ],
+            temperature=0,
+            max_tokens=1800,
+            stream=False,
         )
+        repaired_raw = repaired.choices[0].message.content
 
-    if not result:
-        raise ValueError(
-            "SanoSync AI ha risposto, ma non ha restituito "
-            "ingredienti utilizzabili."
-        )
+    try:
+        repaired_data = _extract_json_object_tolerant(repaired_raw)
+        repaired_result = _normalise_payload(repaired_data)
+    except Exception:
+        repaired_result = []
 
-    return result
+    if repaired_result:
+        return repaired_result
+
+    raise ValueError(
+        "SanoSync AI ha risposto, ma non ha restituito "
+        "alimenti utilizzabili. Prova ad aggiungere una quantità "
+        "approssimativa, per esempio “3 loempia, circa 240 g”."
+    )
 
 
 # 9. PAGE 1: MEAL LOGGING
@@ -9922,6 +11880,16 @@ if selected_page == t["t1"]:
                     "error": "Analysefout: {error}",
                     "voice_error": "Kon de audio niet transcriberen: {error}",
                     "default_name": "AI-maaltijd",
+                },
+                "Português": {
+                    "caption": "Escreva o que comeu. O SanoSync AI reconhece ingredientes e quantidades; nome, kcal e macronutrientes são preenchidos automaticamente.",
+                    "placeholder": "Ex. 250 g frango, 120 g arroz, 200 g curgete, 10 g azeite",
+                    "portions": "Porções",
+                    "analyze": "✨ Calcular com SanoSync AI",
+                    "spinner": "O SanoSync AI está a reconstruir a refeição…",
+                    "error": "Erro na análise: {error}",
+                    "voice_error": "Não foi possível transcrever o áudio: {error}",
+                    "default_name": "Refeição IA",
                 },
                 "Français": {
                     "caption": "Décrivez ce que vous avez mangé. SanoSync AI reconnaît les ingrédients et les quantités ; le nom, les calories et les macros sont remplis automatiquement.",
@@ -10779,29 +12747,45 @@ elif selected_page == t["t2"]:
         on_change=update_overview_date,
     )
 
+    daily_log_res = []
+    meals_data = []
+    raw_activities = []
+    all_weight_logs = []
+
     try:
         daily_log_res = load_daily_log_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        st.error(t["load_data_error"].format(error=e))
+
+    try:
         meals_data = load_daily_meals_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        st.error(t["load_data_error"].format(error=e))
+
+    try:
         raw_activities = load_daily_activities_cached(
             user_id,
             str(summary_date),
             st.session_state.get("auth_access_token"),
         )
+    except Exception as e:
+        st.error(t["load_data_error"].format(error=e))
+
+    try:
         all_weight_logs = load_weight_history_cached(
             user_id,
             st.session_state.get("auth_access_token"),
         )
     except Exception as e:
         st.error(t["load_data_error"].format(error=e))
-        daily_log_res, meals_data, raw_activities, all_weight_logs = [], [], [], []
 
     activities_data = [a for a in raw_activities if a.get("activity_name")] if raw_activities else []
     total_cals_in = sum(_safe_float(m.get("calories")) for m in meals_data)
@@ -11705,6 +13689,18 @@ elif selected_page == t["t2"]:
             "macro_unit": "g",
             "kcal_unit": "kcal",
         },
+        "Português": {
+            "title": "🍩 Distribuição diária",
+            "selector": "Visualizar",
+            "macros": "Macronutrientes",
+            "meals": "Kcal por refeição",
+            "protein": "Proteína",
+            "carbs": "Hidratos de carbono",
+            "fat": "Gordura",
+            "no_data": "Não existem dados disponíveis para esta data.",
+            "macro_unit": "g",
+            "kcal_unit": "kcal",
+        },
         "Français": {
             "title": "🍩 Répartition journalière",
             "selector": "Afficher",
@@ -12056,6 +14052,14 @@ elif selected_page == t["t3"]:
             "history_caption": "Corrigeer of verwijder een bestaande meting.",
             "target_title": "🎯 Doelgewicht",
             "target_caption": "Het doel wordt gebruikt voor prognoses en onderhoudsberekeningen.",
+        },
+        "Português": {
+            "register_title": "⚖️ Registar peso",
+            "register_caption": "Adicione uma nova medição. O valor predefinido é o último peso registado.",
+            "history_title": "🕘 Histórico e edição",
+            "history_caption": "Corrija ou elimine uma medição já registada.",
+            "target_title": "🎯 Peso objetivo",
+            "target_caption": "O objetivo é utilizado nas projeções e no cálculo de manutenção.",
         },
         "Français": {
             "register_title": "⚖️ Enregistrer le poids",
@@ -12843,10 +14847,20 @@ elif selected_page == t["t3"]:
             timeline_html = (
                 '<div style="border:1px solid #E8ECF2;border-radius:12px;padding:8px 10px;overflow-x:auto;">'
                 '<div style="font-size:12px;color:#667085;margin-bottom:4px;">'
-                f'Dettagli: 👍 deficit ≥{int(round(float(user_deficit_target_kcal)))} · '
-                f'😐 deficit 0–{max(0, int(round(float(user_deficit_target_kcal))) - 1)} · '
-                '👎 surplus &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
-                '</div>'
+                + (
+                    (
+                        f'Detalhes: 👍 défice ≥{int(round(float(user_deficit_target_kcal)))} · '
+                        f'😐 défice 0–{max(0, int(round(float(user_deficit_target_kcal))) - 1)} · '
+                        '👎 excedente &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
+                    )
+                    if current_lang == "Português"
+                    else (
+                        f'Dettagli: 👍 deficit ≥{int(round(float(user_deficit_target_kcal)))} · '
+                        f'😐 deficit 0–{max(0, int(round(float(user_deficit_target_kcal))) - 1)} · '
+                        '👎 surplus &nbsp;|&nbsp; 🎾 Padel · 🔥 extra >300 · 🛏️ extra ≤300'
+                    )
+                )
+                + '</div>'
                 f'<div style="display:flex;gap:2px;min-width:{max(100, len(detail_cells)*50)}px;">'
                 + "".join(detail_cells) +
                 '</div></div>'
@@ -12948,6 +14962,42 @@ elif selected_page == t["t4"]:
             "ingredient_ai_empty": "Voer minstens één ingrediënt in.",
             "ingredient_ai_error": "Fout bij ingrediëntanalyse: {error}",
             "ingredient_voice_error": "Kon de audio niet transcriberen: {error}","creation_mode":"Hoe wil je het recept maken?","mode_known":"🍳 Ik weet al wat ik wil koken","mode_ai":"✨ Ik wil hulp van AI","ingredient_entry_mode":"Hoe wil je ingrediënten invoeren?","ingredient_entry_manual":"✍️ Handmatig","ingredient_entry_ai":"✨ Met SanoSync AI","manual_add":"➕ Ingrediënt toevoegen","manual_name":"Ingrediënt","manual_qty":"Hoeveelheid (g)","manual_kcal":"Kcal","manual_pro":"Eiwit","manual_carbs":"Koolh.","manual_fat":"Vet","mode_known_help":"Voer de gekozen ingrediënten in: SanoSync berekent automatisch calorieën en macro’s.","mode_ai_help":"Stel je doelen in en laat SanoSync een compleet recept voorstellen.","ai_starting_ingredients":"✨ Startingrediënten voor AI (optioneel)","ai_starting_help":"Als je ze invoert, gebruikt AI ze als basis (koelkast-opmaakmodus) en voegt alleen toe wat nodig is.","ai_generated_loaded":"✅ AI-recept geladen om te bewerken. Controleer ingrediënten en waarden voor je opslaat.",
+        },
+        "Português": {
+            "my": "👤 As minhas receitas",
+            "shared": "🌍 Receitas partilhadas",
+            "generator": "✨ Gerador de Receitas IA",
+            "builder": "➕ Criar uma refeição a partir de ingredientes",
+            "generator_caption": "Defina os seus objetivos. Se indicar ingredientes disponíveis, o SanoSync irá utilizá-los como base e acrescentar apenas o necessário para criar uma receita coerente.",
+            "available": "Ingredientes que pretende utilizar (opcional)",
+            "available_help": "Se indicar ingredientes, o gerador funciona automaticamente em modo aproveitar o frigorífico. Inclua também as quantidades quando as souber.",
+            "ingredient_ai_label": "✨ **SanoSync AI · Calcular a partir dos ingredientes**",
+            "ingredient_ai_placeholder": "Ex. 250 g frango, 120 g arroz, 200 g curgete, 10 g azeite",
+            "ingredient_ai_help": "Introduza livremente os ingredientes e as quantidades. O SanoSync AI reconhece os alimentos, estima kcal e macronutrientes e preenche a tabela automaticamente.",
+            "ingredient_ai_button": "✨ Analisar com SanoSync AI",
+            "ingredient_ai_spinner": "A analisar os ingredientes…",
+            "ingredient_ai_done": "✅ Ingredientes preenchidos automaticamente.",
+            "ingredient_ai_empty": "Introduza pelo menos um ingrediente.",
+            "ingredient_ai_error": "Erro na análise dos ingredientes: {error}",
+            "ingredient_voice_error": "Não foi possível transcrever o áudio: {error}",
+            "creation_mode": "Como pretende criar a receita?",
+            "mode_known": "🍳 Já sei o que quero cozinhar",
+            "mode_ai": "✨ Quero ajuda da IA",
+            "ingredient_entry_mode": "Como pretende introduzir os ingredientes?",
+            "ingredient_entry_manual": "✍️ Manualmente",
+            "ingredient_entry_ai": "✨ Com SanoSync AI",
+            "manual_add": "➕ Adicionar ingrediente",
+            "manual_name": "Ingrediente",
+            "manual_qty": "Quantidade (g)",
+            "manual_kcal": "Kcal",
+            "manual_pro": "Proteína",
+            "manual_carbs": "Hidratos",
+            "manual_fat": "Gordura",
+            "mode_known_help": "Introduza os ingredientes que decidiu utilizar: o SanoSync calculará automaticamente kcal e macronutrientes.",
+            "mode_ai_help": "Descreva os seus objetivos e deixe o SanoSync propor uma receita completa.",
+            "ai_starting_ingredients": "✨ Ingredientes de partida para a IA (opcional)",
+            "ai_starting_help": "Se os indicar, a IA irá utilizá-los como base e acrescentará apenas o necessário.",
+            "ai_generated_loaded": "✅ Receita IA carregada para edição. Reveja os ingredientes e os valores antes de guardar.",
         },
         "Français": {
             "my": "👤 Mes recettes",
@@ -13618,6 +15668,7 @@ elif selected_page == t["t4"]:
                 "English": "▸ Optional details · notes and photo",
                 "Nederlands": "▸ Optionele details · notities en foto",
                 "Français": "▸ Détails optionnels · notes et photo",
+                "Português": "▸ Detalhes opcionais · notas e fotografia",
             }
             with st.expander(
                 _optional_details_labels.get(
@@ -14626,30 +16677,31 @@ elif selected_page == t["t5"]:
                         st.session_state.get("auth_access_token"),
                     )
                     
-                    # I passi sono incompatibili SOLO con attività che già
-                    # incorporano gli stessi passi/spostamenti: Padel e Corsa.
-                    # Bici/E-Bike e le altre attività possono invece sommarsi.
-                    step_conflicting_activities = {"padel", "corsa", "running"}
-                    has_step_conflict = any(
-                        str(a.get("activity_name") or "").strip().casefold()
-                        in step_conflicting_activities
-                        for a in day_activities
+                    # Sottraiamo dai passi totali quelli già attribuiti
+                    # ad attività strutturate (per esempio una corsa GPX).
+                    step_info = recalculate_step_calories_for_day(
+                        user_id,
+                        act_date,
+                        total_steps=int(new_steps),
                     )
-                    estim_cals = 0 if has_step_conflict else int(new_steps * 0.04)
-                    
-                    upsert_named_activity_via_api(
-                        cache_user_id=user_id,
-                        log_date=act_date,
-                        activity_name="Passi (Stima)",
-                        burned_calories=estim_cals,
-                        access_token=st.session_state.get("auth_access_token"),
-                    )
-                    
+                    estim_cals = step_info["estimated_kcal"]
+
                     refresh_daily_logs(act_date)
                     
                     queue_ui_sound("steps_saved")
                     st.toast(ux["steps_updated_toast"].format(kcal=estim_cals), icon="👣")
-                    st.success(f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)")
+                    if step_info["activity_steps"] > 0:
+                        st.success(
+                            f"✅ {t['steps_updated']} "
+                            f"({step_info['eligible_steps']} passi calorici su "
+                            f"{step_info['total_steps']}; "
+                            f"{step_info['activity_steps']} già inclusi nelle attività; "
+                            f"{estim_cals} kcal stimate)"
+                        )
+                    else:
+                        st.success(
+                            f"✅ {t['steps_updated']} ({estim_cals} kcal stimate)"
+                        )
                     st.rerun()
                 except Exception as e:
                     err_text = str(e)
@@ -14730,16 +16782,13 @@ elif selected_page == t["t5"]:
                         st.session_state.get("auth_access_token"),
                     )
                     
-                    # Padel e Corsa sono incompatibili con le kcal dei passi,
-                    # perché i passi di quelle attività sarebbero già compresi.
-                    # Palestra/Nuoto/Altro restano invece cumulabili con i passi.
-                    if str(extra_act).strip().casefold() in {"padel", "corsa", "running"}:
-                        upsert_named_activity_via_api(
-                            cache_user_id=user_id,
-                            log_date=act_date,
-                            activity_name="Passi (Stima)",
-                            burned_calories=0,
-                            access_token=st.session_state.get("auth_access_token"),
+                    # Per attività manuali senza un numero preciso di passi
+                    # manteniamo il comportamento conservativo anti-doppio conteggio.
+                    if _is_step_conflicting_activity(extra_act):
+                        recalculate_step_calories_for_day(
+                            user_id,
+                            act_date,
+                            total_steps=int(day_steps),
                         )
 
                     refresh_daily_logs(act_date)
@@ -14749,6 +16798,519 @@ elif selected_page == t["t5"]:
                     st.toast(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals), icon="🎯")
                     st.success(ux["activity_saved"].format(activity={"Palestra":ux["activity_gym"],"Nuoto":ux["activity_swim"],"Altro":ux["activity_other"]}.get(extra_act, extra_act), kcal=extra_cals))
                     st.rerun()
+
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown("### 🗺️ Importar atividade GPX" if current_lang == "Português" else "### 🗺️ Importa attività GPX")
+        st.caption(
+            "Carregue um ficheiro .gpx do Zepp/Amazfit, Garmin ou outra aplicação. O ficheiro é analisado localmente pelo SanoSync."
+            if current_lang == "Português"
+            else "Carica una traccia .gpx da Zepp/Amazfit, Garmin o altre app. Il file viene analizzato localmente da SanoSync."
+        )
+
+        gpx_flash_message = st.session_state.pop(
+            "gpx_last_action_message",
+            None,
+        )
+        if gpx_flash_message:
+            st.success(gpx_flash_message)
+
+        gpx_upload_generation = int(
+            st.session_state.get("gpx_upload_generation", 0)
+        )
+        gpx_file = st.file_uploader(
+            ("Ficheiro GPX" if current_lang == "Português" else "File GPX"),
+            type=["gpx"],
+            key=f"gpx_uploader_{act_date}_{gpx_upload_generation}",
+        )
+
+        if gpx_file is not None:
+            try:
+                gpx_data = parse_gpx_activity(
+                    gpx_file.getvalue(),
+                    filename=gpx_file.name,
+                )
+                gpx_date = gpx_data.get("date") or act_date
+
+                if gpx_date != act_date:
+                    st.info(
+                        f"Il GPX risulta del {gpx_date}. "
+                        "Verrà salvato in quella data."
+                    )
+
+                gm1, gm2, gm3, gm4 = st.columns(4)
+                gm1.metric(("Distância" if current_lang == "Português" else "Distanza"), f"{gpx_data['distance_km']:.2f} km")
+                gm2.metric(
+                    ("Duração" if current_lang == "Português" else "Durata"),
+                    _format_duration(gpx_data["duration_seconds"]),
+                )
+                gm3.metric(
+                    ("Passos da atividade" if current_lang == "Português" else "Passi attività"),
+                    f"{gpx_data['estimated_steps']:,}".replace(",", "."),
+                )
+                gm4.metric(
+                    ("FC média" if current_lang == "Português" else "FC media"),
+                    (
+                        f"{gpx_data['avg_hr']:.0f} bpm"
+                        if gpx_data["avg_hr"] is not None else "—"
+                    ),
+                )
+
+                if gpx_data.get("avg_step_cadence") is not None:
+                    cadence_text = (
+                        f"Cadenza media: "
+                        f"{gpx_data['avg_step_cadence']:.0f} passi/min."
+                    )
+                    if gpx_data.get("cadence_factor") == 2.0:
+                        cadence_text += (
+                            " Zepp/Amazfit sembra esportarla per singolo lato; "
+                            "SanoSync l'ha convertita in passi/min."
+                        )
+                    st.caption(cadence_text)
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    gpx_activity_type = st.selectbox(
+                        ("Tipo de atividade" if current_lang == "Português" else "Tipo attività"),
+                        ["Corsa", "Camminata", "Trekking", "Bici", "Altro"],
+                        key=f"gpx_type_{gpx_data['source_ref'][:12]}",
+                    )
+
+                nearest_weight, nearest_weight_date = nearest_weight_for_date(
+                    user_id, gpx_date
+                )
+                with c2:
+                    gpx_weight = st.number_input(
+                        ("Peso para estimar kcal (kg)" if current_lang == "Português" else "Peso per la stima kcal (kg)"),
+                        min_value=30.0,
+                        max_value=250.0,
+                        value=round(float(nearest_weight or 70.0), 1),
+                        step=0.1,
+                        key=f"gpx_weight_{gpx_data['source_ref'][:12]}",
+                    )
+
+                if nearest_weight is not None:
+                    st.caption(
+                        f"Peso dal log più vicino: {nearest_weight:.1f} kg "
+                        f"({nearest_weight_date})."
+                    )
+
+                gpx_kcal = estimate_gpx_kcal(
+                    gpx_activity_type,
+                    gpx_data["distance_km"],
+                    gpx_weight,
+                )
+
+                st.markdown(
+                    f"**Anteprima:** {gpx_activity_type} · "
+                    f"{gpx_data['distance_km']:.2f} km · "
+                    f"{_format_duration(gpx_data['duration_seconds'])} · "
+                    f"**{gpx_kcal} kcal**"
+                )
+
+                with st.expander(("🗺️ Pré-visualização do percurso" if current_lang == "Português" else "🗺️ Anteprima percorso"), expanded=False):
+                    render_gpx_route_map(gpx_data["route_points"], height=360)
+
+                step_based = gpx_activity_type in {
+                    "Corsa", "Camminata", "Trekking"
+                }
+                if step_based and gpx_data["estimated_steps"] > 0:
+                    preview_activities = list(day_activities) + [{
+                        "activity_name": gpx_activity_type,
+                        "activity_steps": gpx_data["estimated_steps"],
+                    }]
+                    preview_offset = calculate_step_calorie_offset(
+                        day_steps, preview_activities
+                    )
+                    st.info(
+                        f"Offset passi: {day_steps} totali − "
+                        f"{preview_offset['activity_steps']} già nelle attività "
+                        f"= {preview_offset['eligible_steps']} passi calorici "
+                        f"({preview_offset['estimated_kcal']} kcal)."
+                    )
+                elif step_based:
+                    st.warning(
+                        "Questo GPX non contiene una cadenza utilizzabile: "
+                        "posso importare kcal/distanza, ma non l'offset passi."
+                    )
+
+                gpx_day_activities = (
+                    day_activities
+                    if gpx_date == act_date
+                    else fetch_daily_activities_from_api(
+                        user_id,
+                        str(gpx_date),
+                        st.session_state.get("auth_access_token"),
+                    )
+                )
+                existing_activity = next(
+                    (
+                        a for a in gpx_day_activities
+                        if str(a.get("source_ref") or "")
+                        == gpx_data["source_ref"]
+                    ),
+                    None,
+                )
+
+                existing_has_map = bool(
+                    existing_activity
+                    and existing_activity.get("route_points")
+                )
+                existing_has_charts = bool(
+                    existing_activity
+                    and existing_activity.get("sensor_series")
+                )
+
+                if (
+                    existing_activity
+                    and existing_has_map
+                    and existing_has_charts
+                ):
+                    st.warning("Questo GPX risulta già importato.")
+                elif existing_activity and st.button(
+                    ("📈 Atualizar mapa e gráficos do GPX já importado" if current_lang == "Português" else "📈 Aggiorna mappa e grafici del GPX già importato"),
+                    key=f"backfill_gpx_details_{gpx_data['source_ref'][:16]}",
+                    use_container_width=True,
+                ):
+                    update_activity_via_api(
+                        existing_activity["id"],
+                        {
+                            "route_points": gpx_data["route_points"],
+                            "sensor_series": gpx_data["sensor_series"],
+                            "distance_km": float(gpx_data["distance_km"]),
+                            "duration_seconds": int(gpx_data["duration_seconds"]),
+                            "avg_hr": (
+                                float(gpx_data["avg_hr"])
+                                if gpx_data["avg_hr"] is not None else None
+                            ),
+                            "avg_cadence": (
+                                float(gpx_data["avg_step_cadence"])
+                                if gpx_data["avg_step_cadence"] is not None
+                                else None
+                            ),
+                        },
+                        st.session_state.get("auth_access_token"),
+                    )
+                    st.session_state["gpx_upload_generation"] = (
+                        gpx_upload_generation + 1
+                    )
+                    st.session_state["gpx_last_action_message"] = (
+                        "✅ Mappa e grafici aggiunti all'attività GPX."
+                    )
+                    st.rerun()
+                elif st.button(
+                    ("📥 Importar GPX para Atividades" if current_lang == "Português" else "📥 Importa GPX in Attività"),
+                    key=f"import_gpx_{gpx_data['source_ref'][:16]}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    activity_steps = (
+                        gpx_data["estimated_steps"] if step_based else 0
+                    )
+                    create_activity_via_api(
+                        {
+                            "date": str(gpx_date),
+                            "activity_name": (
+                                f"{gpx_activity_type} GPX · "
+                                f"{gpx_data['distance_km']:.2f} km"
+                            ),
+                            "burned_calories": int(gpx_kcal),
+                            "activity_steps": int(activity_steps),
+                            "distance_km": float(gpx_data["distance_km"]),
+                            "duration_seconds": int(
+                                gpx_data["duration_seconds"]
+                            ),
+                            "source": "gpx",
+                            "source_file_name": gpx_data["filename"],
+                            "source_ref": gpx_data["source_ref"],
+                            "avg_hr": (
+                                float(gpx_data["avg_hr"])
+                                if gpx_data["avg_hr"] is not None else None
+                            ),
+                            "avg_cadence": (
+                                float(gpx_data["avg_step_cadence"])
+                                if gpx_data["avg_step_cadence"] is not None
+                                else None
+                            ),
+                            "route_points": gpx_data["route_points"],
+                        },
+                        st.session_state.get("auth_access_token"),
+                    )
+
+                    daily_log = fetch_daily_log_from_api(
+                        user_id,
+                        str(gpx_date),
+                        st.session_state.get("auth_access_token"),
+                    )
+                    offset = recalculate_step_calories_for_day(
+                        user_id,
+                        gpx_date,
+                        total_steps=int((daily_log or {}).get("steps") or 0),
+                    )
+
+                    refresh_daily_logs(gpx_date)
+                    queue_ui_sound("activity_saved")
+                    st.session_state["gpx_upload_generation"] = (
+                        gpx_upload_generation + 1
+                    )
+                    st.session_state["gpx_last_action_message"] = (
+                        f"✅ GPX importato: {gpx_kcal} kcal · "
+                        f"{activity_steps} passi attività · "
+                        f"{offset['eligible_steps']} passi calorici residui."
+                    )
+                    st.rerun()
+
+            except Exception as exc:
+                st.error(f"Impossibile leggere/importare il GPX: {exc}")
+
+
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown(("### 📚 Registo de atividades GPX" if current_lang == "Português" else "### 📚 Registro attività GPX"))
+        st.caption(
+            "As últimas atividades importadas de ficheiros GPX. Selecione uma para ver os detalhes e o percurso."
+            if current_lang == "Português"
+            else "Le ultime attività importate da file GPX. Selezionane una per vedere dettagli e percorso."
+        )
+
+        try:
+            gpx_log_rows = fetch_gpx_activity_log(user_id, limit=50)
+        except Exception as exc:
+            gpx_log_rows = []
+            st.error(f"Impossibile caricare il registro GPX: {exc}")
+
+        if not gpx_log_rows:
+            st.info("Non ci sono ancora attività GPX nel registro.")
+        else:
+            log_table_rows = []
+            for row in gpx_log_rows:
+                log_table_rows.append(
+                    {
+                        "Data": row.get("date"),
+                        "Attività": row.get("activity_name") or "GPX",
+                        "Distanza km": row.get("distance_km"),
+                        ("Duração" if current_lang == "Português" else "Durata"): _format_duration(
+                            row.get("duration_seconds") or 0
+                        ),
+                        ("Passos da atividade" if current_lang == "Português" else "Passi attività"): row.get("activity_steps") or 0,
+                        "Kcal": row.get("burned_calories") or 0,
+                        ("FC média" if current_lang == "Português" else "FC media"): row.get("avg_hr"),
+                    }
+                )
+
+            st.dataframe(
+                pd.DataFrame(log_table_rows),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            def _gpx_log_label(row):
+                date_label = str(row.get("date") or "—")
+                activity_label = str(row.get("activity_name") or "Attività GPX")
+                kcal_label = int(row.get("burned_calories") or 0)
+                return f"{date_label} · {activity_label} · {kcal_label} kcal"
+
+            selected_index = st.selectbox(
+                ("Abrir atividade" if current_lang == "Português" else "Apri attività"),
+                options=list(range(len(gpx_log_rows))),
+                format_func=lambda idx: _gpx_log_label(gpx_log_rows[idx]),
+                key="gpx_activity_log_selected",
+            )
+            selected_activity = gpx_log_rows[selected_index]
+
+            selected_activity_id = selected_activity.get("id")
+            selected_activity_date = selected_activity.get("date")
+
+            with st.expander(("📊 Informações da atividade" if current_lang == "Português" else "📊 Informazioni attività"), expanded=False):
+                lm1, lm2, lm3, lm4 = st.columns(4)
+                distance_value = selected_activity.get("distance_km")
+                lm1.metric(
+                    ("Distância" if current_lang == "Português" else "Distanza"),
+                    (
+                        f"{float(distance_value):.2f} km"
+                        if distance_value is not None else "—"
+                    ),
+                )
+                lm2.metric(
+                    ("Duração" if current_lang == "Português" else "Durata"),
+                    _format_duration(
+                        selected_activity.get("duration_seconds") or 0
+                    ),
+                )
+                lm3.metric(
+                    ("Passos da atividade" if current_lang == "Português" else "Passi attività"),
+                    f"{int(selected_activity.get('activity_steps') or 0):,}".replace(
+                        ",", "."
+                    ),
+                )
+                lm4.metric(
+                    "Kcal",
+                    int(selected_activity.get("burned_calories") or 0),
+                )
+
+                detail_bits = []
+                if selected_activity.get("avg_hr") is not None:
+                    detail_bits.append(
+                        f"FC media "
+                        f"{float(selected_activity['avg_hr']):.0f} bpm"
+                    )
+                if selected_activity.get("avg_cadence") is not None:
+                    detail_bits.append(
+                        f"Cadenza "
+                        f"{float(selected_activity['avg_cadence']):.0f} "
+                        f"passi/min"
+                    )
+                if selected_activity.get("source_file_name"):
+                    detail_bits.append(
+                        f"File: {selected_activity['source_file_name']}"
+                    )
+                if detail_bits:
+                    st.caption(" · ".join(detail_bits))
+
+                sensor_series = selected_activity.get("sensor_series") or []
+                sensor_rows = []
+                for sample in sensor_series:
+                    if not isinstance(sample, dict):
+                        continue
+                    try:
+                        minute_value = float(sample.get("minute"))
+                    except Exception:
+                        continue
+                    sensor_rows.append(
+                        {
+                            "Minuti": minute_value,
+                            "Frequenza cardiaca": sample.get("hr"),
+                            "Cadenza": sample.get("cadence"),
+                        }
+                    )
+
+                if sensor_rows:
+                    sensor_df = (
+                        pd.DataFrame(sensor_rows)
+                        .sort_values("Minuti")
+                    )
+                    hr_df = sensor_df.dropna(
+                        subset=["Frequenza cardiaca"]
+                    )
+                    cadence_df = sensor_df.dropna(
+                        subset=["Cadenza"]
+                    )
+
+                    if not hr_df.empty or not cadence_df.empty:
+                        st.markdown(("#### Evolução durante a atividade" if current_lang == "Português" else "#### Andamento durante l'attività"))
+                        chart_tabs = st.tabs(
+                            [
+                                ("❤️ Frequência cardíaca" if current_lang == "Português" else "❤️ Frequenza cardiaca"),
+                                ("👟 Cadência dos passos" if current_lang == "Português" else "👟 Cadenza passi"),
+                            ]
+                        )
+
+                        with chart_tabs[0]:
+                            if not hr_df.empty:
+                                st.line_chart(
+                                    hr_df[
+                                        ["Minuti", "Frequenza cardiaca"]
+                                    ].set_index("Minuti"),
+                                    use_container_width=True,
+                                    height=280,
+                                    x_label=("Minutos" if current_lang == "Português" else "Minuti"),
+                                    y_label="bpm",
+                                )
+                            else:
+                                st.info(
+                                    "Il GPX non contiene dati di frequenza "
+                                    "cardiaca utilizzabili."
+                                )
+
+                        with chart_tabs[1]:
+                            if not cadence_df.empty:
+                                st.line_chart(
+                                    cadence_df[
+                                        ["Minuti", "Cadenza"]
+                                    ].set_index("Minuti"),
+                                    use_container_width=True,
+                                    height=280,
+                                    x_label=("Minutos" if current_lang == "Português" else "Minuti"),
+                                    y_label="passi/min",
+                                )
+                            else:
+                                st.info(
+                                    "Il GPX non contiene dati di cadenza "
+                                    "utilizzabili."
+                                )
+                else:
+                    st.info(
+                        "Grafici non ancora disponibili per questa attività. "
+                        "Ricarica lo stesso GPX nell'importatore e usa "
+                        "“Aggiorna mappa e grafici del GPX già importato”."
+                    )
+
+            route = _route_points_from_activity(selected_activity)
+            with st.expander(("🗺️ Mapa do percurso" if current_lang == "Português" else "🗺️ Mappa percorso"), expanded=False):
+                if route:
+                    render_gpx_route_map(route, height=460)
+                else:
+                    st.info(
+                        "Questa attività è stata importata prima del supporto "
+                        "mappe. Ricarica lo stesso GPX nell'importatore qui "
+                        "sopra e usa “Aggiorna mappa e grafici del GPX già importato”."
+                    )
+
+            with st.expander(("🗑️ Eliminar atividade" if current_lang == "Português" else "🗑️ Elimina attività"), expanded=False):
+                st.warning(
+                    "L'eliminazione rimuove questa attività dal registro e "
+                    "ricalcola automaticamente le kcal dei passi del giorno."
+                )
+                confirm_delete = st.checkbox(
+                    ("Confirmo que pretendo eliminar esta atividade" if current_lang == "Português" else "Confermo di voler eliminare questa attività"),
+                    key=f"confirm_delete_gpx_{selected_activity_id}",
+                )
+                if st.button(
+                    ("Eliminar definitivamente" if current_lang == "Português" else "Elimina definitivamente"),
+                    key=f"delete_gpx_{selected_activity_id}",
+                    type="primary",
+                    disabled=not confirm_delete,
+                    use_container_width=True,
+                ):
+                    delete_activity_via_api(
+                        selected_activity_id,
+                        st.session_state.get("auth_access_token"),
+                    )
+
+                    # Recalculate the step-calorie offset because removing a
+                    # GPX activity frees its activity_steps again.
+                    if selected_activity_date:
+                        deleted_day_log = fetch_daily_log_from_api(
+                            user_id,
+                            str(selected_activity_date),
+                            st.session_state.get("auth_access_token"),
+                        )
+                        recalculate_step_calories_for_day(
+                            user_id,
+                            selected_activity_date,
+                            total_steps=int(
+                                (deleted_day_log or {}).get("steps") or 0
+                            ),
+                        )
+                        try:
+                            deleted_date_obj = date.fromisoformat(
+                                str(selected_activity_date)
+                            )
+                            refresh_daily_logs(deleted_date_obj)
+                        except Exception:
+                            pass
+
+                    st.session_state.pop(
+                        f"confirm_delete_gpx_{selected_activity_id}",
+                        None,
+                    )
+                    st.session_state["gpx_last_action_message"] = (
+                        "🗑️ Attività GPX eliminata."
+                    )
+                    st.rerun()
+
 
 
 # ============================================================

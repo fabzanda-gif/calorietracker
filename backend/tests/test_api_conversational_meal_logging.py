@@ -37,6 +37,11 @@ def test_conversational_preview_route_is_registered():
         in app.openapi()["paths"]
     )
 
+    assert (
+        "/meals/conversational/confirm"
+        in app.openapi()["paths"]
+    )
+
 
 def test_conversational_preview_requires_text():
     response = client.post(
@@ -108,6 +113,7 @@ def test_conversational_preview_builds_preview_from_interpretation(
     assert len(payload["items"]) == 2
     assert payload["items"][0]["name"] == "Carbonara"
     assert payload["items"][1]["name"] == "Mela"
+    assert payload["items"][0]["quantity_g"] == 100.0
 
     assert payload["totals"] == {
         "calories": 780.0,
