@@ -4372,7 +4372,7 @@
 
   .desktopHomeGrid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 380px);
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     column-gap: 24px;
     row-gap: 24px;
     align-items: start;
@@ -4385,8 +4385,7 @@
   }
 
   .desktopHomeGrid .mealsSection {
-    grid-column: 1;
-    grid-row: 1;
+    grid-column: span 8;
     width: 100%;
     min-width: 0;
   }
@@ -4410,8 +4409,7 @@
   }
 
   .desktopHomeGrid .conversationCard {
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: span 4;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
@@ -4420,8 +4418,8 @@
     margin: 0;
     padding: 24px;
     box-sizing: border-box;
-    position: sticky;
-    top: 24px;
+    position: relative;
+    top: auto;
     align-self: start;
   }
 
@@ -4456,7 +4454,7 @@
   }
 
   .desktopHomeGrid .decisionSection {
-    grid-column: 1 / -1;
+    grid-column: span 12;
     width: 100%;
     min-width: 0;
   }
@@ -4475,7 +4473,7 @@
 
 @media (min-width: 1800px) {
   .desktopHomeGrid {
-    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 30px;
   }
 
@@ -4509,5 +4507,208 @@
     width: 105px;
     height: 105px;
     margin: 0 auto 12px;
+  }
+}
+
+
+/* Dashboard personalizzabile */
+.dashboardToolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 12px;
+}
+
+.dashboardCustomizeButton,
+.dashboardCustomizeActive,
+.dashboardResetButton {
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.dashboardCustomizeButton {
+  border: 1px solid #deded7;
+  background: #ffffff;
+  color: #102846;
+}
+
+.dashboardCustomizeActive {
+  border: 1px solid #f47f7a;
+  background: #fff0ef;
+  color: #d94f4b;
+}
+
+.dashboardResetButton {
+  border: 0;
+  background: transparent;
+  color: #686862;
+}
+
+.dashboardWidget {
+  position: relative;
+  transition:
+    opacity 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.dashboardWidget[draggable="true"] {
+  cursor: grab;
+  outline: 2px dashed rgba(244, 127, 122, 0.55);
+  outline-offset: 4px;
+}
+
+.dashboardWidget[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.dashboardWidget[aria-grabbed="true"] {
+  opacity: 0.58;
+  transform: scale(0.99);
+}
+
+.widgetControls {
+  grid-column: 1 / -1;
+  order: -100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff0ef;
+  color: #9f3f3b;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.widgetControls > div {
+  display: flex;
+  gap: 6px;
+}
+
+.widgetControls button {
+  width: 32px;
+  height: 30px;
+  border: 1px solid #f4aaa6;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #9f3f3b;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.widgetControls button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.quickAddWidget {
+  grid-column: span 12;
+  min-width: 0;
+}
+
+@media (max-width: 1099px) {
+  .dashboardToolbar {
+    justify-content: stretch;
+  }
+
+  .dashboardCustomizeButton,
+  .dashboardCustomizeActive {
+    flex: 1;
+  }
+
+  .desktopHomeGrid .dashboardWidget,
+  .quickAddWidget {
+    grid-column: 1 / -1;
+  }
+}
+
+
+/* Rifinitura modalità personalizzazione */
+.summaryWidget {
+  grid-column: span 12;
+  min-width: 0;
+}
+
+.desktopHomeGrid .conversationCard[draggable="true"] {
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+}
+
+.desktopHomeGrid
+  .conversationCard[draggable="true"]
+  .widgetControls {
+  position: static;
+  order: -100;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 1099px) {
+  .summaryWidget {
+    grid-column: 1 / -1;
+  }
+}
+
+
+/* Dimensioni controllate dei widget */
+.desktopHomeGrid
+  .dashboardWidget[data-widget-size="4"] {
+  grid-column: span 4;
+}
+
+.desktopHomeGrid
+  .dashboardWidget[data-widget-size="8"] {
+  grid-column: span 8;
+}
+
+.desktopHomeGrid
+  .dashboardWidget[data-widget-size="12"] {
+  grid-column: span 12;
+}
+
+.widgetControlActions,
+.widgetSizeControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.widgetSizeControls {
+  padding-right: 8px;
+  margin-right: 2px;
+  border-right: 1px solid #f4aaa6;
+}
+
+.widgetSizeControls span {
+  min-width: 58px;
+  text-align: center;
+  font-size: 0.7rem;
+}
+
+@media (max-width: 1099px) {
+  .desktopHomeGrid
+    .dashboardWidget[data-widget-size] {
+    grid-column: 1 / -1 !important;
+  }
+
+  .widgetControls {
+    align-items: flex-start;
+  }
+
+  .widgetControlActions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }

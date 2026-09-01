@@ -19,7 +19,12 @@ import {
 import { RegisteredToday } from "@/components/home/RegisteredToday";
 import { getActivitiesForDate, type Activity } from "@/lib/api/activities";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  type DragEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { confirmMealPrediction } from "@/lib/api/confirm";
@@ -142,7 +147,114 @@ function normalizeDayType(
   return "office";
 }
 
+type DashboardWidgetSize = 4 | 8 | 12;
+
+type DashboardWidgetId =
+  | "meals"
+  | "ai"
+  | "dinner"
+  | "quick-add"
+  | "summary";
+
+const DEFAULT_DASHBOARD_ORDER: DashboardWidgetId[] = [
+  "meals",
+  "ai",
+  "dinner",
+  "quick-add",
+  "summary",
+];
+
+const DASHBOARD_ORDER_KEY =
+  "sanosync-dashboard-widget-order";
+
+const DASHBOARD_SIZE_KEY =
+  "sanosync-dashboard-widget-sizes";
+
+const DEFAULT_DASHBOARD_SIZES:
+  Record<DashboardWidgetId, DashboardWidgetSize> = {
+    meals: 8,
+    ai: 4,
+    dinner: 12,
+    "quick-add": 12,
+    summary: 12,
+  };
+
+function readDashboardOrder(): DashboardWidgetId[] {
+  if (typeof window === "undefined") {
+    return DEFAULT_DASHBOARD_ORDER;
+  }
+
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(
+        DASHBOARD_ORDER_KEY,
+      ) ?? "null",
+    );
+
+    if (
+      Array.isArray(stored) &&
+      DEFAULT_DASHBOARD_ORDER.every(
+        (widget) => stored.includes(widget),
+      )
+    ) {
+      return stored as DashboardWidgetId[];
+    }
+  } catch {
+    // Usa l'ordine iniziale se il dato locale non è valido.
+  }
+
+  return DEFAULT_DASHBOARD_ORDER;
+}
+
+function readDashboardSizes():
+  Record<DashboardWidgetId, DashboardWidgetSize> {
+  if (typeof window === "undefined") {
+    return DEFAULT_DASHBOARD_SIZES;
+  }
+
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(
+        DASHBOARD_SIZE_KEY,
+      ) ?? "null",
+    );
+
+    if (
+      stored &&
+      typeof stored === "object" &&
+      DEFAULT_DASHBOARD_ORDER.every(
+        (widget) =>
+          stored[widget] === 4 ||
+          stored[widget] === 8 ||
+          stored[widget] === 12,
+      )
+    ) {
+      return stored as Record<
+        DashboardWidgetId,
+        DashboardWidgetSize
+      >;
+    }
+  } catch {
+    // Usa le dimensioni iniziali.
+  }
+
+  return DEFAULT_DASHBOARD_SIZES;
+}
+
 export function HomeShell() {
+  const [dashboardOrder, setDashboardOrder] =
+    useState<DashboardWidgetId[]>(readDashboardOrder);
+  const [dashboardSizes, setDashboardSizes] =
+    useState<
+      Record<DashboardWidgetId, DashboardWidgetSize>
+    >(readDashboardSizes);
+  const [
+    customizingDashboard,
+    setCustomizingDashboard,
+  ] = useState(false);
+  const [draggedWidget, setDraggedWidget] =
+    useState<DashboardWidgetId | null>(null);
+
   const [dayPlannerSaving, setDayPlannerSaving] =
     useState(false);
   const [dayPlannerMessage, setDayPlannerMessage] =
@@ -255,6 +367,212 @@ export function HomeShell() {
   const [conversationSuccess, setConversationSuccess] =
     useState<string | null>(null);
 
+
+  function resizeDashboardWidget(
+    widget: DashboardWidgetId,
+    direction: -1 | 1,
+  ) {
+    const allowedSizes: DashboardWidgetSize[] =
+      widget === "ai"
+        ? [4, 8, 12]
+        : [8, 12];
+
+    const currentSize = dashboardSizes[widget];
+    const currentIndex = allowedSizes.indexOf(
+      currentSize,
+    );
+    const safeIndex =
+      currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = Math.min(
+      allowedSizes.length - 1,
+      Math.max(0, safeIndex + direction),
+    );
+
+    if (nextIndex === safeIndex) {
+      return;
+    }
+
+    const nextSizes = {
+      ...dashboardSizes,
+      [widget]: allowedSizes[nextIndex],
+    };
+
+    setDashboardSizes(nextSizes);
+    window.localStorage.setItem(
+      DASHBOARD_SIZE_KEY,
+      JSON.stringify(nextSizes),
+    );
+  }
+
+  function saveDashboardOrder(
+    nextOrder: DashboardWidgetId[],
+  ) {
+    setDashboardOrder(nextOrder);
+
+    window.localStorage.setItem(
+      DASHBOARD_ORDER_KEY,
+      JSON.stringify(nextOrder),
+    );
+  }
+
+  function moveDashboardWidget(
+    widget: DashboardWidgetId,
+    direction: -1 | 1,
+  ) {
+    const currentIndex = dashboardOrder.indexOf(widget);
+    const nextIndex = currentIndex + direction;
+
+    if (
+      currentIndex < 0 ||
+      nextIndex < 0 ||
+      nextIndex >= dashboardOrder.length
+    ) {
+      return;
+    }
+
+    const nextOrder = [...dashboardOrder];
+    [
+      nextOrder[currentIndex],
+      nextOrder[nextIndex],
+    ] = [
+      nextOrder[nextIndex],
+      nextOrder[currentIndex],
+    ];
+
+    saveDashboardOrder(nextOrder);
+  }
+
+  function dashboardWidgetProps(
+    widget: DashboardWidgetId,
+  ) {
+    return {
+      draggable: customizingDashboard,
+      style: {
+        order: dashboardOrder.indexOf(widget),
+      },
+      "data-widget-size":
+        dashboardSizes[widget],
+      "aria-grabbed":
+        customizingDashboard
+          ? draggedWidget === widget
+          : undefined,
+      onDragStart: () => {
+        if (customizingDashboard) {
+          setDraggedWidget(widget);
+        }
+      },
+      onDragOver: (
+        event: DragEvent<HTMLElement>,
+      ) => {
+        if (customizingDashboard) {
+          event.preventDefault();
+        }
+      },
+      onDrop: () => {
+        if (
+          !customizingDashboard ||
+          !draggedWidget ||
+          draggedWidget === widget
+        ) {
+          return;
+        }
+
+        const nextOrder = dashboardOrder.filter(
+          (item) => item !== draggedWidget,
+        );
+        const targetIndex =
+          nextOrder.indexOf(widget);
+
+        nextOrder.splice(
+          targetIndex,
+          0,
+          draggedWidget,
+        );
+
+        saveDashboardOrder(nextOrder);
+        setDraggedWidget(null);
+      },
+      onDragEnd: () => setDraggedWidget(null),
+    };
+  }
+
+  function dashboardWidgetControls(
+    widget: DashboardWidgetId,
+    label: string,
+  ) {
+    if (!customizingDashboard) {
+      return null;
+    }
+
+    const position = dashboardOrder.indexOf(widget);
+
+    return (
+      <div className={styles.widgetControls}>
+        <span>Trascina {label}</span>
+
+        <div className={styles.widgetControlActions}>
+          <div className={styles.widgetSizeControls}>
+            <button
+              type="button"
+              aria-label={`Riduci ${label}`}
+              disabled={
+                dashboardSizes[widget] <=
+                (widget === "ai" ? 4 : 8)
+              }
+              onClick={() =>
+                resizeDashboardWidget(widget, -1)
+              }
+            >
+              −
+            </button>
+
+            <span>
+              {dashboardSizes[widget] === 4
+                ? "Compatto"
+                : dashboardSizes[widget] === 8
+                ? "Medio"
+                : "Largo"}
+            </span>
+
+            <button
+              type="button"
+              aria-label={`Allarga ${label}`}
+              disabled={dashboardSizes[widget] >= 12}
+              onClick={() =>
+                resizeDashboardWidget(widget, 1)
+              }
+            >
+              +
+            </button>
+          </div>
+
+          <button
+            type="button"
+            aria-label={`Sposta ${label} prima`}
+            disabled={position <= 0}
+            onClick={() =>
+              moveDashboardWidget(widget, -1)
+            }
+          >
+            ↑
+          </button>
+
+          <button
+            type="button"
+            aria-label={`Sposta ${label} dopo`}
+            disabled={
+              position >= dashboardOrder.length - 1
+            }
+            onClick={() =>
+              moveDashboardWidget(widget, 1)
+            }
+          >
+            ↓
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const firstName = useMemo(() => {
     const metadataName =
@@ -1619,8 +1937,59 @@ export function HomeShell() {
             </section>
           )}
 
+          <div className={styles.dashboardToolbar}>
+            <button
+              type="button"
+              className={
+                customizingDashboard
+                  ? styles.dashboardCustomizeActive
+                  : styles.dashboardCustomizeButton
+              }
+              onClick={() => {
+                setCustomizingDashboard(
+                  (current) => !current,
+                );
+                setDraggedWidget(null);
+              }}
+            >
+              {customizingDashboard
+                ? "Fine personalizzazione"
+                : "Personalizza Home"}
+            </button>
+
+            {customizingDashboard ? (
+              <button
+                type="button"
+                className={styles.dashboardResetButton}
+                onClick={() => {
+                  saveDashboardOrder([
+                    ...DEFAULT_DASHBOARD_ORDER,
+                  ]);
+                  setDashboardSizes({
+                    ...DEFAULT_DASHBOARD_SIZES,
+                  });
+                  window.localStorage.setItem(
+                    DASHBOARD_SIZE_KEY,
+                    JSON.stringify(
+                      DEFAULT_DASHBOARD_SIZES,
+                    ),
+                  );
+                }}
+              >
+                Ripristina ordine
+              </button>
+            ) : null}
+          </div>
+
           <div className={styles.desktopHomeGrid}>
-            <section className={styles.conversationCard}>
+            <section
+              {...dashboardWidgetProps("ai")}
+              className={`${styles.conversationCard} ${styles.dashboardWidget}`}
+            >
+            {dashboardWidgetControls(
+              "ai",
+              "SanoSync AI",
+            )}
             <div className={styles.conversationHeader}>
               <div>
                 <span className={styles.conversationEyebrow}>
@@ -1917,7 +2286,14 @@ export function HomeShell() {
             ) : null}
           </section>
 
-          <section className={`${styles.section} ${styles.mealsSection}`}>
+          <section
+            {...dashboardWidgetProps("meals")}
+            className={`${styles.section} ${styles.mealsSection} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "meals",
+              "I tuoi pasti",
+            )}
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
@@ -2720,7 +3096,14 @@ export function HomeShell() {
 
           {!actualDinner &&
           showDinnerAlternatives ? (
-            <section className={styles.decisionSection}>
+            <section
+              {...dashboardWidgetProps("dinner")}
+              className={`${styles.decisionSection} ${styles.dashboardWidget}`}
+            >
+            {dashboardWidgetControls(
+              "dinner",
+              "Alternative cena",
+            )}
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
@@ -2828,20 +3211,40 @@ export function HomeShell() {
           </section>
           ) : null}
 
-          <QuickAdd
-            date={todayIso()}
-            accessToken={accessToken}
-            onSaved={refreshHome}
-          />
+          <div
+            {...dashboardWidgetProps("quick-add")}
+            className={`${styles.quickAddWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "quick-add",
+              "Aggiunta rapida",
+            )}
 
+            <QuickAdd
+              date={todayIso()}
+              accessToken={accessToken}
+              onSaved={refreshHome}
+            />
           </div>
 
-          <RegisteredToday
-            meals={actualMeals}
-            activities={actualActivities}
-            accessToken={accessToken}
-            onChanged={refreshHome}
-          />
+          <div
+            {...dashboardWidgetProps("summary")}
+            className={`${styles.summaryWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "summary",
+              "Resoconto della giornata",
+            )}
+
+            <RegisteredToday
+              meals={actualMeals}
+              activities={actualActivities}
+              accessToken={accessToken}
+              onChanged={refreshHome}
+            />
+          </div>
+
+          </div>
 
         </>
       ) : null}
