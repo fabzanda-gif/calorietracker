@@ -225,3 +225,121 @@
     display: none;
   }
 }
+
+
+/* Profilo utente nella sidebar */
+.profileArea {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.profileCard {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e1db;
+  border-radius: 15px;
+  background: #ffffff;
+  color: #102846;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.profileCard:hover {
+  border-color: #f2aaa6;
+  box-shadow: 0 8px 20px rgba(16, 40, 70, 0.07);
+  transform: translateY(-1px);
+}
+
+.profileAvatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 50%;
+  background:
+    linear-gradient(145deg, #173c62, #102846);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.profileAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profileDetails {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.profileDetails strong,
+.profileDetails small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileDetails strong {
+  font-size: 0.78rem;
+}
+
+.profileDetails small {
+  color: #777771;
+  font-size: 0.62rem;
+}
+
+.profileArrow {
+  color: #718096;
+  font-size: 1.25rem;
+}
+
+.profileArea .signOut {
+  width: 100%;
+  margin-top: 0;
+}
+
+
+/* Dispensa come voce secondaria di Ricette */
+.desktopSubLink,
+.desktopSubLinkActive {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 24px);
+  min-height: 38px;
+  margin: -2px 0 4px 24px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 0;
+  border-left: 2px solid #eeeae5;
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+  color: #66758a;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.desktopSubLink:hover {
+  background: #faf7f5;
+  color: #102846;
+}
+
+.desktopSubLinkActive {
+  border-left-color: #ff625e;
+  background: #fff3f2;
+  color: #e9534f;
+}

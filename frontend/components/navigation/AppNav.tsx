@@ -14,34 +14,19 @@ const ITEMS = [
     icon: "⌂",
   },
   {
-    href: "/inventory",
-    label: "Cosa mangio?",
-    icon: "▦",
-  },
-  {
     href: "/recipes",
     label: "Ricette",
     icon: "⌑",
   },
   {
+    href: "/inventory",
+    label: "Dispensa",
+    icon: "▦",
+  },
+  {
     href: "/progress",
     label: "Progressi",
     icon: "⌁",
-  },
-  {
-    href: "#",
-    label: "Condivisioni",
-    icon: "♧",
-  },
-  {
-    href: "/profile",
-    label: "Impostazioni",
-    icon: "⚙",
-  },
-  {
-    href: "#",
-    label: "Aiuto",
-    icon: "?",
   },
 ];
 
@@ -59,7 +44,34 @@ function isActive(pathname: string, href: string): boolean {
 
 export function AppNav() {
   const pathname = usePathname();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
+
+  const metadataName =
+    user?.user_metadata?.full_name ??
+    user?.user_metadata?.name ??
+    user?.user_metadata?.first_name;
+
+  const displayName =
+    typeof metadataName === "string" &&
+    metadataName.trim()
+      ? metadataName.trim()
+      : user?.email?.split("@")[0] ?? "Profilo";
+
+  const initials =
+    displayName
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "S";
+
+  const metadataAvatar =
+    user?.user_metadata?.avatar_url ??
+    user?.user_metadata?.picture;
+
+  const avatarUrl =
+    typeof metadataAvatar === "string"
+      ? metadataAvatar
+      : null;
 
   return (
     <>
@@ -107,7 +119,11 @@ export function AppNav() {
                   <Link
                     href={item.href}
                     className={
-                      active
+                      item.href === "/inventory"
+                        ? active
+                          ? styles.desktopSubLinkActive
+                          : styles.desktopSubLink
+                        : active
                         ? styles.desktopLinkActive
                         : styles.desktopLink
                     }
@@ -129,15 +145,49 @@ export function AppNav() {
           })}
         </nav>
 
-        <button
-          type="button"
-          className={styles.signOut}
-          onClick={() => {
-            void signOut();
-          }}
-        >
-          Esci
-        </button>
+        <div className={styles.profileArea}>
+          <Link
+            href="/profile"
+            className={styles.profileCard}
+            aria-label="Apri il profilo"
+          >
+            <span className={styles.profileAvatar}>
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                initials
+              )}
+            </span>
+
+            <span className={styles.profileDetails}>
+              <strong>{displayName}</strong>
+              <small>
+                {user?.email ?? "Gestisci il profilo"}
+              </small>
+            </span>
+
+            <span
+              className={styles.profileArrow}
+              aria-hidden="true"
+            >
+              ›
+            </span>
+          </Link>
+
+          <button
+            type="button"
+            className={styles.signOut}
+            onClick={() => {
+              void signOut();
+            }}
+          >
+            Esci
+          </button>
+        </div>
       </aside>
 
       <nav

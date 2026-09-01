@@ -44,6 +44,7 @@ import {
 } from "@/lib/api/meals";
 import {
   getDay,
+  getDayBriefing,
   getDayBudget,
   getMealOptions,
   getNextMeal,
@@ -67,6 +68,21 @@ import styles from "./HomeShell.module.css";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function briefingMoment():
+  "morning" | "afternoon" | "evening" {
+  const hour = new Date().getHours();
+
+  if (hour < 12) {
+    return "morning";
+  }
+
+  if (hour < 18) {
+    return "afternoon";
+  }
+
+  return "evening";
 }
 
 function greeting(): string {
@@ -278,6 +294,8 @@ export function HomeShell() {
   const [dayPlannerSaving, setDayPlannerSaving] =
     useState(false);
   const [dayPlannerMessage, setDayPlannerMessage] =
+    useState<string | null>(null);
+  const [dayBriefing, setDayBriefing] =
     useState<string | null>(null);
 
 
@@ -695,6 +713,7 @@ export function HomeShell() {
         const [
           dayPayload,
           budgetPayload,
+          briefingPayload,
           nextMealPayload,
           mealsPayload,
           activitiesPayload,
@@ -710,6 +729,12 @@ export function HomeShell() {
             date,
             accessToken,
           ),
+          getDayBriefing(
+            date,
+            briefingMoment(),
+            "standard",
+            accessToken,
+          ).catch(() => null),
           getNextMeal(
             date,
             accessToken,
@@ -749,6 +774,9 @@ export function HomeShell() {
         if (active) {
           setDay(dayPayload);
           setBudgetResult(budgetPayload);
+          setDayBriefing(
+            briefingPayload?.message ?? null,
+          );
           setNextMeal(nextMealPayload);
           setNextMealOptions(nextMealOptionsPayload);
           setDinnerOptions(
@@ -813,6 +841,11 @@ export function HomeShell() {
   const currentDayType = day
     ? normalizeDayType(day.context.value)
     : null;
+
+  const dayBriefingBody =
+    dayBriefing
+      ?.replace(/^[^!]+!\s*/, "")
+      .trim() || null;
 
   const historicalProfile =
     currentDayType && dayHistory
@@ -1715,7 +1748,9 @@ export function HomeShell() {
       {day ? (
         <>
           <DayPlanner
-            message={buildDayMessage(
+            message={
+              dayBriefingBody ??
+              buildDayMessage(
               buildDayMessageContext(
                 user?.user_metadata?.first_name ||
                   user?.user_metadata?.name ||

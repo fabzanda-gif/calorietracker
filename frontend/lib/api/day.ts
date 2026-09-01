@@ -88,3 +88,41 @@ export async function updateDailyLog(
     },
   );
 }
+
+
+export type DayBriefingMode =
+  | "standard"
+  | "zero";
+
+export type DayBriefingMoment =
+  | "morning"
+  | "afternoon"
+  | "evening";
+
+export type DayBriefingResponse = {
+  date: string;
+  mode: DayBriefingMode;
+  message: string;
+  source: "ai" | "fallback";
+  cached: boolean;
+};
+
+export function getDayBriefing(
+  dayDate: string,
+  moment: DayBriefingMoment,
+  mode: DayBriefingMode = "standard",
+  accessToken?: string | null,
+): Promise<DayBriefingResponse> {
+  const query = new URLSearchParams({
+    moment,
+    mode,
+  });
+
+  return apiRequest<DayBriefingResponse>(
+    `/days/${encodeURIComponent(dayDate)}` +
+      `/briefing?${query.toString()}`,
+    {
+      accessToken,
+    },
+  );
+}

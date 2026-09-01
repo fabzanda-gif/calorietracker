@@ -48,7 +48,7 @@ class GroqMealVisionInterpreter:
             model
             or os.getenv("GROQ_VISION_MODEL")
             or os.getenv("GROQ_TEXT_MODEL")
-            or "qwen/qwen3.6-27b"
+            or "qwen/qwen3.8-27b"
         )
 
         self._client = client

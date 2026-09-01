@@ -27,6 +27,12 @@ from backend.repositories.weight import WeightRepository
 from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
+from backend.services.day_briefing import (
+    DayBriefingError,
+    DayBriefingService,
+    build_status_hint,
+    fallback_day_briefing,
+)
 from backend.services.decision_feedback import DecisionFeedbackService
 from backend.services.decision_learning_pipeline import DecisionLearningPipelineService
 from backend.services.decision_mode import (
@@ -64,6 +70,9 @@ from backend.services.order_personalization import (
 
 
 router = APIRouter(prefix="/days", tags=["days"])
+
+
+_DAY_BRIEFING_CACHE: dict[tuple, dict] = {}
 
 
 MEAL_SLOT_TO_TYPE = {
@@ -644,6 +653,159 @@ def confirm_meal_prediction(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
+
+
+
+
+@router.get("/{day_date}/briefing")
+def get_day_briefing(
+    day_date: Date,
+    moment: str = Query(
+        default="evening",
+        pattern="^(morning|afternoon|evening)$",
+    ),
+    mode: str = Query(
+        default="standard",
+        pattern="^(standard|zero)$",
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+):
+    try:
+        day = _build_day(
+            user_id=current_user.id,
+            day_date=day_date,
+            daily_logs_repo=daily_logs_repo,
+            meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
+        )
+        budget_result = _build_budget(
+            current_user=current_user,
+            day_date=day_date,
+            meals_repo=meals_repo,
+            activities_repo=activities_repo,
+            weight_repo=weight_repo,
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    actual = budget_result.get("actual") or {}
+    budget = budget_result.get("budget") or {}
+
+    consumed_kcal = float(
+        budget.get(
+            "consumed_kcal",
+            actual.get("consumed_kcal", 0),
+        )
+        or 0
+    )
+    daily_budget_kcal = float(
+        budget.get("daily_budget_kcal", 0) or 0
+    )
+    maintenance_kcal = float(
+        budget.get("maintenance_kcal", 0) or 0
+    )
+
+    metadata = current_user.metadata or {}
+    full_name = (
+        metadata.get("first_name")
+        or metadata.get("name")
+        or metadata.get("full_name")
+        or ""
+    )
+    first_name = str(full_name).strip().split(" ")[0]
+
+    payload = {
+        "first_name": first_name,
+        "moment": moment,
+        "day_type": day.get("context", {}).get("value"),
+        "activity_level": (
+            day.get("activity_plan", {}).get("value")
+        ),
+        "activity_count": int(
+            actual.get("activity_count", 0) or 0
+        ),
+        "activity_kcal": float(
+            actual.get("actual_activity_kcal", 0) or 0
+        ),
+        "consumed_kcal": consumed_kcal,
+        "daily_budget_kcal": daily_budget_kcal,
+        "maintenance_kcal": maintenance_kcal,
+        "available_kcal": float(
+            budget.get("available_kcal", 0) or 0
+        ),
+        "status_hint": build_status_hint(
+            consumed_kcal=consumed_kcal,
+            daily_budget_kcal=daily_budget_kcal,
+            maintenance_kcal=maintenance_kcal,
+        ),
+    }
+
+    cache_key = (
+        current_user.id,
+        str(day_date),
+        mode,
+        moment,
+        payload["day_type"],
+        payload["activity_level"],
+        payload["activity_count"],
+        round(payload["activity_kcal"], 1),
+        round(payload["consumed_kcal"], 1),
+        round(payload["daily_budget_kcal"], 1),
+        round(payload["maintenance_kcal"], 1),
+    )
+
+    cached = _DAY_BRIEFING_CACHE.get(cache_key)
+
+    if cached is not None:
+        return {
+            **cached,
+            "cached": True,
+        }
+
+    try:
+        message = DayBriefingService().generate(
+            payload,
+            mode=mode,
+        )
+        source = "ai"
+    except DayBriefingError:
+        message = fallback_day_briefing(
+            payload,
+            mode=mode,
+        )
+        source = "fallback"
+
+    response = {
+        "date": str(day_date),
+        "mode": mode,
+        "message": message,
+        "source": source,
+        "cached": False,
+    }
+
+    if len(_DAY_BRIEFING_CACHE) >= 512:
+        _DAY_BRIEFING_CACHE.clear()
+
+    _DAY_BRIEFING_CACHE[cache_key] = response
+    return response
 
 
 @router.get("/{day_date}")
