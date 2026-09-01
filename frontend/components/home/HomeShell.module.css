@@ -4712,3 +4712,266 @@
     justify-content: flex-end;
   }
 }
+
+
+/* Home enrichment — mockup alignment */
+.greetingWave {
+  display: inline-block;
+  margin-left: 14px;
+  font-size: 0.58em;
+  vertical-align: 0.16em;
+  transform: rotate(-8deg);
+}
+
+.budgetEyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+  color: #ffffff;
+  font-size: 0.78rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.budgetEyebrow > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 105, 101, 0.6);
+  border-radius: 50%;
+  color: #ff6965;
+  font-size: 1.15rem;
+}
+
+.mealIdentity {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.mealIcon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      145deg,
+      #ff7d78,
+      #ff5d59
+    );
+  color: #ffffff;
+  font-size: 0.92rem;
+  line-height: 1;
+  box-shadow:
+    0 5px 12px rgba(255, 93, 89, 0.18);
+}
+
+.mealsSection .mealCardTop {
+  align-items: center;
+}
+
+.mealsSection .mealLabel {
+  color: #102846;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+@media (min-width: 1100px) {
+  .header {
+    padding-bottom: 18px;
+  }
+
+  .header h1 {
+    font-size: clamp(3rem, 4.5vw, 4.5rem);
+    line-height: 0.98;
+  }
+}
+
+@media (max-width: 600px) {
+  .greetingWave {
+    margin-left: 8px;
+  }
+
+  .budgetEyebrow {
+    margin-bottom: 15px;
+  }
+
+  .mealIcon {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+
+/* Widget Trend peso e Obiettivo calorico */
+.insightWidget {
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 22px;
+  border: 1px solid #e8e7e1;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(16, 40, 70, 0.06);
+}
+
+.insightWidgetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.insightWidgetHeader h2 {
+  margin: 3px 0 0;
+  color: #102846;
+  font-size: 1.2rem;
+  letter-spacing: -0.035em;
+}
+
+.periodBadge {
+  padding: 7px 10px;
+  border: 1px solid #e5e4df;
+  border-radius: 10px;
+  color: #686862;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.weightSummary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.weightSummary strong {
+  color: #102846;
+  font-size: 1.85rem;
+  letter-spacing: -0.04em;
+}
+
+.weightChangePositive {
+  color: #24a965;
+  font-weight: 800;
+}
+
+.weightChangeNeutral {
+  color: #f05f5b;
+  font-weight: 800;
+}
+
+.weightChart {
+  display: block;
+  width: 100%;
+  height: 150px;
+  margin-top: 8px;
+  overflow: visible;
+}
+
+.weightChart line {
+  stroke: #ecebe6;
+  stroke-width: 1;
+}
+
+.weightChart polyline {
+  stroke: #ff625e;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.weightChart circle {
+  fill: #ff625e;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.weightDates {
+  display: flex;
+  justify-content: space-between;
+  color: #85857f;
+  font-size: 0.7rem;
+}
+
+.goalIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #fff0ef;
+  color: #ff625e;
+  font-size: 1.3rem;
+}
+
+.goalValue {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #f8f8f5;
+}
+
+.goalValue span {
+  color: #686862;
+  font-size: 0.78rem;
+}
+
+.goalValue strong {
+  color: #102846;
+  font-size: 1.55rem;
+  letter-spacing: -0.035em;
+}
+
+.goalDescription {
+  margin: 14px 0;
+  color: #686862;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.goalEditLink {
+  color: #f05f5b;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.goalEditLink:hover {
+  text-decoration: underline;
+}
+
+.insightEmpty {
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+  padding: 20px;
+  border: 1px dashed #deded7;
+  border-radius: 14px;
+  color: #686862;
+  text-align: center;
+}
+
+.insightEmpty p {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 600px) {
+  .insightWidget {
+    padding: 18px;
+  }
+
+  .weightChart {
+    height: 125px;
+  }
+}

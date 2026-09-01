@@ -57,7 +57,11 @@ import type {
   RankedMealOption,
 } from "@/lib/api/types";
 
-import { getLatestWeight } from "@/lib/api/weight";
+import {
+  getLatestWeight,
+  getWeightHistory,
+  type WeightEntry,
+} from "@/lib/api/weight";
 
 import styles from "./HomeShell.module.css";
 
@@ -83,8 +87,18 @@ function mealLabel(slot: string): string {
   return {
     breakfast: "Colazione",
     lunch: "Pranzo",
+    snack: "Snack",
     dinner: "Cena",
   }[slot] ?? slot;
+}
+
+function mealIcon(slot: string): string {
+  return {
+    breakfast: "☕",
+    lunch: "▦",
+    snack: "●",
+    dinner: "♨",
+  }[slot] ?? "•";
 }
 
 function roundNumber(value: number): string {
@@ -154,6 +168,8 @@ type DashboardWidgetId =
   | "ai"
   | "dinner"
   | "quick-add"
+  | "weight"
+  | "goal"
   | "summary";
 
 const DEFAULT_DASHBOARD_ORDER: DashboardWidgetId[] = [
@@ -161,6 +177,8 @@ const DEFAULT_DASHBOARD_ORDER: DashboardWidgetId[] = [
   "ai",
   "dinner",
   "quick-add",
+  "weight",
+  "goal",
   "summary",
 ];
 
@@ -176,6 +194,8 @@ const DEFAULT_DASHBOARD_SIZES:
     ai: 4,
     dinner: 12,
     "quick-add": 12,
+    weight: 8,
+    goal: 4,
     summary: 12,
   };
 
@@ -321,6 +341,8 @@ export function HomeShell() {
 
   const [latestWeight, setLatestWeight] =
     useState<number | null>(null);
+  const [weightHistory, setWeightHistory] =
+    useState<WeightEntry[]>([]);
 
   const [dayHistory, setDayHistory] =
     useState<DayHistoryResponse | null>(null);
@@ -373,7 +395,7 @@ export function HomeShell() {
     direction: -1 | 1,
   ) {
     const allowedSizes: DashboardWidgetSize[] =
-      widget === "ai"
+      widget === "ai" || widget === "goal"
         ? [4, 8, 12]
         : [8, 12];
 
@@ -517,7 +539,12 @@ export function HomeShell() {
               aria-label={`Riduci ${label}`}
               disabled={
                 dashboardSizes[widget] <=
-                (widget === "ai" ? 4 : 8)
+                (
+                  widget === "ai" ||
+                  widget === "goal"
+                    ? 4
+                    : 8
+                )
               }
               onClick={() =>
                 resizeDashboardWidget(widget, -1)
@@ -593,6 +620,64 @@ export function HomeShell() {
     return "";
   }, [user]);
 
+  const recentWeights = useMemo(
+    () =>
+      [...weightHistory]
+        .sort(
+          (left, right) =>
+            new Date(left.date).getTime() -
+            new Date(right.date).getTime(),
+        )
+        .slice(-14),
+    [weightHistory],
+  );
+
+  const weightChartPoints = useMemo(() => {
+    if (!recentWeights.length) {
+      return "";
+    }
+
+    const values = recentWeights.map(
+      (entry) => Number(entry.weight),
+    );
+    const minimum = Math.min(...values);
+    const maximum = Math.max(...values);
+    const range = Math.max(maximum - minimum, 1);
+
+    return recentWeights
+      .map((entry, index) => {
+        const x =
+          recentWeights.length === 1
+            ? 150
+            : 12 +
+              (index /
+                (recentWeights.length - 1)) *
+                276;
+        const y =
+          92 -
+          ((Number(entry.weight) - minimum) /
+            range) *
+            72;
+
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [recentWeights]);
+
+  const weightChange =
+    recentWeights.length >= 2
+      ? Number(
+          (
+            Number(
+              recentWeights[
+                recentWeights.length - 1
+              ].weight,
+            ) -
+            Number(recentWeights[0].weight)
+          ).toFixed(1),
+        )
+      : null;
+
   useEffect(() => {
     if (!accessToken) {
       return;
@@ -614,6 +699,7 @@ export function HomeShell() {
           mealsPayload,
           activitiesPayload,
           latestWeightPayload,
+          weightHistoryPayload,
           dayHistoryPayload,
         ] = await Promise.all([
           getDay(
@@ -639,6 +725,12 @@ export function HomeShell() {
           getLatestWeight(
             accessToken,
           ),
+          getWeightHistory(
+            accessToken,
+          ).catch(() => ({
+            count: 0,
+            items: [],
+          })),
           getDayHistory(
             accessToken,
           ),
@@ -673,6 +765,9 @@ export function HomeShell() {
             latestWeightPayload.item?.weight != null
               ? Number(latestWeightPayload.item.weight)
               : null,
+          );
+          setWeightHistory(
+            weightHistoryPayload.items,
           );
           setActualDinner(
             mealsPayload.items.find(
@@ -1589,6 +1684,13 @@ export function HomeShell() {
             {firstName
               ? `, ${firstName}`
               : ""}
+            <span
+              className={styles.greetingWave}
+              role="img"
+              aria-label="Ciao"
+            >
+              👋
+            </span>
           </h1>
         </div>
       </header>
@@ -1664,6 +1766,11 @@ export function HomeShell() {
                   : styles.budgetHeroCollapsed
               }`}
             >
+              <div className={styles.budgetEyebrow}>
+                <span aria-hidden="true">◎</span>
+                <strong>Il tuo piano di oggi</strong>
+              </div>
+
               <div className={styles.budgetHeader}>
                 <div className={styles.budgetColumn}>
                   <span className={styles.budgetLabel}>
@@ -2315,13 +2422,20 @@ export function HomeShell() {
                         styles.mealCardTop
                       }
                     >
-                      <span
-                        className={
-                          styles.mealLabel
-                        }
-                      >
-                        {mealLabel(slot)}
-                      </span>
+                      <div className={styles.mealIdentity}>
+                        <span
+                          className={styles.mealIcon}
+                          aria-hidden="true"
+                        >
+                          {mealIcon(slot)}
+                        </span>
+
+                        <span
+                          className={styles.mealLabel}
+                        >
+                          {mealLabel(slot)}
+                        </span>
+                      </div>
 
                       <span
                         className={
@@ -3226,6 +3340,168 @@ export function HomeShell() {
               onSaved={refreshHome}
             />
           </div>
+
+          <section
+            {...dashboardWidgetProps("weight")}
+            className={`${styles.insightWidget} ${styles.weightWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "weight",
+              "Trend peso",
+            )}
+
+            <div className={styles.insightWidgetHeader}>
+              <div>
+                <p className={styles.kicker}>
+                  Andamento
+                </p>
+                <h2>Trend peso</h2>
+              </div>
+
+              <span className={styles.periodBadge}>
+                Ultimi 14
+              </span>
+            </div>
+
+            {recentWeights.length ? (
+              <>
+                <div className={styles.weightSummary}>
+                  <strong>
+                    {Number(
+                      recentWeights[
+                        recentWeights.length - 1
+                      ].weight,
+                    ).toFixed(1)}{" "}
+                    kg
+                  </strong>
+
+                  {weightChange !== null ? (
+                    <span
+                      className={
+                        weightChange <= 0
+                          ? styles.weightChangePositive
+                          : styles.weightChangeNeutral
+                      }
+                    >
+                      {weightChange > 0 ? "+" : ""}
+                      {weightChange.toFixed(1)} kg
+                    </span>
+                  ) : null}
+                </div>
+
+                <svg
+                  className={styles.weightChart}
+                  viewBox="0 0 300 110"
+                  role="img"
+                  aria-label="Andamento recente del peso"
+                >
+                  <line x1="12" y1="92" x2="288" y2="92" />
+                  <line x1="12" y1="56" x2="288" y2="56" />
+                  <line x1="12" y1="20" x2="288" y2="20" />
+
+                  <polyline
+                    points={weightChartPoints}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                  />
+
+                  {recentWeights.map((entry, index) => {
+                    const [x, y] =
+                      weightChartPoints
+                        .split(" ")[index]
+                        .split(",");
+
+                    return (
+                      <circle
+                        key={`${entry.date}-${entry.id}`}
+                        cx={x}
+                        cy={y}
+                        r="3.5"
+                      />
+                    );
+                  })}
+                </svg>
+
+                <div className={styles.weightDates}>
+                  <span>
+                    {new Date(
+                      recentWeights[0].date,
+                    ).toLocaleDateString("it-IT", {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}
+                  </span>
+                  <span>
+                    {new Date(
+                      recentWeights[
+                        recentWeights.length - 1
+                      ].date,
+                    ).toLocaleDateString("it-IT", {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className={styles.insightEmpty}>
+                <strong>Nessun peso registrato</strong>
+                <p>
+                  Aggiungi il primo peso dal tuo profilo.
+                </p>
+              </div>
+            )}
+          </section>
+
+          <section
+            {...dashboardWidgetProps("goal")}
+            className={`${styles.insightWidget} ${styles.goalWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "goal",
+              "Obiettivo calorico",
+            )}
+
+            <div className={styles.insightWidgetHeader}>
+              <div>
+                <p className={styles.kicker}>
+                  Obiettivo
+                </p>
+                <h2>Obiettivo calorico</h2>
+              </div>
+
+              <span
+                className={styles.goalIcon}
+                aria-hidden="true"
+              >
+                ◎
+              </span>
+            </div>
+
+            <div className={styles.goalValue}>
+              <span>Deficit giornaliero</span>
+              <strong>
+                {budget
+                  ? roundNumber(
+                      budget.goal_adjustment_kcal,
+                    )
+                  : "—"}{" "}
+                kcal
+              </strong>
+            </div>
+
+            <p className={styles.goalDescription}>
+              Il target viene calcolato dal tuo
+              mantenimento e dal piano scelto.
+            </p>
+
+            <a
+              href="/profile"
+              className={styles.goalEditLink}
+            >
+              Modifica nel profilo →
+            </a>
+          </section>
 
           <div
             {...dashboardWidgetProps("summary")}
