@@ -11199,13 +11199,13 @@ def render_ai_spotlight_css():
 
 def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
     """
-    Convert free ingredient text into recipe_builder_ingredients.
+    Convert free meal/ingredient text into recipe_builder_ingredients.
 
-    Groq occasionally rejects response_format=json_object before returning any
-    content (json_validate_failed). We therefore:
-      1. try strict JSON mode;
-      2. retry without response_format using an even simpler prompt;
-      3. extract the first JSON object from the model text.
+    Robust flow:
+      1. strict JSON mode;
+      2. normal completion fallback;
+      3. tolerant JSON extraction + flexible schema normalization;
+      4. one repair pass when the model replied but the payload is unusable.
     """
     raw_text = str(ingredient_text or "").strip()
     if not raw_text:
@@ -11225,6 +11225,12 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
         "Português": "Portuguese",
     }.get(language, "Italian")
 
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    model_id = resolve_groq_text_model()
+
     schema_example = """
 {
   "ingredients": [
@@ -11241,73 +11247,197 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
 """.strip()
 
     prompt = f"""
-Extract ONLY the ingredients explicitly present in this text:
+Interpret the user's meal description and return the foods that should be
+logged by SanoSync.
 
+User text:
 {raw_text}
 
-Return one JSON object matching this example:
+Return ONE valid JSON object matching this shape:
 {schema_example}
 
-Requirements:
-- ingredient names must be in {language_name};
-- preserve user quantities;
-- kg -> g;
-- estimate grams for common units only when grams were not supplied;
+Rules:
+- names must be in {language_name};
+- preserve explicit quantities when possible;
+- convert kg to g;
+- if the user gives a COUNT instead of grams (for example "3 spring rolls"),
+  estimate a realistic TOTAL gram weight for that count;
+- a prepared food may remain ONE food item when splitting it into ingredients
+  would be artificial or unreliable;
 - use realistic average nutrition values per 100 g;
-- do NOT add ingredients;
+- do not invent extra foods that are not implied by the text;
 - every numeric value must be a JSON number;
-- no markdown, no prose, no reasoning.
+- no markdown, prose or reasoning.
 """.strip()
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.groq.com/openai/v1",
-    )
+    def _normalise_payload(data):
+        """Accept a few common model shapes and convert them to ingredients."""
+        if not isinstance(data, dict):
+            return []
 
-    def _extract_json_object(text):
-        cleaned = str(text or "").strip()
-        cleaned = re.sub(
-            r"^```(?:json)?\s*",
-            "",
-            cleaned,
-            flags=re.I,
+        items = (
+            data.get("ingredients")
+            or data.get("foods")
+            or data.get("items")
+            or data.get("meal_items")
+            or data.get("food_items")
+            or []
         )
-        cleaned = re.sub(r"\s*```$", "", cleaned).strip()
 
-        try:
-            return json.loads(cleaned)
-        except Exception:
-            pass
+        # Some models return one single food object at top level.
+        if not items and any(
+            key in data
+            for key in (
+                "name",
+                "food_name",
+                "item",
+                "ingredient",
+            )
+        ):
+            items = [data]
 
-        # Fallback for a model that wrapped the JSON in one sentence.
-        first = cleaned.find("{")
-        last = cleaned.rfind("}")
-        if first >= 0 and last > first:
-            return json.loads(cleaned[first:last + 1])
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            return []
 
-        raise ValueError(
-            "La risposta AI non contiene un oggetto JSON leggibile."
-        )
+        result = []
+        for item in items:
+            if isinstance(item, str):
+                item = {"name": item}
+            if not isinstance(item, dict):
+                continue
+
+            name = str(
+                item.get("name")
+                or item.get("food_name")
+                or item.get("item")
+                or item.get("ingredient")
+                or ""
+            ).strip()
+
+            quantity_g = max(
+                0.0,
+                _safe_float(
+                    item.get("quantity_g")
+                    or item.get("grams")
+                    or item.get("weight_g")
+                    or item.get("amount_g")
+                    or item.get("total_grams")
+                ),
+            )
+
+            kcal_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("calories_per_100g")
+                    or item.get("kcal_per_100g")
+                    or item.get("calories_100g")
+                    or item.get("kcal_100g")
+                ),
+            )
+            protein_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("protein_per_100g")
+                    or item.get("protein_100g")
+                    or item.get("protein")
+                ),
+            )
+            carbs_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("carbs_per_100g")
+                    or item.get("carbohydrates_per_100g")
+                    or item.get("carbs_100g")
+                    or item.get("carbs")
+                ),
+            )
+            fat_100 = max(
+                0.0,
+                _safe_float(
+                    item.get("fat_per_100g")
+                    or item.get("fats_per_100g")
+                    or item.get("fat_100g")
+                    or item.get("fat")
+                ),
+            )
+
+            # If the model returned TOTAL macros/calories instead of per-100g,
+            # convert them when a usable gram quantity exists.
+            if quantity_g > 0:
+                factor = 100.0 / quantity_g
+                if kcal_100 <= 0:
+                    total_kcal = _safe_float(
+                        item.get("calories")
+                        or item.get("kcal")
+                        or item.get("total_calories")
+                        or item.get("total_kcal")
+                    )
+                    if total_kcal > 0:
+                        kcal_100 = total_kcal * factor
+
+                if protein_100 <= 0:
+                    total_protein = _safe_float(
+                        item.get("protein_g")
+                        or item.get("total_protein_g")
+                    )
+                    if total_protein > 0:
+                        protein_100 = total_protein * factor
+
+                if carbs_100 <= 0:
+                    total_carbs = _safe_float(
+                        item.get("carbs_g")
+                        or item.get("carbohydrates_g")
+                        or item.get("total_carbs_g")
+                    )
+                    if total_carbs > 0:
+                        carbs_100 = total_carbs * factor
+
+                if fat_100 <= 0:
+                    total_fat = _safe_float(
+                        item.get("fat_g")
+                        or item.get("total_fat_g")
+                    )
+                    if total_fat > 0:
+                        fat_100 = total_fat * factor
+
+            if not name or quantity_g <= 0:
+                continue
+
+            result.append(
+                {
+                    "name": name,
+                    "quantity_g": round(quantity_g, 1),
+                    "calories_per_100g": round(kcal_100, 2),
+                    "protein_per_100g": round(protein_100, 2),
+                    "carbs_per_100g": round(carbs_100, 2),
+                    "fat_per_100g": round(fat_100, 2),
+                    "source": "ai",
+                }
+            )
+
+        return result
 
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a food ingredient parser. "
-                "Return only a single valid JSON object. "
+                "You are a food logging parser for SanoSync. "
+                "Return only one valid JSON object. "
                 "Never expose reasoning."
             ),
         },
         {"role": "user", "content": prompt},
     ]
 
-    raw = None
+    raw_candidates = []
     first_error = None
 
-    # Attempt 1 — strict JSON mode.
+    # Attempt 1: strict JSON mode.
     try:
         response = client.chat.completions.create(
-            model=resolve_groq_text_model(),
+            model=model_id,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0,
@@ -11315,107 +11445,116 @@ Requirements:
             stream=False,
         )
         raw = response.choices[0].message.content
+        if raw:
+            raw_candidates.append(raw)
     except Exception as exc:
         first_error = exc
 
-    # Attempt 2 — Groq may reject JSON validation server-side.
-    if not raw:
-        retry_prompt = f"""
-Ingredient text:
-{raw_text}
-
-Output ONLY JSON. No code fence.
-
-Exact top-level shape:
-{{"ingredients":[{{"name":"...","quantity_g":100,"calories_per_100g":0,"protein_per_100g":0,"carbs_per_100g":0,"fat_per_100g":0}}]}}
-
-Names in {language_name}. Include only ingredients in the input.
-""".strip()
-
+    # Attempt 2: normal completion if strict JSON mode failed/returned nothing.
+    if not raw_candidates:
         try:
             response = client.chat.completions.create(
-                model=resolve_groq_text_model(),
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Return valid JSON only. "
-                            "Do not explain anything."
-                        ),
-                    },
-                    {"role": "user", "content": retry_prompt},
-                ],
+                model=model_id,
+                messages=messages,
                 temperature=0,
                 max_tokens=1800,
                 stream=False,
             )
             raw = response.choices[0].message.content
+            if raw:
+                raw_candidates.append(raw)
         except Exception as retry_exc:
             if first_error is not None:
                 raise RuntimeError(
-                    "SanoSync AI non è riuscita a strutturare gli "
-                    "ingredienti dopo due tentativi. "
-                    f"Primo errore: {first_error}. "
-                    f"Retry: {retry_exc}"
+                    "SanoSync AI non è riuscita a strutturare il pasto "
+                    "dopo due tentativi. "
+                    f"Primo errore: {first_error}. Retry: {retry_exc}"
                 ) from retry_exc
             raise
 
-    data = _extract_json_object(raw)
-    items = data.get("ingredients") or []
-    result = []
+    # Try every returned payload with the tolerant JSON extractor already used
+    # elsewhere in SanoSync.
+    last_raw = raw_candidates[-1] if raw_candidates else ""
+    for raw in raw_candidates:
+        try:
+            data = _extract_json_object_tolerant(raw)
+            result = _normalise_payload(data)
+            if result:
+                return result
+        except Exception:
+            pass
 
-    for item in items:
-        if not isinstance(item, dict):
-            continue
+    # Attempt 3: repair a response that was valid text/JSON but not in the
+    # structure the app could consume.
+    repair_prompt = f"""
+The user described this meal:
+{raw_text}
 
-        name = str(item.get("name") or "").strip()
-        quantity_g = max(
-            0.0,
-            _safe_float(item.get("quantity_g")),
+A previous model response was:
+{last_raw}
+
+Convert it into ONE valid JSON object only.
+
+Required exact top-level shape:
+{{"ingredients":[{{"name":"...","quantity_g":100,"calories_per_100g":0,"protein_per_100g":0,"carbs_per_100g":0,"fat_per_100g":0}}]}}
+
+Important:
+- output names in {language_name};
+- if the meal is a prepared item such as spring rolls, pizza, sandwich, sushi,
+  dumplings, etc., it is acceptable to return ONE prepared-food item rather
+  than inventing its internal recipe;
+- if the user gave a count but no grams, estimate a realistic TOTAL gram weight;
+- preserve the user's quantity/count semantically;
+- provide realistic average nutrition values per 100 g;
+- JSON only, no markdown and no explanation.
+""".strip()
+
+    try:
+        repaired = client.chat.completions.create(
+            model=model_id,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Return valid JSON only. No reasoning.",
+                },
+                {"role": "user", "content": repair_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+            max_tokens=1800,
+            stream=False,
         )
-
-        if not name or quantity_g <= 0:
-            continue
-
-        result.append(
-            {
-                "name": name,
-                "quantity_g": quantity_g,
-                "calories_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("calories_per_100g")
-                    ),
-                ),
-                "protein_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("protein_per_100g")
-                    ),
-                ),
-                "carbs_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("carbs_per_100g")
-                    ),
-                ),
-                "fat_per_100g": max(
-                    0.0,
-                    _safe_float(
-                        item.get("fat_per_100g")
-                    ),
-                ),
-                "source": "ai",
-            }
+        repaired_raw = repaired.choices[0].message.content
+    except Exception:
+        repaired = client.chat.completions.create(
+            model=model_id,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Return valid JSON only. No reasoning.",
+                },
+                {"role": "user", "content": repair_prompt},
+            ],
+            temperature=0,
+            max_tokens=1800,
+            stream=False,
         )
+        repaired_raw = repaired.choices[0].message.content
 
-    if not result:
-        raise ValueError(
-            "SanoSync AI ha risposto, ma non ha restituito "
-            "ingredienti utilizzabili."
-        )
+    try:
+        repaired_data = _extract_json_object_tolerant(repaired_raw)
+        repaired_result = _normalise_payload(repaired_data)
+    except Exception:
+        repaired_result = []
 
-    return result
+    if repaired_result:
+        return repaired_result
+
+    raise ValueError(
+        "SanoSync AI ha risposto, ma non ha restituito "
+        "alimenti utilizzabili. Prova ad aggiungere una quantità "
+        "approssimativa, per esempio “3 loempia, circa 240 g”."
+    )
 
 
 # 9. PAGE 1: MEAL LOGGING
