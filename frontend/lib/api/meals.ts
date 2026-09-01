@@ -185,12 +185,31 @@ export interface ConversationalMealPreviewItem {
   name: string;
   quantity: number;
   unit: string;
+  quantity_g: number;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
   estimated: boolean;
   uncertainty?: string | null;
+}
+
+export function confirmConversationalMeal(
+  input: {
+    date: string;
+    meal_type: string;
+    items: ConversationalMealPreviewItem[];
+  },
+  accessToken?: string | null,
+): Promise<MealCreateResponse> {
+  return apiRequest<MealCreateResponse>(
+    "/meals/conversational/confirm",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export interface ConversationalMealPreview {

@@ -12,6 +12,7 @@ import { confirmMealPrediction } from "@/lib/api/confirm";
 import { commitMealDecision } from "@/lib/api/decision";
 import {
   createMeal,
+  confirmConversationalMeal,
   deleteMeal,
   getMeal,
   getMealsForDate,
@@ -370,57 +371,11 @@ export function HomeShell() {
     setConversationSuccess(null);
 
     try {
-      const mealName =
-        conversationPreview.items
-          .map((item) => item.name)
-          .join(" + ") || "Pasto registrato";
-
-      const singleItem =
-        conversationPreview.items.length === 1
-          ? conversationPreview.items[0]
-          : null;
-
-      await createMeal(
+      await confirmConversationalMeal(
         {
           date: todayIso(),
           meal_type: conversationPreview.meal_type,
-          name: mealName,
-          calories: conversationPreview.totals.calories,
-          protein: conversationPreview.totals.protein,
-          carbs: conversationPreview.totals.carbs,
-          fat: conversationPreview.totals.fat,
-          is_reusable: false,
-          ...(singleItem
-            ? (() => {
-                const isPer100g =
-                  singleItem.unit.toLowerCase() === "g";
-
-                const baseFactor = isPer100g
-                  ? singleItem.quantity / 100
-                  : singleItem.quantity;
-
-                const safeFactor =
-                  baseFactor > 0 ? baseFactor : 1;
-
-                return {
-                  base_name: singleItem.name,
-                  quantity: singleItem.quantity,
-                  is_per_100g: isPer100g,
-                  base_calories:
-                    conversationPreview.totals.calories /
-                    safeFactor,
-                  base_protein:
-                    conversationPreview.totals.protein /
-                    safeFactor,
-                  base_carbs:
-                    conversationPreview.totals.carbs /
-                    safeFactor,
-                  base_fat:
-                    conversationPreview.totals.fat /
-                    safeFactor,
-                };
-              })()
-            : {}),
+          items: conversationPreview.items,
         },
         accessToken,
       );

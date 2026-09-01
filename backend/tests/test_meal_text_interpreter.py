@@ -42,7 +42,27 @@ def test_normalizes_ai_interpretation():
     assert result["meal_type"] == "Pranzo"
     assert len(result["items"]) == 2
     assert result["items"][0]["name"] == "Carbonara"
+    assert result["items"][0]["quantity_g"] == 100.0
     assert result["items"][1]["calories"] == 80.0
+
+
+def test_preserves_explicit_total_weight():
+    result = interpreter().normalize(
+        {
+            "meal_type": "Cena",
+            "items": [
+                {
+                    "name": "Pizza",
+                    "quantity": 1,
+                    "unit": "pizza",
+                    "quantity_g": 420,
+                    "calories": 900,
+                }
+            ],
+        }
+    )
+
+    assert result["items"][0]["quantity_g"] == 420.0
 
 
 def test_missing_quantity_is_marked_uncertain():

@@ -48,6 +48,7 @@ def test_interpret_uses_xai_and_returns_structured_data():
                             "name": "Carbonara",
                             "quantity": 1,
                             "unit": "porzione",
+                            "quantity_g": 350,
                             "calories": 700,
                             "protein": 30,
                             "carbs": 80,
@@ -91,6 +92,7 @@ def test_interpret_uses_xai_and_returns_structured_data():
     assert result["meal_type"] == "Pranzo"
     assert result["items"][0]["name"] == "Carbonara"
     assert result["items"][0]["calories"] == 700.0
+    assert result["items"][0]["quantity_g"] == 350.0
 
 
 def test_prompt_preserves_requested_meal_type():
@@ -200,4 +202,5 @@ def test_prompt_requires_portion_nutrition_consistency():
     system_prompt = calls["messages"][0]["content"]
 
     assert "same total portion" in system_prompt
+    assert "quantity_g" in system_prompt
     assert "consistent with the estimated macros" in system_prompt
