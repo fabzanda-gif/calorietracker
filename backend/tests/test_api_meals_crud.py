@@ -152,3 +152,21 @@ def test_delete_meal_is_user_scoped():
         "meal-1",
         "authenticated-user",
     )
+
+
+def test_update_meal_can_move_to_another_meal_type():
+    response = client.patch(
+        "/meals/meal-1",
+        json={
+            "meal_type": "Pranzo",
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake_repo.last_update == (
+        "meal-1",
+        "authenticated-user",
+        {
+            "meal_type": "Pranzo",
+        },
+    )

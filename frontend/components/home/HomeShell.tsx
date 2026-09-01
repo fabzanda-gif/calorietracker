@@ -66,6 +66,25 @@ import {
 
 import styles from "./HomeShell.module.css";
 
+type ExperienceMode =
+  | "standard"
+  | "zero";
+
+const EXPERIENCE_MODE_KEY =
+  "sanosync-experience-mode";
+
+function readExperienceMode(): ExperienceMode {
+  if (typeof window === "undefined") {
+    return "standard";
+  }
+
+  return window.localStorage.getItem(
+    EXPERIENCE_MODE_KEY,
+  ) === "zero"
+    ? "zero"
+    : "standard";
+}
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -278,6 +297,9 @@ function readDashboardSizes():
 }
 
 export function HomeShell() {
+  const [experienceMode, setExperienceMode] =
+    useState<ExperienceMode>(readExperienceMode);
+
   const [dashboardOrder, setDashboardOrder] =
     useState<DashboardWidgetId[]>(readDashboardOrder);
   const [dashboardSizes, setDashboardSizes] =
@@ -367,6 +389,12 @@ export function HomeShell() {
 
   const [editingMealId, setEditingMealId] =
     useState<string | number | null>(null);
+  const [mealEditType, setMealEditType] =
+    useState("Colazione");
+  const [
+    mealEditRecipeServings,
+    setMealEditRecipeServings,
+  ] = useState(1);
 
   const [mealEditIngredients, setMealEditIngredients] =
     useState<StructuredMealIngredient[]>([]);
@@ -732,7 +760,7 @@ export function HomeShell() {
           getDayBriefing(
             date,
             briefingMoment(),
-            "standard",
+            experienceMode,
             accessToken,
           ).catch(() => null),
           getNextMeal(
@@ -827,7 +855,7 @@ export function HomeShell() {
     return () => {
       active = false;
     };
-  }, [accessToken]);
+  }, [accessToken, experienceMode]);
 
   const budget =
     budgetResult?.budget ?? null;
@@ -1176,6 +1204,11 @@ export function HomeShell() {
         response.item.structured_ingredients ?? [];
 
       setEditingMealId(meal.id);
+      setMealEditType(
+        response.item.meal_type ||
+          meal.meal_type ||
+          "Colazione",
+      );
 
       if (!structured.length) {
         setMealEditIngredients([]);
@@ -1187,12 +1220,57 @@ export function HomeShell() {
       }
 
       setSimpleMealEdit(null);
+
+      const storedRecipeServings = Math.max(
+        1,
+        Number(response.item.recipe_servings) || 1,
+      );
+      const currentCalories = Math.max(
+        0,
+        Number(response.item.calories) || 0,
+      );
+      const baseCalories = Math.max(
+        0,
+        Number(response.item.base_calories) || 0,
+      );
+
+      const inferredRecipeServings =
+        baseCalories > 0 &&
+        currentCalories > baseCalories * 1.05
+          ? currentCalories / baseCalories
+          : 1;
+
+      const effectiveRecipeServings = Math.max(
+        storedRecipeServings,
+        inferredRecipeServings,
+      );
+      const consumedPortions = Math.max(
+        0.01,
+        Number(response.item.quantity) || 1,
+      );
+      const portionScale =
+        effectiveRecipeServings > 1
+          ? consumedPortions /
+            effectiveRecipeServings
+          : 1;
+
+      setMealEditRecipeServings(
+        effectiveRecipeServings,
+      );
       setMealEditIngredients(
-        structured.map((item) => ({
-          ...item,
-          original_quantity_g:
-            Number(item.quantity_g) || 0,
-        })),
+        structured.map((item) => {
+          const portionQuantity =
+            (Number(item.quantity_g) || 0) *
+            portionScale;
+
+          return {
+            ...item,
+            quantity: portionQuantity,
+            quantity_g: portionQuantity,
+            original_quantity_g:
+              portionQuantity,
+          };
+        }),
       );
     } catch (err) {
       setError(
@@ -1208,6 +1286,8 @@ export function HomeShell() {
     setMealEditIngredients([]);
     setSimpleMealEdit(null);
     setSimpleMealQuantity(1);
+    setMealEditType("Colazione");
+    setMealEditRecipeServings(1);
   }
 
   function updateMealIngredientQuantity(
@@ -1332,6 +1412,7 @@ export function HomeShell() {
       await updateMeal(
         meal.id,
         {
+          meal_type: mealEditType,
           quantity: simpleMealQuantity,
           calories: nutrition.calories,
           protein: nutrition.protein,
@@ -1385,26 +1466,56 @@ export function HomeShell() {
     setError(null);
 
     try {
-      await updateMeal(
-        meal.id,
-        {
-          name: meal.name,
-          meal_type: meal.meal_type,
-          structured_ingredients:
-            mealEditIngredients.map(
-              (item) => ({
-                ingredient_id:
-                  item.ingredient_id,
-                quantity:
-                  Number(item.quantity_g),
-                unit: item.unit || "g",
-                quantity_g:
-                  Number(item.quantity_g),
-              }),
-            ),
-        },
-        accessToken,
-      );
+      const ingredientsChanged =
+        mealEditIngredients.some(
+          (item) =>
+            Math.abs(
+              Number(item.quantity_g) -
+                Number(
+                  item.original_quantity_g ??
+                    item.quantity_g,
+                ),
+            ) > 0.001,
+        );
+
+      const needsPortionNormalization =
+        mealEditRecipeServings > 1;
+
+      if (
+        !ingredientsChanged &&
+        !needsPortionNormalization
+      ) {
+        await updateMeal(
+          meal.id,
+          {
+            meal_type: mealEditType,
+          },
+          accessToken,
+        );
+      } else {
+        await updateMeal(
+          meal.id,
+          {
+            name: meal.name,
+            meal_type: mealEditType,
+            quantity: 1,
+            recipe_servings: 1,
+            structured_ingredients:
+              mealEditIngredients.map(
+                (item) => ({
+                  ingredient_id:
+                    item.ingredient_id,
+                  quantity:
+                    Number(item.quantity_g),
+                  unit: item.unit || "g",
+                  quantity_g:
+                    Number(item.quantity_g),
+                }),
+              ),
+          },
+          accessToken,
+        );
+      }
 
       closeMealEditor();
       await refreshHome();
@@ -1707,9 +1818,15 @@ export function HomeShell() {
 
   return (
     <>
-      <AppNav />
+      <AppNav experienceMode={experienceMode} />
 
-      <main className={styles.page}>
+      <main
+        className={
+          experienceMode === "zero"
+            ? `${styles.page} ${styles.pageZero}`
+            : styles.page
+        }
+      >
       <header className={styles.header}>
         <div>
           <h1>
@@ -1725,6 +1842,47 @@ export function HomeShell() {
               👋
             </span>
           </h1>
+        </div>
+
+        <div
+          className={styles.experienceSwitch}
+          aria-label="Modalità SanoSync"
+        >
+          <button
+            type="button"
+            className={
+              experienceMode === "standard"
+                ? styles.experienceSwitchActive
+                : undefined
+            }
+            onClick={() => {
+              setExperienceMode("standard");
+              window.localStorage.setItem(
+                EXPERIENCE_MODE_KEY,
+                "standard",
+              );
+            }}
+          >
+            Standard
+          </button>
+
+          <button
+            type="button"
+            className={
+              experienceMode === "zero"
+                ? styles.experienceSwitchZeroActive
+                : undefined
+            }
+            onClick={() => {
+              setExperienceMode("zero");
+              window.localStorage.setItem(
+                EXPERIENCE_MODE_KEY,
+                "zero",
+              );
+            }}
+          >
+            Zero
+          </button>
         </div>
       </header>
 
@@ -2136,8 +2294,16 @@ export function HomeShell() {
               <div>
                 <span className={styles.conversationEyebrow}>
                   <img
-                    src="/assets/AILogo.png"
-                    alt="SanoSync AI"
+                    src={
+                      experienceMode === "zero"
+                        ? "/assets/SanoSyncAIZero.png"
+                        : "/assets/AILogo.png"
+                    }
+                    alt={
+                      experienceMode === "zero"
+                        ? "SanoSync AI Zero"
+                        : "SanoSync AI"
+                    }
                     className={styles.conversationAiLogo}
                   />
                 </span>
@@ -2637,6 +2803,36 @@ export function HomeShell() {
                               styles.registeredMealEditor
                             }
                           >
+                            <label
+                              className={
+                                styles.registeredMealTypeField
+                              }
+                            >
+                              <span>Sposta nel pasto</span>
+
+                              <select
+                                value={mealEditType}
+                                onChange={(event) =>
+                                  setMealEditType(
+                                    event.target.value,
+                                  )
+                                }
+                              >
+                                <option value="Colazione">
+                                  Colazione
+                                </option>
+                                <option value="Pranzo">
+                                  Pranzo
+                                </option>
+                                <option value="Snack">
+                                  Snack
+                                </option>
+                                <option value="Cena">
+                                  Cena
+                                </option>
+                              </select>
+                            </label>
+
                             {simpleMealEdit ? (
                               <>
                                 <label>

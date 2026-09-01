@@ -343,3 +343,61 @@
   background: #fff3f2;
   color: #e9534f;
 }
+
+
+/* Sidebar Zero Mode */
+.desktopNavZero {
+  border-right-color: #242424;
+  background:
+    linear-gradient(
+      180deg,
+      #080808 0%,
+      #111111 100%
+    );
+}
+
+.desktopNavZero .desktopLink,
+.desktopNavZero .desktopSubLink {
+  color: #f3f3f3;
+}
+
+.desktopNavZero .desktopLink:hover,
+.desktopNavZero .desktopSubLink:hover {
+  background: #1d1d1d;
+  color: #ffffff;
+}
+
+.desktopNavZero .desktopLinkActive,
+.desktopNavZero .desktopSubLinkActive {
+  background:
+    linear-gradient(
+      135deg,
+      #f43d3d,
+      #df2525
+    );
+  color: #ffffff;
+}
+
+.desktopNavZero .separator {
+  background: #2a2a2a;
+}
+
+.desktopNavZero .profileCard {
+  border-color: #343434;
+  background: #151515;
+  color: #ffffff;
+}
+
+.desktopNavZero .profileDetails small {
+  color: #aaaaaa;
+}
+
+.desktopNavZero .signOut {
+  border-color: #343434;
+  background: #151515;
+  color: #ffffff;
+}
+
+.desktopNavZero .signOut:hover {
+  background: #242424;
+}

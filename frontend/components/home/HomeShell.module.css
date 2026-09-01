@@ -4975,3 +4975,319 @@
     height: 125px;
   }
 }
+
+
+/* Modalità Standard / Zero */
+.experienceSwitch {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-self: center;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid #deded7;
+  border-radius: 13px;
+  background: #f2f2ee;
+}
+
+.experienceSwitch button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #777771;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.experienceSwitchActive {
+  background: #ffffff !important;
+  color: #102846 !important;
+  box-shadow: 0 2px 7px rgba(16, 40, 70, 0.1);
+}
+
+.experienceSwitchZeroActive {
+  background: #111111 !important;
+  color: #ff4545 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.pageZero {
+  --ss-coral-500: #f23838;
+  --ss-coral-600: #d91f1f;
+  --ss-navy-950: #111111;
+  --ss-text-soft: #666666;
+  --ss-border: #deded8;
+}
+
+.pageZero .greetingWave {
+  display: none;
+}
+
+.pageZero .budgetHero {
+  border-color: #242424;
+  background:
+    linear-gradient(
+      145deg,
+      #090909 0%,
+      #151515 100%
+    );
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16);
+}
+
+.pageZero .budgetEyebrow,
+.pageZero .budgetAvailable,
+.pageZero .budgetPositive {
+  color: #ff4545;
+}
+
+.pageZero .budgetEyebrow > span {
+  border-color: #f23838;
+  color: #f23838;
+}
+
+.pageZero .budgetScaleFill {
+  background: #f23838;
+}
+
+.pageZero .conversationCard,
+.pageZero .mealsSection,
+.pageZero .insightWidget,
+.pageZero .decisionSection {
+  border-color: #e4d4d4;
+}
+
+.pageZero .conversationCard {
+  background:
+    linear-gradient(
+      145deg,
+      #fff7f7,
+      #ffffff 72%
+    );
+}
+
+.pageZero .mealIcon {
+  background:
+    linear-gradient(
+      145deg,
+      #ff4b4b,
+      #d91f1f
+    );
+}
+
+.pageZero .dashboardCustomizeActive,
+.pageZero .widgetControls {
+  border-color: #f23838;
+  background: #fff0f0;
+  color: #b91f1f;
+}
+
+@media (max-width: 760px) {
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .experienceSwitch {
+    width: 100%;
+  }
+}
+
+
+/* Zero Mode — palette completa */
+.pageZero,
+.pageZero h1,
+.pageZero h2,
+.pageZero h3,
+.pageZero strong {
+  color: #111111;
+}
+
+.pageZero .header h1,
+.pageZero .sectionHeader h2,
+.pageZero .conversationHeader h2,
+.pageZero .insightWidgetHeader h2,
+.pageZero .mealLabel,
+.pageZero .mealName,
+.pageZero .registeredMealRowInfo strong,
+.pageZero .registeredMealSlotTotal strong,
+.pageZero .weightSummary strong,
+.pageZero .goalValue strong {
+  color: #111111;
+}
+
+.pageZero .kicker,
+.pageZero .mealMeta,
+.pageZero .conversationHeader p,
+.pageZero .registeredMealRowInfo span,
+.pageZero .registeredMealSlotTotal span,
+.pageZero .goalDescription,
+.pageZero .weightDates {
+  color: #666666;
+}
+
+.pageZero .budgetHero,
+.pageZero .budgetHero strong {
+  color: #ffffff;
+}
+
+.pageZero .budgetLabel,
+.pageZero .budgetKcal,
+.pageZero .budgetScaleLabels,
+.pageZero .budgetHero small {
+  color: #bcbcbc;
+}
+
+.pageZero .budgetAvailable,
+.pageZero .budgetPositive,
+.pageZero .budgetStatusRow strong,
+.pageZero .budgetStatusIcon {
+  color: #f23838;
+}
+
+.pageZero .budgetStatusIcon {
+  border-color: #f23838;
+}
+
+.pageZero .budgetScale {
+  background: #333333;
+}
+
+.pageZero .budgetScaleFill,
+.pageZero .budgetProgressFill {
+  background:
+    linear-gradient(
+      90deg,
+      #ff4141,
+      #e51f1f
+    );
+}
+
+.pageZero .conversationEyebrow,
+.pageZero .goalIcon,
+.pageZero .goalEditLink,
+.pageZero .mealActions button,
+.pageZero .registeredMealRowActions button,
+.pageZero .registeredMealMoreButton {
+  color: #e62525;
+}
+
+.pageZero .registeredMealBadge,
+.pageZero .predictedBadge,
+.pageZero .unknownBadge {
+  border-color: #f2b5b5;
+  background: #fff0f0;
+  color: #bd2525;
+}
+
+.pageZero .weightChangePositive,
+.pageZero .weightChangeNeutral {
+  color: #e62525;
+}
+
+.pageZero .weightChart polyline {
+  stroke: #e62525;
+}
+
+.pageZero .weightChart circle {
+  fill: #e62525;
+}
+
+.pageZero .goalIcon {
+  background: #fff0f0;
+}
+
+.pageZero .conversationCard,
+.pageZero .mealsSection,
+.pageZero .insightWidget,
+.pageZero .decisionSection,
+.pageZero .quickAddWidget > *,
+.pageZero .summaryWidget > * {
+  border-color: #e3d3d3;
+  background-color: #ffffff;
+}
+
+.pageZero .conversationCard {
+  background:
+    linear-gradient(
+      145deg,
+      #fff5f5,
+      #ffffff 68%
+    );
+}
+
+.pageZero .conversationModeSwitch {
+  border-color: #dddddd;
+  background: #eeeeec;
+}
+
+.pageZero
+  .conversationModeSwitch
+  button.conversationModeActive {
+  background: #111111;
+  color: #ffffff;
+}
+
+.pageZero .conversationControls > button {
+  background:
+    linear-gradient(
+      135deg,
+      #f43d3d,
+      #dc2020
+    );
+}
+
+.pageZero .dashboardCustomizeButton,
+.pageZero .dashboardResetButton {
+  border-color: #d7d7d2;
+  color: #111111;
+}
+
+.pageZero .mealIcon {
+  background:
+    linear-gradient(
+      145deg,
+      #f43d3d,
+      #d71919
+    );
+}
+
+.pageZero .registeredMealNutrition,
+.pageZero .goalValue {
+  background: #f5f5f2;
+}
+
+.pageZero a {
+  text-decoration-color: #e62525;
+}
+
+.pageZero input:focus,
+.pageZero textarea:focus,
+.pageZero select:focus {
+  border-color: #e62525;
+  box-shadow: 0 0 0 3px rgba(230, 37, 37, 0.12);
+}
+
+
+/* Spostamento di un pasto tra gli slot */
+.registeredMealTypeField {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #deded7;
+}
+
+.registeredMealTypeField select {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 0 38px 0 11px;
+  border: 1px solid #d7d7d0;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #171815;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

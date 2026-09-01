@@ -42,7 +42,13 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppNav() {
+type AppNavProps = {
+  experienceMode?: "standard" | "zero";
+};
+
+export function AppNav({
+  experienceMode = "standard",
+}: AppNavProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
 
@@ -76,13 +82,25 @@ export function AppNav() {
   return (
     <>
       <aside
-        className={styles.desktopNav}
+        className={
+          experienceMode === "zero"
+            ? `${styles.desktopNav} ${styles.desktopNavZero}`
+            : styles.desktopNav
+        }
         aria-label="Navigazione principale"
       >
         <div className={styles.brandBlock}>
           <img
-            src="/assets/LogoCoral.png"
-            alt="SanoSync"
+            src={
+              experienceMode === "zero"
+                ? "/assets/LogoZero.png"
+                : "/assets/LogoCoral.png"
+            }
+            alt={
+              experienceMode === "zero"
+                ? "SanoSync Zero Mode"
+                : "SanoSync"
+            }
             className={styles.brandLogo}
           />
         </div>

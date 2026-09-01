@@ -29,6 +29,7 @@ export interface LoggedMeal {
   is_reusable?: boolean | null;
   notes?: string | null;
   quantity?: number | null;
+  recipe_servings?: number | null;
   is_per_100g?: boolean | null;
   base_calories?: number | null;
   base_protein?: number | null;
@@ -98,6 +99,7 @@ export interface MealUpdateInput {
   is_reusable?: boolean;
   base_name?: string | null;
   quantity?: number | null;
+  recipe_servings?: number | null;
   is_per_100g?: boolean | null;
   base_calories?: number | null;
   base_protein?: number | null;
