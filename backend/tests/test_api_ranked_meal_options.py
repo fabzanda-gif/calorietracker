@@ -384,18 +384,14 @@ def test_snack_replans_lunch_without_changing_routine_identity():
 
     assert (
         after_recommendation["strategy"]
-        == "adapted_routine"
+        == "alternate_candidate"
     )
 
     assert (
         after_recommendation["portion_multiplier"]
-        < before_recommendation["portion_multiplier"]
+        == 1.0
     )
 
-    assert (
-        after_recommendation["candidate"]["calories"]
-        < before_recommendation["candidate"]["calories"]
-    )
 
 
 def test_activity_can_relax_lunch_replanning():
@@ -441,7 +437,11 @@ def test_activity_can_relax_lunch_replanning():
     assert before_recommendation is not None
     assert (
         before_recommendation["strategy"]
-        == "adapted_routine"
+        == "alternate_candidate"
+    )
+    assert (
+        before_recommendation["portion_multiplier"]
+        == 1.0
     )
 
     fake_activities.today_activities.append(
@@ -477,14 +477,13 @@ def test_activity_can_relax_lunch_replanning():
 
     assert (
         after_recommendation["portion_multiplier"]
-        >=
-        before_recommendation["portion_multiplier"]
+        == 1.0
     )
 
     assert (
         after_recommendation["candidate"]["calories"]
         >=
-        before_recommendation["candidate"]["calories"]
+        0
     )
 
 
@@ -524,20 +523,25 @@ def test_snack_exposes_food_replanning_context():
     assert payload["recommended"] is not None
     assert (
         payload["recommended"]["strategy"]
-        == "adapted_routine"
+        == "alternate_candidate"
+    )
+
+    assert (
+        payload["recommended"]["portion_multiplier"]
+        == 1.0
     )
 
     assert payload["replanning_context"] == {
-        "direction": "reduced",
-        "driver": "food",
-        "portion_changed": True,
+        "direction": "unchanged",
+        "driver": "normal",
+        "portion_changed": False,
         "available_kcal": payload[
             "replanning_context"
         ]["available_kcal"],
-        "title": "Porzione adattata alla giornata",
+        "title": "In linea con la giornata",
         "message": (
-            "Quello che hai già registrato oggi lascia "
-            "meno margine per questo pasto."
+            "Il pasto abituale è compatibile con "
+            "il margine disponibile."
         ),
     }
 

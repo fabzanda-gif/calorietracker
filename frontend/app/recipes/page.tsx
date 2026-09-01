@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { AppNav } from "@/components/navigation/AppNav";
 import { RecipeShareButton } from "@/components/recipes/RecipeShareButton";
 
@@ -31,6 +33,8 @@ import {
 import {
   createMeal,
 } from "@/lib/api/meals";
+
+import { createMealPrep } from "@/lib/api/mealPrep";
 
 import styles from "./RecipesPage.module.css";
 
@@ -130,6 +134,12 @@ export default function RecipesPage() {
     } | null>(null);
 
   const [loggingMeal, setLoggingMeal] =
+    useState(false);
+  const [cookRecipe, setCookRecipe] =
+    useState<Recipe | null>(null);
+  const [cookPortions, setCookPortions] =
+    useState("1");
+  const [cooking, setCooking] =
     useState(false);
 
   const availableRecipeMealTypes = useMemo(() => {
@@ -376,6 +386,69 @@ export default function RecipesPage() {
       },
     );
   }, [draftIngredients, ingredients]);
+
+  function openCookDialog(recipe: Recipe) {
+    setCookRecipe(recipe);
+    setCookPortions("1");
+    setMessage(null);
+  }
+
+  function closeCookDialog() {
+    if (cooking) {
+      return;
+    }
+
+    setCookRecipe(null);
+    setCookPortions("1");
+  }
+
+  async function confirmCook() {
+    if (!accessToken || !cookRecipe) {
+      return;
+    }
+
+    const portions = Number(cookPortions);
+
+    if (
+      !Number.isInteger(portions) ||
+      portions <= 0
+    ) {
+      setMessage(
+        "Inserisci un numero intero di porzioni.",
+      );
+      return;
+    }
+
+    setCooking(true);
+    setMessage(null);
+
+    try {
+      await createMealPrep(accessToken, {
+        recipe_id: cookRecipe.id,
+        prepared_at: todayLocalIso(),
+        portions_prepared: portions,
+      });
+
+      setCookRecipe(null);
+      setCookPortions("1");
+
+      setMessage(
+        `${cookRecipe.name}: ${portions} ${
+          portions === 1
+            ? "porzione aggiunta"
+            : "porzioni aggiunte"
+        } all'inventario.`,
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Impossibile aggiungere la preparazione all'inventario.",
+      );
+    } finally {
+      setCooking(false);
+    }
+  }
 
   async function startMealFromRecipe(
     recipeId: string,
@@ -847,6 +920,12 @@ export default function RecipesPage() {
           </p>
 
           <h1>Le tue ricette</h1>
+            <Link
+              href="/inventory"
+              className={styles.inventoryLink}
+            >
+              Inventario
+            </Link>
 
           <p className={styles.headerSubtitle}>
             I piatti che conosci già, pronti da registrare
@@ -859,6 +938,61 @@ export default function RecipesPage() {
         <p className={styles.message}>
           {message}
         </p>
+      ) : null}
+
+      {cookRecipe ? (
+        <section className={styles.editorCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.kicker}>
+                Meal prep
+              </p>
+              <h2>Cucina</h2>
+            </div>
+
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={closeCookDialog}
+              disabled={cooking}
+            >
+              Annulla
+            </button>
+          </div>
+
+          <p>
+            <strong>{cookRecipe.name}</strong>
+          </p>
+
+          <label className={styles.field}>
+            <span>Quante porzioni hai cucinato?</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={cookPortions}
+              onChange={(event) => {
+                setCookPortions(
+                  event.target.value,
+                );
+              }}
+              disabled={cooking}
+            />
+          </label>
+
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={() => {
+              void confirmCook();
+            }}
+            disabled={cooking}
+          >
+            {cooking
+              ? "Salvataggio..."
+              : "Aggiungi all'inventario"}
+          </button>
+        </section>
       ) : null}
 
       {mealDraft ? (
@@ -1018,7 +1152,319 @@ export default function RecipesPage() {
         </section>
       ) : null}
 
-      <section className={styles.editorCard}>
+      <section>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.kicker}>
+              Libreria personale
+            </p>
+            <h2>Pronte quando ti servono</h2>
+          </div>
+
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            disabled={saving}
+            onClick={() => {
+              void migrateLegacyLibrary();
+            }}
+          >
+            Aggiorna ricette legacy
+          </button>
+        </div>
+
+        <div className={styles.recipeToolbar}>
+          <label className={styles.recipeSearch}>
+            <span className={styles.searchIcon}>
+              ⌕
+            </span>
+
+            <input
+              type="search"
+              value={recipeSearch}
+              placeholder="Cerca una ricetta…"
+              aria-label="Cerca una ricetta"
+              onChange={(event) => {
+                setRecipeSearch(
+                  event.target.value,
+                );
+              }}
+            />
+
+            {recipeSearch ? (
+              <button
+                type="button"
+                className={styles.clearSearch}
+                aria-label="Cancella ricerca"
+                onClick={() => {
+                  setRecipeSearch("");
+                }}
+              >
+                ×
+              </button>
+            ) : null}
+          </label>
+
+          <div
+            className={styles.recipeFilters}
+            aria-label="Filtra per tipo di pasto"
+          >
+            <button
+              type="button"
+              className={
+                recipeMealFilter === "Tutte"
+                  ? styles.recipeFilterActive
+                  : styles.recipeFilter
+              }
+              onClick={() => {
+                setRecipeMealFilter("Tutte");
+              }}
+            >
+              Tutte
+            </button>
+
+            {availableRecipeMealTypes.map(
+              (type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={
+                    recipeMealFilter === type
+                      ? styles.recipeFilterActive
+                      : styles.recipeFilter
+                  }
+                  onClick={() => {
+                    setRecipeMealFilter(type);
+                  }}
+                >
+                  {type}
+                </button>
+              ),
+            )}
+          </div>
+
+          <div className={styles.recipeResultCount}>
+            <strong>
+              {filteredRecipes.length}
+            </strong>{" "}
+            {filteredRecipes.length === 1
+              ? "ricetta"
+              : "ricette"}
+          </div>
+        </div>
+
+        {loading ? (
+          <p>Caricamento…</p>
+        ) : filteredRecipes.length ? (
+          <div className={styles.recipeList}>
+            {filteredRecipes.map((recipe) => (
+              <article
+                key={recipe.id}
+                className={styles.recipeCard}
+              >
+                <div className={styles.recipeVisual}>
+                  {recipe.image_url ? (
+                    <img
+                      src={recipe.image_url}
+                      alt={recipe.name}
+                      className={styles.recipeThumb}
+                    />
+                  ) : (
+                    <div
+                      className={
+                        styles.recipePlaceholder
+                      }
+                    >
+                      <span>S</span>
+                    </div>
+                  )}
+
+                  <span className={styles.recipeTypeBadge}>
+                    {recipe.meal_type || "Ricetta"}
+                  </span>
+                </div>
+
+                <div className={styles.recipeContent}>
+                  <div className={styles.recipeMain}>
+                    <strong className={styles.recipeTitle}>
+                      {recipe.name}
+                    </strong>
+
+                    <div className={styles.recipeNutrition}>
+                      <span>
+                        <strong>
+                          {Math.round(
+                            Number(
+                              recipe.calories || 0,
+                            ),
+                          )}
+                        </strong>
+                        kcal totali
+                      </span>
+
+                      {recipe.protein != null ? (
+                        <span>
+                          <strong>
+                            {Math.round(
+                              Number(
+                                recipe.protein || 0,
+                              ),
+                            )}
+                          </strong>
+                          g proteine totali
+                        </span>
+                      ) : null}
+
+                      <span>
+                        <strong>
+                          {Math.max(
+                            1,
+                            Number(
+                              recipe.recipe_servings || 1,
+                            ),
+                          )}
+                        </strong>
+                        {Number(
+                          recipe.recipe_servings || 1,
+                        ) === 1
+                          ? " porzione"
+                          : " porzioni"}
+                      </span>
+
+                      <span className={styles.recipePerServing}>
+                        <strong>
+                          {Math.round(
+                            Number(
+                              recipe.calories || 0,
+                            ) /
+                              Math.max(
+                                1,
+                                Number(
+                                  recipe.recipe_servings || 1,
+                                ),
+                              ),
+                          )}
+                        </strong>{" "}
+                        kcal / porzione
+                      </span>
+
+                      {recipe.protein != null ? (
+                        <span className={styles.recipePerServing}>
+                          <strong>
+                            {Math.round(
+                              Number(
+                                recipe.protein || 0,
+                              ) /
+                                Math.max(
+                                  1,
+                                  Number(
+                                    recipe.recipe_servings || 1,
+                                  ),
+                                ),
+                            )}
+                          </strong>{" "}
+                          g proteine / porzione
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {recipe.notes ? (
+                      <p
+                        className={
+                          styles.recipeDescription
+                        }
+                      >
+                        {recipe.notes}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.recipeActions}>
+                    <RecipeShareButton
+                      name={recipe.name}
+                      imageUrl={recipe.image_url}
+                      calories={Number(recipe.calories || 0)}
+                      protein={
+                        recipe.protein != null
+                          ? Number(recipe.protein)
+                          : null
+                      }
+                      servings={recipe.recipe_servings}
+                      preparation={recipe.preparation}
+                    />
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => {
+                        openCookDialog(recipe);
+                      }}
+                    >
+                      Cucina
+                    </button>
+<button
+                      type="button"
+                      className={
+                        styles.primarySmallButton
+                      }
+                      onClick={() => {
+                        void startMealFromRecipe(
+                          recipe.id,
+                        );
+                      }}
+                    >
+                      Registra
+                    </button>
+
+                    <button
+                      type="button"
+                      className={
+                        styles.secondaryButton
+                      }
+                      onClick={() => {
+                        void editRecipe(
+                          recipe.id,
+                        );
+                      }}
+                    >
+                      Modifica
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.recipeEmptyState}>
+            <strong>
+              {recipes.length
+                ? "Nessuna ricetta trovata"
+                : "La tua libreria è ancora vuota"}
+            </strong>
+
+            <p>
+              {recipes.length
+                ? "Prova a cambiare ricerca o filtro."
+                : "Salva una ricetta e la troverai qui pronta da riutilizzare."}
+            </p>
+
+            {recipes.length ? (
+              <button
+                type="button"
+                className={styles.resetFiltersButton}
+                onClick={() => {
+                  setRecipeSearch("");
+                  setRecipeMealFilter("Tutte");
+                }}
+              >
+                Azzera filtri
+              </button>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+
+<section className={styles.editorCard}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
@@ -1352,307 +1798,6 @@ export default function RecipesPage() {
         </button>
       </section>
 
-      <section>
-        <div className={styles.sectionHeader}>
-          <div>
-            <p className={styles.kicker}>
-              Libreria personale
-            </p>
-            <h2>Pronte quando ti servono</h2>
-          </div>
-
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            disabled={saving}
-            onClick={() => {
-              void migrateLegacyLibrary();
-            }}
-          >
-            Aggiorna ricette legacy
-          </button>
-        </div>
-
-        <div className={styles.recipeToolbar}>
-          <label className={styles.recipeSearch}>
-            <span className={styles.searchIcon}>
-              ⌕
-            </span>
-
-            <input
-              type="search"
-              value={recipeSearch}
-              placeholder="Cerca una ricetta…"
-              aria-label="Cerca una ricetta"
-              onChange={(event) => {
-                setRecipeSearch(
-                  event.target.value,
-                );
-              }}
-            />
-
-            {recipeSearch ? (
-              <button
-                type="button"
-                className={styles.clearSearch}
-                aria-label="Cancella ricerca"
-                onClick={() => {
-                  setRecipeSearch("");
-                }}
-              >
-                ×
-              </button>
-            ) : null}
-          </label>
-
-          <div
-            className={styles.recipeFilters}
-            aria-label="Filtra per tipo di pasto"
-          >
-            <button
-              type="button"
-              className={
-                recipeMealFilter === "Tutte"
-                  ? styles.recipeFilterActive
-                  : styles.recipeFilter
-              }
-              onClick={() => {
-                setRecipeMealFilter("Tutte");
-              }}
-            >
-              Tutte
-            </button>
-
-            {availableRecipeMealTypes.map(
-              (type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={
-                    recipeMealFilter === type
-                      ? styles.recipeFilterActive
-                      : styles.recipeFilter
-                  }
-                  onClick={() => {
-                    setRecipeMealFilter(type);
-                  }}
-                >
-                  {type}
-                </button>
-              ),
-            )}
-          </div>
-
-          <div className={styles.recipeResultCount}>
-            <strong>
-              {filteredRecipes.length}
-            </strong>{" "}
-            {filteredRecipes.length === 1
-              ? "ricetta"
-              : "ricette"}
-          </div>
-        </div>
-
-        {loading ? (
-          <p>Caricamento…</p>
-        ) : filteredRecipes.length ? (
-          <div className={styles.recipeList}>
-            {filteredRecipes.map((recipe) => (
-              <article
-                key={recipe.id}
-                className={styles.recipeCard}
-              >
-                <div className={styles.recipeVisual}>
-                  {recipe.image_url ? (
-                    <img
-                      src={recipe.image_url}
-                      alt={recipe.name}
-                      className={styles.recipeThumb}
-                    />
-                  ) : (
-                    <div
-                      className={
-                        styles.recipePlaceholder
-                      }
-                    >
-                      <span>S</span>
-                    </div>
-                  )}
-
-                  <span className={styles.recipeTypeBadge}>
-                    {recipe.meal_type || "Ricetta"}
-                  </span>
-                </div>
-
-                <div className={styles.recipeContent}>
-                  <div className={styles.recipeMain}>
-                    <strong className={styles.recipeTitle}>
-                      {recipe.name}
-                    </strong>
-
-                    <div className={styles.recipeNutrition}>
-                      <span>
-                        <strong>
-                          {Math.round(
-                            Number(
-                              recipe.calories || 0,
-                            ),
-                          )}
-                        </strong>
-                        kcal totali
-                      </span>
-
-                      {recipe.protein != null ? (
-                        <span>
-                          <strong>
-                            {Math.round(
-                              Number(
-                                recipe.protein || 0,
-                              ),
-                            )}
-                          </strong>
-                          g proteine totali
-                        </span>
-                      ) : null}
-
-                      <span>
-                        <strong>
-                          {Math.max(
-                            1,
-                            Number(
-                              recipe.recipe_servings || 1,
-                            ),
-                          )}
-                        </strong>
-                        {Number(
-                          recipe.recipe_servings || 1,
-                        ) === 1
-                          ? " porzione"
-                          : " porzioni"}
-                      </span>
-
-                      <span className={styles.recipePerServing}>
-                        <strong>
-                          {Math.round(
-                            Number(
-                              recipe.calories || 0,
-                            ) /
-                              Math.max(
-                                1,
-                                Number(
-                                  recipe.recipe_servings || 1,
-                                ),
-                              ),
-                          )}
-                        </strong>{" "}
-                        kcal / porzione
-                      </span>
-
-                      {recipe.protein != null ? (
-                        <span className={styles.recipePerServing}>
-                          <strong>
-                            {Math.round(
-                              Number(
-                                recipe.protein || 0,
-                              ) /
-                                Math.max(
-                                  1,
-                                  Number(
-                                    recipe.recipe_servings || 1,
-                                  ),
-                                ),
-                            )}
-                          </strong>{" "}
-                          g proteine / porzione
-                        </span>
-                      ) : null}
-                    </div>
-
-                    {recipe.notes ? (
-                      <p
-                        className={
-                          styles.recipeDescription
-                        }
-                      >
-                        {recipe.notes}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className={styles.recipeActions}>
-                    <RecipeShareButton
-                      name={recipe.name}
-                      imageUrl={recipe.image_url}
-                      calories={Number(recipe.calories || 0)}
-                      protein={
-                        recipe.protein != null
-                          ? Number(recipe.protein)
-                          : null
-                      }
-                      servings={recipe.recipe_servings}
-                      preparation={recipe.preparation}
-                    />
-                    <button
-                      type="button"
-                      className={
-                        styles.primarySmallButton
-                      }
-                      onClick={() => {
-                        void startMealFromRecipe(
-                          recipe.id,
-                        );
-                      }}
-                    >
-                      Registra
-                    </button>
-
-                    <button
-                      type="button"
-                      className={
-                        styles.secondaryButton
-                      }
-                      onClick={() => {
-                        void editRecipe(
-                          recipe.id,
-                        );
-                      }}
-                    >
-                      Modifica
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.recipeEmptyState}>
-            <strong>
-              {recipes.length
-                ? "Nessuna ricetta trovata"
-                : "La tua libreria è ancora vuota"}
-            </strong>
-
-            <p>
-              {recipes.length
-                ? "Prova a cambiare ricerca o filtro."
-                : "Salva una ricetta e la troverai qui pronta da riutilizzare."}
-            </p>
-
-            {recipes.length ? (
-              <button
-                type="button"
-                className={styles.resetFiltersButton}
-                onClick={() => {
-                  setRecipeSearch("");
-                  setRecipeMealFilter("Tutte");
-                }}
-              >
-                Azzera filtri
-              </button>
-            ) : null}
-          </div>
-        )}
-      </section>
       </main>
     </>
   );

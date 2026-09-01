@@ -1,0 +1,305 @@
+.page {
+  min-height: 100vh;
+  padding: 40px 24px 96px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.subtitle {
+  max-width: 620px;
+  margin: 10px 0 0;
+  opacity: 0.7;
+}
+
+.email {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.card {
+  padding: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.sectionHeader {
+  margin-bottom: 20px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.sectionHeader p {
+  margin: 5px 0 0;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.grid label {
+  display: grid;
+  gap: 7px;
+}
+
+.grid label > span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.grid input,
+.grid select {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.checkbox {
+  display: flex !important;
+  align-items: center;
+  align-self: center;
+  grid-template-columns: auto 1fr !important;
+  gap: 10px !important;
+}
+
+.checkbox input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.integrations {
+  display: grid;
+  gap: 10px;
+}
+
+.integration {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 13px;
+}
+
+.integration div {
+  display: grid;
+  gap: 3px;
+}
+
+.integration strong {
+  font-size: 15px;
+}
+
+.integration span {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.integration button {
+  min-width: 88px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.07);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.save {
+  min-height: 46px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 11px;
+  background: #111;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.save:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.error,
+.success {
+  padding: 13px 15px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.error {
+  background: rgba(190, 40, 40, 0.08);
+}
+
+.success {
+  background: rgba(40, 150, 80, 0.09);
+}
+
+@media (max-width: 680px) {
+  .page {
+    padding: 28px 16px 90px;
+  }
+
+  .header {
+    display: block;
+  }
+
+  .email {
+    margin-top: 10px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .save {
+    width: 100%;
+  }
+}
+
+
+.schedule {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+}
+
+.scheduleToggle {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.055);
+}
+
+.scheduleButton,
+.scheduleActive {
+  min-width: 76px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.scheduleButton {
+  background: transparent;
+}
+
+.scheduleActive {
+  background: white;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+
+.scheduleDay {
+  display: grid;
+  gap: 3px;
+  min-width: 130px;
+}
+
+.scheduleDay strong {
+  font-size: 14px;
+}
+
+.overrideLabel {
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+.weekActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+@media (max-width: 680px) {
+  .scheduleRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .scheduleToggle {
+    width: 100%;
+  }
+
+  .scheduleButton,
+  .scheduleActive {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .weekActions {
+    justify-content: stretch;
+  }
+
+  .weekActions .save {
+    width: 100%;
+  }
+}

@@ -1174,3 +1174,44 @@
 .recipePerServing strong {
   color: #ef5e5c !important;
 }
+
+
+.inventoryLink {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  text-decoration: none;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+}
+
+/* SANOSYNC RECIPE BUTTON ALIGNMENT V1 */
+
+/*
+ * Tutte le azioni della card ricetta devono avere
+ * la stessa altezza e lo stesso comportamento visivo.
+ */
+
+.recipeActions {
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+}
+
+.recipeActions > button {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.recipeActions .primarySmallButton,
+.recipeActions .secondaryButton {
+  min-height: 36px;
+  box-sizing: border-box;
+  margin: 0;
+}

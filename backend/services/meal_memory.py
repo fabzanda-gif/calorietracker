@@ -357,16 +357,35 @@ class MealMemoryService:
         field_name: str,
         quantity: float,
     ) -> float | None:
-        base = cls._average_field(
-            items,
-            field_name,
-        )
+        values: list[float] = []
 
-        if base is None:
+        for item in items:
+            base = cls._safe_float(
+                item.get(field_name)
+            )
+
+            if base is None:
+                continue
+
+            raw_is_per_100g = item.get("is_per_100g")
+            is_per_100g = (
+                raw_is_per_100g is True
+                or str(raw_is_per_100g).strip().lower()
+                in {"true", "1", "yes"}
+            )
+
+            if is_per_100g:
+                scaled = base * quantity / 100.0
+            else:
+                scaled = base * quantity
+
+            values.append(scaled)
+
+        if not values:
             return None
 
         return round(
-            base * quantity,
+            sum(values) / len(values),
             2,
         )
 

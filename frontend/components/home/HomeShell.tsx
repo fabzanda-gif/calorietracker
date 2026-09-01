@@ -2,6 +2,20 @@
 
 import { AppNav } from "@/components/navigation/AppNav";
 import { QuickAdd } from "@/components/home/QuickAdd";
+import {
+  DayPlanner,
+  type DayType,
+  type ActivityLevel,
+} from "@/components/home/DayPlanner";
+
+import {
+  buildDayMessage,
+  buildDayMessageContext,
+} from "@/components/home/dayMessage";
+import {
+  getDayHistory,
+  type DayHistoryResponse,
+} from "@/lib/api/dayHistory";
 import { RegisteredToday } from "@/components/home/RegisteredToday";
 import { getActivitiesForDate, type Activity } from "@/lib/api/activities";
 
@@ -28,6 +42,7 @@ import {
   getDayBudget,
   getMealOptions,
   getNextMeal,
+  updateDailyLog,
 } from "@/lib/api/day";
 import type {
   DayBudgetResponse,
@@ -102,7 +117,38 @@ function optionSourceLabel(
   }[source] ?? source;
 }
 
+function normalizeDayType(
+  value: unknown,
+): DayType {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized === "home" ||
+    normalized.includes("casa")
+  ) {
+    return "home";
+  }
+
+  if (
+    normalized === "free" ||
+    normalized === "rest" ||
+    normalized.includes("liber")
+  ) {
+    return "free";
+  }
+
+  return "office";
+}
+
 export function HomeShell() {
+  const [dayPlannerSaving, setDayPlannerSaving] =
+    useState(false);
+  const [dayPlannerMessage, setDayPlannerMessage] =
+    useState<string | null>(null);
+
+
   const {
     user,
     accessToken,
@@ -125,6 +171,14 @@ export function HomeShell() {
   ] = useState(false);
   const [loading, setLoading] =
     useState(true);
+  const [budgetExpanded, setBudgetExpanded] =
+    useState(false);
+
+  const maintenanceBudgetKcal =
+    budgetResult?.budget
+      ? budgetResult.budget.daily_budget_kcal +
+        budgetResult.budget.goal_adjustment_kcal
+      : 0;
   const [committingIndex, setCommittingIndex] =
     useState<number | null>(null);
   const [confirmingSlot, setConfirmingSlot] =
@@ -155,6 +209,9 @@ export function HomeShell() {
 
   const [latestWeight, setLatestWeight] =
     useState<number | null>(null);
+
+  const [dayHistory, setDayHistory] =
+    useState<DayHistoryResponse | null>(null);
 
   const [editingMealId, setEditingMealId] =
     useState<string | number | null>(null);
@@ -239,6 +296,7 @@ export function HomeShell() {
           mealsPayload,
           activitiesPayload,
           latestWeightPayload,
+          dayHistoryPayload,
         ] = await Promise.all([
           getDay(
             date,
@@ -261,6 +319,9 @@ export function HomeShell() {
             accessToken,
           ),
           getLatestWeight(
+            accessToken,
+          ),
+          getDayHistory(
             accessToken,
           ),
         ]);
@@ -300,6 +361,10 @@ export function HomeShell() {
               (meal) => meal.meal_type === "Cena",
             ) ?? null,
           );
+
+          setDayHistory(
+            dayHistoryPayload,
+          );
         }
       } catch (err) {
         if (active) {
@@ -331,6 +396,15 @@ export function HomeShell() {
       total + Number(activity.burned_calories || 0),
     0,
   );
+
+  const currentDayType = day
+    ? normalizeDayType(day.context.value)
+    : null;
+
+  const historicalProfile =
+    currentDayType && dayHistory
+      ? dayHistory.profiles[currentDayType]
+      : null;
 
   const budgetProgress =
     budget && budget.daily_budget_kcal > 0
@@ -499,6 +573,61 @@ export function HomeShell() {
       );
     } finally {
       setConversationConfirming(false);
+    }
+  }
+  function normalizeActivityLevel(
+    value: string | null | undefined,
+  ) {
+    const normalized = (value ?? "").toLowerCase();
+
+    if (
+      normalized === "low" ||
+      normalized.includes("poco")
+    ) {
+      return "low" as const;
+    }
+
+    if (
+      normalized === "high" ||
+      normalized.includes("molto")
+    ) {
+      return "high" as const;
+    }
+
+    return "moderate" as const;
+  }
+
+  async function handleDayPlannerChange(
+    changes: {
+      day_type?: DayType;
+      activity_plan?: "low" | "moderate" | "high";
+    },
+  ) {
+    if (!accessToken || !day) {
+      return;
+    }
+
+    setDayPlannerSaving(true);
+    setDayPlannerMessage(null);
+
+    try {
+      await updateDailyLog(
+        accessToken,
+        todayIso(),
+        changes,
+      );
+
+      setDayPlannerMessage("Giornata aggiornata.");
+
+      await refreshHome();
+    } catch (err) {
+      setDayPlannerMessage(
+        err instanceof Error
+          ? err.message
+          : "Impossibile aggiornare la giornata.",
+      );
+    } finally {
+      setDayPlannerSaving(false);
     }
   }
 
@@ -1135,6 +1264,13 @@ export function HomeShell() {
       <AppNav />
 
       <main className={styles.page}>
+        <div className={styles.homeBrand} aria-label="SanoSync">
+          <img
+            src="/assets/LogoCoral.png"
+            alt="SanoSync"
+            className={styles.homeBrandLogo}
+          />
+        </div>
       <header className={styles.header}>
         <div>
           <h1>
@@ -1165,146 +1301,318 @@ export function HomeShell() {
 
       {day ? (
         <>
-          <section className={styles.dayIntro}>
-            <p className={styles.kicker}>
-              Oggi
-            </p>
+          <DayPlanner
+            message={buildDayMessage(
+              buildDayMessageContext(
+                user?.user_metadata?.first_name ||
+                  user?.user_metadata?.name ||
+                  "",
+                normalizeDayType(
+                  day.context.value,
+                ),
+                normalizeActivityLevel(
+                  day.activity_plan.value,
+                ),
+                burnedCalories,
+                actualActivities.length,
+                historicalProfile?.average_burned_calories ?? null,
+                historicalProfile?.days ?? 0,
+              ),
+            )}
+            dayType={normalizeDayType(
+              day.context.value,
+            )}
+            activityLevel={normalizeActivityLevel(
+              day.activity_plan.value,
+            )}
+            onDayTypeChange={(value) => {
+              void handleDayPlannerChange({
+                day_type: value,
+              });
+            }}
+            onActivityLevelChange={(value) => {
+              void handleDayPlannerChange({
+                activity_plan: value,
+              });
+            }}
+          />
 
-            <h2>
-              {day.context.value ||
-                "Giornata da definire"}
-            </h2>
-
-            <p className={styles.subtitle}>
-              {day.activity_plan.value
-                ? `${day.activity_plan.value} prevista`
-                : "Attività non ancora prevista"}
+          {dayPlannerMessage ? (
+            <p className={styles.muted}>
+              {dayPlannerSaving
+                ? "Salvataggio..."
+                : dayPlannerMessage}
             </p>
-          </section>
+          ) : null}
 
           {budget ? (
-            <section className={styles.budgetHero}>
-              <div className={styles.budgetTopline}>
-                <span>Kcal disponibili</span>
-                <span>
-                  Budget{" "}
-                  {roundNumber(
-                    budget.daily_budget_kcal,
-                  )}
-                </span>
-              </div>
+            <section
+              className={`${styles.budgetHero} ${
+                budgetExpanded
+                  ? styles.budgetHeroExpanded
+                  : styles.budgetHeroCollapsed
+              }`}
+            >
+              <div className={styles.budgetHeader}>
+                <div className={styles.budgetColumn}>
+                  <span className={styles.budgetLabel}>
+                    Kcal disponibili
+                  </span>
 
-              <div className={styles.budgetNumber}>
-                {roundNumber(
-                  budget.available_kcal,
-                )}
-              </div>
-
-              <div className={styles.budgetUnit}>
-                kcal
-              </div>
-
-              <div
-                className={styles.progressTrack}
-                aria-label="Calorie consumate"
-              >
-                <div
-                  className={styles.progressFill}
-                  style={{
-                    width: `${budgetProgress}%`,
-                  }}
-                />
-              </div>
-
-              <div className={styles.budgetBreakdown}>
-                <div>
-                  <span>Consumate</span>
-                  <strong>
-                    {roundNumber(
-                      budget.consumed_kcal,
-                    )}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Pianificate</span>
-                  <strong>
-                    {roundNumber(
-                      budget.planned_kcal,
-                    )}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Non allocate</span>
-                  <strong>
-                    {roundNumber(
-                      budget.unallocated_kcal,
-                    )}
-                  </strong>
-                </div>
-              </div>
-
-              <div className={styles.planMetrics}>
-                <div className={styles.planMetric}>
-                  <span>Peso</span>
-                  <strong>
-                    {latestWeight != null
-                      ? `${latestWeight.toLocaleString(
-                          "it-IT",
-                          {
-                            minimumFractionDigits: 1,
-                            maximumFractionDigits: 1,
-                          },
-                        )} kg`
-                      : "—"}
-                  </strong>
-                </div>
-
-                <div className={styles.planMetric}>
-                  <span>Kcal bruciate</span>
-                  <strong>
-                    {roundNumber(burnedCalories)} kcal
-                  </strong>
-                </div>
-
-                <div
-                  className={`${styles.planMetric} ${styles.planProtein}`}
-                >
-                  <div className={styles.planProteinTop}>
-                    <span>Proteine</span>
-
-                    {budget?.protein_target_g != null ? (
-                      <small>
-                        {roundNumber(
-                          budget.protein_remaining_g ?? 0,
-                        )} g rimaste
-                      </small>
-                    ) : null}
+                  <div className={styles.budgetValueRow}>
+                    <strong className={styles.budgetAvailable}>
+                      {roundNumber(budget.available_kcal)}
+                    </strong>
+                    <span className={styles.budgetKcal}>kcal</span>
                   </div>
 
-                  <strong>
-                    {budget?.protein_target_g != null
-                      ? `${roundNumber(
-                          budget.protein_consumed_g,
-                        )} / ${roundNumber(
-                          budget.protein_target_g,
-                        )} g`
-                      : "—"}
-                  </strong>
+                  <span className={styles.budgetPositive}>
+                    {budget.consumed_kcal <=
+                    budget.daily_budget_kcal
+                      ? "Stai rispettando il tuo deficit"
+                      : budget.consumed_kcal <
+                        maintenanceBudgetKcal
+                      ? "Sei ancora in deficit"
+                      : "Hai raggiunto il mantenimento"}
+                  </span>
+                </div>
 
-                  {budget?.protein_target_g != null ? (
-                    <div className={styles.planProteinTrack}>
-                      <div
-                        className={styles.planProteinFill}
-                        style={{
-                          width: `${proteinProgress}%`,
-                        }}
-                      />
-                    </div>
-                  ) : null}
+                <div className={styles.budgetDivider} />
+
+                <div className={styles.budgetColumn}>
+                  <span className={styles.budgetLabel}>
+                    Obiettivo con deficit
+                  </span>
+
+                  <div className={styles.budgetValueRow}>
+                    <strong className={styles.budgetMainValue}>
+                      {roundNumber(
+                        budget.consumed_kcal +
+                          budget.available_kcal,
+                      )}
+                    </strong>
+                    <span className={styles.budgetKcal}>kcal</span>
+                  </div>
+
+                  <span className={styles.budgetSecondary}>
+                    {budget.goal_mode === "loss" &&
+                    budget.goal_adjustment_kcal > 0
+                      ? `${roundNumber(
+                          budget.goal_adjustment_kcal,
+                        )} kcal di deficit`
+                      : "Target giornaliero"}
+                  </span>
+                </div>
+
+                <div className={styles.budgetDivider} />
+
+                <div className={styles.budgetColumn}>
+                  <span className={styles.budgetLabel}>
+                    Consumato oggi
+                  </span>
+
+                  <div className={styles.budgetValueRow}>
+                    <strong className={styles.budgetMainValue}>
+                      {roundNumber(budget.consumed_kcal)}
+                    </strong>
+                    <span className={styles.budgetKcal}>kcal</span>
+                  </div>
+
+                  <span className={styles.budgetSecondary}>
+                    {budget.available_kcal >= 0
+                      ? `${roundNumber(
+                          budget.available_kcal,
+                        )} kcal disponibili`
+                      : "Target superato"}
+                  </span>
+                </div>
+
+                <div className={styles.budgetDivider} />
+
+                <button
+                  type="button"
+                  className={styles.budgetStatus}
+                  aria-expanded={budgetExpanded}
+                  onClick={() =>
+                    setBudgetExpanded((current) => !current)
+                  }
+                >
+                  <span className={styles.budgetLabel}>
+                    Stato di oggi
+                  </span>
+
+                  <span className={styles.budgetStatusRow}>
+                    <span
+                      className={styles.budgetStatusIcon}
+                      aria-hidden="true"
+                    >
+                      ✓
+                    </span>
+
+                    <strong>
+                      {budget.consumed_kcal <
+                      maintenanceBudgetKcal
+                        ? "Deficit in corso"
+                        : "Mantenimento raggiunto"}
+                    </strong>
+                  </span>
+
+                  <span
+                    className={`${styles.budgetChevron} ${
+                      budgetExpanded
+                        ? styles.budgetChevronUp
+                        : ""
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+
+              <div className={styles.budgetScale}>
+                <span className={styles.budgetScaleStart}>
+                  0
+                </span>
+
+                <div className={styles.budgetScaleTrack}>
+                  <div
+                    className={styles.budgetScaleFill}
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.max(
+                          0,
+                          maintenanceBudgetKcal > 0
+                            ? (budget.consumed_kcal /
+                                maintenanceBudgetKcal) *
+                                100
+                            : 0,
+                        ),
+                      )}%`,
+                    }}
+                  />
+
+                  <span
+                    className={styles.budgetScaleTarget}
+                    style={{
+                      left:
+                        maintenanceBudgetKcal > 0
+                          ? `${Math.min(
+                              100,
+                              Math.max(
+                                0,
+                                (budget.daily_budget_kcal /
+                                  maintenanceBudgetKcal) *
+                                  100,
+                              ),
+                            )}%`
+                          : "0%",
+                    }}
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <div className={styles.budgetScaleLabels}>
+                  <span>
+                    {roundNumber(budget.consumed_kcal)} consumate
+                  </span>
+
+                  <span>
+                    {roundNumber(
+                      budget.consumed_kcal +
+                        budget.available_kcal,
+                    )}{" "}
+                    target
+                  </span>
+
+                  <span>
+                    {roundNumber(
+                      maintenanceBudgetKcal,
+                    )}{" "}
+                    mantenimento
+                  </span>
                 </div>
               </div>
+
+              {budgetExpanded ? (
+                <div className={styles.budgetExpandedPanel}>
+                  <div className={styles.budgetDetail}>
+                    <span className={styles.budgetDetailIcon}>
+                      🍴
+                    </span>
+                    <div>
+                      <span>Consumate</span>
+                      <strong>
+                        {roundNumber(
+                          budget.consumed_kcal,
+                        )}{" "}
+                        kcal
+                      </strong>
+                      <small>di cibo</small>
+                    </div>
+                  </div>
+
+                  <div className={styles.budgetDetail}>
+                    <span className={styles.budgetDetailIcon}>
+                      🏃
+                    </span>
+                    <div>
+                      <span>Attività</span>
+                      <strong>
+                        {roundNumber(burnedCalories)} kcal
+                      </strong>
+                      <small>bruciate</small>
+                    </div>
+                  </div>
+
+                  <div className={styles.budgetDetail}>
+                    <span className={styles.budgetDetailIcon}>
+                      ⚖
+                    </span>
+                    <div>
+                      <span>Rispetto al target</span>
+                      <strong>
+                        {roundNumber(
+                          budget.available_kcal,
+                        )}{" "}
+                        kcal
+                      </strong>
+                      <small>
+                        {budget.available_kcal >= 0
+                          ? "ancora disponibili"
+                          : "oltre il target"}
+                      </small>
+                    </div>
+                  </div>
+
+                  <div className={styles.budgetDetail}>
+                    <span className={styles.budgetDetailIcon}>
+                      ◉
+                    </span>
+                    <div>
+                      <span>Non allocate</span>
+                      <strong>
+                        {roundNumber(
+                          budget.unallocated_kcal,
+                        )}{" "}
+                        kcal
+                      </strong>
+                      <small>margine residuo</small>
+                    </div>
+                  </div>
+
+                  <div className={styles.budgetExplanation}>
+                    <span aria-hidden="true">ⓘ</span>
+                    <span>
+                      Il target con deficit è il budget
+                      di mantenimento meno{" "}
+                      {roundNumber(
+                        budget.goal_adjustment_kcal,
+                      )}{" "}
+                      kcal di deficit.
+                    </span>
+                  </div>
+                </div>
+              ) : null}
             </section>
           ) : (
             <section className={styles.card}>
@@ -1318,11 +1626,16 @@ export function HomeShell() {
             </section>
           )}
 
-          <section className={styles.conversationCard}>
+          <div className={styles.desktopHomeGrid}>
+            <section className={styles.conversationCard}>
             <div className={styles.conversationHeader}>
               <div>
                 <span className={styles.conversationEyebrow}>
-                  SanoSync AI
+                  <img
+                    src="/assets/AILogo.png"
+                    alt="SanoSync AI"
+                    className={styles.conversationAiLogo}
+                  />
                 </span>
                 <h2>
                   {conversationMode === "text"
@@ -2011,12 +2324,41 @@ export function HomeShell() {
                         <strong
                           className={styles.mealName}
                         >
-                          {meal.value ||
-                            "Nessuna routine abbastanza forte"}
+                          {slot === nextMeal?.next_slot &&
+                          !actualMealForSlot(slot) &&
+                          nextMealOptions?.recommended
+                            ? nextMealOptions.recommended
+                                .candidate.name
+                            : meal.value ||
+                              "Nessuna routine abbastanza forte"}
                         </strong>
 
-                        {typeof meal.estimated_calories ===
-                        "number" ? (
+                        {slot === nextMeal?.next_slot &&
+                        !actualMealForSlot(slot) &&
+                        nextMealOptions?.recommended ? (
+                          <p className={styles.mealMeta}>
+                            {typeof nextMealOptions.recommended
+                              .recommended_quantity === "number"
+                              ? `${roundNumber(
+                                  nextMealOptions.recommended
+                                    .recommended_quantity,
+                                )} porz. · `
+                              : ""}
+                            {roundNumber(
+                              nextMealOptions.recommended
+                                .candidate.calories,
+                            )}{" "}
+                            kcal
+                            {typeof nextMealOptions.recommended
+                              .candidate.protein_g === "number"
+                              ? ` · ${roundNumber(
+                                  nextMealOptions.recommended
+                                    .candidate.protein_g,
+                                )} g proteine`
+                              : ""}
+                          </p>
+                        ) : typeof meal.estimated_calories ===
+                          "number" ? (
                           <p className={styles.mealMeta}>
                             {Math.round(
                               meal.estimated_calories,
@@ -2157,7 +2499,8 @@ export function HomeShell() {
                       )
                     ) : null}
 
-                    {!actualMealForSlot(slot) &&
+                    {slot === nextMeal?.next_slot &&
+                    !actualMealForSlot(slot) &&
                     meal.state === "predicted" ? (
                       <>
                         <div className={styles.mealActions}>
@@ -2338,6 +2681,47 @@ export function HomeShell() {
                   </article>
                 ),
               )}
+
+              <article
+                className={`${styles.mealCard} ${styles.snackCard}`}
+              >
+                <div className={styles.mealCardTop}>
+                  <span className={styles.mealLabel}>
+                    Snack
+                  </span>
+
+                  <span className={styles.unknownBadge}>
+                    Da pianificare
+                  </span>
+                </div>
+
+                <div className={styles.snackIcon} aria-hidden="true">
+                  +
+                </div>
+
+                <strong className={styles.mealName}>
+                  Uno spuntino per la giornata
+                </strong>
+
+                <p className={styles.mealMeta}>
+                  Puoi aggiungerlo quando vuoi.
+                </p>
+
+                <div className={styles.mealActions}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      document
+                        .querySelector<HTMLTextAreaElement>(
+                          "textarea",
+                        )
+                        ?.focus();
+                    }}
+                  >
+                    Aggiungi
+                  </button>
+                </div>
+              </article>
             </div>
           </section>
 
@@ -2456,6 +2840,8 @@ export function HomeShell() {
             accessToken={accessToken}
             onSaved={refreshHome}
           />
+
+          </div>
 
           <RegisteredToday
             meals={actualMeals}

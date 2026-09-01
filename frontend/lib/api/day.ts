@@ -62,3 +62,29 @@ export function getMealOptions(
     },
   );
 }
+
+export type DailyLogUpdate = {
+  weight?: number | null;
+  steps?: number | null;
+  day_type?: string | null;
+  activity_plan?: string | null;
+};
+
+export async function updateDailyLog(
+  accessToken: string,
+  date: string,
+  changes: DailyLogUpdate,
+) {
+  return apiRequest<{
+    updated: boolean;
+    date: string;
+    item: Record<string, unknown> | null;
+  }>(
+    `/daily-logs/${date}`,
+    {
+      method: "PATCH",
+      accessToken,
+      body: JSON.stringify(changes),
+    },
+  );
+}

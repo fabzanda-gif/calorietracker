@@ -1,7 +1,7 @@
 .page {
   width: min(100%, 720px);
   margin: 0 auto;
-  padding: 22px 18px 64px;
+  padding: 18px 18px 64px;
 }
 
 .header {
@@ -9,7 +9,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  padding: 18px 0 34px;
+  padding: 10px 0 24px;
 }
 
 .brand,
@@ -361,6 +361,8 @@
 @media (min-width: 768px) {
   .page {
     width: min(100%, 1180px);
+    margin-left: 236px;
+    box-sizing: border-box;
     padding: 34px 28px 72px;
   }
 
@@ -2626,4 +2628,2271 @@
   max-width: 220px;
   object-fit: contain;
   margin-bottom: 28px;
+}
+
+/* ============================================================
+   BUDGET HERO — REDESIGN MOCKUP
+   ============================================================ */
+
+.budgetHero {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 32px;
+  padding: 28px 34px 22px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #09213a 0%, #102f4f 100%);
+  color: #f7fbff;
+  overflow: hidden;
+  box-shadow: 0 14px 34px rgba(8, 28, 48, 0.18);
+}
+
+.budgetHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(260px, 1fr);
+  align-items: stretch;
+  min-height: 116px;
+}
+
+.budgetColumn {
+  min-width: 0;
+  padding: 0 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.budgetColumn:first-child {
+  padding-left: 0;
+}
+
+.budgetLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 500;
+  color: rgba(247, 251, 255, 0.94);
+}
+
+.budgetValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.budgetAvailable,
+.budgetMainValue {
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: -1.5px;
+  font-weight: 700;
+}
+
+.budgetAvailable {
+  color: #55d879;
+}
+
+.budgetKcal {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.budgetPositive {
+  margin-top: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #55d879;
+}
+
+.budgetSecondary {
+  margin-top: 8px;
+  font-size: 16px;
+  color: rgba(247, 251, 255, 0.78);
+}
+
+.budgetDivider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.budgetStatus {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  padding: 4px 34px 4px 28px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.budgetStatus .budgetLabel {
+  margin-bottom: 10px;
+}
+
+.budgetStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #55d879;
+}
+
+.budgetStatusRow strong {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.budgetStatusIcon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #55d879;
+  border-radius: 50%;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.budgetChevron {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-right: 3px solid rgba(247, 251, 255, 0.85);
+  border-bottom: 3px solid rgba(247, 251, 255, 0.85);
+  transform: translateY(-65%) rotate(45deg);
+  transition: transform 180ms ease;
+}
+
+.budgetChevronUp {
+  transform: translateY(-35%) rotate(225deg);
+}
+
+.budgetScale {
+  position: relative;
+  margin-top: 24px;
+  padding-bottom: 34px;
+}
+
+.budgetScaleStart {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.budgetScaleTrack {
+  position: relative;
+  height: 9px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: visible;
+}
+
+.budgetScaleFill {
+  height: 100%;
+  border-radius: inherit;
+  background: #55d879;
+}
+
+.budgetScaleTarget {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #ffffff;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18);
+}
+
+.budgetScaleLabels {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 19px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  line-height: 1.2;
+  color: rgba(247, 251, 255, 0.9);
+}
+
+.budgetScaleLabels span:nth-child(2) {
+  transform: translateX(-50%);
+}
+
+.budgetScaleLabels span:last-child {
+  text-align: right;
+}
+
+.budgetExpandedPanel {
+  margin: 24px -34px -22px;
+  padding: 24px 34px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.budgetExpandedPanel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+}
+
+.budgetDetail {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 28px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.budgetDetail:first-child {
+  padding-left: 0;
+}
+
+.budgetDetail:nth-child(4) {
+  border-right: 0;
+}
+
+.budgetDetailIcon {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #55d879;
+  border-radius: 50%;
+  font-size: 23px;
+}
+
+.budgetDetail:nth-child(2) .budgetDetailIcon {
+  border-color: #f3b21b;
+}
+
+.budgetDetail:nth-child(3) .budgetDetailIcon {
+  border-color: #55d879;
+}
+
+.budgetDetail:nth-child(4) .budgetDetailIcon {
+  border-color: #ff5b5b;
+}
+
+.budgetDetail > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.budgetDetail > div > span {
+  font-size: 15px;
+  color: rgba(247, 251, 255, 0.82);
+}
+
+.budgetDetail strong {
+  margin-top: 3px;
+  font-size: 25px;
+  line-height: 1.1;
+}
+
+.budgetDetail small {
+  margin-top: 4px;
+  font-size: 15px;
+  color: rgba(247, 251, 255, 0.78);
+}
+
+.budgetExplanation {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px -34px -18px;
+  padding: 14px 34px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 15px;
+  color: rgba(247, 251, 255, 0.78);
+}
+
+.budgetExplanation > span:first-child {
+  flex: 0 0 auto;
+  font-size: 19px;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .budgetHero {
+    padding: 24px;
+    border-radius: 20px;
+  }
+
+  .budgetHeader {
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .budgetDivider {
+    display: none;
+  }
+
+  .budgetColumn {
+    padding: 14px 18px;
+  }
+
+  .budgetColumn:first-child {
+    padding-left: 0;
+  }
+
+  .budgetStatus {
+    padding-left: 18px;
+  }
+
+  .budgetExpandedPanel {
+    margin-left: -24px;
+    margin-right: -24px;
+    padding-left: 24px;
+    padding-right: 24px;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px 0;
+  }
+
+  .budgetDetail:nth-child(2) {
+    border-right: 0;
+  }
+
+  .budgetDetail:nth-child(3) {
+    padding-left: 0;
+  }
+
+  .budgetExplanation {
+    margin-left: -24px;
+    margin-right: -24px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .budgetHero {
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .budgetHeader {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .budgetColumn,
+  .budgetColumn:first-child {
+    padding: 12px 0;
+  }
+
+  .budgetStatus {
+    min-height: 90px;
+    padding: 12px 28px 12px 0;
+  }
+
+  .budgetAvailable,
+  .budgetMainValue {
+    font-size: 38px;
+  }
+
+  .budgetScale {
+    margin-top: 20px;
+  }
+
+  .budgetScaleLabels {
+    font-size: 12px;
+  }
+
+  .budgetExpandedPanel {
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+    grid-template-columns: 1fr;
+  }
+
+  .budgetDetail,
+  .budgetDetail:nth-child(3) {
+    padding: 0;
+    border-right: 0;
+  }
+
+  .budgetExplanation {
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+/* ---------- NEXT MEAL EMPHASIS ---------- */
+
+/*
+ * Questo blocco viene volutamente alla fine del file:
+ * le regole precedenti contengono diverse ridefinizioni
+ * di .mealCard e .nextMealBadge.
+ */
+
+.mealCard:has(.nextMealBadge) {
+  position: relative;
+  border-color: rgba(56, 95, 52, 0.28);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(237, 245, 234, 0.72) 0%,
+      var(--ss-surface) 42%
+    );
+  box-shadow:
+    0 8px 24px rgba(31, 53, 28, 0.06);
+}
+
+.mealCard:has(.nextMealBadge) .mealCardTop {
+  min-height: 30px;
+}
+
+.mealCard:has(.nextMealBadge) .mealLabel {
+  color: #315b2c;
+  font-weight: 850;
+}
+
+.mealCard:has(.nextMealBadge) .nextMealBadge {
+  padding: 5px 10px;
+  border: 1px solid rgba(56, 95, 52, 0.30);
+  border-radius: 999px;
+  background: #edf5ea;
+  color: #315b2c;
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  opacity: 1;
+}
+
+.mealCard:has(.nextMealBadge) .mealName {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.mealCard:has(.nextMealBadge) .mealMeta {
+  color: #555b52;
+  font-size: 0.73rem;
+}
+
+/*
+ * La preview/raccomandazione di SanoSync deve sembrare
+ * una proposta interna alla card, non un'altra meal card.
+ */
+
+.mealCard:has(.nextMealBadge) .replanningPreview {
+  margin-top: 4px;
+  padding: 13px;
+  border: 1px solid rgba(56, 95, 52, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.mealCard:has(.nextMealBadge) .replanningPreview strong {
+  color: #315b2c;
+}
+
+.mealCard:has(.nextMealBadge) .mealActions {
+  margin-top: 2px;
+  gap: 8px;
+}
+
+.mealCard:has(.nextMealBadge) .confirmMealButton,
+.mealCard:has(.nextMealBadge) .alternateMealButton {
+  min-height: 40px;
+  border-radius: 12px;
+}
+
+.mealCard:has(.nextMealBadge) .confirmMealButton {
+  font-weight: 850;
+}
+
+@media (max-width: 640px) {
+  .mealCard:has(.nextMealBadge) {
+    padding: 15px 15px 0;
+  }
+
+  .mealCard:has(.nextMealBadge) .mealName {
+    font-size: 0.92rem;
+  }
+
+  .mealCard:has(.nextMealBadge) .replanningPreview {
+    padding: 11px;
+  }
+}
+
+
+
+/* ============================================================
+   SANOSYNC HOME — BUDGET HERO V3
+   ============================================================ */
+
+.budgetHero {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 28px;
+  padding: 28px 32px 22px;
+
+  border: 0;
+  border-radius: 26px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #0b2743 0%,
+      #123756 100%
+    );
+
+  color: #f8fbff;
+
+  box-shadow:
+    0 18px 38px rgba(12, 39, 67, 0.16);
+
+  overflow: hidden;
+}
+
+.budgetHeader {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.1fr)
+    1px
+    minmax(0, 1fr)
+    1px
+    minmax(0, 1fr)
+    1px
+    minmax(0, 1.15fr);
+
+  align-items: stretch;
+  min-height: 124px;
+  gap: 0;
+}
+
+.budgetColumn {
+  min-width: 0;
+  padding: 4px 26px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.budgetColumn:first-child {
+  padding-left: 0;
+}
+
+.budgetDivider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.budgetLabel {
+  display: block;
+  margin-bottom: 7px;
+
+  color: rgba(248, 251, 255, 0.72);
+
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.budgetValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.budgetAvailable,
+.budgetMainValue {
+  margin: 0;
+
+  font-size: clamp(2.45rem, 4vw, 3.15rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+  font-weight: 750;
+}
+
+.budgetAvailable {
+  color: var(--ss-coral-500, #f47f7a) !important;
+}
+
+.budgetMainValue {
+  color: #f8fbff;
+}
+
+.budgetKcal {
+  color: rgba(248, 251, 255, 0.84);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.budgetPositive {
+  margin-top: 8px;
+
+  color: var(--ss-coral-500, #f47f7a) !important;
+
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.budgetSecondary {
+  margin-top: 7px;
+
+  color: rgba(248, 251, 255, 0.67);
+
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.budgetStatus {
+  position: relative;
+
+  min-width: 0;
+  padding: 4px 0 4px 26px;
+
+  border: 0;
+  background: transparent;
+
+  color: #ffffff;
+  text-align: left;
+
+  cursor: pointer;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.budgetStatus:focus-visible {
+  outline: 2px solid var(--ss-coral-500, #f47f7a);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.budgetStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.budgetStatusRow strong {
+  color: #55d879;
+
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 750;
+}
+
+.budgetStatusIcon {
+  flex: 0 0 auto;
+
+  width: 31px;
+  height: 31px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 2px solid #55d879;
+  border-radius: 50%;
+
+  color: #55d879;
+
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.budgetChevron {
+  position: absolute;
+
+  right: 28px;
+  top: 50%;
+
+  width: 11px;
+  height: 11px;
+
+  border-right: 3px solid rgba(255, 255, 255, 0.82);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.82);
+
+  transform:
+    translateY(-80%)
+    rotate(45deg);
+
+  transition: transform 160ms ease;
+}
+
+.budgetChevronUp {
+  transform:
+    translateY(-25%)
+    rotate(225deg);
+}
+
+.budgetScale {
+  position: relative;
+  margin-top: 23px;
+}
+
+.budgetScaleTrack {
+  position: relative;
+
+  width: 100%;
+  height: 7px;
+
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.budgetScaleFill {
+  position: absolute;
+
+  left: 0;
+  top: 0;
+
+  height: 100%;
+
+  border-radius: inherit;
+
+  background: var(--ss-coral-500, #f47f7a);
+}
+
+.budgetScaleTarget {
+  position: absolute;
+
+  top: 50%;
+
+  width: 15px;
+  height: 15px;
+
+  border-radius: 50%;
+  background: #ffffff;
+
+  transform: translate(-50%, -50%);
+
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+
+.budgetScaleStart {
+  position: absolute;
+
+  left: 0;
+  top: 19px;
+
+  color: rgba(248, 251, 255, 0.78);
+
+  font-size: 13px;
+}
+
+.budgetScaleLabels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  margin-top: 19px;
+
+  color: rgba(248, 251, 255, 0.82);
+
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.budgetExpandedPanel {
+  margin-top: 24px;
+  padding-top: 22px;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.12);
+}
+
+.budgetExplanation {
+  margin-top: 18px;
+
+  color: rgba(248, 251, 255, 0.7);
+
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 950px) {
+  .budgetHero {
+    padding: 24px;
+  }
+
+  .budgetHeader {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    row-gap: 20px;
+  }
+
+  .budgetDivider {
+    display: none;
+  }
+
+  .budgetColumn,
+  .budgetColumn:first-child {
+    padding: 8px 16px;
+  }
+
+  .budgetColumn:nth-child(1),
+  .budgetColumn:nth-child(5) {
+    padding-left: 0;
+  }
+
+  .budgetStatus {
+    padding-left: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .budgetHero {
+    margin-bottom: 22px;
+    padding: 20px;
+    border-radius: 21px;
+  }
+
+  .budgetHeader {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .budgetColumn,
+  .budgetColumn:first-child {
+    padding: 13px 0;
+  }
+
+  .budgetStatus {
+    min-height: 76px;
+    padding: 13px 34px 13px 0;
+  }
+
+  .budgetAvailable,
+  .budgetMainValue {
+    font-size: 2.45rem;
+  }
+
+  .budgetStatusRow strong {
+    font-size: 18px;
+  }
+
+  .budgetScale {
+    margin-top: 19px;
+  }
+
+  .budgetScaleLabels {
+    font-size: 12px;
+  }
+
+  .budgetChevron {
+    right: 20px;
+  }
+}
+
+
+/* ============================================================
+   SANOSYNC HOME — AI MEAL CAPTURE
+   Step 4
+   ============================================================ */
+
+.conversationCard {
+  position: relative;
+
+  display: grid;
+  grid-template-columns: minmax(230px, 0.78fr) minmax(0, 1.22fr);
+  align-items: start;
+  gap: 28px;
+
+  margin: 0 0 28px;
+  padding: 22px;
+
+  border: 1px solid rgba(244, 127, 122, 0.28);
+  border-radius: 22px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #fff8f7 0%,
+      #ffffff 72%
+    );
+
+  box-shadow:
+    0 10px 28px rgba(16, 40, 70, 0.06);
+}
+
+/* ------------------------------------------------------------
+   Header
+   ------------------------------------------------------------ */
+
+.conversationHeader {
+  min-width: 0;
+}
+
+.conversationHeader > div {
+  display: grid;
+  gap: 7px;
+}
+
+.conversationEyebrow {
+  width: fit-content;
+
+  color: var(--ss-coral-500, #f47f7a);
+
+  font-size: 0.68rem;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.conversationHeader h2 {
+  margin: 0;
+
+  color: #102846;
+
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+}
+
+.conversationHeader p {
+  max-width: 38ch;
+  margin: 3px 0 0;
+
+  color: #686862;
+
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------------------
+   Controls
+   ------------------------------------------------------------ */
+
+.conversationModeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  min-height: 38px;
+  margin-bottom: 8px;
+
+  padding: 3px;
+
+  border: 1px solid #e5e4df;
+  border-radius: 11px;
+
+  background: #f0f0ed;
+}
+
+.conversationModeSwitch button {
+  min-height: 30px;
+
+  border: 0;
+  border-radius: 8px;
+
+  background: transparent;
+  color: #8b8b84;
+
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.conversationModeSwitch button:hover {
+  color: #30302d;
+}
+
+.conversationModeSwitch button.conversationModeActive {
+  background: #ffffff;
+  color: #102846;
+
+  box-shadow:
+    0 1px 4px rgba(16, 40, 70, 0.08);
+}
+
+.conversationControls {
+  display: grid;
+  gap: 8px;
+}
+
+.conversationControls select,
+.conversationControls textarea {
+  width: 100%;
+  box-sizing: border-box;
+
+  border: 1px solid #dfdfd8;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #102846;
+
+  font: inherit;
+  font-size: 0.8rem;
+
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.conversationControls select {
+  min-height: 38px;
+  padding: 0 11px;
+}
+
+.conversationControls textarea {
+  min-height: 68px;
+  padding: 11px;
+
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.conversationControls select:focus,
+.conversationControls textarea:focus {
+  outline: none;
+
+  border-color:
+    var(--ss-coral-500, #f47f7a);
+
+  box-shadow:
+    0 0 0 3px rgba(244, 127, 122, 0.12);
+}
+
+.conversationControls textarea::placeholder {
+  color: #a0a09a;
+}
+
+/* ------------------------------------------------------------
+   Primary action
+   ------------------------------------------------------------ */
+
+.conversationControls > button {
+  min-height: 39px;
+
+  border: 0;
+  border-radius: 10px;
+
+  background:
+    var(--ss-coral-500, #f47f7a);
+
+  color: #ffffff;
+
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 5px 12px rgba(244, 127, 122, 0.18);
+
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.conversationControls > button:hover:not(:disabled) {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 7px 16px rgba(244, 127, 122, 0.24);
+}
+
+.conversationControls > button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------
+   Photo mode
+   ------------------------------------------------------------ */
+
+.conversationPhotoPicker {
+  min-height: 68px;
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 12px;
+
+  border: 1px dashed rgba(244, 127, 122, 0.45);
+  border-radius: 10px;
+
+  background: rgba(244, 127, 122, 0.035);
+
+  color: #686862;
+
+  font-size: 0.78rem;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.conversationPhotoPicker:hover {
+  background: rgba(244, 127, 122, 0.07);
+}
+
+.conversationPhotoPicker input {
+  display: none;
+}
+
+.conversationPhotoPreview {
+  overflow: hidden;
+
+  border-radius: 10px;
+  border: 1px solid #e2e1dc;
+}
+
+.conversationPhotoPreview img {
+  display: block;
+
+  width: 100%;
+  max-height: 180px;
+
+  object-fit: contain;
+}
+
+/* ------------------------------------------------------------
+   Preview returned by AI
+   ------------------------------------------------------------ */
+
+.conversationPreview {
+  grid-column: 1 / -1;
+
+  padding-top: 18px;
+
+  border-top:
+    1px solid rgba(16, 40, 70, 0.09);
+}
+
+.conversationPreviewTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conversationPreviewTop strong {
+  color: #102846;
+  font-size: 0.88rem;
+}
+
+.conversationPreviewTop span {
+  color: #8a625f;
+  font-size: 0.72rem;
+}
+
+.conversationItems {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.conversationItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 9px 11px;
+
+  border-radius: 9px;
+  background: #ffffff;
+
+  border: 1px solid #ecebe7;
+}
+
+.conversationItem div {
+  display: grid;
+  gap: 2px;
+}
+
+.conversationItem strong {
+  color: #102846;
+  font-size: 0.78rem;
+}
+
+.conversationItem span,
+.conversationTotals span {
+  color: #777771;
+  font-size: 0.7rem;
+}
+
+.conversationTotals {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+
+  margin-top: 10px;
+}
+
+.conversationTotals strong {
+  color: #102846;
+  font-size: 0.9rem;
+}
+
+.conversationPreviewActions {
+  display: flex;
+  gap: 8px;
+
+  margin-top: 13px;
+}
+
+.conversationPreviewActions button {
+  min-height: 36px;
+
+  padding: 0 14px;
+
+  border-radius: 9px;
+
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.conversationPreviewActions button:first-child {
+  border: 0;
+  background: var(--ss-coral-500, #f47f7a);
+  color: #ffffff;
+}
+
+.conversationPreviewActions button:last-child {
+  border: 1px solid #deded8;
+  background: #ffffff;
+  color: #555550;
+}
+
+.conversationError {
+  margin: 10px 0 0;
+  color: #a33b3b;
+  font-size: 0.76rem;
+}
+
+.conversationSuccess {
+  margin: 10px 0 0;
+  color: #23824b;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------
+   Responsive
+   ------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+  .conversationCard {
+    grid-template-columns: 1fr;
+    gap: 17px;
+    padding: 18px;
+  }
+
+  .conversationHeader p {
+    max-width: none;
+  }
+
+  .conversationPreview {
+    grid-column: auto;
+  }
+}
+
+
+/* ============================================================
+   SANOSYNC HOME — MEALS
+   Step 5
+   ============================================================ */
+
+.mealsSection {
+  margin-top: 28px;
+}
+
+/* Titolo della sezione */
+
+.mealsSection .sectionHeader {
+  margin-bottom: 14px;
+}
+
+.mealsSection .sectionHeader h2 {
+  margin: 0;
+
+  color: #102846;
+
+  font-size: 1.28rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+}
+
+.mealsSection .kicker {
+  margin: 0 0 5px;
+
+  color: #69788d;
+
+  font-size: 0.64rem;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------
+   Griglia pasti
+   ------------------------------------------------------------ */
+
+.mealsSection .mealList {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 12px;
+
+  align-items: stretch;
+}
+
+/* ------------------------------------------------------------
+   Card
+   ------------------------------------------------------------ */
+
+.mealsSection .mealCard {
+  display: flex;
+  flex-direction: column;
+
+  min-width: 0;
+  min-height: 168px;
+
+  gap: 10px;
+
+  padding: 16px;
+
+  border: 1px solid #e3e3dd;
+  border-radius: 15px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 2px 8px rgba(16, 40, 70, 0.035);
+
+  overflow: hidden;
+}
+
+.mealsSection .mealCard:hover {
+  border-color: #d8d8d1;
+
+  box-shadow:
+    0 6px 16px rgba(16, 40, 70, 0.055);
+}
+
+/* ------------------------------------------------------------
+   Header card
+   ------------------------------------------------------------ */
+
+.mealsSection .mealCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  min-height: 22px;
+
+  gap: 8px;
+}
+
+.mealsSection .mealLabel {
+  color: #102846;
+
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+/* Badge Registrato */
+
+.mealsSection .predictedBadge,
+.mealsSection .unknownBadge {
+  flex-shrink: 0;
+
+  padding: 4px 7px;
+
+  border-radius: 999px;
+
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.mealsSection .predictedBadge {
+  background: #fff0ef;
+  color: #df625d;
+}
+
+.mealsSection .unknownBadge {
+  background: #f2f2ef;
+  color: #777771;
+}
+
+/* ------------------------------------------------------------
+   Nome pasto
+   ------------------------------------------------------------ */
+
+.mealsSection .mealName {
+  margin: 5px 0 0;
+
+  color: #102846;
+
+  font-size: 0.78rem;
+  line-height: 1.3;
+  font-weight: 750;
+
+  letter-spacing: -0.01em;
+}
+
+.mealsSection .mealMeta {
+  margin: -3px 0 0;
+
+  color: #778294;
+
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+/* ------------------------------------------------------------
+   Azioni
+   ------------------------------------------------------------ */
+
+.mealsSection .mealActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+
+  gap: 9px;
+
+  margin-top: auto;
+}
+
+.mealsSection .mealActions button {
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+
+  color: #173653;
+
+  font: inherit;
+
+  font-size: 0.62rem;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.mealsSection .mealActions button:hover {
+  color: var(--ss-coral-500, #f47f7a);
+}
+
+.mealsSection .mealActions button:last-child {
+  color: #d95752;
+}
+
+/* ------------------------------------------------------------
+   Totale in fondo alla card
+   ------------------------------------------------------------ */
+
+.mealsSection .mealTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin:
+    7px -16px -16px;
+
+  padding:
+    9px 16px;
+
+  border-top: 1px solid #e8e8e2;
+
+  background: #fafaf8;
+
+  color: #7a8491;
+
+  font-size: 0.58rem;
+}
+
+.mealsSection .mealTotal strong {
+  color: #173653;
+
+  font-size: 0.61rem;
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------------
+   Quando una card contiene più pasti
+   ------------------------------------------------------------ */
+
+.mealsSection .mealCard .mealItem + .mealItem {
+  padding-top: 10px;
+
+  border-top: 1px solid #e7e6df;
+}
+
+/* ------------------------------------------------------------
+   Responsive
+   ------------------------------------------------------------ */
+
+@media (max-width: 1050px) {
+  .mealsSection .mealList {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .mealsSection .mealList {
+    grid-template-columns: 1fr;
+  }
+
+  .mealsSection .mealCard {
+    min-height: 0;
+  }
+}
+
+
+/* ============================================================
+   SANOSYNC HOME — MEALS 4 CARDS
+   Step 5 final
+   ============================================================ */
+
+.mealsSection .mealList {
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+}
+
+/* Ordine visuale:
+   Colazione · Pranzo · Snack · Cena */
+.mealsSection .mealList > article:nth-child(1) {
+  order: 1;
+}
+
+.mealsSection .mealList > article:nth-child(2) {
+  order: 2;
+}
+
+.mealsSection .mealList > article.snackCard {
+  order: 3;
+}
+
+.mealsSection .mealList > article:nth-child(3) {
+  order: 4;
+}
+
+.mealsSection .mealCard {
+  position: relative;
+  min-height: 184px;
+}
+
+.mealsSection .mealCardTop {
+  min-height: 24px;
+}
+
+.mealsSection .mealLabel {
+  font-size: 0.78rem;
+}
+
+.mealsSection .snackCard {
+  border-color:
+    rgba(244, 127, 122, 0.28);
+
+  background:
+    linear-gradient(
+      145deg,
+      #fff9f8 0%,
+      #ffffff 100%
+    );
+}
+
+.mealsSection .snackIcon {
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-top: 5px;
+
+  border-radius: 50%;
+
+  background:
+    rgba(244, 127, 122, 0.13);
+
+  color:
+    var(--ss-coral-500, #f47f7a);
+
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.mealsSection .snackCard .mealName {
+  margin-top: 0;
+  color: #102846;
+}
+
+.mealsSection .snackCard .mealActions button {
+  color:
+    var(--ss-coral-500, #f47f7a);
+}
+
+.mealsSection .registeredMealBadge {
+  flex-shrink: 0;
+
+  padding: 4px 7px;
+
+  border-radius: 999px;
+
+  background: #edf8f0;
+  color: #27804b;
+
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.mealsSection .nextMealBadge {
+  flex-shrink: 0;
+
+  padding: 4px 7px;
+
+  border-radius: 999px;
+
+  background: #fff0ef;
+  color:
+    var(--ss-coral-500, #f47f7a);
+
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+@media (max-width: 1050px) {
+  .mealsSection .mealList {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .mealsSection .mealList {
+    grid-template-columns: 1fr;
+  }
+
+  .mealsSection .mealList > article {
+    order: initial !important;
+  }
+
+  .mealsSection .snackCard {
+    order: initial !important;
+  }
+}
+
+
+/* ============================================================
+   SANOSYNC HOME — DESKTOP DEFINITIVO
+   ============================================================ */
+
+@media (min-width: 1100px) {
+  .page {
+    display: block;
+    position: relative;
+
+    width: calc(100vw - 236px);
+    max-width: none;
+    min-width: 0;
+
+    margin: 0 0 0 236px;
+    padding: 42px 34px 80px;
+
+    box-sizing: border-box;
+  }
+
+  .header,
+  .dayIntro,
+  .budgetHero,
+  .errorCard {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
+  .desktopHomeGrid {
+    display: grid;
+
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      330px;
+
+    gap: 24px;
+
+    align-items: start;
+  }
+
+  .desktopHomeGrid > * {
+    min-width: 0;
+  }
+
+  /* SINISTRA — PASTI */
+  .desktopHomeGrid .mealsSection {
+    grid-column: 1;
+    grid-row: 1;
+
+    width: 100%;
+    min-width: 0;
+  }
+
+  .desktopHomeGrid .mealList {
+    display: grid;
+
+    width: 100%;
+    min-width: 0;
+
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+
+    gap: 12px;
+
+    align-items: start;
+  }
+
+  .desktopHomeGrid .mealCard {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+
+    box-sizing: border-box;
+  }
+
+  /* DESTRA — SANOSYNC AI */
+  .desktopHomeGrid .conversationCard {
+    grid-column: 2;
+    grid-row: 1;
+
+    width: 100%;
+    min-width: 0;
+
+    margin: 0;
+    padding: 20px;
+
+    box-sizing: border-box;
+  }
+
+  .desktopHomeGrid .conversationCard textarea {
+    width: 100%;
+    min-height: 116px;
+
+    box-sizing: border-box;
+  }
+
+  /* Le sezioni successive restano sotto la griglia */
+  .decisionSection {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* ============================================================
+   DESKTOP LARGO
+   ============================================================ */
+
+@media (min-width: 1450px) {
+  .desktopHomeGrid {
+    grid-template-columns:
+      minmax(0, 1fr)
+      360px;
+
+    gap: 28px;
+  }
+
+  .desktopHomeGrid .mealList {
+    gap: 14px;
+  }
+}
+
+
+/* LARGE BODY LOGO */
+.largeBodyLogo {
+  position: absolute;
+  top: 18px;
+  left: 28px;
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  display: block;
+  z-index: 2;
+}
+
+@media (max-width: 1100px) {
+  .largeBodyLogo {
+    width: 120px;
+    height: 120px;
+    left: 20px;
+    top: 16px;
+  }
+}
+
+@media (max-width: 820px) {
+  .largeBodyLogo {
+    position: static;
+    width: 105px;
+    height: 105px;
+    margin: 0 auto 12px;
+  }
+}
+
+
+/* CONVERSATION AI LOGO */
+.conversationAiLogo {
+  display: block;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.conversationEyebrow:has(.conversationAiLogo) {
+  display: block;
+  margin: 0 0 10px;
+  letter-spacing: normal;
+}
+
+/* Fix altezza card pasti: ogni card mantiene la propria altezza naturale */
+@media (min-width: 900px) {
+  .desktopHomeGrid .mealList {
+    align-items: start;
+  }
+
+  .desktopHomeGrid .mealCard {
+    height: auto;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+
+  .desktopHomeGrid .registeredMealEditor {
+    max-height: 330px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* ============================================================
+   DESKTOP HOME — sfruttiamo meglio la larghezza disponibile
+   ============================================================ */
+
+@media (min-width: 1100px) {
+
+  /* Contenitore principale più ampio */
+  .page {
+    width: min(100% - 48px, 1400px);
+    max-width: 1400px;
+    margin-inline: auto;
+  }
+
+  /* Header e contenuti superiori seguono la nuova larghezza */
+  .header {
+    width: 100%;
+  }
+
+  /* Budget a tutta la larghezza disponibile */
+  .budgetHero {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /*
+   * Area principale:
+   * pasti larghi + AI laterale più generosa
+   */
+  .desktopHomeGrid {
+    width: 100%;
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(360px, 390px);
+    gap: 28px;
+    align-items: start;
+  }
+
+  /*
+   * La sezione pasti sfrutta tutto lo spazio rimasto.
+   */
+  .desktopHomeGrid .mealsSection {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /*
+   * Quattro card realmente utilizzabili.
+   */
+  .desktopHomeGrid .mealList {
+    width: 100%;
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+
+  .desktopHomeGrid .mealCard {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+
+  /*
+   * AI più presente visivamente, senza diventare enorme.
+   */
+  .desktopHomeGrid .conversationCard {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 24px;
+  }
+
+  .desktopHomeGrid .conversationCard textarea {
+    min-height: 128px;
+  }
+
+  /*
+   * Evita che l'editor della cena allarghi o deformi la griglia.
+   */
+  .desktopHomeGrid .registeredMealEditor {
+    max-height: 330px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Schermi molto larghi: sfruttiamo ancora meglio lo spazio */
+@media (min-width: 1450px) {
+
+  .page {
+    width: min(100% - 64px, 1480px);
+    max-width: 1480px;
+  }
+
+  .desktopHomeGrid {
+    grid-template-columns:
+      minmax(0, 1fr)
+      400px;
+    gap: 32px;
+  }
+
+  .desktopHomeGrid .mealList {
+    gap: 16px;
+  }
+}
+
+/* ============================================================
+   FINAL HOME BRAND POSITION
+   ============================================================ */
+
+@media (min-width: 1100px) {
+  .homeBrand {
+    left: -155px;
+    top: 42px;
+    width: 150px;
+  }
+
+  .homeBrandLogo {
+    width: 142px;
+    height: auto;
+  }
+}
+
+@media (min-width: 1450px) {
+  .homeBrand {
+    left: -165px;
+    top: 42px;
+    width: 160px;
+  }
+
+  .homeBrandLogo {
+    width: 150px;
+  }
+}
+
+/* ============================================================
+   SANOSYNC HOME — FINAL DESKTOP LAYOUT
+   Single authoritative override
+   ============================================================ */
+
+@media (min-width: 1100px) {
+  .page {
+    display: block;
+    width: min(calc(100% - 48px), 1400px);
+    max-width: 1400px;
+    margin-inline: auto;
+    padding: 42px 34px 80px;
+    box-sizing: border-box;
+  }
+
+  .header,
+  .dayIntro,
+  .budgetHero,
+  .errorCard {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .desktopHomeGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: 28px;
+    align-items: start;
+    width: 100%;
+  }
+
+  .desktopHomeGrid > * {
+    min-width: 0;
+  }
+
+  .desktopHomeGrid .mealsSection {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .desktopHomeGrid .conversationCard {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0;
+    align-self: start;
+    box-sizing: border-box;
+    position: sticky;
+    top: 24px;
+  }
+
+  .desktopHomeGrid .mealList {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    width: 100%;
+    align-items: start;
+  }
+
+  .desktopHomeGrid .mealCard {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+
+  .desktopHomeGrid .decisionSection {
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .desktopHomeGrid .conversationCard textarea {
+    min-height: 128px;
+  }
+
+  .desktopHomeGrid .registeredMealEditor {
+    max-height: 330px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (min-width: 1450px) {
+  .page {
+    width: min(calc(100% - 64px), 1480px);
+    max-width: 1480px;
+  }
+
+  .desktopHomeGrid {
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 32px;
+  }
+
+  .desktopHomeGrid .mealList {
+    gap: 16px;
+  }
+}
+
+/* ============================================================
+   SANOSYNC HOME — FINAL DESKTOP COMPOSITION
+   Sidebar: 236px
+   ============================================================ */
+
+@media (min-width: 1100px) {
+  .page {
+    width: calc(100vw - 236px);
+    max-width: none;
+    min-width: 0;
+
+    margin-left: 236px;
+    margin-right: 0;
+
+    padding: 42px 34px 80px;
+    box-sizing: border-box;
+  }
+
+  /*
+   * Budget e parte introduttiva restano full width.
+   */
+  .header,
+  .dayIntro,
+  .budgetHero,
+  .errorCard {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /*
+   * Area operativa:
+   *
+   * ┌──────────────────────────────┬───────────────┐
+   * │ I TUOI PASTI                 │ SanoSync AI   │
+   * │ 4 card                       │               │
+   * └──────────────────────────────┴───────────────┘
+   */
+  .desktopHomeGrid {
+    display: grid;
+
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      360px;
+
+    column-gap: 24px;
+    row-gap: 24px;
+
+    align-items: start;
+  }
+
+  .desktopHomeGrid > * {
+    min-width: 0;
+  }
+
+  .desktopHomeGrid .mealsSection {
+    grid-column: 1;
+    grid-row: 1;
+
+    width: 100%;
+    min-width: 0;
+  }
+
+  .desktopHomeGrid .conversationCard {
+    grid-column: 2;
+    grid-row: 1;
+
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+
+    margin: 0;
+    padding: 20px;
+  }
+
+  /*
+   * Quattro pasti sempre nella colonna principale.
+   */
+  .desktopHomeGrid .mealList {
+    display: grid;
+
+    width: 100%;
+    min-width: 0;
+
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+
+    gap: 12px;
+
+    align-items: start;
+  }
+
+  .desktopHomeGrid .mealCard {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+
+    box-sizing: border-box;
+    padding: 16px;
+  }
+
+  .desktopHomeGrid .mealName {
+    font-size: 0.98rem;
+    line-height: 1.28;
+  }
+
+  .desktopHomeGrid .mealMeta {
+    font-size: 0.78rem;
+  }
+
+  /*
+   * AI compatta ma leggibile.
+   */
+  .desktopHomeGrid .conversationHeader h2 {
+    font-size: 1.2rem;
+    line-height: 1.08;
+  }
+
+  .desktopHomeGrid .conversationHeader p {
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .desktopHomeGrid .conversationControls {
+    gap: 10px;
+  }
+
+  .desktopHomeGrid .conversationControls textarea {
+    min-height: 116px;
+  }
+
+  /*
+   * Le alternative/resoconto rimangono sotto la griglia,
+   * senza interferire con le due colonne principali.
+   */
+  .decisionSection {
+    width: 100%;
+    box-sizing: border-box;
+  }
 }

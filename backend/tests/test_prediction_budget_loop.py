@@ -7,9 +7,11 @@ from backend.api.dependencies import (
     CurrentUser,
     get_activities_repository,
     get_current_user,
+    get_authenticated_supabase,
     get_daily_logs_repository,
     get_meals_repository,
     get_weight_repository,
+    get_weekly_schedule_repository,
 )
 from backend.api.main import app
 
@@ -127,6 +129,25 @@ class FakeActivitiesRepository:
         return []
 
 
+class FakeWeeklyScheduleRepository:
+    """
+    Test-only repository: the prediction confirmation test does not
+    need persisted weekly scheduling data.
+    """
+
+    def list_for_date(self, user_id, log_date):
+        return []
+
+    def list_date_range(self, user_id, start_date, end_date):
+        return []
+
+    def get_for_date(self, user_id, log_date):
+        return None
+
+    def get_named_for_date(self, user_id, log_date, activity_name):
+        return None
+
+
 class FakeWeightRepository:
     def latest(self, user_id):
         return {
@@ -154,6 +175,10 @@ def override_current_user():
     )
 
 
+def override_authenticated_supabase():
+    return None
+
+
 def override_meals():
     return meals_repo
 
@@ -170,15 +195,25 @@ def override_weight():
     return FakeWeightRepository()
 
 
+def override_weekly_schedule():
+    return FakeWeeklyScheduleRepository()
+
+
 @pytest.fixture(autouse=True)
 def api_overrides():
     meals_repo.reset()
 
     app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_authenticated_supabase] = (
+        override_authenticated_supabase
+    )
     app.dependency_overrides[get_meals_repository] = override_meals
     app.dependency_overrides[get_daily_logs_repository] = override_daily_logs
     app.dependency_overrides[get_activities_repository] = override_activities
     app.dependency_overrides[get_weight_repository] = override_weight
+    app.dependency_overrides[get_weekly_schedule_repository] = (
+        override_weekly_schedule
+    )
 
     yield
 

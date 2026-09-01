@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.daily_logs import router as daily_logs_router
+from backend.api.routers.day_history import router as day_history_router
 from backend.api.routers.decision_learning import router as decision_learning_router
 from backend.api.routers.decision_outcomes import router as decision_outcomes_router
 from backend.api.routers.decision_selections import router as decision_selections_router
@@ -16,6 +17,8 @@ from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
 from backend.api.routers.recipes import router as recipes_router
 from backend.api.routers.progress import router as progress_router
+from backend.api.routers.profile import router as profile_router
+from backend.api.routers.weekly_schedule import router as weekly_schedule_router
 from backend.api.routers.weight import router as weight_router
 
 
@@ -51,7 +54,10 @@ app.include_router(meals_router)
 app.include_router(activities_router)
 app.include_router(weight_router)
 app.include_router(progress_router)
+app.include_router(profile_router)
+app.include_router(weekly_schedule_router)
 app.include_router(daily_logs_router)
+app.include_router(day_history_router)
 app.include_router(recipes_router)
 app.include_router(ingredients_router)
 app.include_router(days_router)

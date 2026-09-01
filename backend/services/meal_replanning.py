@@ -2,23 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.services.portion_adaptation import (
-    PortionAdaptationService,
-)
-
 
 class MealReplanningService:
     """
-    Choose a realistic recommendation for the current
+    Choose the best realistic recommendation for the current
     state of the day.
 
-    In auto mode the caller may supply the routine as the
-    preferred starting point. Explicit modes can omit it and
-    rely only on already-ranked compatible alternatives.
+    Rules:
+    - in auto mode, keep the routine when its normal portion
+      fits the available budget;
+    - never change the portion of a candidate automatically;
+    - when the routine does not fit, choose the best compatible
+      candidate already supplied by the ranking layer;
+    - if nothing is compatible, return None.
     """
-
-    def __init__(self) -> None:
-        self.portions = PortionAdaptationService()
 
     def recommend(
         self,
@@ -27,70 +24,67 @@ class MealReplanningService:
         ranked_options: list[dict[str, Any]],
         available_kcal: float | None,
     ) -> dict[str, Any] | None:
-        routine_result = self._adapt_candidate(
-            candidate=routine_candidate,
-            available_kcal=available_kcal,
-        )
+        """
+        Prefer the normal routine when it fits.
 
-        if routine_result is not None:
-            multiplier = float(
-                routine_result["portion_multiplier"]
-            )
+        If the routine does not fit, fall back to the best
+        already-ranked candidate that fits at its original
+        portion.
 
-            return self._recommendation(
-                candidate=routine_result,
-                multiplier=multiplier,
-                strategy=(
-                    "routine"
-                    if multiplier == 1.0
-                    else "adapted_routine"
-                ),
-                original_candidate=routine_candidate,
-            )
+        No candidate is ever portion-adapted here.
+        """
+
+        if isinstance(routine_candidate, dict):
+            if self._fits_budget(
+                routine_candidate,
+                available_kcal,
+            ):
+                return self._recommendation(
+                    candidate=dict(routine_candidate),
+                    multiplier=1.0,
+                    strategy="routine",
+                    original_candidate=routine_candidate,
+                )
 
         for option in ranked_options:
             candidate = option.get("candidate")
 
-            alternative_result = self._adapt_candidate(
-                candidate=candidate,
-                available_kcal=available_kcal,
-            )
-
-            if alternative_result is None:
+            if not isinstance(candidate, dict):
                 continue
 
-            multiplier = float(
-                alternative_result[
-                    "portion_multiplier"
-                ]
-            )
+            if not self._fits_budget(
+                candidate,
+                available_kcal,
+            ):
+                continue
 
             return self._recommendation(
-                candidate=alternative_result,
-                multiplier=multiplier,
-                strategy=(
-                    "alternate_candidate"
-                    if multiplier == 1.0
-                    else "adapted_alternative"
-                ),
+                candidate=dict(candidate),
+                multiplier=1.0,
+                strategy="alternate_candidate",
                 original_candidate=candidate,
             )
 
         return None
 
-    def _adapt_candidate(
-        self,
-        *,
-        candidate: Any,
+    @classmethod
+    def _fits_budget(
+        cls,
+        candidate: dict[str, Any],
         available_kcal: float | None,
-    ) -> dict[str, Any] | None:
-        if not isinstance(candidate, dict):
-            return None
+    ) -> bool:
+        if available_kcal is None:
+            return True
 
-        return self.portions.adapt(
-            candidate=candidate,
-            available_kcal=available_kcal,
+        calories = cls._number(
+            candidate.get("calories")
         )
+
+        available = cls._number(
+            available_kcal
+        )
+
+        return calories <= available
 
     @classmethod
     def _recommendation(
@@ -110,6 +104,7 @@ class MealReplanningService:
         original_calories = cls._number(
             original.get("calories")
         )
+
         recommended_calories = cls._number(
             candidate.get("calories")
         )
@@ -152,19 +147,15 @@ class MealReplanningService:
                 "La routine abituale è compatibile "
                 "con la giornata di oggi."
             ),
-            "adapted_routine": (
-                "La routine resta una buona scelta, "
-                "con una porzione adattata al margine di oggi."
-            ),
             "alternate_candidate": (
-                "La routine richiederebbe una porzione poco "
-                "realistica, quindi conviene un'altra opzione."
+                "La routine non entra nel margine disponibile, "
+                "quindi scelgo la migliore alternativa "
+                "compatibile nel pool di oggi."
             ),
-            "adapted_alternative": (
-                "Un'alternativa è più adatta alla giornata, "
-                "con una porzione leggermente adattata."
-            ),
-        }[strategy]
+        }.get(
+            strategy,
+            "Scelta selezionata dal motore.",
+        )
 
     @staticmethod
     def _number(value: Any) -> float:

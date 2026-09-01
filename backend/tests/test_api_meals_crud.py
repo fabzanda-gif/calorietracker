@@ -31,6 +31,11 @@ class FakeMealsRepository:
         self.last_create = payload
         return SimpleNamespace(data=[{"id": "meal-1", **payload}])
 
+    def get_by_id(self, meal_id, user_id):
+        if meal_id == "meal-1" and user_id == "authenticated-user":
+            return {"id": meal_id, "category": "regular"}
+        return None
+
     def update(self, meal_id, user_id, payload):
         self.last_update = (meal_id, user_id, payload)
         return {"id": meal_id, **payload}

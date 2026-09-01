@@ -24,6 +24,7 @@ from backend.repositories.meals import MealsRepository
 from backend.repositories.recipe_ingredients import RecipeIngredientsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
+from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -100,74 +101,43 @@ def get_current_user(
                 metadata=dict(cached[2]),
             )
 
-        url, key = _supabase_settings()
-
         try:
-            session = requests.Session()
-            session.trust_env = False
-
-            response = None
-            last_error = None
-
-            for attempt in range(2):
-                try:
-                    response = session.get(
-                        f"{url.rstrip('/')}/auth/v1/user",
-                        headers={
-                            "apikey": key,
-                            "Authorization": f"Bearer {token}",
-                        },
-                        timeout=(5, 20),
-                    )
-                    break
-                except requests.Timeout as exc:
-                    last_error = exc
-
-                    if attempt == 0:
-                        time.sleep(0.25)
-                        continue
-
-                    raise HTTPException(
-                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail="Supabase Auth temporarily unavailable",
-                    ) from exc
-
-            if response is None:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Supabase Auth temporarily unavailable",
-                ) from last_error
-
-        except HTTPException:
-            raise
-        except requests.RequestException as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Unable to reach Supabase Auth",
-            ) from exc
-
-        if response.status_code in (401, 403):
+            auth_response = get_supabase_client().auth.get_user(
+                token
+            )
+        except Exception as exc:
             _AUTH_CACHE.pop(token_key, None)
 
+            print(
+                "AUTH DEBUG:",
+                type(exc).__name__,
+                str(exc),
+                flush=True,
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+
+        user_obj = getattr(auth_response, "user", None)
+
+        if user_obj is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        if not response.ok:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Supabase Auth returned an unexpected response",
-            )
-
-        try:
-            user = response.json()
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Invalid response from Supabase Auth",
-            ) from exc
+        user = {
+            "id": getattr(user_obj, "id", None),
+            "user_metadata": getattr(
+                user_obj,
+                "user_metadata",
+                None,
+            ),
+        }
 
         user_id = user.get("id")
 
@@ -286,4 +256,9 @@ def get_optional_decision_selections_repository(
         return None
 
     return DecisionSelectionsRepository(supabase)
+
+def get_weekly_schedule_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> WeeklyScheduleRepository:
+    return WeeklyScheduleRepository(supabase)
 

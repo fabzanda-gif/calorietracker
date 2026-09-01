@@ -42,7 +42,7 @@ def option(
     }
 
 
-def test_keeps_routine_at_normal_portion_when_it_fits():
+def test_keeps_routine_when_it_fits():
     routine = candidate(
         "Lasagna Fit",
         500,
@@ -59,11 +59,12 @@ def test_keeps_routine_at_normal_portion_when_it_fits():
 
     assert result is not None
     assert result["candidate"]["name"] == "Lasagna Fit"
+    assert result["candidate"]["calories"] == 500
     assert result["portion_multiplier"] == 1.0
     assert result["strategy"] == "routine"
 
 
-def test_adapts_routine_before_replacing_it():
+def test_does_not_shrink_routine_to_fit():
     routine = candidate(
         "Lasagna Fit",
         700,
@@ -79,13 +80,13 @@ def test_adapts_routine_before_replacing_it():
     )
 
     assert result is not None
-    assert result["candidate"]["name"] == "Lasagna Fit"
-    assert result["portion_multiplier"] == 0.75
-    assert result["candidate"]["calories"] == 525
-    assert result["strategy"] == "adapted_routine"
+    assert result["candidate"]["name"] == "Chicken Bowl"
+    assert result["candidate"]["calories"] == 500
+    assert result["portion_multiplier"] == 1.0
+    assert result["strategy"] == "alternate_candidate"
 
 
-def test_uses_ranked_alternative_when_routine_portion_is_too_small():
+def test_uses_ranked_alternative_at_original_portion():
     routine = candidate(
         "Huge Lasagna",
         1200,
@@ -107,11 +108,12 @@ def test_uses_ranked_alternative_when_routine_portion_is_too_small():
 
     assert result is not None
     assert result["candidate"]["name"] == "Chicken Bowl"
+    assert result["candidate"]["calories"] == 480
     assert result["portion_multiplier"] == 1.0
     assert result["strategy"] == "alternate_candidate"
 
 
-def test_alternative_can_also_be_portion_adapted():
+def test_does_not_adapt_alternative_portion():
     routine = candidate(
         "Huge Lasagna",
         1400,
@@ -131,14 +133,10 @@ def test_alternative_can_also_be_portion_adapted():
         available_kcal=470,
     )
 
-    assert result is not None
-    assert result["candidate"]["name"] == "Salmon Bowl"
-    assert result["portion_multiplier"] == 0.75
-    assert result["candidate"]["calories"] == 487.5
-    assert result["strategy"] == "adapted_alternative"
+    assert result is None
 
 
-def test_returns_none_when_nothing_is_realistically_compatible():
+def test_returns_none_when_nothing_is_compatible():
     routine = candidate(
         "Huge Lasagna",
         1400,

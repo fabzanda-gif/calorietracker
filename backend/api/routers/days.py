@@ -13,6 +13,7 @@ from backend.api.dependencies import (
     get_meal_prep_repository,
     get_meals_repository,
     get_recipes_repository,
+    get_weekly_schedule_repository,
     get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
@@ -23,6 +24,7 @@ from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
+from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
 from backend.services.decision_feedback import DecisionFeedbackService
@@ -96,9 +98,11 @@ def _build_day(
     day_date: Date,
     daily_logs_repo: DailyLogsRepository,
     meals_repo: MealsRepository,
+    weekly_schedule_repo: WeeklyScheduleRepository,
 ) -> dict:
     return DayService(
         daily_logs_repo=daily_logs_repo,
+        weekly_schedule_repo=weekly_schedule_repo,
         meal_memory_service=_meal_memory(
             meals_repo,
             daily_logs_repo,
@@ -272,6 +276,9 @@ def get_ranked_meal_options(
     decision_selections_repo: DecisionSelectionsRepository | None = Depends(
         get_optional_decision_selections_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -281,6 +288,7 @@ def get_ranked_meal_options(
             day_date=day_date,
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
         )
 
         budget_result = _build_budget(
@@ -507,6 +515,9 @@ def get_meal_decision(
     meal_prep_repo: MealPrepRepository = Depends(
         get_meal_prep_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -516,6 +527,7 @@ def get_meal_decision(
             day_date=day_date,
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
         )
 
         budget_result = _build_budget(
@@ -561,6 +573,9 @@ def confirm_meal_prediction(
     meals_repo: MealsRepository = Depends(
         get_meals_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -570,6 +585,7 @@ def confirm_meal_prediction(
             day_date=day_date,
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
         )
 
         prediction = day["meals"][meal_slot]
@@ -640,6 +656,9 @@ def get_day(
     meals_repo: MealsRepository = Depends(
         get_meals_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
 ):
     try:
         return _build_day(
@@ -647,6 +666,7 @@ def get_day(
             day_date=day_date,
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
         )
     except RepositoryError as exc:
         raise HTTPException(
