@@ -65,6 +65,10 @@ class MealTextInterpreter:
             "unit": str(
                 item.get("unit") or "porzione"
             ).strip(),
+            "quantity_g": self._number(
+                item.get("quantity_g"),
+                default=self._default_quantity_g(item),
+            ),
             "calories": self._nutrition_number(
                 item.get("calories")
             ),
@@ -90,6 +94,21 @@ class MealTextInterpreter:
             ).strip()
 
         return normalized
+
+    def _default_quantity_g(
+        self,
+        item: dict[str, Any],
+    ) -> float:
+        quantity = self._number(
+            item.get("quantity"),
+            default=1.0,
+        )
+        unit = str(item.get("unit") or "").strip().lower()
+
+        if unit in {"g", "grammo", "grammi"}:
+            return quantity
+
+        return quantity * 100.0
 
     @staticmethod
     def _number(

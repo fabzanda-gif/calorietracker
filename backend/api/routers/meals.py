@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field
 from backend.services.conversational_meal_logging import (
     ConversationalMealLoggingService,
 )
+from backend.services.conversational_meal_confirmation import (
+    ConversationalMealConfirmationService,
+)
 from backend.services.meal_text_interpreter import (
     MealTextInterpreter,
 )
@@ -96,6 +99,23 @@ class ConversationalMealPreviewRequest(BaseModel):
     meal_type: str
 
 
+class ConversationalMealItem(BaseModel):
+    name: str = Field(min_length=1)
+    quantity: float = Field(gt=0)
+    unit: str = Field(min_length=1)
+    quantity_g: float = Field(gt=0)
+    calories: float = Field(ge=0)
+    protein: float = Field(default=0, ge=0)
+    carbs: float = Field(default=0, ge=0)
+    fat: float = Field(default=0, ge=0)
+
+
+class ConversationalMealConfirmRequest(BaseModel):
+    date: date
+    meal_type: str = Field(min_length=1)
+    items: list[ConversationalMealItem] = Field(min_length=1)
+
+
 class MealUpdate(BaseModel):
     meal_type: str | None = None
     name: str | None = None
@@ -149,6 +169,58 @@ def preview_conversational_meal(
         meal_type=normalized["meal_type"],
         interpreted_items=normalized["items"],
     )
+
+
+@router.post(
+    "/conversational/confirm",
+    status_code=status.HTTP_201_CREATED,
+)
+def confirm_conversational_meal(
+    request: ConversationalMealConfirmRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: MealsRepository = Depends(get_meals_repository),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    meal_ingredients_repo: MealIngredientsRepository = Depends(
+        get_meal_ingredients_repository
+    ),
+):
+    items = [item.model_dump() for item in request.items]
+    meal_name = " + ".join(item["name"] for item in items)
+
+    try:
+        result = ConversationalMealConfirmationService(
+            meals_repo=repo,
+            ingredients_repo=ingredients_repo,
+            meal_ingredients_repo=meal_ingredients_repo,
+        ).confirm(
+            user_id=current_user.id,
+            meal_payload={
+                "date": str(request.date),
+                "meal_type": request.meal_type,
+                "name": meal_name or "Pasto registrato",
+                "is_reusable": False,
+            },
+            items=items,
+        )
+    except (StructuredMealError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "created": True,
+        "structured": True,
+        "item": result["meal"],
+        "meal_ingredients": result["meal_ingredients"],
+    }
 
 
 @router.get("/history")
@@ -573,22 +645,13 @@ def update_meal(
         None,
     )
 
-    # Keep PATCH consistent with POST: the database stores all
-    # nutrition columns as integers, while clients may send floats
-    # after scaling grams or portions.
-    for field in (
-        "calories",
-        "protein",
-        "carbs",
-        "fat",
+    if (
+        "calories" in payload
+        and payload["calories"] is not None
     ):
-        if (
-            field in payload
-            and payload[field] is not None
-        ):
-            payload[field] = int(
-                round(float(payload[field]))
-            )
+        payload["calories"] = int(
+            round(float(payload["calories"]))
+        )
 
     try:
         if structured is not None:
