@@ -573,13 +573,22 @@ def update_meal(
         None,
     )
 
-    if (
-        "calories" in payload
-        and payload["calories"] is not None
+    # Keep PATCH consistent with POST: the database stores all
+    # nutrition columns as integers, while clients may send floats
+    # after scaling grams or portions.
+    for field in (
+        "calories",
+        "protein",
+        "carbs",
+        "fat",
     ):
-        payload["calories"] = int(
-            round(float(payload["calories"]))
-        )
+        if (
+            field in payload
+            and payload[field] is not None
+        ):
+            payload[field] = int(
+                round(float(payload[field]))
+            )
 
     try:
         if structured is not None:
