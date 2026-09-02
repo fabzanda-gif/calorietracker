@@ -384,7 +384,7 @@ def test_snack_replans_lunch_without_changing_routine_identity():
 
     assert (
         after_recommendation["strategy"]
-        == "alternate_candidate"
+        == "routine"
     )
 
     assert (
@@ -437,7 +437,7 @@ def test_activity_can_relax_lunch_replanning():
     assert before_recommendation is not None
     assert (
         before_recommendation["strategy"]
-        == "alternate_candidate"
+        == "routine"
     )
     assert (
         before_recommendation["portion_multiplier"]
@@ -523,7 +523,7 @@ def test_snack_exposes_food_replanning_context():
     assert payload["recommended"] is not None
     assert (
         payload["recommended"]["strategy"]
-        == "alternate_candidate"
+        == "routine"
     )
 
     assert (

@@ -10,6 +10,7 @@ ACTIVITY_PROFILES: dict[str, dict[str, Any]] = {
         "icon": "🎾",
         "step_cadence": 105,
         "suggested_kcal_per_hour": 500,
+        "default_duration_minutes": 90,
     },
     "Corsa": {
         "icon": "🏃",
@@ -114,6 +115,9 @@ def activity_profile(
     return {
         "activity_type": normalized,
         **ACTIVITY_PROFILES[normalized],
+        "default_duration_minutes": ACTIVITY_PROFILES[normalized].get(
+            "default_duration_minutes", 60
+        ),
     }
 
 

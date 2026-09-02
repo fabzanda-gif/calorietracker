@@ -13,6 +13,7 @@ def test_profiles_supply_dropdown_defaults():
     assert profile["activity_type"] == "Padel"
     assert profile["icon"] == "🎾"
     assert profile["step_cadence"] == 105
+    assert profile["default_duration_minutes"] == 90
 
 
 def test_activity_calories_scale_with_duration():

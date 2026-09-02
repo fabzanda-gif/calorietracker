@@ -28,46 +28,55 @@ const ACTIVITY_OPTIONS = [
     value: "Padel",
     label: "🎾 Padel",
     kcalPerHour: 500,
+    defaultMinutes: 90,
   },
   {
     value: "Corsa",
     label: "🏃 Corsa",
     kcalPerHour: 650,
+    defaultMinutes: 60,
   },
   {
     value: "Tennis",
     label: "🎾 Tennis",
     kcalPerHour: 480,
+    defaultMinutes: 60,
   },
   {
     value: "Palestra",
     label: "🏋️ Palestra",
     kcalPerHour: 350,
+    defaultMinutes: 60,
   },
   {
     value: "Calcio",
     label: "⚽ Calcio",
     kcalPerHour: 600,
+    defaultMinutes: 60,
   },
   {
     value: "Nuoto",
     label: "🏊 Nuoto",
     kcalPerHour: 500,
+    defaultMinutes: 60,
   },
   {
     value: "Escursione",
     label: "🥾 Escursione",
     kcalPerHour: 400,
+    defaultMinutes: 120,
   },
   {
     value: "Camminata",
     label: "🚶 Camminata",
     kcalPerHour: 280,
+    defaultMinutes: 60,
   },
   {
     value: "Altro",
     label: "🔥 Altro",
     kcalPerHour: 300,
+    defaultMinutes: 60,
   },
 ];
 
@@ -104,9 +113,9 @@ export function ActivityLogger({
   const [customName, setCustomName] =
     useState("");
   const [durationMinutes, setDurationMinutes] =
-    useState("60");
+    useState("90");
   const [calories, setCalories] =
-    useState("500");
+    useState("750");
   const [caloriesEdited, setCaloriesEdited] =
     useState(false);
   const [steps, setSteps] = useState("");
@@ -338,9 +347,10 @@ export function ActivityLogger({
             <select
               value={activityType}
               onChange={(event) => {
-                setActivityType(
-                  event.target.value,
-                );
+                const nextType = event.target.value;
+                const option = ACTIVITY_OPTIONS.find((item) => item.value === nextType);
+                setActivityType(nextType);
+                setDurationMinutes(String(option?.defaultMinutes ?? 60));
                 setCaloriesEdited(false);
                 setError(null);
               }}

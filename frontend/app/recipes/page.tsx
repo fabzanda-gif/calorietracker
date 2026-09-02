@@ -24,7 +24,6 @@ import {
 
 import {
   createRecipe,
-  getRecipe,
   getRecipes,
   migrateLegacyRecipes,
   updateRecipe,
@@ -285,58 +284,6 @@ export default function RecipesPage() {
     setNotes("");
     setDraftIngredients([]);
     setMessage(null);
-  }
-
-  async function editRecipe(recipeId: string) {
-    if (!accessToken) {
-      return;
-    }
-
-    setMessage(null);
-
-    try {
-      const response = await getRecipe(
-        recipeId,
-        accessToken,
-      );
-
-      const recipe = response.item;
-
-      setCookRecipe(null);
-      setMealDraft(null);
-      setEditingId(recipe.id);
-      setName(recipe.name);
-      setMealType(
-        recipe.meal_type || "Cena",
-      );
-      setServings(
-        String(recipe.recipe_servings || 1),
-      );
-      setTasteRating(recipe.taste_rating ? String(recipe.taste_rating) : "");
-      setEaseRating(recipe.ease_rating ? String(recipe.ease_rating) : "");
-      setImageUrl(
-        recipe.image_url || null,
-      );
-      setNotes(
-        recipe.notes || "",
-      );
-
-      setDraftIngredients(
-        (recipe.structured_ingredients ?? []).map(
-          (item) => ({
-            ingredientId: item.ingredient_id,
-            quantityG: item.quantity_g,
-          }),
-        ),
-      );
-      reveal(editorRef);
-    } catch (err) {
-      setMessage(
-        err instanceof Error
-          ? err.message
-          : "Non riesco ad aprire la ricetta.",
-      );
-    }
   }
 
   function addIngredientRow() {
@@ -1530,19 +1477,12 @@ export default function RecipesPage() {
                       Registra
                     </button>
 
-                    <button
-                      type="button"
-                      className={
-                        styles.secondaryButton
-                      }
-                      onClick={() => {
-                        void editRecipe(
-                          recipe.id,
-                        );
-                      }}
+                    <Link
+                      className={styles.secondaryButton}
+                      href={`/recipes/${encodeURIComponent(recipe.id)}`}
                     >
-                      Modifica
-                    </button>
+                      Dettaglio
+                    </Link>
                   </div>
                 </div>
               </article>

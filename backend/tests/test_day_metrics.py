@@ -50,6 +50,7 @@ def test_empty_day_returns_zero_actuals():
         "actual_activity_kcal": 0.0,
         "meal_count": 0,
         "activity_count": 0,
+        "logged_meal_types": [],
     }
 
 
