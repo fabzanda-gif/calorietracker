@@ -1,0 +1,425 @@
+From b724a53e938da96ecab261d7d543ace479ac52db Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 17:10:48 +0300
+Subject: [PATCH] Make daily calorie targets adaptive
+
+---
+ backend/services/budget.py             | 51 +++++++++++++++++++++----
+ backend/services/day_budget.py         | 15 ++++++++
+ backend/services/day_metrics.py        |  9 +++++
+ backend/tests/test_budget_service.py   | 35 +++++++++++++++++
+ backend/tests/test_day_budget.py       | 53 +++++++++++++++++++++++++-
+ frontend/components/home/HomeShell.tsx | 38 +++++++++++-------
+ frontend/lib/api/types.ts              |  4 ++
+ 7 files changed, 182 insertions(+), 23 deletions(-)
+
+diff --git a/backend/services/budget.py b/backend/services/budget.py
+index 14dd4ed..04facbe 100644
+--- a/backend/services/budget.py
++++ b/backend/services/budget.py
+@@ -11,6 +11,7 @@ GoalMode = Literal["loss", "maintenance", "gain"]
+ class BudgetInput:
+     bmr: float
+     activity_kcal: float = 0.0
++    baseline_activity_factor: float = 1.0
+ 
+     consumed_kcal: float = 0.0
+     planned_kcal: float = 0.0
+@@ -20,6 +21,7 @@ class BudgetInput:
+ 
+     goal_mode: GoalMode = "maintenance"
+     goal_adjustment_kcal: float = 0.0
++    remaining_meal_reserve_kcal: float = 0.0
+ 
+ 
+ class BudgetService:
+@@ -29,8 +31,8 @@ class BudgetService:
+     v0.1 deliberately contains no Streamlit, FastAPI, Supabase or AI logic.
+ 
+     Definitions:
+-    - maintenance_kcal = BMR + actual/planned activity contribution supplied
+-      by the caller.
++    - maintenance_kcal applies the caller's baseline daily-living factor to
++      BMR, then adds actual/planned exercise supplied by the caller.
+     - daily_budget_kcal applies the selected objective:
+         loss        -> maintenance - adjustment
+         maintenance -> maintenance
+@@ -51,17 +53,34 @@ class BudgetService:
+         activity = float(data.activity_kcal)
+         consumed = float(data.consumed_kcal)
+         planned = float(data.planned_kcal)
+-        adjustment = abs(float(data.goal_adjustment_kcal))
++        requested_adjustment = abs(float(data.goal_adjustment_kcal))
++        reserve = max(0.0, float(data.remaining_meal_reserve_kcal))
+ 
+-        maintenance = bmr + activity
++        maintenance = (
++            bmr * float(data.baseline_activity_factor)
++        ) + activity
+ 
+         if data.goal_mode == "loss":
+-            daily_budget = maintenance - adjustment
++            base_daily_budget = maintenance - requested_adjustment
++            # A deficit is a direction, not a reason to leave too little for
++            # the meals that still need to happen. Relax it up to maintenance.
++            daily_budget = min(
++                maintenance,
++                max(base_daily_budget, consumed + reserve),
++            )
+         elif data.goal_mode == "gain":
+-            daily_budget = maintenance + adjustment
++            base_daily_budget = maintenance + requested_adjustment
++            daily_budget = base_daily_budget
+         else:
++            base_daily_budget = maintenance
+             daily_budget = maintenance
+-            adjustment = 0.0
++            requested_adjustment = 0.0
++
++        effective_adjustment = (
++            max(0.0, maintenance - daily_budget)
++            if data.goal_mode == "loss"
++            else requested_adjustment
++        )
+ 
+         available = daily_budget - consumed
+         unallocated = available - planned
+@@ -82,13 +101,23 @@ class BudgetService:
+ 
+         return {
+             "goal_mode": data.goal_mode,
+-            "goal_adjustment_kcal": round(adjustment, 2),
++            "goal_adjustment_kcal": round(requested_adjustment, 2),
++            "effective_goal_adjustment_kcal": round(
++                effective_adjustment,
++                2,
++            ),
+             "maintenance_kcal": round(maintenance, 2),
++            "base_daily_budget_kcal": round(base_daily_budget, 2),
+             "daily_budget_kcal": round(daily_budget, 2),
+             "consumed_kcal": round(consumed, 2),
+             "planned_kcal": round(planned, 2),
+             "available_kcal": round(available, 2),
+             "unallocated_kcal": round(unallocated, 2),
++            "remaining_meal_reserve_kcal": round(reserve, 2),
++            "budget_adapted": (
++                data.goal_mode == "loss"
++                and daily_budget > base_daily_budget
++            ),
+             "protein_consumed_g": round(protein_consumed, 2),
+             "protein_target_g": (
+                 round(protein_target, 2)
+@@ -114,6 +143,9 @@ class BudgetService:
+         if float(data.activity_kcal) < 0:
+             raise ValueError("activity_kcal cannot be negative")
+ 
++        if float(data.baseline_activity_factor) < 1:
++            raise ValueError("baseline_activity_factor cannot be below 1")
++
+         if float(data.consumed_kcal) < 0:
+             raise ValueError("consumed_kcal cannot be negative")
+ 
+@@ -123,6 +155,9 @@ class BudgetService:
+         if float(data.goal_adjustment_kcal) < 0:
+             raise ValueError("goal_adjustment_kcal cannot be negative")
+ 
++        if float(data.remaining_meal_reserve_kcal) < 0:
++            raise ValueError("remaining_meal_reserve_kcal cannot be negative")
++
+         if float(data.protein_consumed_g or 0.0) < 0:
+             raise ValueError("protein_consumed_g cannot be negative")
+ 
+diff --git a/backend/services/day_budget.py b/backend/services/day_budget.py
+index 1db1bd6..dde3282 100644
+--- a/backend/services/day_budget.py
++++ b/backend/services/day_budget.py
+@@ -71,16 +71,31 @@ class DayBudgetService:
+                 "profile": profile,
+             }
+ 
++        logged_meal_types = {
++            str(value).strip().casefold()
++            for value in metrics.get("logged_meal_types", [])
++        }
++        dinner_logged = bool(
++            logged_meal_types.intersection({"cena", "dinner"})
++        )
++        dinner_reserve = (
++            0.0
++            if dinner_logged
++            else min(750.0, max(600.0, float(profile["bmr"]) * 0.4))
++        )
++
+         budget = self.budget_service.calculate(
+             BudgetInput(
+                 bmr=profile["bmr"],
+                 activity_kcal=metrics["actual_activity_kcal"],
++                baseline_activity_factor=1.2,
+                 consumed_kcal=metrics["consumed_kcal"],
+                 planned_kcal=0.0,
+                 protein_consumed_g=metrics["protein_consumed_g"],
+                 protein_target_g=profile["protein_target_g"],
+                 goal_mode=profile["goal_mode"],
+                 goal_adjustment_kcal=profile["goal_adjustment_kcal"],
++                remaining_meal_reserve_kcal=dinner_reserve,
+             )
+         )
+ 
+diff --git a/backend/services/day_metrics.py b/backend/services/day_metrics.py
+index 7eb0c95..6c67805 100644
+--- a/backend/services/day_metrics.py
++++ b/backend/services/day_metrics.py
+@@ -73,6 +73,14 @@ class DayMetricsService:
+             for item in activities
+         )
+ 
++        logged_meal_types = sorted(
++            {
++                str(item.get("meal_type") or "").strip()
++                for item in meals
++                if str(item.get("meal_type") or "").strip()
++            }
++        )
++
+         return {
+             "date": str(day_date),
+             "consumed_kcal": round(consumed_kcal, 2),
+@@ -80,4 +88,5 @@ class DayMetricsService:
+             "actual_activity_kcal": round(actual_activity_kcal, 2),
+             "meal_count": len(meals),
+             "activity_count": len(activities),
++            "logged_meal_types": logged_meal_types,
+         }
+diff --git a/backend/tests/test_budget_service.py b/backend/tests/test_budget_service.py
+index 2c2b697..a8bfe76 100644
+--- a/backend/tests/test_budget_service.py
++++ b/backend/tests/test_budget_service.py
+@@ -76,6 +76,41 @@ def test_available_can_be_negative():
+     assert result["available_kcal"] == -200
+ 
+ 
++def test_loss_budget_relaxes_to_protect_a_remaining_meal():
++    result = service.calculate(
++        BudgetInput(
++            bmr=1703,
++            baseline_activity_factor=1.2,
++            consumed_kcal=1007,
++            remaining_meal_reserve_kcal=681.2,
++            goal_mode="loss",
++            goal_adjustment_kcal=500,
++        )
++    )
++
++    assert result["maintenance_kcal"] == 2043.6
++    assert result["base_daily_budget_kcal"] == 1543.6
++    assert result["daily_budget_kcal"] == 1688.2
++    assert result["available_kcal"] == 681.2
++    assert result["effective_goal_adjustment_kcal"] == 355.4
++    assert result["budget_adapted"] is True
++
++
++def test_adaptive_loss_budget_never_exceeds_maintenance():
++    result = service.calculate(
++        BudgetInput(
++            bmr=1700,
++            consumed_kcal=1900,
++            remaining_meal_reserve_kcal=700,
++            goal_mode="loss",
++            goal_adjustment_kcal=500,
++        )
++    )
++
++    assert result["daily_budget_kcal"] == 1700
++    assert result["available_kcal"] == -200
++
++
+ def test_unallocated_can_be_negative_without_clamping():
+     result = service.calculate(
+         BudgetInput(
+diff --git a/backend/tests/test_day_budget.py b/backend/tests/test_day_budget.py
+index da39eb6..d019977 100644
+--- a/backend/tests/test_day_budget.py
++++ b/backend/tests/test_day_budget.py
+@@ -61,7 +61,9 @@ def test_day_budget_combines_profile_food_and_activity():
+     assert result["actual"]["actual_activity_kcal"] == 450
+ 
+     budget = result["budget"]
+-    assert budget["maintenance_kcal"] == result["profile"]["bmr"] + 450
++    assert budget["maintenance_kcal"] == (
++        result["profile"]["bmr"] * 1.2
++    ) + 450
+     assert budget["available_kcal"] == (
+         budget["daily_budget_kcal"] - 1200
+     )
+@@ -166,6 +168,55 @@ def test_planned_calories_are_zero_until_planning_is_persisted():
+     )
+ 
+ 
++def test_day_budget_reserves_a_realistic_dinner_until_logged():
++    result = service(
++        meals=[
++            {
++                "meal_type": "Pranzo",
++                "calories": 1007,
++                "protein": 55,
++            },
++        ]
++    ).build(
++        user_id="u1",
++        day_date=DAY,
++        metadata={
++            **BASE_META,
++            "goal_mode": "loss",
++            "goal_adjustment_kcal": 500,
++        },
++        current_weight=80,
++    )
++
++    budget = result["budget"]
++    assert 600 <= budget["remaining_meal_reserve_kcal"] <= 750
++    assert budget["available_kcal"] >= 600
++    assert budget["budget_adapted"] is True
++
++
++def test_dinner_reserve_is_removed_once_dinner_is_logged():
++    result = service(
++        meals=[
++            {
++                "meal_type": "Cena",
++                "calories": 700,
++                "protein": 35,
++            },
++        ]
++    ).build(
++        user_id="u1",
++        day_date=DAY,
++        metadata={
++            **BASE_META,
++            "goal_mode": "loss",
++            "goal_adjustment_kcal": 500,
++        },
++        current_weight=80,
++    )
++
++    assert result["budget"]["remaining_meal_reserve_kcal"] == 0
++
++
+ def test_profile_incomplete_does_not_invent_budget():
+     result = service(
+         meals=[
+diff --git a/frontend/components/home/HomeShell.tsx b/frontend/components/home/HomeShell.tsx
+index 7e6aec5..ffa326f 100644
+--- a/frontend/components/home/HomeShell.tsx
++++ b/frontend/components/home/HomeShell.tsx
+@@ -367,8 +367,7 @@ export function HomeShell() {
+ 
+   const maintenanceBudgetKcal =
+     budgetResult?.budget
+-      ? budgetResult.budget.daily_budget_kcal +
+-        budgetResult.budget.goal_adjustment_kcal
++      ? budgetResult.budget.maintenance_kcal
+       : 0;
+   const [committingIndex, setCommittingIndex] =
+     useState<number | null>(null);
+@@ -2123,7 +2122,9 @@ export function HomeShell() {
+               <div className={styles.budgetHeader}>
+                 <div className={styles.budgetColumn}>
+                   <span className={styles.budgetLabel}>
+-                    Kcal disponibili
++                    {budget.budget_adapted
++                      ? "Per i pasti che restano"
++                      : "Kcal disponibili"}
+                   </span>
+ 
+                   <div className={styles.budgetValueRow}>
+@@ -2134,7 +2135,9 @@ export function HomeShell() {
+                   </div>
+ 
+                   <span className={styles.budgetPositive}>
+-                    {budget.consumed_kcal === 0
++                    {budget.budget_adapted
++                      ? "Il piano si è adattato alla giornata"
++                      : budget.consumed_kcal === 0
+                       ? "Budget disponibile"
+                       : budget.consumed_kcal <=
+                         budget.daily_budget_kcal
+@@ -2169,7 +2172,9 @@ export function HomeShell() {
+ 
+                 <div className={styles.budgetColumn}>
+                   <span className={styles.budgetLabel}>
+-                    Obiettivo con deficit
++                    {budget.budget_adapted
++                      ? "Obiettivo aggiornato"
++                      : "Obiettivo con deficit"}
+                   </span>
+ 
+                   <div className={styles.budgetValueRow}>
+@@ -2183,10 +2188,12 @@ export function HomeShell() {
+                   </div>
+ 
+                   <span className={styles.budgetSecondary}>
+-                    {budget.goal_mode === "loss" &&
+-                    budget.goal_adjustment_kcal > 0
++                    {budget.budget_adapted
++                      ? "Un deficit più sostenibile oggi"
++                      : budget.goal_mode === "loss" &&
++                    budget.effective_goal_adjustment_kcal > 0
+                       ? `${roundNumber(
+-                          budget.goal_adjustment_kcal,
++                          budget.effective_goal_adjustment_kcal,
+                         )} kcal di deficit`
+                       : "Target giornaliero"}
+                   </span>
+@@ -2248,6 +2255,8 @@ export function HomeShell() {
+                     <strong>
+                       {budget.consumed_kcal === 0
+                         ? "Giornata da iniziare"
++                        : budget.budget_adapted
++                        ? "Piano riequilibrato"
+                         : budget.consumed_kcal <
+                           maintenanceBudgetKcal
+                         ? "Deficit in corso"
+@@ -2401,12 +2410,13 @@ export function HomeShell() {
+                   <div className={styles.budgetExplanation}>
+                     <span aria-hidden="true">ⓘ</span>
+                     <span>
+-                      Il target con deficit è il budget
+-                      di mantenimento meno{" "}
+-                      {roundNumber(
+-                        budget.goal_adjustment_kcal,
+-                      )}{" "}
+-                      kcal di deficit.
++                      {budget.budget_adapted
++                        ? `Hai ancora una cena completa davanti. Il deficit di oggi è stato ridotto a circa ${roundNumber(
++                            budget.effective_goal_adjustment_kcal,
++                          )} kcal per mantenere il piano sostenibile.`
++                        : `Il target parte dal mantenimento e applica circa ${roundNumber(
++                            budget.effective_goal_adjustment_kcal,
++                          )} kcal di deficit.`}
+                     </span>
+                   </div>
+                 </div>
+diff --git a/frontend/lib/api/types.ts b/frontend/lib/api/types.ts
+index 025875b..730f613 100644
+--- a/frontend/lib/api/types.ts
++++ b/frontend/lib/api/types.ts
+@@ -53,12 +53,16 @@ export interface DayResponse {
+ export interface DayBudget {
+   goal_mode: "loss" | "maintenance" | "gain";
+   goal_adjustment_kcal: number;
++  effective_goal_adjustment_kcal: number;
+   maintenance_kcal: number;
++  base_daily_budget_kcal: number;
+   daily_budget_kcal: number;
+   consumed_kcal: number;
+   planned_kcal: number;
+   available_kcal: number;
+   unallocated_kcal: number;
++  remaining_meal_reserve_kcal: number;
++  budget_adapted: boolean;
+   protein_consumed_g: number;
+   protein_target_g: number | null;
+   protein_remaining_g: number | null;
+-- 
+2.51.1
+
