@@ -1,0 +1,724 @@
+From ce8d539f5d9969675b0800e89b3709af6a5fc33c Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 18:11:33 +0300
+Subject: [PATCH] Improve activity history and GPX imports
+
+---
+ backend/api/routers/activities.py             |  28 +++-
+ backend/repositories/activities.py            |   3 +-
+ backend/services/activity_movement.py         |  39 ++++++
+ backend/tests/test_activity_movement.py       |  10 ++
+ backend/tests/test_api_activities_crud.py     |  12 ++
+ .../app/activities/ActivitiesPage.module.css  |  51 ++++++-
+ frontend/app/activities/page.tsx              | 124 ++++++++++++------
+ .../activity/ActivityMap.module.css           |  33 +++++
+ frontend/components/activity/ActivityMap.tsx  |  31 ++++-
+ frontend/lib/api/activities.ts                |   6 +-
+ 10 files changed, 292 insertions(+), 45 deletions(-)
+
+diff --git a/backend/api/routers/activities.py b/backend/api/routers/activities.py
+index 6ae0e57..e077e06 100644
+--- a/backend/api/routers/activities.py
++++ b/backend/api/routers/activities.py
+@@ -13,16 +13,19 @@ from backend.api.dependencies import (
+     get_activities_repository,
+     get_current_user,
+     get_daily_logs_repository,
++    get_weight_repository,
+ )
+ from backend.repositories.activities import ActivitiesRepository
+ from backend.repositories.base import RepositoryError
+ from backend.repositories.daily_logs import DailyLogsRepository
++from backend.repositories.weight import WeightRepository
+ from backend.services.gpx_activity import (
+     GpxActivityError,
+     parse_gpx_activity,
+ )
+ from backend.services.activity_movement import (
+     estimated_activity_steps,
++    estimated_gpx_calories,
+     normalize_activity_type,
+ )
+ from backend.services.activity_movement_sync import (
+@@ -55,6 +58,7 @@ class ActivityUpdate(BaseModel):
+ class GpxPreviewRequest(BaseModel):
+     file_name: str = Field(min_length=1, max_length=255)
+     content_base64: str = Field(min_length=1)
++    activity_type: str | None = Field(default="Corsa", max_length=80)
+ 
+ 
+ class GpxImportRequest(GpxPreviewRequest):
+@@ -68,7 +72,7 @@ class GpxImportRequest(GpxPreviewRequest):
+         max_length=80,
+     )
+     activity_date: date | None = None
+-    burned_calories: int = Field(default=0, ge=0)
++    burned_calories: int | None = Field(default=None, ge=0)
+ 
+ 
+ @router.get("/range")
+@@ -109,6 +113,7 @@ def get_activities_for_range(
+ def preview_gpx_activity(
+     request: GpxPreviewRequest,
+     current_user: CurrentUser = Depends(get_current_user),
++    weight_repo: WeightRepository = Depends(get_weight_repository),
+ ):
+     try:
+         content = base64.b64decode(
+@@ -137,6 +142,14 @@ def preview_gpx_activity(
+             detail=str(exc),
+         ) from exc
+ 
++    latest_weight = weight_repo.latest(current_user.id)
++    preview["estimated_calories"] = estimated_gpx_calories(
++        activity_type=request.activity_type or preview["activity_name"],
++        duration_seconds=preview["duration_seconds"],
++        distance_meters=preview["distance_meters"],
++        weight_kg=(latest_weight or {}).get("weight"),
++    )
++
+     return {
+         "preview": preview,
+         "file_name": request.file_name,
+@@ -156,6 +169,7 @@ def import_gpx_activity(
+     daily_logs_repo: DailyLogsRepository = Depends(
+         get_daily_logs_repository
+     ),
++    weight_repo: WeightRepository = Depends(get_weight_repository),
+ ):
+     try:
+         content = base64.b64decode(
+@@ -205,6 +219,16 @@ def import_gpx_activity(
+         else parsed["activity_name"]
+     )
+ 
++    latest_weight = weight_repo.latest(current_user.id)
++    burned_calories = request.burned_calories
++    if burned_calories is None:
++        burned_calories = estimated_gpx_calories(
++            activity_type=request.activity_type or parsed["activity_name"],
++            duration_seconds=parsed["duration_seconds"],
++            distance_meters=parsed["distance_meters"],
++            weight_kg=(latest_weight or {}).get("weight"),
++        )
++
+     payload = {
+         "user_id": current_user.id,
+         "date": str(effective_date),
+@@ -214,7 +238,7 @@ def import_gpx_activity(
+             if request.activity_type
+             else None
+         ),
+-        "burned_calories": request.burned_calories,
++        "burned_calories": burned_calories,
+         "source": "gpx",
+         "started_at": parsed["started_at"],
+         "duration_seconds": parsed[
+diff --git a/backend/repositories/activities.py b/backend/repositories/activities.py
+index 28b3c0b..fd05846 100644
+--- a/backend/repositories/activities.py
++++ b/backend/repositories/activities.py
+@@ -45,7 +45,8 @@ class ActivitiesRepository(BaseRepository):
+                 .eq("user_id", user_id)
+                 .gte("date", str(start_date))
+                 .lte("date", str(end_date))
+-                .order("date")
++                .order("date", desc=True)
++                .order("started_at", desc=True)
+                 .execute()
+             )
+             return self._data(response)
+diff --git a/backend/services/activity_movement.py b/backend/services/activity_movement.py
+index 7c1998a..cda272a 100644
+--- a/backend/services/activity_movement.py
++++ b/backend/services/activity_movement.py
+@@ -46,6 +46,11 @@ ACTIVITY_PROFILES: dict[str, dict[str, Any]] = {
+         "step_cadence": 100,
+         "suggested_kcal_per_hour": 280,
+     },
++    "Bicicletta": {
++        "icon": "🚴",
++        "step_cadence": 0,
++        "suggested_kcal_per_hour": 420,
++    },
+     "Altro": {
+         "icon": "🔥",
+         "step_cadence": 0,
+@@ -86,6 +91,10 @@ def normalize_activity_type(
+         "hiking": "Escursione",
+         "camminata": "Camminata",
+         "walking": "Camminata",
++        "bici": "Bicicletta",
++        "bicicletta": "Bicicletta",
++        "cycling": "Bicicletta",
++        "ciclismo": "Bicicletta",
+     }
+ 
+     for fragment, activity_type in aliases.items():
+@@ -126,6 +135,36 @@ def suggested_activity_calories(
+     )
+ 
+ 
++def estimated_gpx_calories(
++    *,
++    activity_type: Any,
++    duration_seconds: Any,
++    distance_meters: Any,
++    weight_kg: Any = None,
++) -> int:
++    """Estimate GPX energy while keeping the value explicitly editable."""
++    duration = max(0.0, _number(duration_seconds))
++    distance_km = max(0.0, _number(distance_meters)) / 1000
++    weight = _number(weight_kg)
++    normalized = normalize_activity_type(activity_type)
++
++    if weight > 0 and distance_km > 0:
++        distance_factors = {
++            "Corsa": 1.0,
++            "Camminata": 0.5,
++            "Escursione": 0.6,
++            "Bicicletta": 0.32,
++        }
++        factor = distance_factors.get(normalized)
++        if factor is not None:
++            return max(1, round(weight * distance_km * factor))
++
++    return suggested_activity_calories(
++        activity_type=normalized,
++        duration_seconds=duration,
++    )
++
++
+ def estimated_activity_steps(
+     *,
+     activity_type: Any,
+diff --git a/backend/tests/test_activity_movement.py b/backend/tests/test_activity_movement.py
+index cbbf5bf..f930609 100644
+--- a/backend/tests/test_activity_movement.py
++++ b/backend/tests/test_activity_movement.py
+@@ -1,6 +1,7 @@
+ from backend.services.activity_movement import (
+     activity_profile,
+     estimated_activity_steps,
++    estimated_gpx_calories,
+     movement_step_summary,
+     suggested_activity_calories,
+ )
+@@ -26,6 +27,15 @@ def test_activity_calories_scale_with_duration():
+     ) == 250
+ 
+ 
++def test_gpx_calories_use_weight_and_distance_for_running():
++    assert estimated_gpx_calories(
++        activity_type="Corsa",
++        duration_seconds=3600,
++        distance_meters=10000,
++        weight_kg=80,
++    ) == 800
++
++
+ def test_padel_steps_are_estimated_from_duration():
+     assert estimated_activity_steps(
+         activity_type="Padel",
+diff --git a/backend/tests/test_api_activities_crud.py b/backend/tests/test_api_activities_crud.py
+index f4be04a..f570f97 100644
+--- a/backend/tests/test_api_activities_crud.py
++++ b/backend/tests/test_api_activities_crud.py
+@@ -6,6 +6,7 @@ from backend.api.dependencies import (
+     get_activities_repository,
+     get_current_user,
+     get_daily_logs_repository,
++    get_weight_repository,
+ )
+ from backend.api.main import app
+ 
+@@ -64,6 +65,14 @@ fake_repo = FakeActivitiesRepository()
+ fake_daily_logs_repo = FakeDailyLogsRepository()
+ 
+ 
++class FakeWeightRepository:
++    def latest(self, user_id):
++        return {"weight": 80}
++
++
++fake_weight_repo = FakeWeightRepository()
++
++
+ def override_current_user():
+     return CurrentUser(id="authenticated-user", access_token="fake-token")
+ 
+@@ -83,6 +92,9 @@ def api_overrides():
+     app.dependency_overrides[get_daily_logs_repository] = (
+         override_daily_logs_repo
+     )
++    app.dependency_overrides[get_weight_repository] = (
++        lambda: fake_weight_repo
++    )
+     yield
+     app.dependency_overrides.clear()
+ 
+diff --git a/frontend/app/activities/ActivitiesPage.module.css b/frontend/app/activities/ActivitiesPage.module.css
+index 76d78ec..b8f761e 100644
+--- a/frontend/app/activities/ActivitiesPage.module.css
++++ b/frontend/app/activities/ActivitiesPage.module.css
+@@ -204,7 +204,7 @@
+   display: grid;
+   place-items: center;
+   flex: 1;
+-  min-height: 210px;
++  min-height: 120px;
+   margin-top: 14px;
+   padding: 22px;
+   border: 1.5px dashed #ffaaa5;
+@@ -479,7 +479,7 @@
+ }
+ 
+ .detailStats {
+-  grid-template-columns: repeat(3, 1fr);
++  grid-template-columns: repeat(4, 1fr);
+   margin-bottom: 15px;
+ }
+ 
+@@ -752,6 +752,7 @@
+ 
+ 
+ .loggerCard {
++  margin-top: 20px;
+   margin-bottom: 20px;
+   padding: 22px;
+   border: 1px solid #e5e2dc;
+@@ -764,6 +765,52 @@
+   margin-bottom: 18px;
+ }
+ 
++summary.loggerHeading {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  margin-bottom: 0;
++  cursor: pointer;
++  list-style: none;
++}
++
++.loggerCard[open] summary.loggerHeading {
++  margin-bottom: 18px;
++}
++
++.loggerHeading strong {
++  font-size: 1.1rem;
++}
++
++.openHint {
++  color: #ff514d;
++  font-size: 0.76rem;
++  font-weight: 800;
++}
++
++.detailActions {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++}
++
++.deleteButton {
++  min-height: 32px;
++  padding: 0 11px;
++  border: 1px solid #ffaaa5;
++  border-radius: 999px;
++  background: #fff;
++  color: #b63230;
++  cursor: pointer;
++  font: inherit;
++  font-size: 0.7rem;
++  font-weight: 800;
++}
++
++.deleteButton:disabled {
++  opacity: 0.55;
++}
++
+ .loggerHeading h2 {
+   margin: 0;
+   color: #102744;
+diff --git a/frontend/app/activities/page.tsx b/frontend/app/activities/page.tsx
+index c263d33..309aac4 100644
+--- a/frontend/app/activities/page.tsx
++++ b/frontend/app/activities/page.tsx
+@@ -13,6 +13,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
+ import { AppNav } from "@/components/navigation/AppNav";
+ import {
+   getActivitiesForRange,
++  deleteActivity,
+   importGpxActivity,
+   previewGpxActivity,
+   type Activity,
+@@ -261,6 +262,29 @@ function formatDuration(value?: number | null): string {
+   return `${seconds}s`;
+ }
+ 
++function formatActivityDate(value: string): string {
++  return new Date(`${value}T00:00:00`).toLocaleDateString("it-IT", {
++    day: "numeric",
++    month: "short",
++    year: "numeric",
++  });
++}
++
++function normalizedArray<T>(value: T[] | string | null | undefined): T[] {
++  if (Array.isArray(value)) return value;
++  if (typeof value !== "string") return [];
++  try {
++    const parsed: unknown = JSON.parse(value);
++    return Array.isArray(parsed) ? (parsed as T[]) : [];
++  } catch {
++    return [];
++  }
++}
++
++function activityTimestamp(activity: Activity): number {
++  return new Date(activity.started_at ?? `${activity.date}T00:00:00`).getTime();
++}
++
+ function MetricChart({
+   points,
+   metric,
+@@ -435,6 +459,7 @@ export default function ActivitiesPage() {
+     useState(false);
+   const [importing, setImporting] =
+     useState(false);
++  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+   const [importMessage, setImportMessage] =
+     useState<string | null>(null);
+ 
+@@ -464,10 +489,13 @@ export default function ActivitiesPage() {
+         accessToken,
+       );
+ 
+-      setActivities(response.items);
++      const sortedItems = [...response.items].sort(
++        (left, right) => activityTimestamp(right) - activityTimestamp(left),
++      );
++      setActivities(sortedItems);
+ 
+       setSelectedActivity((current) => {
+-        const visibleItems = response.items.filter(
++        const visibleItems = sortedItems.filter(
+           (item) => !isDailyMovement(item),
+         );
+ 
+@@ -559,6 +587,7 @@ export default function ActivitiesPage() {
+         {
+           file_name: file.name,
+           content_base64: contentBase64,
++          activity_type: gpxType,
+         },
+         accessToken,
+       );
+@@ -566,6 +595,7 @@ export default function ActivitiesPage() {
+       setGpxBase64(contentBase64);
+       setGpxPreview(response.preview);
+       setGpxName(response.preview.activity_name);
++      setGpxCalories(String(response.preview.estimated_calories ?? 0));
+       const previewDate =
+         response.preview.date || isoDate(new Date());
+ 
+@@ -600,6 +630,23 @@ export default function ActivitiesPage() {
+     }
+   }
+ 
++  async function removeActivity(activity: Activity) {
++    if (!accessToken || activity.id == null) return;
++    if (!window.confirm(`Eliminare “${activity.activity_name}”?`)) return;
++
++    setDeletingId(activity.id);
++    setError(null);
++    try {
++      await deleteActivity(activity.id, accessToken);
++      setSelectedActivity(null);
++      await loadMonth();
++    } catch (err) {
++      setError(err instanceof Error ? err.message : "Non riesco a eliminare l’attività.");
++    } finally {
++      setDeletingId(null);
++    }
++  }
++
+   async function saveGpx() {
+     if (
+       !accessToken ||
+@@ -722,31 +769,6 @@ export default function ActivitiesPage() {
+           </div>
+         ) : null}
+ 
+-        <section className={styles.loggerCard}>
+-          <div className={styles.loggerHeading}>
+-            <div>
+-              <p className={styles.eyebrow}>
+-                Registra
+-              </p>
+-              <h2>Attività e movimento</h2>
+-              <p>
+-                Aggiungi un allenamento oppure aggiorna
+-                i passi totali rilevati nella giornata.
+-              </p>
+-            </div>
+-          </div>
+-
+-          <ActivityLogger
+-            date={
+-              selectedDate ||
+-              isoDate(new Date())
+-            }
+-            accessToken={accessToken}
+-            showMovement
+-            onSaved={loadMonth}
+-          />
+-        </section>
+-
+         <div className={styles.topGrid}>
+           <section className={styles.card}>
+             <div className={styles.cardHeading}>
+@@ -939,6 +961,22 @@ export default function ActivitiesPage() {
+           </section>
+         </div>
+ 
++        <details className={styles.loggerCard}>
++          <summary className={styles.loggerHeading}>
++            <span>
++              <span className={styles.eyebrow}>Registra</span>
++              <strong>Nuova attività o passi</strong>
++            </span>
++            <span className={styles.openHint}>Apri modulo ＋</span>
++          </summary>
++          <ActivityLogger
++            date={selectedDate || isoDate(new Date())}
++            accessToken={accessToken}
++            showMovement
++            onSaved={loadMonth}
++          />
++        </details>
++
+         {gpxPreview ? (
+           <section className={styles.previewCard}>
+             <div className={styles.cardHeading}>
+@@ -1051,8 +1089,9 @@ export default function ActivitiesPage() {
+             </div>
+ 
+             <ActivityMap
+-              points={gpxPreview.route_points ?? []}
++              points={normalizedArray<ActivityRoutePoint>(gpxPreview.route_points)}
+               activityName={gpxPreview.activity_name}
++              compact
+             />
+ 
+             <button
+@@ -1133,7 +1172,7 @@ export default function ActivitiesPage() {
+                         {activity.activity_name}
+                       </strong>
+                       <small>
+-                        {activity.activity_type ??
++                        {formatActivityDate(activity.date)} · {activity.activity_type ??
+                           (activity.source === "gpx"
+                             ? "Attività GPX"
+                             : "Attività manuale")}
+@@ -1170,14 +1209,24 @@ export default function ActivitiesPage() {
+                     <h2>{detail.activity_name}</h2>
+                   </div>
+ 
+-                  <span className={styles.gpxBadge}>
+-                    {detail.source === "gpx"
+-                      ? "GPX"
+-                      : "Manuale"}
+-                  </span>
++                  <div className={styles.detailActions}>
++                    <span className={styles.gpxBadge}>{detail.source === "gpx" ? "GPX" : "Manuale"}</span>
++                    <button
++                      type="button"
++                      className={styles.deleteButton}
++                      disabled={deletingId === detail.id}
++                      onClick={() => void removeActivity(detail)}
++                    >
++                      {deletingId === detail.id ? "Elimino…" : "Elimina"}
++                    </button>
++                  </div>
+                 </div>
+ 
+                 <div className={styles.detailStats}>
++                  <div>
++                    <span>Data</span>
++                    <strong>{formatActivityDate(detail.date)}</strong>
++                  </div>
+                   <div>
+                     <span>Distanza</span>
+                     <strong>
+@@ -1203,19 +1252,20 @@ export default function ActivitiesPage() {
+                 </div>
+ 
+                 <ActivityMap
+-                  points={detail.route_points ?? []}
++                  points={normalizedArray<ActivityRoutePoint>(detail.route_points)}
+                   activityName={detail.activity_name}
++                  compact
+                 />
+ 
+                 <div className={styles.charts}>
+                   <MetricChart
+-                    points={detail.series_points ?? []}
++                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
+                     metric="cadence"
+                     title="Cadenza"
+                     unit="spm"
+                   />
+                   <MetricChart
+-                    points={detail.series_points ?? []}
++                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
+                     metric="heart_rate"
+                     title="Frequenza cardiaca"
+                     unit="bpm"
+diff --git a/frontend/components/activity/ActivityMap.module.css b/frontend/components/activity/ActivityMap.module.css
+index 1eae6cb..d25700d 100644
+--- a/frontend/components/activity/ActivityMap.module.css
++++ b/frontend/components/activity/ActivityMap.module.css
+@@ -1,10 +1,39 @@
+ .wrapper {
++  position: relative;
+   overflow: hidden;
+   border: 1px solid #deded9;
+   border-radius: 18px;
+   background: #edf0ec;
+ }
+ 
++.fallbackRoute {
++  position: absolute;
++  inset: 0 0 42px;
++  z-index: 1;
++  width: 100%;
++  height: calc(100% - 42px);
++  padding: 18px;
++  box-sizing: border-box;
++  background: linear-gradient(135deg, #edf0ec, #e3e7e2);
++}
++
++.routeShadow,
++.routeLine {
++  fill: none;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++
++.routeShadow {
++  stroke: rgba(255, 61, 67, 0.18);
++  stroke-width: 13;
++}
++
++.routeLine {
++  stroke: #ff3d43;
++  stroke-width: 5;
++}
++
+ .map {
+   width: 100%;
+   height: clamp(300px, 38vw, 470px);
+@@ -17,6 +46,10 @@
+     );
+ }
+ 
++.compact {
++  height: 260px;
++}
++
+ .legend {
+   position: relative;
+   z-index: 2;
+diff --git a/frontend/components/activity/ActivityMap.tsx b/frontend/components/activity/ActivityMap.tsx
+index 6fdf645..af4085d 100644
+--- a/frontend/components/activity/ActivityMap.tsx
++++ b/frontend/components/activity/ActivityMap.tsx
+@@ -17,11 +17,33 @@ import styles from "./ActivityMap.module.css";
+ type ActivityMapProps = {
+   points: ActivityRoutePoint[];
+   activityName?: string;
++  compact?: boolean;
+ };
+ 
++function routePath(points: ActivityRoutePoint[]): string {
++  const width = 600;
++  const height = 320;
++  const padding = 24;
++  const latitudes = points.map((point) => point.latitude);
++  const longitudes = points.map((point) => point.longitude);
++  const minLat = Math.min(...latitudes);
++  const maxLat = Math.max(...latitudes);
++  const minLon = Math.min(...longitudes);
++  const maxLon = Math.max(...longitudes);
++  const latRange = Math.max(maxLat - minLat, 0.000001);
++  const lonRange = Math.max(maxLon - minLon, 0.000001);
++
++  return points.map((point, index) => {
++    const x = padding + ((point.longitude - minLon) / lonRange) * (width - padding * 2);
++    const y = height - padding - ((point.latitude - minLat) / latRange) * (height - padding * 2);
++    return `${index === 0 ? "M" : "L"} ${x} ${y}`;
++  }).join(" ");
++}
++
+ export function ActivityMap({
+   points,
+   activityName = "attività",
++  compact = false,
+ }: ActivityMapProps) {
+   const containerRef =
+     useRef<HTMLDivElement | null>(null);
+@@ -196,11 +218,18 @@ export function ActivityMap({
+     <div className={styles.wrapper}>
+       <div
+         ref={containerRef}
+-        className={styles.map}
++        className={`${styles.map} ${compact ? styles.compact : ""}`}
+         role="img"
+         aria-label={`Mappa del percorso: ${activityName}`}
+       />
+ 
++      {tilesUnavailable ? (
++        <svg className={styles.fallbackRoute} viewBox="0 0 600 320" aria-label={`Tracciato GPS: ${activityName}`}>
++          <path d={routePath(points)} className={styles.routeShadow} />
++          <path d={routePath(points)} className={styles.routeLine} />
++        </svg>
++      ) : null}
++
+       <div className={styles.legend}>
+         <span>
+           <i className={styles.startDot} />
+diff --git a/frontend/lib/api/activities.ts b/frontend/lib/api/activities.ts
+index 9d22c8f..01e4382 100644
+--- a/frontend/lib/api/activities.ts
++++ b/frontend/lib/api/activities.ts
+@@ -27,8 +27,8 @@ export interface Activity {
+   distance_meters?: number | null;
+   average_cadence?: number | null;
+   average_heart_rate?: number | null;
+-  route_points?: ActivityRoutePoint[];
+-  series_points?: ActivitySeriesPoint[];
++  route_points?: ActivityRoutePoint[] | string;
++  series_points?: ActivitySeriesPoint[] | string;
+   original_point_count?: number | null;
+   gpx_file_name?: string | null;
+ }
+@@ -129,6 +129,7 @@ export interface GpxActivityPreview
+   extends Omit<Activity, "id" | "user_id" | "burned_calories"> {
+   source: "gpx";
+   original_point_count: number;
++  estimated_calories?: number;
+ }
+ 
+ export interface GpxPreviewResponse {
+@@ -155,6 +156,7 @@ export function previewGpxActivity(
+   input: {
+     file_name: string;
+     content_base64: string;
++    activity_type?: string;
+   },
+   accessToken?: string | null,
+ ): Promise<GpxPreviewResponse> {
+-- 
+2.51.1
+
