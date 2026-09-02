@@ -1,6 +1,9 @@
 from types import SimpleNamespace
 
+import pytest
+
 from backend.services.day_briefing import (
+    DayBriefingError,
     DayBriefingService,
     build_status_hint,
     fallback_day_briefing,
@@ -143,3 +146,71 @@ def test_zero_morning_without_meals_is_not_celebratory():
 
     assert "colazione" in message.lower()
     assert "bravo" not in message.lower()
+
+def test_morning_with_a_logged_meal_is_still_provisional():
+    payload = {
+        **_payload(),
+        "moment": "morning",
+        "meal_count": 1,
+        "status_hint": "deficit",
+    }
+
+    message = fallback_day_briefing(
+        payload,
+        mode="standard",
+    )
+
+    assert message.startswith("Buongiorno Fabio!")
+    assert "giornata è ancora in corso" in message
+    assert "hai rispettato" not in message
+    assert "sei rimasto" not in message
+    assert "mantenimento" not in message
+    assert "Goditi la serata" not in message
+
+
+def test_ai_morning_outcome_is_rejected():
+    parsed = SimpleNamespace(
+        message=(
+            "Buongiorno Fabio! Oggi sei rimasto "
+            "sotto il target. Buona giornata!"
+        )
+    )
+    completion = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    parsed=parsed,
+                )
+            )
+        ]
+    )
+
+    class FakeParse:
+        def parse(self, **kwargs):
+            return completion
+
+    client = SimpleNamespace(
+        beta=SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=FakeParse(),
+            )
+        )
+    )
+
+    payload = {
+        **_payload(),
+        "moment": "morning",
+        "meal_count": 0,
+    }
+
+    with pytest.raises(
+        DayBriefingError,
+        match="premature morning outcome",
+    ):
+        DayBriefingService(
+            api_key="test",
+            client=client,
+        ).generate(
+            payload,
+            mode="standard",
+        )

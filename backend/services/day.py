@@ -103,9 +103,9 @@ class DayService:
             week_start=week_start,
         )
 
-        # weekly_schedule uses:
-        # Monday = 0 ... Sunday = 6
-        target_day = day_date.weekday()
+        # weekly_schedule persists ISO-style values:
+        # Monday = 1 ... Sunday = 7
+        target_day = day_date.weekday() + 1
 
         for row in rows:
             if row.get("day_of_week") != target_day:

@@ -154,6 +154,37 @@ def _day_label(day_type: str) -> str:
     }.get(day_type, "giornata")
 
 
+MORNING_OUTCOME_PHRASES = (
+    "hai rispettato",
+    "sei rimasto",
+    "sei rimasta",
+    "obiettivo raggiunto",
+    "target raggiunto",
+    "sotto il target",
+    "sopra il target",
+    "in mantenimento",
+    "deficit raggiunto",
+    "oggi è stata",
+    "giornata conclusa",
+    "goditi la serata",
+)
+
+
+def _violates_morning_timing(
+    message: str,
+    payload: dict[str, Any],
+) -> bool:
+    if payload.get("moment") != "morning":
+        return False
+
+    normalized = message.casefold()
+
+    return any(
+        phrase in normalized
+        for phrase in MORNING_OUTCOME_PHRASES
+    )
+
+
 def build_status_hint(
     *,
     consumed_kcal: float,
@@ -203,18 +234,32 @@ def fallback_day_briefing(
         payload.get("meal_count") or 0
     )
 
-    if moment == "morning" and meal_count == 0:
+    if moment == "morning":
+        if meal_count == 0:
+            if mode == "zero":
+                return (
+                    f"{opening} Il bilancio di oggi non esiste "
+                    "ancora. Registra la colazione, poi vedremo "
+                    "quanto dureranno le buone intenzioni."
+                )
+
+            return (
+                f"{opening} La giornata è appena iniziata: "
+                "quando fai colazione, ricordati di registrarla. "
+                "Al bilancio penseremo più tardi."
+            )
+
         if mode == "zero":
             return (
-                f"{opening} Il bilancio di oggi non esiste "
-                "ancora. Registra la colazione, poi vedremo "
-                "quanto dureranno le buone intenzioni."
+                f"{opening} La giornata è ancora in corso. "
+                "Continua a registrare i pasti; per le "
+                "conclusioni è decisamente presto."
             )
 
         return (
-            f"{opening} La giornata è appena iniziata: "
-            "quando fai colazione, ricordati di registrarla. "
-            "Al bilancio penseremo più tardi."
+            f"{opening} La giornata è ancora in corso: "
+            "continua a registrare i prossimi pasti. "
+            "Valuteremo il bilancio questa sera."
         )
 
     if mode == "zero":
@@ -342,6 +387,14 @@ class DayBriefingService:
         if not message:
             raise DayBriefingError(
                 "Groq returned an empty briefing"
+            )
+
+        if _violates_morning_timing(
+            message,
+            payload,
+        ):
+            raise DayBriefingError(
+                "Groq returned a premature morning outcome"
             )
 
         return message
