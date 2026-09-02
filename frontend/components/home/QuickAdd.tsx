@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 
+import { ActivityLogger } from "@/components/activity/ActivityLogger";
 import { createActivity } from "@/lib/api/activities";
 import {
   getIngredients,
@@ -1317,7 +1318,7 @@ export function QuickAdd({
         <div className={styles.panel}>
           <div className={styles.panelHeader}>
             <strong>
-              Aggiungi attività
+              Aggiungi allenamento
             </strong>
 
             <button
@@ -1329,50 +1330,15 @@ export function QuickAdd({
             </button>
           </div>
 
-          <label>
-            <span>Cosa hai fatto?</span>
-
-            <input
-              value={activityName}
-              placeholder="Es. Padel"
-              onChange={(event) => {
-                setActivityName(
-                  event.target.value,
-                );
-              }}
-            />
-          </label>
-
-          <label>
-            <span>
-              Calorie bruciate
-            </span>
-
-            <input
-              type="number"
-              min="0"
-              value={activityCalories}
-              placeholder="450"
-              onChange={(event) => {
-                setActivityCalories(
-                  event.target.value,
-                );
-              }}
-            />
-          </label>
-
-          <button
-            type="button"
-            className={styles.saveButton}
-            disabled={saving}
-            onClick={() => {
-              void saveActivity();
+          <ActivityLogger
+            date={date}
+            accessToken={accessToken}
+            compact
+            onSaved={async () => {
+              setMode(null);
+              await onSaved();
             }}
-          >
-            {saving
-              ? "Salvo…"
-              : "Registra attività"}
-          </button>
+          />
         </div>
       ) : null}
     </section>

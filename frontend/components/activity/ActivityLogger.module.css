@@ -1,0 +1,168 @@
+.logger {
+  display: grid;
+  gap: 16px;
+}
+
+.activityPanel,
+.movementPanel {
+  padding: 18px;
+  border: 1px solid #e5e2dc;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.panelHeading {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.panelHeading span {
+  color: #727a85;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.panelHeading h3 {
+  margin: 4px 0 0;
+  color: #102744;
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.formGrid label,
+.stepsInput {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  color: #5e625d;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.formGrid input,
+.formGrid select,
+.stepsInput input {
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid #deded8;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #102744;
+  font: inherit;
+}
+
+.formGrid small {
+  color: #85857e;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.saveButton,
+.secondaryButton {
+  min-height: 43px;
+  margin-top: 15px;
+  padding: 0 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.saveButton {
+  border: 0;
+  background: #ff514d;
+  color: #ffffff;
+}
+
+.secondaryButton {
+  border: 1px solid #deded8;
+  background: #ffffff;
+  color: #102744;
+}
+
+.saveButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.movementStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.movementStats div {
+  padding: 13px;
+  border-radius: 13px;
+  background: #f6f6f3;
+}
+
+.movementStats span,
+.movementStats small {
+  display: block;
+  color: #767670;
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.movementStats strong {
+  display: block;
+  margin-top: 5px;
+  color: #102744;
+  font-size: 1.15rem;
+}
+
+.netSteps {
+  background: #fff0ef !important;
+}
+
+.success,
+.error {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 11px;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.success {
+  background: #eaf9ef;
+  color: #27743d;
+}
+
+.error {
+  background: #fff0ef;
+  color: #a82d2b;
+}
+
+.compact .activityPanel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.compact .formGrid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 720px) {
+  .formGrid,
+  .compact .formGrid,
+  .movementStats {
+    grid-template-columns: 1fr;
+  }
+}

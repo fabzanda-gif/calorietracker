@@ -320,6 +320,9 @@ export function HomeShell() {
   const [dayBriefing, setDayBriefing] =
     useState<string | null>(null);
 
+  const [briefingHour, setBriefingHour] =
+    useState(() => new Date().getHours());
+
 
   const {
     user,
@@ -647,6 +650,41 @@ export function HomeShell() {
     );
   }
 
+  useEffect(() => {
+    let timeoutId: ReturnType<
+      typeof setTimeout
+    >;
+
+    function scheduleNextHour() {
+      const now = new Date();
+      const nextHour = new Date(now);
+
+      nextHour.setHours(
+        now.getHours() + 1,
+        0,
+        0,
+        50,
+      );
+
+      timeoutId = setTimeout(() => {
+        setBriefingHour(
+          new Date().getHours(),
+        );
+        scheduleNextHour();
+      }, Math.max(
+        1000,
+        nextHour.getTime() - now.getTime(),
+      ));
+    }
+
+    scheduleNextHour();
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
+
   const firstName = useMemo(() => {
     const metadataName =
       user?.user_metadata?.first_name ||
@@ -761,6 +799,7 @@ export function HomeShell() {
             date,
             briefingMoment(),
             experienceMode,
+            briefingHour,
             accessToken,
           ).catch(() => null),
           getNextMeal(
@@ -855,7 +894,7 @@ export function HomeShell() {
     return () => {
       active = false;
     };
-  }, [accessToken, experienceMode]);
+  }, [accessToken, experienceMode, briefingHour]);
 
   const budget =
     budgetResult?.budget ?? null;

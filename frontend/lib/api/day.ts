@@ -1,5 +1,8 @@
 import { apiRequest } from "./client";
 import type {
+  ActivityMovementSummary,
+} from "./activities";
+import type {
   DayBudgetResponse,
   DayResponse,
   DecisionMode,
@@ -79,6 +82,7 @@ export async function updateDailyLog(
     updated: boolean;
     date: string;
     item: Record<string, unknown> | null;
+    movement?: ActivityMovementSummary | null;
   }>(
     `/daily-logs/${date}`,
     {
@@ -111,11 +115,13 @@ export function getDayBriefing(
   dayDate: string,
   moment: DayBriefingMoment,
   mode: DayBriefingMode = "standard",
+  hour: number = new Date().getHours(),
   accessToken?: string | null,
 ): Promise<DayBriefingResponse> {
   const query = new URLSearchParams({
     moment,
     mode,
+    hour: String(hour),
   });
 
   return apiRequest<DayBriefingResponse>(

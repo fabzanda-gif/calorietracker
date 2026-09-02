@@ -24,11 +24,20 @@ const ITEMS = [
     icon: "▦",
   },
   {
+    href: "/activities",
+    label: "Attività",
+    icon: "⌁",
+  },
+  {
     href: "/progress",
     label: "Progressi",
     icon: "⌁",
   },
 ];
+
+const MOBILE_ITEMS = ITEMS.filter(
+  (item) => item.href !== "/inventory",
+);
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") {
@@ -212,7 +221,7 @@ export function AppNav({
         className={styles.mobileNav}
         aria-label="Navigazione principale"
       >
-        {ITEMS.slice(0, 4).map((item) => {
+        {MOBILE_ITEMS.slice(0, 4).map((item) => {
           const active = isActive(pathname, item.href);
 
           return (

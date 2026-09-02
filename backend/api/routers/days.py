@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import date as Date
+from datetime import datetime
+import time
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
@@ -72,7 +74,89 @@ from backend.services.order_personalization import (
 router = APIRouter(prefix="/days", tags=["days"])
 
 
-_DAY_BRIEFING_CACHE: dict[tuple, dict] = {}
+_DAY_BRIEFING_CACHE_TTL_SECONDS = 2 * 60 * 60
+_DAY_BRIEFING_CACHE: dict[
+    tuple,
+    tuple[float, dict],
+] = {}
+
+
+def _briefing_calorie_bucket(
+    value: float,
+    size: int = 25,
+) -> int:
+    return int(
+        round(float(value) / size) * size
+    )
+
+
+def _is_briefing_training(
+    activity: dict,
+) -> bool:
+    name = str(
+        activity.get("activity_name") or ""
+    ).strip().lower()
+
+    daily_movement_prefixes = (
+        "passi",
+        "steps",
+        "bici",
+        "bicicletta",
+    )
+
+    return not any(
+        name == prefix
+        or name.startswith(f"{prefix} ")
+        or name.startswith(f"{prefix} (")
+        for prefix in daily_movement_prefixes
+    )
+
+
+def _briefing_activity_signature(
+    activities: list[dict],
+) -> tuple:
+    return tuple(
+        sorted(
+            (
+                str(activity.get("id") or ""),
+                str(
+                    activity.get(
+                        "activity_name"
+                    )
+                    or ""
+                ),
+                str(
+                    activity.get(
+                        "activity_type"
+                    )
+                    or ""
+                ),
+                round(
+                    float(
+                        activity.get(
+                            "burned_calories"
+                        )
+                        or 0
+                    ),
+                    1,
+                ),
+                int(
+                    activity.get(
+                        "duration_seconds"
+                    )
+                    or 0
+                ),
+                int(
+                    activity.get(
+                        "estimated_steps"
+                    )
+                    or 0
+                ),
+            )
+            for activity in activities
+            if _is_briefing_training(activity)
+        )
+    )
 
 
 MEAL_SLOT_TO_TYPE = {
@@ -668,6 +752,11 @@ def get_day_briefing(
         default="standard",
         pattern="^(standard|zero)$",
     ),
+    hour: int | None = Query(
+        default=None,
+        ge=0,
+        le=23,
+    ),
     current_user: CurrentUser = Depends(get_current_user),
     daily_logs_repo: DailyLogsRepository = Depends(
         get_daily_logs_repository
@@ -709,6 +798,25 @@ def get_day_briefing(
     actual = budget_result.get("actual") or {}
     budget = budget_result.get("budget") or {}
 
+    try:
+        day_activities = (
+            activities_repo.list_for_date(
+                current_user.id,
+                day_date,
+            )
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    training_activities = [
+        activity
+        for activity in day_activities
+        if _is_briefing_training(activity)
+    ]
+
     consumed_kcal = float(
         budget.get(
             "consumed_kcal",
@@ -739,11 +847,17 @@ def get_day_briefing(
         "activity_level": (
             day.get("activity_plan", {}).get("value")
         ),
-        "activity_count": int(
-            actual.get("activity_count", 0) or 0
+        "activity_count": len(
+            training_activities
         ),
-        "activity_kcal": float(
-            actual.get("actual_activity_kcal", 0) or 0
+        "activity_kcal": sum(
+            float(
+                activity.get(
+                    "burned_calories"
+                )
+                or 0
+            )
+            for activity in training_activities
         ),
         "consumed_kcal": consumed_kcal,
         "daily_budget_kcal": daily_budget_kcal,
@@ -758,27 +872,55 @@ def get_day_briefing(
         ),
     }
 
+    effective_hour = (
+        hour
+        if hour is not None
+        else datetime.now().hour
+    )
+
+    activity_signature = (
+        _briefing_activity_signature(
+            training_activities
+        )
+    )
+
     cache_key = (
         current_user.id,
         str(day_date),
         mode,
         moment,
+        effective_hour,
         payload["day_type"],
         payload["activity_level"],
-        payload["activity_count"],
-        round(payload["activity_kcal"], 1),
-        round(payload["consumed_kcal"], 1),
-        round(payload["daily_budget_kcal"], 1),
-        round(payload["maintenance_kcal"], 1),
+        payload["status_hint"],
+        _briefing_calorie_bucket(
+            payload["available_kcal"]
+        ),
+        _briefing_calorie_bucket(
+            payload["consumed_kcal"]
+        ),
+        activity_signature,
     )
 
-    cached = _DAY_BRIEFING_CACHE.get(cache_key)
+    cached_entry = _DAY_BRIEFING_CACHE.get(
+        cache_key
+    )
 
-    if cached is not None:
-        return {
-            **cached,
-            "cached": True,
-        }
+    if cached_entry is not None:
+        expires_at, cached_response = (
+            cached_entry
+        )
+
+        if expires_at > time.monotonic():
+            return {
+                **cached_response,
+                "cached": True,
+            }
+
+        _DAY_BRIEFING_CACHE.pop(
+            cache_key,
+            None,
+        )
 
     try:
         message = DayBriefingService().generate(
@@ -804,7 +946,11 @@ def get_day_briefing(
     if len(_DAY_BRIEFING_CACHE) >= 512:
         _DAY_BRIEFING_CACHE.clear()
 
-    _DAY_BRIEFING_CACHE[cache_key] = response
+    _DAY_BRIEFING_CACHE[cache_key] = (
+        time.monotonic()
+        + _DAY_BRIEFING_CACHE_TTL_SECONDS,
+        response,
+    )
     return response
 
 

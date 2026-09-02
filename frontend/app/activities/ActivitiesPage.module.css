@@ -1,0 +1,783 @@
+.page {
+  width: min(100%, 1180px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 34px 22px 90px;
+  color: #102744;
+}
+
+.header,
+.cardHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header {
+  margin-bottom: 28px;
+}
+
+.header h1,
+.card h2,
+.uploadCard h2,
+.previewCard h2,
+.detailCard h2 {
+  margin: 0;
+  letter-spacing: -0.04em;
+}
+
+.header h1 {
+  font-size: clamp(2.5rem, 7vw, 4.6rem);
+  line-height: 0.95;
+}
+
+.header > div > p:last-child,
+.uploadCard > div > p:last-child {
+  color: #6f7680;
+}
+
+.eyebrow {
+  margin: 0 0 7px;
+  color: #68768a;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.monthTotal {
+  min-width: 130px;
+  padding: 14px 18px;
+  border: 1px solid #e5e2dc;
+  border-radius: 18px;
+  background: #fff;
+  text-align: right;
+}
+
+.monthTotal strong {
+  display: block;
+  color: #ff5b57;
+  font-size: 2rem;
+}
+
+.monthTotal span {
+  color: #73736d;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.topGrid,
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  gap: 20px;
+}
+
+.contentGrid {
+  margin-top: 20px;
+}
+
+.card,
+.uploadCard,
+.previewCard,
+.detailCard {
+  border: 1px solid #e5e2dc;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(16, 39, 68, 0.07);
+}
+
+.card,
+.uploadCard,
+.previewCard,
+.detailCard {
+  padding: 22px;
+}
+
+.cardHeading {
+  margin-bottom: 18px;
+}
+
+.monthControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monthControls strong {
+  min-width: 145px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.monthControls button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #dddcd6;
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 7px;
+}
+
+.weekday {
+  padding: 5px 0;
+  color: #8a8a83;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.day,
+.emptyDay {
+  aspect-ratio: 1;
+  min-width: 0;
+}
+
+.day {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: #f7f7f4;
+  color: #39485d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.day:hover {
+  border-color: #ffaaa5;
+}
+
+.activeDay {
+  background: #fff0ef;
+  color: #c93635;
+}
+
+.activeDay i {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #ff5b57;
+  color: #fff;
+  font-size: 0.58rem;
+  font-style: normal;
+}
+
+.selectedDay {
+  border-color: #ff5b57;
+  box-shadow: inset 0 0 0 1px #ff5b57;
+}
+
+.today::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #102744;
+  transform: translateX(-50%);
+}
+
+.uploadCard {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropZone {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 210px;
+  margin-top: 14px;
+  padding: 22px;
+  border: 1.5px dashed #ffaaa5;
+  border-radius: 19px;
+  background: #fff8f7;
+  cursor: pointer;
+  text-align: center;
+}
+
+.dropZone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.uploadIcon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ff5b57;
+  color: #fff;
+  font-size: 1.5rem;
+}
+
+.dropZone small,
+.fileName {
+  color: #777771;
+}
+
+.fileName {
+  overflow: hidden;
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewCard {
+  margin-top: 20px;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) 1.2fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.previewForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.previewForm label {
+  display: grid;
+  gap: 6px;
+  color: #666962;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.previewForm input,
+.previewForm select {
+  min-width: 0;
+  min-height: 43px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid #deded8;
+  border-radius: 12px;
+  background: #fff;
+  color: #102744;
+  font: inherit;
+}
+
+.previewStats,
+.detailStats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.previewStats div,
+.detailStats div {
+  padding: 14px;
+  border-radius: 14px;
+  background: #f7f7f4;
+}
+
+.previewStats span,
+.detailStats span {
+  display: block;
+  margin-bottom: 5px;
+  color: #777771;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.previewStats strong,
+.detailStats strong {
+  font-size: 1rem;
+}
+
+.gpxBadge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #ffe9e7;
+  color: #d94340;
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.importButton {
+  display: block;
+  min-height: 46px;
+  margin: 18px 0 0 auto;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 13px;
+  background: #ff514d;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.importButton:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.mapFrame {
+  overflow: hidden;
+  border: 1px solid #e5e2dc;
+  border-radius: 18px;
+  background: #f4f5f2;
+}
+
+.mapFrame svg {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+}
+
+.mapGrid {
+  fill: none;
+  stroke: #dfe4df;
+  stroke-width: 1;
+}
+
+.routeShadow,
+.routeLine,
+.chartLine {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.routeShadow {
+  stroke: rgba(255, 91, 87, 0.18);
+  stroke-width: 12;
+}
+
+.routeLine {
+  stroke: #ff4c48;
+  stroke-width: 5;
+}
+
+.routeStart {
+  fill: #49cf7c;
+  stroke: #fff;
+  stroke-width: 4;
+}
+
+.routeEnd {
+  fill: #ff3f3b;
+  stroke: #fff;
+  stroke-width: 4;
+}
+
+.mapLegend {
+  display: flex;
+  gap: 18px;
+  padding: 10px 14px;
+  border-top: 1px solid #e5e2dc;
+  background: #fff;
+  color: #6f746d;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.mapLegend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.startDot,
+.endDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.startDot {
+  background: #49cf7c;
+}
+
+.endDot {
+  background: #ff3f3b;
+}
+
+.activityList {
+  display: grid;
+  gap: 8px;
+}
+
+.activityRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e5e2dc;
+  border-radius: 14px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.activityRowActive {
+  border-color: #ff827c;
+  background: #fff5f4;
+}
+
+.activityMark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffe9e7;
+  color: #ff4c48;
+}
+
+.activityInfo {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.activityInfo strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activityInfo small {
+  color: #7d7d76;
+}
+
+.activityValue {
+  margin-left: auto;
+  color: #5f6d7f;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.detailStats {
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 15px;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.chartCard {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e5e2dc;
+  border-radius: 16px;
+}
+
+.chartHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chartHeading h3,
+.chartCard h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.chartHeading strong {
+  color: #ff514d;
+  font-size: 0.8rem;
+}
+
+.chartCard svg {
+  display: block;
+  width: 100%;
+}
+
+.chartGrid {
+  stroke: #e8e8e3;
+  stroke-width: 1;
+}
+
+.chartLine {
+  stroke: #ff514d;
+  stroke-width: 4;
+}
+
+.chartPoint {
+  fill: #ff514d;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.chartRange {
+  display: flex;
+  justify-content: space-between;
+  color: #85857e;
+  font-size: 0.66rem;
+}
+
+.emptyChart,
+.emptyVisual,
+.emptyDetail {
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+  color: #777771;
+  text-align: center;
+}
+
+.emptyChart span,
+.emptyDetail span {
+  margin-top: 5px;
+  font-size: 0.75rem;
+}
+
+.emptyList,
+.loading {
+  padding: 18px;
+  color: #7d7d76;
+  text-align: center;
+}
+
+.error,
+.success {
+  margin-bottom: 18px;
+  padding: 13px 16px;
+  border-radius: 13px;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.error {
+  background: #fff0ef;
+  color: #a92c2a;
+}
+
+.success {
+  background: #eaf9ef;
+  color: #26723c;
+}
+
+/* Zero mode */
+
+.pageZero {
+  color: #111;
+}
+
+.pageZero .eyebrow,
+.pageZero .header > div > p:last-child {
+  color: #686868;
+}
+
+.pageZero .card,
+.pageZero .uploadCard,
+.pageZero .previewCard,
+.pageZero .detailCard,
+.pageZero .monthTotal {
+  border-color: #d8d8d4;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.08);
+}
+
+.pageZero .monthTotal strong,
+.pageZero .chartHeading strong {
+  color: #f52f35;
+}
+
+.pageZero .activeDay,
+.pageZero .activityRowActive {
+  background: #fff0f0;
+}
+
+.pageZero .selectedDay {
+  border-color: #f52f35;
+  box-shadow: inset 0 0 0 1px #f52f35;
+}
+
+.pageZero .activeDay i,
+.pageZero .uploadIcon,
+.pageZero .importButton {
+  background: #f52f35;
+}
+
+.pageZero .dropZone {
+  border-color: #f52f35;
+  background: #fff8f8;
+}
+
+.pageZero .routeLine,
+.pageZero .chartLine {
+  stroke: #f52f35;
+}
+
+.pageZero .chartPoint {
+  fill: #f52f35;
+}
+
+.pageZero .activityMark,
+.pageZero .gpxBadge {
+  color: #f52f35;
+}
+
+@media (min-width: 760px) {
+  .page {
+    margin-left: max(
+      236px,
+      calc((100vw - 1180px + 236px) / 2)
+    );
+  }
+}
+
+@media (max-width: 980px) {
+  .topGrid,
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .page {
+    padding: 22px 14px 100px;
+  }
+
+  .header,
+  .cardHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .monthTotal {
+    text-align: left;
+  }
+
+  .monthControls {
+    justify-content: space-between;
+  }
+
+  .previewGrid,
+  .previewForm {
+    grid-template-columns: 1fr;
+  }
+
+  .detailStats {
+    grid-template-columns: 1fr;
+  }
+
+  .day {
+    border-radius: 9px;
+  }
+
+  .activeDay i {
+    display: none;
+  }
+}
+
+
+.showMonthButton {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #deded8;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #4e5968;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.showMonthButton:hover {
+  border-color: #ff827c;
+  color: #d94340;
+}
+
+.pageZero .showMonthButton:hover {
+  border-color: #f52f35;
+  color: #f52f35;
+}
+
+
+.dayActivityIcon {
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  font-size: clamp(0.82rem, 1.5vw, 1.15rem);
+  line-height: 1;
+  transform: translateX(-50%);
+}
+
+.activeDay i {
+  z-index: 2;
+  width: auto;
+  min-width: 17px;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+.activityMark {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+
+.loggerCard {
+  margin-bottom: 20px;
+  padding: 22px;
+  border: 1px solid #e5e2dc;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 14px 38px rgba(16, 39, 68, 0.07);
+}
+
+.loggerHeading {
+  margin-bottom: 18px;
+}
+
+.loggerHeading h2 {
+  margin: 0;
+  color: #102744;
+  letter-spacing: -0.04em;
+}
+
+.loggerHeading p:last-child {
+  margin-bottom: 0;
+  color: #737973;
+}
+
+.pageZero .loggerCard {
+  border-color: #d8d8d4;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.08);
+}
+
+.pageZero .loggerHeading h2 {
+  color: #111111;
+}
