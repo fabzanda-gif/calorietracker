@@ -972,6 +972,9 @@ export function HomeShell() {
     budgetResult?.budget ?? null;
 
   const bmr = Number(budgetResult?.profile?.bmr ?? 0);
+  const needsWelcomeJourney =
+    showWelcomeJourney ||
+    budgetResult?.status === "profile_incomplete";
 
   const burnedCalories = actualActivities.reduce(
     (total, activity) =>
@@ -1942,7 +1945,7 @@ export function HomeShell() {
     <>
       <AppNav experienceMode={experienceMode} />
 
-      {showWelcomeJourney && accessToken ? (
+      {!loading && needsWelcomeJourney && accessToken ? (
         <WelcomeJourney
           accessToken={accessToken}
           initialName={
