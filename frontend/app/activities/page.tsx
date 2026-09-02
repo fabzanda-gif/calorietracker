@@ -13,6 +13,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AppNav } from "@/components/navigation/AppNav";
 import {
   getActivitiesForRange,
+  getActivityOverview,
   deleteActivity,
   importGpxActivity,
   previewGpxActivity,
@@ -20,6 +21,7 @@ import {
   type ActivityRoutePoint,
   type ActivitySeriesPoint,
   type GpxActivityPreview,
+  type ActivityEnergyDay,
 } from "@/lib/api/activities";
 
 import styles from "./ActivitiesPage.module.css";
@@ -438,6 +440,8 @@ export default function ActivitiesPage() {
   const [activities, setActivities] = useState<
     Activity[]
   >([]);
+  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
+  const [energyDays, setEnergyDays] = useState<ActivityEnergyDay[]>([]);
   const [selectedActivity, setSelectedActivity] =
     useState<Activity | null>(null);
   const [selectedDate, setSelectedDate] =
@@ -483,16 +487,24 @@ export default function ActivitiesPage() {
 
     try {
       const bounds = monthBounds(month);
-      const response = await getActivitiesForRange(
-        bounds.start,
-        bounds.end,
-        accessToken,
-      );
+      const today = new Date();
+      const rollingStart = new Date(today);
+      rollingStart.setDate(today.getDate() - 29);
+      const [response, recentResponse] = await Promise.all([
+        getActivityOverview(bounds.start, bounds.end, accessToken),
+        getActivitiesForRange(isoDate(rollingStart), isoDate(today), accessToken),
+      ]);
 
       const sortedItems = [...response.items].sort(
         (left, right) => activityTimestamp(right) - activityTimestamp(left),
       );
       setActivities(sortedItems);
+      setRecentActivities(
+        [...recentResponse.items].sort(
+          (left, right) => activityTimestamp(right) - activityTimestamp(left),
+        ),
+      );
+      setEnergyDays(response.energy_days);
 
       setSelectedActivity((current) => {
         const visibleItems = sortedItems.filter(
@@ -536,6 +548,26 @@ export default function ActivitiesPage() {
         (activity) => !isDailyMovement(activity),
       ),
     [activities],
+  );
+
+  const rollingTrainingActivities = useMemo(
+    () => recentActivities.filter((activity) => !isDailyMovement(activity)),
+    [recentActivities],
+  );
+
+  const rollingSummary = useMemo(
+    () => ({
+      workouts: rollingTrainingActivities.length,
+      duration: rollingTrainingActivities.reduce((sum, item) => sum + Number(item.duration_seconds ?? 0), 0),
+      distance: rollingTrainingActivities.reduce((sum, item) => sum + Number(item.distance_meters ?? 0), 0),
+      calories: rollingTrainingActivities.reduce((sum, item) => sum + Number(item.burned_calories ?? 0), 0),
+    }),
+    [rollingTrainingActivities],
+  );
+
+  const energyByDate = useMemo(
+    () => new Map(energyDays.map((item) => [item.date, item])),
+    [energyDays],
   );
 
   const activitiesByDate = useMemo(() => {
@@ -750,14 +782,29 @@ export default function ActivitiesPage() {
           </div>
 
           <div className={styles.monthTotal}>
-            <strong>{trainingActivities.length}</strong>
+            <strong>{rollingTrainingActivities.length}</strong>
             <span>
-              {trainingActivities.length === 1
-                ? "allenamento nel mese"
-                : "allenamenti nel mese"}
+              {rollingTrainingActivities.length === 1
+                ? "allenamento negli ultimi 30 giorni"
+                : "allenamenti negli ultimi 30 giorni"}
             </span>
           </div>
         </header>
+
+        <section className={styles.summarySection}>
+          <div className={styles.summaryHeading}>
+            <div>
+              <p className={styles.eyebrow}>Il tuo movimento</p>
+              <h2>Ultimi 30 giorni</h2>
+            </div>
+          </div>
+          <div className={styles.summaryGrid}>
+            <div><span>Allenamenti</span><strong>{rollingSummary.workouts}</strong></div>
+            <div><span>Tempo totale</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
+            <div><span>Distanza</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
+            <div><span>Energia</span><strong>{rollingSummary.calories.toLocaleString("it-IT")} kcal</strong></div>
+          </div>
+        </section>
 
         {error ? (
           <div className={styles.error}>{error}</div>
@@ -850,6 +897,7 @@ export default function ActivitiesPage() {
                   selectedDate === date;
                 const today =
                   date === isoDate(new Date());
+                const energy = energyByDate.get(date);
 
                 return (
                   <button
@@ -881,6 +929,22 @@ export default function ActivitiesPage() {
                   >
                     <span>{day.getDate()}</span>
 
+                    {energy ? (
+                      <span
+                        className={`${styles.energyState} ${
+                          energy.state === "deficit"
+                            ? styles.energyDeficit
+                            : energy.state === "surplus"
+                            ? styles.energySurplus
+                            : styles.energyMaintenance
+                        }`}
+                        title={`${energy.state === "deficit" ? "Deficit" : energy.state === "surplus" ? "Surplus" : "Mantenimento"}: ${Math.abs(energy.balance_kcal)} kcal`}
+                        aria-label={energy.state}
+                      >
+                        {energy.state === "deficit" ? "↓" : energy.state === "surplus" ? "↑" : "="}
+                      </span>
+                    ) : null}
+
                     {active ? (
                       <span
                         className={styles.dayActivityIcon}
@@ -910,6 +974,12 @@ export default function ActivitiesPage() {
                   </button>
                 );
               })}
+            </div>
+
+            <div className={styles.energyLegend}>
+              <span className={styles.energyDeficit}>↓ <i>Deficit</i></span>
+              <span className={styles.energyMaintenance}>= <i>Mantenimento</i></span>
+              <span className={styles.energySurplus}>↑ <i>Surplus</i></span>
             </div>
 
             {loading ? (

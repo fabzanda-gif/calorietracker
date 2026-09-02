@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,11 +13,13 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
+    get_meals_repository,
     get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.meals import MealsRepository
 from backend.repositories.weight import WeightRepository
 from backend.services.gpx_activity import (
     GpxActivityError,
@@ -31,9 +33,20 @@ from backend.services.activity_movement import (
 from backend.services.activity_movement_sync import (
     ActivityMovementSyncService,
 )
+from backend.services.profile_goal import ProfileGoalService
 
 
 router = APIRouter(prefix="/activities", tags=["activities"])
+
+
+def _is_training_activity(activity: dict) -> bool:
+    if activity.get("source") == "gpx":
+        return True
+    name = str(activity.get("activity_name") or "").strip().casefold()
+    return not any(
+        name == prefix or name.startswith(f"{prefix} ") or name.startswith(f"{prefix} (")
+        for prefix in ("passi", "steps", "bici", "bicicletta")
+    )
 
 
 class ActivityCreate(BaseModel):
@@ -73,6 +86,71 @@ class GpxImportRequest(GpxPreviewRequest):
     )
     activity_date: date | None = None
     burned_calories: int | None = Field(default=None, ge=0)
+
+
+@router.get("/overview")
+def get_activity_overview(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: ActivitiesRepository = Depends(get_activities_repository),
+    meals_repo: MealsRepository = Depends(get_meals_repository),
+    weight_repo: WeightRepository = Depends(get_weight_repository),
+):
+    if end_date < start_date or (end_date - start_date).days > 62:
+        raise HTTPException(status_code=400, detail="Invalid overview date range")
+
+    try:
+        activities = repo.list_date_range(current_user.id, start_date, end_date)
+        meals = meals_repo.list_date_range(
+            current_user.id, start_date, end_date,
+            columns="date,calories",
+        )
+        latest_weight = weight_repo.latest(current_user.id)
+        profile = ProfileGoalService().build(
+            current_user.metadata,
+            current_weight=(latest_weight or {}).get("weight"),
+            on_date=end_date,
+        )
+    except RepositoryError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    training = [item for item in activities if _is_training_activity(item)]
+    calories_by_date: dict[str, float] = {}
+    for meal in meals:
+        key = str(meal.get("date") or "")
+        calories_by_date[key] = calories_by_date.get(key, 0) + float(meal.get("calories") or 0)
+    activity_by_date: dict[str, float] = {}
+    for item in training:
+        key = str(item.get("date") or "")
+        activity_by_date[key] = activity_by_date.get(key, 0) + float(item.get("burned_calories") or 0)
+
+    energy_days = []
+    bmr = float(profile.get("bmr") or 0)
+    if bmr > 0:
+        cursor = start_date
+        while cursor <= min(end_date, date.today()):
+            key = str(cursor)
+            if key in calories_by_date:
+                maintenance = bmr * 1.2 + activity_by_date.get(key, 0)
+                balance = round(calories_by_date[key] - maintenance)
+                state = "maintenance" if abs(balance) <= 100 else ("surplus" if balance > 0 else "deficit")
+                energy_days.append({"date": key, "state": state, "balance_kcal": balance})
+            cursor += timedelta(days=1)
+
+    return {
+        "start_date": str(start_date),
+        "end_date": str(end_date),
+        "count": len(activities),
+        "items": activities,
+        "energy_days": energy_days,
+        "summary": {
+            "workouts": len(training),
+            "duration_seconds": sum(int(item.get("duration_seconds") or 0) for item in training),
+            "distance_meters": sum(float(item.get("distance_meters") or 0) for item in training),
+            "burned_calories": sum(int(item.get("burned_calories") or 0) for item in training),
+        },
+    }
 
 
 @router.get("/range")

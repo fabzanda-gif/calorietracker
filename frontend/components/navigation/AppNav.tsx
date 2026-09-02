@@ -14,11 +14,6 @@ const ITEMS = [
     icon: "⌂",
   },
   {
-    href: "/recipes",
-    label: "Ricette",
-    icon: "⌑",
-  },
-  {
     href: "/activities",
     label: "Attività",
     icon: "⌁",
@@ -32,6 +27,11 @@ const ITEMS = [
         <path d="M14 8h5v5" />
       </svg>
     ),
+  },
+  {
+    href: "/recipes",
+    label: "Ricette",
+    icon: "⌑",
   },
 ];
 

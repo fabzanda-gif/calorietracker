@@ -152,6 +152,31 @@ export interface ActivityRangeResponse
   end_date: string;
 }
 
+export interface ActivityEnergyDay {
+  date: string;
+  state: "deficit" | "maintenance" | "surplus";
+  balance_kcal: number;
+}
+
+export interface ActivityOverviewResponse extends ActivityRangeResponse {
+  energy_days: ActivityEnergyDay[];
+  summary: {
+    workouts: number;
+    duration_seconds: number;
+    distance_meters: number;
+    burned_calories: number;
+  };
+}
+
+export function getActivityOverview(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<ActivityOverviewResponse> {
+  const query = new URLSearchParams({ start_date: startDate, end_date: endDate });
+  return apiRequest<ActivityOverviewResponse>(`/activities/overview?${query.toString()}`, { accessToken });
+}
+
 export function previewGpxActivity(
   input: {
     file_name: string;

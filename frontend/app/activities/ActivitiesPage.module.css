@@ -67,6 +67,43 @@
   font-weight: 700;
 }
 
+.summarySection {
+  margin-bottom: 20px;
+}
+
+.summaryHeading h2 {
+  margin: 0 0 12px;
+  letter-spacing: -0.035em;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.summaryGrid > div {
+  padding: 16px 18px;
+  border: 1px solid #e5e2dc;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(16, 39, 68, 0.05);
+}
+
+.summaryGrid span {
+  display: block;
+  color: #747b84;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.summaryGrid strong {
+  display: block;
+  margin-top: 5px;
+  color: #102744;
+  font-size: 1.35rem;
+}
+
 .topGrid,
 .contentGrid {
   display: grid;
@@ -193,6 +230,38 @@
   border-radius: 50%;
   background: #102744;
   transform: translateX(-50%);
+}
+
+.energyState {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.energyDeficit { color: #35a85b; }
+.energyMaintenance { color: #d99a00; }
+.energySurplus { color: #ff5b57; }
+
+.energyLegend {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin-top: 14px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.energyLegend span {
+  display: flex;
+  gap: 5px;
+}
+
+.energyLegend i {
+  color: #596576;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .uploadCard {
@@ -664,6 +733,10 @@
   .charts {
     grid-template-columns: 1fr;
   }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 620px) {
@@ -692,6 +765,10 @@
 
   .detailStats {
     grid-template-columns: 1fr;
+  }
+
+  .summaryGrid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .day {
