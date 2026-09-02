@@ -1,0 +1,396 @@
+From eac8f2c7a91a3a3ec4a6598da5c8e7dba84f7e91 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 15:43:19 +0300
+Subject: [PATCH] Make recipe actions and meal reuse discoverable
+
+---
+ frontend/app/recipes/RecipesPage.module.css  | 34 ++++++-
+ frontend/app/recipes/page.tsx                | 96 ++++++++++++++++++--
+ frontend/components/home/QuickAdd.module.css | 18 ++--
+ frontend/components/home/QuickAdd.tsx        | 27 ++++--
+ frontend/lib/api/recipes.ts                  | 13 ++-
+ 5 files changed, 161 insertions(+), 27 deletions(-)
+
+diff --git a/frontend/app/recipes/RecipesPage.module.css b/frontend/app/recipes/RecipesPage.module.css
+index 11be101..fb53513 100644
+--- a/frontend/app/recipes/RecipesPage.module.css
++++ b/frontend/app/recipes/RecipesPage.module.css
+@@ -676,10 +676,36 @@
+ }
+ 
+ .recipeRating {
+-  padding: 3px 7px;
+-  border-radius: 999px;
+-  background: #fff0ef;
+-  color: #102846 !important;
++  display: flex;
++  align-items: center;
++  gap: 5px;
++  color: #778392;
++  font-size: 0.66rem;
++}
++
++.recipeRating > div {
++  display: inline-flex;
++  gap: 1px;
++}
++
++.star,
++.starActive {
++  padding: 0;
++  border: 0;
++  background: transparent;
++  color: #d7d9dc;
++  cursor: pointer;
++  font-size: 0.9rem;
++  line-height: 1;
++}
++
++.starActive {
++  color: #ff6864;
++}
++
++.star:hover,
++.starActive:hover {
++  color: #e95250;
+ }
+ 
+ .recipeSort {
+diff --git a/frontend/app/recipes/page.tsx b/frontend/app/recipes/page.tsx
+index 8f92d6e..ac4c624 100644
+--- a/frontend/app/recipes/page.tsx
++++ b/frontend/app/recipes/page.tsx
+@@ -6,6 +6,7 @@ import { AppNav } from "@/components/navigation/AppNav";
+ import { RecipeShareButton } from "@/components/recipes/RecipeShareButton";
+ 
+ import {
++  useRef,
+   useEffect,
+   useMemo,
+   useState,
+@@ -147,6 +148,17 @@ export default function RecipesPage() {
+     useState("1");
+   const [cooking, setCooking] =
+     useState(false);
++  const actionPanelRef = useRef<HTMLElement | null>(null);
++  const editorRef = useRef<HTMLElement | null>(null);
++
++  function reveal(ref: React.RefObject<HTMLElement | null>) {
++    window.requestAnimationFrame(() => {
++      ref.current?.scrollIntoView({
++        behavior: "smooth",
++        block: "start",
++      });
++    });
++  }
+ 
+   const availableRecipeMealTypes = useMemo(() => {
+     const values = recipes
+@@ -290,6 +302,8 @@ export default function RecipesPage() {
+ 
+       const recipe = response.item;
+ 
++      setCookRecipe(null);
++      setMealDraft(null);
+       setEditingId(recipe.id);
+       setName(recipe.name);
+       setMealType(
+@@ -315,6 +329,7 @@ export default function RecipesPage() {
+           }),
+         ),
+       );
++      reveal(editorRef);
+     } catch (err) {
+       setMessage(
+         err instanceof Error
+@@ -409,7 +424,9 @@ export default function RecipesPage() {
+   }, [draftIngredients, ingredients]);
+ 
+   function openCookDialog(recipe: Recipe) {
++    setMealDraft(null);
+     setCookRecipe(recipe);
++    reveal(actionPanelRef);
+     setCookPortions("1");
+     setMessage(null);
+   }
+@@ -517,6 +534,7 @@ export default function RecipesPage() {
+       const initialScale =
+         1 / recipeServings;
+ 
++      setCookRecipe(null);
+       setMealDraft({
+         recipeId: recipe.id,
+         name: recipe.name,
+@@ -535,6 +553,7 @@ export default function RecipesPage() {
+             }),
+           ),
+       });
++      reveal(actionPanelRef);
+     } catch (err) {
+       setMessage(
+         err instanceof Error
+@@ -763,6 +782,39 @@ export default function RecipesPage() {
+     }
+   }
+ 
++  async function rateRecipe(
++    recipe: Recipe,
++    field: "taste_rating" | "ease_rating",
++    rating: number,
++  ) {
++    if (!accessToken) {
++      return;
++    }
++
++    setMessage(null);
++
++    try {
++      await updateRecipe(
++        recipe.id,
++        { [field]: rating },
++        accessToken,
++      );
++      setRecipes((current) =>
++        current.map((item) =>
++          item.id === recipe.id
++            ? { ...item, [field]: rating }
++            : item,
++        ),
++      );
++    } catch (err) {
++      setMessage(
++        err instanceof Error
++          ? err.message
++          : "Non riesco a salvare la valutazione.",
++      );
++    }
++  }
++
+   async function handleRecipeImage(
+     file: File,
+   ) {
+@@ -964,7 +1016,7 @@ export default function RecipesPage() {
+       ) : null}
+ 
+       {cookRecipe ? (
+-        <section className={styles.editorCard}>
++        <section ref={actionPanelRef} className={styles.editorCard}>
+           <div className={styles.sectionHeader}>
+             <div>
+               <p className={styles.kicker}>
+@@ -1019,7 +1071,7 @@ export default function RecipesPage() {
+       ) : null}
+ 
+       {mealDraft ? (
+-        <section className={styles.editorCard}>
++        <section ref={actionPanelRef} className={styles.editorCard}>
+           <div className={styles.sectionHeader}>
+             <div>
+               <p className={styles.kicker}>
+@@ -1322,12 +1374,38 @@ export default function RecipesPage() {
+                     </strong>
+ 
+                     <div className={styles.recipeNutrition}>
+-                      <span className={styles.recipeRating}>
+-                        Gusto <strong>{recipe.taste_rating ?? "—"}/5</strong>
+-                      </span>
+-                      <span className={styles.recipeRating}>
+-                        Facilità <strong>{recipe.ease_rating ?? "—"}/5</strong>
+-                      </span>
++                      <div className={styles.recipeRating}>
++                        <span>Gusto</span>
++                        <div aria-label={`Valuta il gusto di ${recipe.name}`}>
++                          {[1, 2, 3, 4, 5].map((rating) => (
++                            <button
++                              key={rating}
++                              type="button"
++                              aria-label={`${rating} su 5`}
++                              className={rating <= Number(recipe.taste_rating || 0) ? styles.starActive : styles.star}
++                              onClick={() => void rateRecipe(recipe, "taste_rating", rating)}
++                            >
++                              ★
++                            </button>
++                          ))}
++                        </div>
++                      </div>
++                      <div className={styles.recipeRating}>
++                        <span>Facilità</span>
++                        <div aria-label={`Valuta la facilità di ${recipe.name}`}>
++                          {[1, 2, 3, 4, 5].map((rating) => (
++                            <button
++                              key={rating}
++                              type="button"
++                              aria-label={`${rating} su 5`}
++                              className={rating <= Number(recipe.ease_rating || 0) ? styles.starActive : styles.star}
++                              onClick={() => void rateRecipe(recipe, "ease_rating", rating)}
++                            >
++                              ★
++                            </button>
++                          ))}
++                        </div>
++                      </div>
+                       <span>
+                         <strong>
+                           {Math.round(
+@@ -1501,7 +1579,7 @@ export default function RecipesPage() {
+       </section>
+ 
+ 
+-<section className={styles.editorCard}>
++<section ref={editorRef} className={styles.editorCard}>
+         <div className={styles.sectionHeader}>
+           <div>
+             <p className={styles.kicker}>
+diff --git a/frontend/components/home/QuickAdd.module.css b/frontend/components/home/QuickAdd.module.css
+index 8226a67..69c8b38 100644
+--- a/frontend/components/home/QuickAdd.module.css
++++ b/frontend/components/home/QuickAdd.module.css
+@@ -112,22 +112,26 @@
+ }
+ 
+ .knownMealField {
+-  position: relative;
++  position: static;
+ }
+ 
+ .knownMealSuggestions {
+-  position: absolute;
+-  z-index: 20;
+-  top: calc(100% + 5px);
+-  left: 0;
+-  right: 0;
+-  overflow: hidden;
++  overflow: auto;
++  max-height: 270px;
++  margin-top: 2px;
+   border: 1px solid #d7d7d0;
+   border-radius: 12px;
+   background: #ffffff;
+   box-shadow: 0 16px 35px rgba(16, 39, 68, 0.14);
+ }
+ 
++.knownMealSuggestions p {
++  margin: 0;
++  padding: 12px;
++  color: #74746e;
++  font-size: 0.78rem;
++}
++
+ .knownMealSuggestions button {
+   display: flex;
+   align-items: center;
+diff --git a/frontend/components/home/QuickAdd.tsx b/frontend/components/home/QuickAdd.tsx
+index 963fb61..d3c8b60 100644
+--- a/frontend/components/home/QuickAdd.tsx
++++ b/frontend/components/home/QuickAdd.tsx
+@@ -18,7 +18,7 @@ import {
+   type LoggedMeal,
+ } from "@/lib/api/meals";
+ import {
+-  getRecipes,
++  getAvailableRecipes,
+   type Recipe,
+ } from "@/lib/api/recipes";
+ import { createWeight } from "@/lib/api/weight";
+@@ -208,6 +208,10 @@ export function QuickAdd({
+     useState<KnownMeal[]>([]);
+   const [showKnownMeals, setShowKnownMeals] =
+     useState(false);
++  const [knownMealsLoading, setKnownMealsLoading] =
++    useState(false);
++  const [knownMealsLoaded, setKnownMealsLoaded] =
++    useState(false);
+ 
+   const [calories, setCalories] =
+     useState("");
+@@ -285,8 +289,10 @@ export function QuickAdd({
+     let active = true;
+ 
+     async function loadKnownMeals() {
++      setKnownMealsLoading(true);
++
+       const [recipes, history] = await Promise.all([
+-        getRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
++        getAvailableRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
+         getMealHistory(accessToken).catch(() => ({ count: 0, items: [] })),
+       ]);
+ 
+@@ -310,6 +316,8 @@ export function QuickAdd({
+       });
+ 
+       setKnownMeals(choices);
++      setKnownMealsLoaded(true);
++      setKnownMealsLoading(false);
+     }
+ 
+     void loadKnownMeals();
+@@ -1112,17 +1120,17 @@ export function QuickAdd({
+                 setShowKnownMeals(true);
+               }}
+               onFocus={() => setShowKnownMeals(true)}
+-              onBlur={() => {
+-                window.setTimeout(() => setShowKnownMeals(false), 120);
+-              }}
+               autoComplete="off"
+               role="combobox"
+               aria-expanded={showKnownMeals && knownMealSuggestions.length > 0}
+               aria-autocomplete="list"
+             />
+ 
+-            {showKnownMeals && knownMealSuggestions.length ? (
++            {showKnownMeals ? (
+               <div className={styles.knownMealSuggestions} role="listbox">
++                {knownMealsLoading ? (
++                  <p>Carico ricette e pasti recenti…</p>
++                ) : null}
+                 {knownMealSuggestions.map((meal) => (
+                   <button
+                     key={meal.key}
+@@ -1138,6 +1146,13 @@ export function QuickAdd({
+                     <b>{Math.round(meal.calories)} kcal</b>
+                   </button>
+                 ))}
++                {!knownMealsLoading && knownMealsLoaded && !knownMealSuggestions.length ? (
++                  <p>
++                    {name.trim()
++                      ? "Nessuna ricetta o pasto corrispondente."
++                      : "Non ci sono ancora pasti da riutilizzare."}
++                  </p>
++                ) : null}
+               </div>
+             ) : null}
+           </label>
+diff --git a/frontend/lib/api/recipes.ts b/frontend/lib/api/recipes.ts
+index ab3f180..6b0e4f7 100644
+--- a/frontend/lib/api/recipes.ts
++++ b/frontend/lib/api/recipes.ts
+@@ -71,6 +71,17 @@ export async function getRecipes(
+   );
+ }
+ 
++export async function getAvailableRecipes(
++  accessToken?: string | null,
++): Promise<RecipesResponse> {
++  return apiRequest<RecipesResponse>(
++    "/recipes/available",
++    {
++      accessToken,
++    },
++  );
++}
++
+ export async function getRecipe(
+   recipeId: string,
+   accessToken?: string | null,
+@@ -99,7 +110,7 @@ export async function createRecipe(
+ 
+ export async function updateRecipe(
+   recipeId: string,
+-  input: RecipeWriteInput,
++  input: Partial<RecipeWriteInput>,
+   accessToken?: string | null,
+ ): Promise<{ updated: boolean; item: Recipe }> {
+   return apiRequest(
+-- 
+2.51.1
+
