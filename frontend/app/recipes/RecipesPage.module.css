@@ -676,10 +676,36 @@
 }
 
 .recipeRating {
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: #fff0ef;
-  color: #102846 !important;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #778392;
+  font-size: 0.66rem;
+}
+
+.recipeRating > div {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.star,
+.starActive {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d7d9dc;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.starActive {
+  color: #ff6864;
+}
+
+.star:hover,
+.starActive:hover {
+  color: #e95250;
 }
 
 .recipeSort {

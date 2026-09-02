@@ -112,20 +112,24 @@
 }
 
 .knownMealField {
-  position: relative;
+  position: static;
 }
 
 .knownMealSuggestions {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 5px);
-  left: 0;
-  right: 0;
-  overflow: hidden;
+  overflow: auto;
+  max-height: 270px;
+  margin-top: 2px;
   border: 1px solid #d7d7d0;
   border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 16px 35px rgba(16, 39, 68, 0.14);
+}
+
+.knownMealSuggestions p {
+  margin: 0;
+  padding: 12px;
+  color: #74746e;
+  font-size: 0.78rem;
 }
 
 .knownMealSuggestions button {

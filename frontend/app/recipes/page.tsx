@@ -6,6 +6,7 @@ import { AppNav } from "@/components/navigation/AppNav";
 import { RecipeShareButton } from "@/components/recipes/RecipeShareButton";
 
 import {
+  useRef,
   useEffect,
   useMemo,
   useState,
@@ -147,6 +148,17 @@ export default function RecipesPage() {
     useState("1");
   const [cooking, setCooking] =
     useState(false);
+  const actionPanelRef = useRef<HTMLElement | null>(null);
+  const editorRef = useRef<HTMLElement | null>(null);
+
+  function reveal(ref: React.RefObject<HTMLElement | null>) {
+    window.requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
 
   const availableRecipeMealTypes = useMemo(() => {
     const values = recipes
@@ -290,6 +302,8 @@ export default function RecipesPage() {
 
       const recipe = response.item;
 
+      setCookRecipe(null);
+      setMealDraft(null);
       setEditingId(recipe.id);
       setName(recipe.name);
       setMealType(
@@ -315,6 +329,7 @@ export default function RecipesPage() {
           }),
         ),
       );
+      reveal(editorRef);
     } catch (err) {
       setMessage(
         err instanceof Error
@@ -409,7 +424,9 @@ export default function RecipesPage() {
   }, [draftIngredients, ingredients]);
 
   function openCookDialog(recipe: Recipe) {
+    setMealDraft(null);
     setCookRecipe(recipe);
+    reveal(actionPanelRef);
     setCookPortions("1");
     setMessage(null);
   }
@@ -517,6 +534,7 @@ export default function RecipesPage() {
       const initialScale =
         1 / recipeServings;
 
+      setCookRecipe(null);
       setMealDraft({
         recipeId: recipe.id,
         name: recipe.name,
@@ -535,6 +553,7 @@ export default function RecipesPage() {
             }),
           ),
       });
+      reveal(actionPanelRef);
     } catch (err) {
       setMessage(
         err instanceof Error
@@ -763,6 +782,39 @@ export default function RecipesPage() {
     }
   }
 
+  async function rateRecipe(
+    recipe: Recipe,
+    field: "taste_rating" | "ease_rating",
+    rating: number,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    setMessage(null);
+
+    try {
+      await updateRecipe(
+        recipe.id,
+        { [field]: rating },
+        accessToken,
+      );
+      setRecipes((current) =>
+        current.map((item) =>
+          item.id === recipe.id
+            ? { ...item, [field]: rating }
+            : item,
+        ),
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a salvare la valutazione.",
+      );
+    }
+  }
+
   async function handleRecipeImage(
     file: File,
   ) {
@@ -964,7 +1016,7 @@ export default function RecipesPage() {
       ) : null}
 
       {cookRecipe ? (
-        <section className={styles.editorCard}>
+        <section ref={actionPanelRef} className={styles.editorCard}>
           <div className={styles.sectionHeader}>
             <div>
               <p className={styles.kicker}>
@@ -1019,7 +1071,7 @@ export default function RecipesPage() {
       ) : null}
 
       {mealDraft ? (
-        <section className={styles.editorCard}>
+        <section ref={actionPanelRef} className={styles.editorCard}>
           <div className={styles.sectionHeader}>
             <div>
               <p className={styles.kicker}>
@@ -1322,12 +1374,38 @@ export default function RecipesPage() {
                     </strong>
 
                     <div className={styles.recipeNutrition}>
-                      <span className={styles.recipeRating}>
-                        Gusto <strong>{recipe.taste_rating ?? "—"}/5</strong>
-                      </span>
-                      <span className={styles.recipeRating}>
-                        Facilità <strong>{recipe.ease_rating ?? "—"}/5</strong>
-                      </span>
+                      <div className={styles.recipeRating}>
+                        <span>Gusto</span>
+                        <div aria-label={`Valuta il gusto di ${recipe.name}`}>
+                          {[1, 2, 3, 4, 5].map((rating) => (
+                            <button
+                              key={rating}
+                              type="button"
+                              aria-label={`${rating} su 5`}
+                              className={rating <= Number(recipe.taste_rating || 0) ? styles.starActive : styles.star}
+                              onClick={() => void rateRecipe(recipe, "taste_rating", rating)}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className={styles.recipeRating}>
+                        <span>Facilità</span>
+                        <div aria-label={`Valuta la facilità di ${recipe.name}`}>
+                          {[1, 2, 3, 4, 5].map((rating) => (
+                            <button
+                              key={rating}
+                              type="button"
+                              aria-label={`${rating} su 5`}
+                              className={rating <= Number(recipe.ease_rating || 0) ? styles.starActive : styles.star}
+                              onClick={() => void rateRecipe(recipe, "ease_rating", rating)}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <span>
                         <strong>
                           {Math.round(
@@ -1501,7 +1579,7 @@ export default function RecipesPage() {
       </section>
 
 
-<section className={styles.editorCard}>
+<section ref={editorRef} className={styles.editorCard}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>

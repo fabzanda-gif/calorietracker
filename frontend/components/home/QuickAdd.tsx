@@ -18,7 +18,7 @@ import {
   type LoggedMeal,
 } from "@/lib/api/meals";
 import {
-  getRecipes,
+  getAvailableRecipes,
   type Recipe,
 } from "@/lib/api/recipes";
 import { createWeight } from "@/lib/api/weight";
@@ -208,6 +208,10 @@ export function QuickAdd({
     useState<KnownMeal[]>([]);
   const [showKnownMeals, setShowKnownMeals] =
     useState(false);
+  const [knownMealsLoading, setKnownMealsLoading] =
+    useState(false);
+  const [knownMealsLoaded, setKnownMealsLoaded] =
+    useState(false);
 
   const [calories, setCalories] =
     useState("");
@@ -285,8 +289,10 @@ export function QuickAdd({
     let active = true;
 
     async function loadKnownMeals() {
+      setKnownMealsLoading(true);
+
       const [recipes, history] = await Promise.all([
-        getRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
+        getAvailableRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
         getMealHistory(accessToken).catch(() => ({ count: 0, items: [] })),
       ]);
 
@@ -310,6 +316,8 @@ export function QuickAdd({
       });
 
       setKnownMeals(choices);
+      setKnownMealsLoaded(true);
+      setKnownMealsLoading(false);
     }
 
     void loadKnownMeals();
@@ -1112,17 +1120,17 @@ export function QuickAdd({
                 setShowKnownMeals(true);
               }}
               onFocus={() => setShowKnownMeals(true)}
-              onBlur={() => {
-                window.setTimeout(() => setShowKnownMeals(false), 120);
-              }}
               autoComplete="off"
               role="combobox"
               aria-expanded={showKnownMeals && knownMealSuggestions.length > 0}
               aria-autocomplete="list"
             />
 
-            {showKnownMeals && knownMealSuggestions.length ? (
+            {showKnownMeals ? (
               <div className={styles.knownMealSuggestions} role="listbox">
+                {knownMealsLoading ? (
+                  <p>Carico ricette e pasti recenti…</p>
+                ) : null}
                 {knownMealSuggestions.map((meal) => (
                   <button
                     key={meal.key}
@@ -1138,6 +1146,13 @@ export function QuickAdd({
                     <b>{Math.round(meal.calories)} kcal</b>
                   </button>
                 ))}
+                {!knownMealsLoading && knownMealsLoaded && !knownMealSuggestions.length ? (
+                  <p>
+                    {name.trim()
+                      ? "Nessuna ricetta o pasto corrispondente."
+                      : "Non ci sono ancora pasti da riutilizzare."}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </label>

@@ -71,6 +71,17 @@ export async function getRecipes(
   );
 }
 
+export async function getAvailableRecipes(
+  accessToken?: string | null,
+): Promise<RecipesResponse> {
+  return apiRequest<RecipesResponse>(
+    "/recipes/available",
+    {
+      accessToken,
+    },
+  );
+}
+
 export async function getRecipe(
   recipeId: string,
   accessToken?: string | null,
@@ -99,7 +110,7 @@ export async function createRecipe(
 
 export async function updateRecipe(
   recipeId: string,
-  input: RecipeWriteInput,
+  input: Partial<RecipeWriteInput>,
   accessToken?: string | null,
 ): Promise<{ updated: boolean; item: Recipe }> {
   return apiRequest(
