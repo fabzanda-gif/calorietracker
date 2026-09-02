@@ -12,7 +12,15 @@ import {
   getIngredients,
   type Ingredient,
 } from "@/lib/api/ingredients";
-import { createMeal } from "@/lib/api/meals";
+import {
+  createMeal,
+  getMealHistory,
+  type LoggedMeal,
+} from "@/lib/api/meals";
+import {
+  getRecipes,
+  type Recipe,
+} from "@/lib/api/recipes";
 import { createWeight } from "@/lib/api/weight";
 
 import styles from "./QuickAdd.module.css";
@@ -43,6 +51,52 @@ interface IngredientRow {
   ingredientId: string;
   amount: string;
   unitMode: "g" | "unit";
+}
+
+type KnownMeal = {
+  key: string;
+  name: string;
+  mealType: string;
+  quantityMode: "portion" | "grams";
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  source: "Ricetta" | "Cronologia";
+};
+
+function recipeKnownMeal(recipe: Recipe): KnownMeal {
+  const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
+
+  return {
+    key: `recipe-${recipe.id}`,
+    name: recipe.name,
+    mealType: recipe.meal_type || "Pranzo",
+    quantityMode: "portion",
+    calories: Number(recipe.calories || 0) / servings,
+    protein: Number(recipe.protein || 0) / servings,
+    carbs: Number(recipe.carbs || 0) / servings,
+    fat: Number(recipe.fat || 0) / servings,
+    source: "Ricetta",
+  };
+}
+
+function historyKnownMeal(meal: LoggedMeal): KnownMeal {
+  const quantity = Math.max(0.01, Number(meal.quantity) || 1);
+  const perHundred = meal.is_per_100g === true;
+  const fallbackFactor = perHundred ? 100 / quantity : 1 / quantity;
+
+  return {
+    key: `history-${meal.id ?? `${meal.date}-${meal.name}`}`,
+    name: meal.base_name || meal.name,
+    mealType: meal.meal_type || "Pranzo",
+    quantityMode: perHundred ? "grams" : "portion",
+    calories: Number(meal.base_calories ?? Number(meal.calories || 0) * fallbackFactor),
+    protein: Number(meal.base_protein ?? Number(meal.protein || 0) * fallbackFactor),
+    carbs: Number(meal.base_carbs ?? Number(meal.carbs || 0) * fallbackFactor),
+    fat: Number(meal.base_fat ?? Number(meal.fat || 0) * fallbackFactor),
+    source: "Cronologia",
+  };
 }
 
 
@@ -150,6 +204,10 @@ export function QuickAdd({
 
   const [name, setName] =
     useState("");
+  const [knownMeals, setKnownMeals] =
+    useState<KnownMeal[]>([]);
+  const [showKnownMeals, setShowKnownMeals] =
+    useState(false);
 
   const [calories, setCalories] =
     useState("");
@@ -201,6 +259,79 @@ export function QuickAdd({
 
   const [message, setMessage] =
     useState<string | null>(null);
+
+  const knownMealSuggestions = useMemo(() => {
+    const query = name.trim().toLocaleLowerCase("it");
+
+    return knownMeals
+      .filter((meal) => {
+        const snack = ["spuntino", "snack"].includes(
+          meal.mealType.toLocaleLowerCase("it"),
+        );
+        const compatible = mode === "snack" ? snack : !snack;
+
+        return compatible && (
+          !query || meal.name.toLocaleLowerCase("it").includes(query)
+        );
+      })
+      .slice(0, 8);
+  }, [knownMeals, mode, name]);
+
+  useEffect(() => {
+    if ((mode !== "meal" && mode !== "snack") || !accessToken) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadKnownMeals() {
+      const [recipes, history] = await Promise.all([
+        getRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
+        getMealHistory(accessToken).catch(() => ({ count: 0, items: [] })),
+      ]);
+
+      if (!active) {
+        return;
+      }
+
+      const seen = new Set<string>();
+      const choices = [
+        ...recipes.items.map(recipeKnownMeal),
+        ...history.items.map(historyKnownMeal),
+      ].filter((meal) => {
+        const key = meal.name.trim().toLocaleLowerCase("it");
+
+        if (!key || seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+
+      setKnownMeals(choices);
+    }
+
+    void loadKnownMeals();
+
+    return () => {
+      active = false;
+    };
+  }, [mode, accessToken]);
+
+  function selectKnownMeal(meal: KnownMeal) {
+    setName(meal.name);
+    setMealType(meal.mealType === "Spuntino" ? "Pranzo" : meal.mealType);
+    setQuantityMode(meal.quantityMode);
+    setMealQuantity(meal.quantityMode === "grams" ? "100" : "1");
+    setCalories(String(Math.round(meal.calories * 10) / 10));
+    setProtein(String(Math.round(meal.protein * 10) / 10));
+    setCarbs(String(Math.round(meal.carbs * 10) / 10));
+    setFat(String(Math.round(meal.fat * 10) / 10));
+    setMealEntryMode("quick");
+    setShowKnownMeals(false);
+    setMessage(null);
+  }
 
 
   useEffect(() => {
@@ -966,7 +1097,7 @@ export function QuickAdd({
             </label>
           ) : null}
 
-          <label>
+          <label className={styles.knownMealField}>
             <span>
               Nome del pasto
             </span>
@@ -978,8 +1109,37 @@ export function QuickAdd({
                 setName(
                   event.target.value,
                 );
+                setShowKnownMeals(true);
               }}
+              onFocus={() => setShowKnownMeals(true)}
+              onBlur={() => {
+                window.setTimeout(() => setShowKnownMeals(false), 120);
+              }}
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={showKnownMeals && knownMealSuggestions.length > 0}
+              aria-autocomplete="list"
             />
+
+            {showKnownMeals && knownMealSuggestions.length ? (
+              <div className={styles.knownMealSuggestions} role="listbox">
+                {knownMealSuggestions.map((meal) => (
+                  <button
+                    key={meal.key}
+                    type="button"
+                    role="option"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectKnownMeal(meal)}
+                  >
+                    <span>
+                      <strong>{meal.name}</strong>
+                      <small>{meal.source} · {meal.mealType}</small>
+                    </span>
+                    <b>{Math.round(meal.calories)} kcal</b>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </label>
 
           {mealEntryMode === "quick" ? (

@@ -33,6 +33,8 @@ export interface Recipe {
   notes?: string | null;
   ingredients_json?: unknown;
   image_url?: string | null;
+  taste_rating?: number | null;
+  ease_rating?: number | null;
   structured_ingredients?: StructuredRecipeIngredient[];
 }
 
@@ -48,6 +50,8 @@ export interface RecipeWriteInput {
   recipe_servings?: number | null;
   image_url?: string | null;
   notes?: string | null;
+  taste_rating?: number | null;
+  ease_rating?: number | null;
   structured_ingredients: Array<{
     ingredient_id: string;
     quantity: number;

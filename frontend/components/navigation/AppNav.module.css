@@ -126,6 +126,17 @@
   line-height: 1;
 }
 
+.desktopIcon svg,
+.mobileIcon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .separator {
   height: 1px;
   margin: 18px 14px;

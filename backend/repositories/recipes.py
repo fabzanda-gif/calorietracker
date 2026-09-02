@@ -8,7 +8,7 @@ from .base import BaseRepository, RepositoryError
 RECIPE_COLUMNS = (
     "id,user_id,name,meal_type,category,recipe_servings,"
     "calories,protein,carbs,fat,notes,ingredients_json,"
-    "is_shared,image_url,created_at"
+    "is_shared,image_url,taste_rating,ease_rating,created_at"
 )
 
 

@@ -26,7 +26,12 @@ const ITEMS = [
   {
     href: "/progress",
     label: "Progressi",
-    icon: "▥",
+    icon: (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M4 18 9 13l3 3 7-8" />
+        <path d="M14 8h5v5" />
+      </svg>
+    ),
   },
 ];
 

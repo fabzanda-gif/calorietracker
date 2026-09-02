@@ -90,6 +90,10 @@ export default function RecipesPage() {
     useState("Cena");
   const [servings, setServings] =
     useState("1");
+  const [tasteRating, setTasteRating] =
+    useState("");
+  const [easeRating, setEaseRating] =
+    useState("");
 
   const [imageUrl, setImageUrl] =
     useState<string | null>(null);
@@ -120,6 +124,8 @@ export default function RecipesPage() {
 
   const [recipeMealFilter, setRecipeMealFilter] =
     useState("Tutte");
+  const [recipeSort, setRecipeSort] =
+    useState<"recent" | "taste" | "ease">("recent");
 
 
   const [mealDraft, setMealDraft] =
@@ -167,7 +173,7 @@ export default function RecipesPage() {
       .trim()
       .toLocaleLowerCase("it");
 
-    return recipes.filter((recipe) => {
+    const matches = recipes.filter((recipe) => {
       const recipeType =
         String(
           recipe.meal_type || "",
@@ -203,10 +209,21 @@ export default function RecipesPage() {
 
       return searchableText.includes(query);
     });
+
+    if (recipeSort === "taste") {
+      return matches.sort((a, b) => Number(b.taste_rating || 0) - Number(a.taste_rating || 0));
+    }
+
+    if (recipeSort === "ease") {
+      return matches.sort((a, b) => Number(b.ease_rating || 0) - Number(a.ease_rating || 0));
+    }
+
+    return matches;
   }, [
     recipes,
     recipeSearch,
     recipeMealFilter,
+    recipeSort,
   ]);
 
   useEffect(() => {
@@ -250,6 +267,8 @@ export default function RecipesPage() {
     setName("");
     setMealType("Cena");
     setServings("1");
+    setTasteRating("");
+    setEaseRating("");
     setImageUrl(null);
     setNotes("");
     setDraftIngredients([]);
@@ -279,6 +298,8 @@ export default function RecipesPage() {
       setServings(
         String(recipe.recipe_servings || 1),
       );
+      setTasteRating(recipe.taste_rating ? String(recipe.taste_rating) : "");
+      setEaseRating(recipe.ease_rating ? String(recipe.ease_rating) : "");
       setImageUrl(
         recipe.image_url || null,
       );
@@ -802,6 +823,8 @@ export default function RecipesPage() {
         ),
       image_url: imageUrl,
       notes: notes.trim() || null,
+      taste_rating: tasteRating ? Number(tasteRating) : null,
+      ease_rating: easeRating ? Number(easeRating) : null,
       structured_ingredients:
         draftIngredients.map((item) => ({
           ingredient_id:
@@ -1251,6 +1274,14 @@ export default function RecipesPage() {
               ? "ricetta"
               : "ricette"}
           </div>
+          <label className={styles.recipeSort}>
+            <span>Ordina</span>
+            <select value={recipeSort} onChange={(event) => setRecipeSort(event.target.value as "recent" | "taste" | "ease")}>
+              <option value="recent">Più recenti</option>
+              <option value="taste">Gusto</option>
+              <option value="ease">Facilità</option>
+            </select>
+          </label>
         </div>
 
         {loading ? (
@@ -1291,6 +1322,12 @@ export default function RecipesPage() {
                     </strong>
 
                     <div className={styles.recipeNutrition}>
+                      <span className={styles.recipeRating}>
+                        Gusto <strong>{recipe.taste_rating ?? "—"}/5</strong>
+                      </span>
+                      <span className={styles.recipeRating}>
+                        Facilità <strong>{recipe.ease_rating ?? "—"}/5</strong>
+                      </span>
                       <span>
                         <strong>
                           {Math.round(
@@ -1562,6 +1599,23 @@ export default function RecipesPage() {
                 );
               }}
             />
+          </label>
+        </div>
+
+        <div className={styles.twoColumns}>
+          <label className={styles.field}>
+            Gusto
+            <select value={tasteRating} onChange={(event) => setTasteRating(event.target.value)}>
+              <option value="">Non valutato</option>
+              {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
+            </select>
+          </label>
+          <label className={styles.field}>
+            Facilità
+            <select value={easeRating} onChange={(event) => setEaseRating(event.target.value)}>
+              <option value="">Non valutata</option>
+              {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
+            </select>
           </label>
         </div>
 

@@ -675,6 +675,32 @@
   font-size: 0.72rem;
 }
 
+.recipeRating {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #fff0ef;
+  color: #102846 !important;
+}
+
+.recipeSort {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #778392;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.recipeSort select {
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid #deded8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #153354;
+  font: inherit;
+}
+
 .recipeDescription {
   margin-top: 10px !important;
 
@@ -812,6 +838,7 @@
 
   grid-template-columns:
     minmax(240px, 1fr)
+    auto
     auto
     auto;
 
@@ -1121,6 +1148,12 @@
   .recipeResultCount {
     grid-column: 2;
     grid-row: 1;
+  }
+
+  .recipeSort {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: flex-end;
   }
 }
 
