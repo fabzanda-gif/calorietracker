@@ -35,6 +35,7 @@ import {
   confirmConversationalMeal,
   deleteMeal,
   getMeal,
+  getMealHistory,
   getMealsForDate,
   previewConversationalMeal,
   previewPhotoMeal,
@@ -387,6 +388,8 @@ export function HomeShell() {
     useState<LoggedMeal | null>(null);
   const [actualMeals, setActualMeals] =
     useState<LoggedMeal[]>([]);
+  const [mealHistory, setMealHistory] =
+    useState<LoggedMeal[]>([]);
 
   const [actualActivities, setActualActivities] =
     useState<Activity[]>([]);
@@ -465,6 +468,27 @@ export function HomeShell() {
       ),
     [actualMeals],
   );
+
+  const recentMealChoices = useMemo(() => {
+    const seen = new Set<string>();
+
+    return mealHistory.filter((meal) => {
+      const name = (meal.base_name || meal.name || "").trim();
+
+      if (!name) {
+        return false;
+      }
+
+      const key = `${meal.meal_type.toLowerCase()}::${name.toLowerCase()}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  }, [mealHistory]);
 
   useEffect(() => {
     if (
@@ -847,6 +871,7 @@ export function HomeShell() {
           weightHistoryPayload,
           dayHistoryPayload,
           profilePayload,
+          mealHistoryPayload,
         ] = await Promise.all([
           getDay(
             date,
@@ -888,6 +913,10 @@ export function HomeShell() {
             accessToken,
           ),
           getProfile(accessToken),
+          getMealHistory(accessToken).catch(() => ({
+            count: 0,
+            items: [],
+          })),
         ]);
 
         const nextMealOptionsPayload =
@@ -914,6 +943,7 @@ export function HomeShell() {
               : null,
           );
           setActualMeals(mealsPayload.items);
+          setMealHistory(mealHistoryPayload.items);
           setActualActivities(
             activitiesPayload.items,
           );
@@ -1234,6 +1264,7 @@ export function HomeShell() {
       nextMealPayload,
       mealsPayload,
       activitiesPayload,
+      mealHistoryPayload,
     ] = await Promise.all([
       getDay(date, accessToken),
       getDayBudget(date, accessToken),
@@ -1249,6 +1280,10 @@ export function HomeShell() {
         date,
         accessToken,
       ),
+      getMealHistory(accessToken).catch(() => ({
+        count: 0,
+        items: [],
+      })),
     ]);
 
     const nextMealOptionsPayload =
@@ -1271,6 +1306,7 @@ export function HomeShell() {
         : null,
     );
     setActualMeals(mealsPayload.items);
+    setMealHistory(mealHistoryPayload.items);
     setActualActivities(
       activitiesPayload.items,
     );
@@ -2526,6 +2562,37 @@ export function HomeShell() {
             </div>
 
             <div className={styles.conversationControls}>
+              {conversationMode === "text" && recentMealChoices.length ? (
+                <label className={styles.recentMealPicker}>
+                  <span>Inserimento rapido</span>
+                  <select
+                    defaultValue=""
+                    aria-label="Scegli un pasto già registrato"
+                    onChange={(event) => {
+                      const index = Number(event.target.value);
+                      const meal = recentMealChoices[index];
+
+                      if (!meal) {
+                        return;
+                      }
+
+                      setConversationMealType(meal.meal_type || "Pranzo");
+                      setConversationText(meal.base_name || meal.name);
+                      setConversationPreview(null);
+                      setConversationError(null);
+                      setConversationSuccess(null);
+                    }}
+                  >
+                    <option value="">Scegli tra i pasti recenti…</option>
+                    {recentMealChoices.map((meal, index) => (
+                      <option key={`${meal.id ?? index}-${meal.meal_type}`} value={index}>
+                        {meal.name} · {meal.meal_type}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
               <select
                 value={conversationMealType}
                 onChange={(event) =>

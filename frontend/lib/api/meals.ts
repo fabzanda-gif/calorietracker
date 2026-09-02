@@ -45,12 +45,28 @@ export interface MealsForDateResponse {
   items: LoggedMeal[];
 }
 
+export interface MealHistoryResponse {
+  count: number;
+  items: LoggedMeal[];
+}
+
 export function getMealsForDate(
   dayDate: string,
   accessToken?: string | null,
 ): Promise<MealsForDateResponse> {
   return apiRequest<MealsForDateResponse>(
     `/meals/${encodeURIComponent(dayDate)}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function getMealHistory(
+  accessToken?: string | null,
+): Promise<MealHistoryResponse> {
+  return apiRequest<MealHistoryResponse>(
+    "/meals/history",
     {
       accessToken,
     },

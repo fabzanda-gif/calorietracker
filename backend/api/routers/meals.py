@@ -274,7 +274,7 @@ def get_meal_history(
     repo: MealsRepository = Depends(get_meals_repository),
 ):
     try:
-        meals = repo.list_history_compatible(current_user.id)
+        meals, _enhanced = repo.list_history_compatible(current_user.id)
 
         return {
             "count": len(meals),

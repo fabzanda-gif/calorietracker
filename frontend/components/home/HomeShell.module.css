@@ -3637,6 +3637,19 @@
   gap: 8px;
 }
 
+.recentMealPicker {
+  display: grid;
+  gap: 6px;
+}
+
+.recentMealPicker > span {
+  color: #68768a;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .conversationControls select,
 .conversationControls textarea {
   width: 100%;
