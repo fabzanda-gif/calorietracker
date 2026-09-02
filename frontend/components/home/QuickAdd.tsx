@@ -65,6 +65,45 @@ type KnownMeal = {
   source: "Ricetta" | "Cronologia";
 };
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 12000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error("Tempo di caricamento scaduto")),
+      timeoutMs,
+    );
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
+function mergeKnownMeals(current: KnownMeal[], incoming: KnownMeal[]): KnownMeal[] {
+  const seen = new Set<string>();
+
+  return [...current, ...incoming]
+    .sort((a, b) =>
+      Number(b.source === "Ricetta") - Number(a.source === "Ricetta"),
+    )
+    .filter((meal) => {
+      const key = meal.name.trim().toLocaleLowerCase("it");
+
+      if (!key || seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+}
+
 function recipeKnownMeal(recipe: Recipe): KnownMeal {
   const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
 
@@ -290,34 +329,35 @@ export function QuickAdd({
 
     async function loadKnownMeals() {
       setKnownMealsLoading(true);
+      setKnownMealsLoaded(false);
+      setKnownMeals([]);
 
-      const [recipes, history] = await Promise.all([
-        getAvailableRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
-        getMealHistory(accessToken).catch(() => ({ count: 0, items: [] })),
-      ]);
+      let settled = 0;
 
-      if (!active) {
-        return;
-      }
-
-      const seen = new Set<string>();
-      const choices = [
-        ...recipes.items.map(recipeKnownMeal),
-        ...history.items.map(historyKnownMeal),
-      ].filter((meal) => {
-        const key = meal.name.trim().toLocaleLowerCase("it");
-
-        if (!key || seen.has(key)) {
-          return false;
+      function finish(items: KnownMeal[]) {
+        if (!active) {
+          return;
         }
 
-        seen.add(key);
-        return true;
-      });
+        settled += 1;
 
-      setKnownMeals(choices);
-      setKnownMealsLoaded(true);
-      setKnownMealsLoading(false);
+        if (items.length) {
+          setKnownMeals((current) => mergeKnownMeals(current, items));
+          setKnownMealsLoading(false);
+          setKnownMealsLoaded(true);
+        } else if (settled === 2) {
+          setKnownMealsLoading(false);
+          setKnownMealsLoaded(true);
+        }
+      }
+
+      void withTimeout(getAvailableRecipes(accessToken))
+        .then((response) => finish(response.items.map(recipeKnownMeal)))
+        .catch(() => finish([]));
+
+      void withTimeout(getMealHistory(accessToken))
+        .then((response) => finish(response.items.map(historyKnownMeal)))
+        .catch(() => finish([]));
     }
 
     void loadKnownMeals();
