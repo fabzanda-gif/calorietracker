@@ -2035,8 +2035,10 @@ export function HomeShell() {
                   </div>
 
                   <span className={styles.budgetPositive}>
-                    {budget.consumed_kcal <=
-                    budget.daily_budget_kcal
+                    {budget.consumed_kcal === 0
+                      ? "Budget disponibile"
+                      : budget.consumed_kcal <=
+                        budget.daily_budget_kcal
                       ? "Stai rispettando il tuo deficit"
                       : budget.consumed_kcal <
                         maintenanceBudgetKcal
@@ -2109,17 +2111,27 @@ export function HomeShell() {
                     Stato di oggi
                   </span>
 
-                  <span className={styles.budgetStatusRow}>
+                  <span
+                    className={`${styles.budgetStatusRow} ${
+                      budget.consumed_kcal === 0
+                        ? styles.budgetStatusPending
+                        : ""
+                    }`}
+                  >
                     <span
                       className={styles.budgetStatusIcon}
                       aria-hidden="true"
                     >
-                      ✓
+                      {budget.consumed_kcal === 0
+                        ? "○"
+                        : "✓"}
                     </span>
 
                     <strong>
-                      {budget.consumed_kcal <
-                      maintenanceBudgetKcal
+                      {budget.consumed_kcal === 0
+                        ? "Giornata da iniziare"
+                        : budget.consumed_kcal <
+                          maintenanceBudgetKcal
                         ? "Deficit in corso"
                         : "Mantenimento raggiunto"}
                     </strong>

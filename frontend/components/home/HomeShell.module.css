@@ -192,7 +192,7 @@
 .proteinTop {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-end;
   gap: 18px;
 }
 
@@ -238,7 +238,7 @@
 .sectionHeader {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-end;
   gap: 16px;
 }
 
@@ -5290,4 +5290,362 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+
+/* ==========================================================
+   HOME FOCUS ENERGIA V1
+   Desktop: più corallo.
+   Tablet/mobile: struttura narrativa del mockup.
+   ========================================================== */
+
+/* Palette Standard più energica */
+.page:not(.pageZero) .conversationCard {
+  border-color: #ffd2ce;
+  background:
+    linear-gradient(
+      135deg,
+      #fff5f3 0%,
+      #fffafa 58%,
+      #ffffff 100%
+    );
+  box-shadow:
+    0 14px 34px rgba(244, 103, 96, 0.1);
+}
+
+.page:not(.pageZero) .mealsSection {
+  border-color: #f3ddd9;
+}
+
+.page:not(.pageZero) .mealsSection .mealCard {
+  border-color: #f4d3cf;
+  background:
+    linear-gradient(
+      155deg,
+      #fff9f7,
+      #ffffff 62%
+    );
+}
+
+.page:not(.pageZero)
+  .mealsSection
+  .mealCard:hover {
+  border-color: #f49a94;
+  box-shadow:
+    0 10px 24px rgba(244, 103, 96, 0.11);
+}
+
+.page:not(.pageZero) .goalValue {
+  background:
+    linear-gradient(
+      135deg,
+      #fff2f0,
+      #faf9f6
+    );
+}
+
+.page:not(.pageZero) .insightWidget {
+  border-color: #eee0dc;
+}
+
+.page:not(.pageZero) .periodBadge {
+  border-color: #efc9c4;
+  background: #fff8f6;
+  color: #a74c47;
+  cursor: pointer;
+}
+
+/* Tablet: ordine e densità del mockup */
+@media (min-width: 701px) and (max-width: 1099px) {
+  .page {
+    width: min(940px, calc(100% - 36px));
+    margin: 0 auto;
+    padding-top: 30px;
+  }
+
+  .desktopHomeGrid {
+    display: grid;
+    grid-template-columns:
+      repeat(12, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .desktopHomeGrid
+    .dashboardWidget[data-widget-size] {
+    grid-column: 1 / -1 !important;
+  }
+
+  .conversationCard {
+    order: 0 !important;
+    display: grid;
+    grid-template-columns:
+      minmax(210px, 0.82fr)
+      minmax(0, 1.45fr);
+    gap: 16px 22px;
+    padding: 22px;
+  }
+
+  .conversationCard .widgetControls {
+    grid-column: 1 / -1;
+  }
+
+  .conversationHeader {
+    grid-column: 1;
+    grid-row: span 2;
+    align-self: center;
+  }
+
+  .conversationModeSwitch,
+  .conversationControls {
+    grid-column: 2;
+  }
+
+  .conversationPreview,
+  .conversationError,
+  .conversationSuccess {
+    grid-column: 1 / -1;
+  }
+
+  .conversationAiLogo {
+    width: 50px;
+    height: 50px;
+  }
+
+  .mealsSection {
+    order: 1 !important;
+  }
+
+  .desktopHomeGrid .mealsSection .mealList {
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .desktopHomeGrid .mealCard {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .mealsSection .mealName {
+    font-size: 0.88rem;
+  }
+
+  .mealsSection .mealMeta {
+    font-size: 0.7rem;
+  }
+
+  .quickAddWidget {
+    order: 2 !important;
+  }
+
+  .summaryWidget {
+    order: 3 !important;
+  }
+
+  .weightWidget {
+    order: 4 !important;
+    grid-column: span 7 !important;
+  }
+
+  .goalWidget {
+    order: 5 !important;
+    grid-column: span 5 !important;
+  }
+
+  .decisionSection {
+    order: 6 !important;
+  }
+
+  .dashboardToolbar {
+    margin-top: 12px;
+  }
+}
+
+/* Mobile: stessa gerarchia in formato compatto */
+@media (max-width: 700px) {
+  .page {
+    width: min(100% - 24px, 620px);
+    margin: 0 auto;
+    padding-top: 22px;
+  }
+
+  .desktopHomeGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .conversationCard {
+    order: 0 !important;
+    width: 100%;
+    margin: 0;
+    padding: 18px;
+  }
+
+  .mealsSection {
+    order: 1 !important;
+    width: 100%;
+    padding: 16px;
+  }
+
+  .mealsSection .mealList {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mealsSection .mealCard {
+    min-height: 0;
+    padding: 13px;
+    border-radius: 15px;
+  }
+
+  .mealIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .mealsSection .mealLabel {
+    font-size: 0.76rem;
+  }
+
+  .mealsSection .mealName {
+    font-size: 0.84rem;
+  }
+
+  .mealsSection .mealMeta {
+    font-size: 0.68rem;
+  }
+
+  .quickAddWidget {
+    order: 2 !important;
+  }
+
+  .summaryWidget {
+    order: 3 !important;
+  }
+
+  .weightWidget {
+    order: 4 !important;
+  }
+
+  .goalWidget {
+    order: 5 !important;
+  }
+
+  .decisionSection {
+    order: 6 !important;
+  }
+
+  .insightWidget,
+  .summaryWidget > *,
+  .quickAddWidget > * {
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 430px) {
+  .mealsSection .mealList {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* FIX TABLET — spazio riservato alla sidebar desktop */
+@media (min-width: 760px) and (max-width: 1099px) {
+  .page {
+    width: calc(100vw - 236px);
+    max-width: none;
+    margin: 0 0 0 236px;
+    padding:
+      28px 22px
+      80px;
+    box-sizing: border-box;
+  }
+
+  .header,
+  .dayIntro,
+  .budgetHero,
+  .errorCard,
+  .dashboardToolbar,
+  .desktopHomeGrid {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
+  .header h1 {
+    font-size:
+      clamp(2.4rem, 6vw, 3.5rem);
+  }
+
+  .budgetHero {
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 759px) {
+  .page {
+    width: min(100% - 28px, 720px);
+    margin: 0 auto;
+  }
+}
+
+
+/* HOME FOCUS ENERGIA — rifiniture tablet e pasti */
+.budgetStatusPending strong {
+  color: #ff6965 !important;
+}
+
+.budgetStatusPending .budgetStatusIcon {
+  border-color: #ff6965;
+  color: #ff6965;
+}
+
+.mealsSection .replanningCompact {
+  min-height: 0;
+  padding: 8px 10px;
+  gap: 7px;
+  border-radius: 10px;
+}
+
+.mealsSection .replanningCompactIcon {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  font-size: 0.68rem;
+}
+
+.mealsSection .replanningCompact strong {
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+.mealsSection .replanningCompact p {
+  display: none;
+}
+
+@media (min-width: 760px) and (max-width: 1099px) {
+  .header h1 {
+    max-width: 100%;
+    font-size:
+      clamp(2.35rem, 4vw, 3.25rem);
+    white-space: nowrap;
+  }
+
+  .greetingWave {
+    margin-left: 8px;
+    font-size: 0.46em;
+  }
+}
+
+@media (max-width: 500px) {
+  .header h1 {
+    font-size:
+      clamp(2rem, 11vw, 2.8rem);
+  }
+
+  .greetingWave {
+    display: none;
+  }
 }
