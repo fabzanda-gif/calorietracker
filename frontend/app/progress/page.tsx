@@ -434,6 +434,50 @@ function WeightChart({
   );
 }
 
+function HeroWeightChart({ items }: { items: WeightEntry[] }) {
+  if (items.length < 2) {
+    return (
+      <div className={styles.heroChartEmpty}>
+        Registra almeno due pesate per vedere la direzione.
+      </div>
+    );
+  }
+
+  const width = 560;
+  const height = 170;
+  const padding = 18;
+  const values = items.map((item) => Number(item.weight));
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const spread = Math.max(1, maximum - minimum);
+  const xFor = (index: number) =>
+    padding + (index / (items.length - 1)) * (width - padding * 2);
+  const yFor = (value: number) =>
+    padding + (1 - (value - minimum) / spread) * (height - padding * 2);
+  const points = values
+    .map((value, index) => `${xFor(index)},${yFor(value)}`)
+    .join(" ");
+
+  return (
+    <div className={styles.heroChartWrap}>
+      <div className={styles.heroChartTitle}>
+        <span>Andamento peso · ultimi 90 giorni</span>
+        <strong>{formatWeight(values[0])} → {formatWeight(values[values.length - 1])} kg</strong>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Trend del peso negli ultimi 90 giorni">
+        {[0.25, 0.5, 0.75].map((ratio) => (
+          <line key={ratio} x1={padding} x2={width - padding} y1={height * ratio} y2={height * ratio} className={styles.heroGridLine} />
+        ))}
+        <polyline points={points} fill="none" className={styles.heroTrendLine} />
+        {items.map((item, index) => (
+          <circle key={`${item.id}-hero`} cx={xFor(index)} cy={yFor(Number(item.weight))} r="3.5" className={styles.heroTrendPoint} />
+        ))}
+      </svg>
+      <div className={styles.heroChartDates}><span>90 giorni fa</span><span>Oggi</span></div>
+    </div>
+  );
+}
+
 function DailyMetricsChart({
   items,
   metric,
@@ -1719,9 +1763,9 @@ export default function ProgressPage() {
       ) : null}
 
       <section className={styles.hero}>
-        <div>
+        <div className={styles.heroSummary}>
           <p className={styles.kicker}>
-            Peso
+            Peso attuale
           </p>
 
           <div className={styles.currentWeight}>
@@ -1749,7 +1793,16 @@ export default function ProgressPage() {
               Nessuna misurazione disponibile.
             </p>
           )}
+          <div className={styles.directionNote}>
+            <span aria-hidden="true">↘</span>
+            <div>
+              <strong>{stats && stats.change < 0 ? "Direzione costante" : "Il trend prende forma"}</strong>
+              <small>Conta la direzione, non la singola giornata.</small>
+            </div>
+          </div>
         </div>
+
+        <HeroWeightChart items={visibleItems} />
 
         <form
           className={styles.weightForm}
@@ -1796,13 +1849,21 @@ export default function ProgressPage() {
         </form>
       </section>
 
-      <section className={styles.chartSection}>
+      <section className={styles.topStatsGrid}>
+        <article><span className={styles.statIcon}>↗</span><div><strong>{stats ? `${stats.change > 0 ? "+" : ""}${formatWeight(stats.change)} kg` : "—"}</strong><span>Variazione nel periodo</span></div></article>
+        <article><span className={styles.statIcon}>▣</span><div><strong>{stats?.count ?? 0}</strong><span>Misurazioni totali</span></div></article>
+        <article><span className={`${styles.statIcon} ${styles.statIconWarm}`}>◎</span><div><strong>{nutritionStats?.days_with_budget ? `${nutritionStats.days_within_budget}/${nutritionStats.days_with_budget}` : "—"}</strong><span>Giorni nel budget</span></div></article>
+        <article><span className={`${styles.statIcon} ${styles.statIconLilac}`}>◇</span><div><strong>{macroStats ? `${roundKcal(macroStats.protein)} g` : "—"}</strong><span>Proteine medie</span></div></article>
+      </section>
+
+      <section className={styles.overviewSection}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
-              Andamento
+              La tua storia
             </p>
-            <h2>Il tuo peso nel tempo</h2>
+            <h2>Il quadro completo</h2>
+            <p className={styles.sectionSubtitle}>Peso, bilancio calorico e abitudini letti insieme.</p>
           </div>
 
           <div
@@ -1827,57 +1888,25 @@ export default function ProgressPage() {
             ))}
           </div>
         </div>
-
-        {loading ? (
-          <div className={styles.loadingChart}>
-            Carico lo storico…
+        <div className={styles.overviewGrid}>
+          <div className={styles.overviewChart}>
+            {loading ? <div className={styles.loadingChart}>Carico lo storico…</div> : <WeightChart items={visibleItems} />}
           </div>
-        ) : (
-          <WeightChart
-            items={visibleItems}
-          />
-        )}
+          <aside className={styles.insightPanel}>
+            <p className={styles.kicker}>Insight</p>
+            <h3>Cosa sta funzionando</h3>
+            {progressInsights.length ? progressInsights.slice(0, 3).map((insight, index) => (
+              <article key={`${insight.eyebrow}-summary-${index}`}>
+                <span aria-hidden="true">{index === 0 ? "↓" : index === 1 ? "◔" : "✓"}</span>
+                <div><strong>{insight.title}</strong><p>{insight.body}</p></div>
+              </article>
+            )) : <p className={styles.muted}>Continua a registrare: presto troverai qui una lettura dei tuoi progressi.</p>}
+            <Link href="#nutrition-detail" className={styles.insightLink}>Vedi dettaglio nutrizione →</Link>
+          </aside>
+        </div>
       </section>
 
-      <section className={styles.statsGrid}>
-        <article>
-          <span>Minimo</span>
-          <strong>
-            {stats
-              ? `${formatWeight(stats.min)} kg`
-              : "—"}
-          </strong>
-        </article>
-
-        <article>
-          <span>Massimo</span>
-          <strong>
-            {stats
-              ? `${formatWeight(stats.max)} kg`
-              : "—"}
-          </strong>
-        </article>
-
-        <article>
-          <span>Variazione</span>
-          <strong>
-            {stats
-              ? `${stats.change > 0 ? "+" : ""}${formatWeight(
-                  stats.change,
-                )} kg`
-              : "—"}
-          </strong>
-        </article>
-
-        <article>
-          <span>Misurazioni</span>
-          <strong>
-            {stats?.count ?? 0}
-          </strong>
-        </article>
-      </section>
-
-      <section className={styles.analyticsSection}>
+      <section className={styles.analyticsSection} id="nutrition-detail">
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
@@ -2162,59 +2191,27 @@ export default function ProgressPage() {
           </article>
         </section>
       )}
-      {progressInsights.length ? (
-        <section className={styles.insightsSection}>
-          <div className={styles.insightsHeader}>
-            <div>
-              <p className={styles.kicker}>
-                Insight
-              </p>
-
-              <h2>
-                Cosa sta succedendo
-              </h2>
-
-              <p className={styles.sectionSubtitle}>
-                Una lettura semplice dei dati che hai
-                registrato.
-              </p>
-            </div>
-          </div>
-
-          <div className={styles.insightsGrid}>
-            {progressInsights.map(
-              (insight, index) => (
-                <article
-                  key={`${insight.eyebrow}-${index}`}
-                  className={`${styles.insightCard} ${
-                    insight.tone === "coral"
-                      ? styles.insightCardCoral
-                      : insight.tone === "navy"
-                        ? styles.insightCardNavy
-                        : styles.insightCardNeutral
-                  }`}
-                >
-                  <span
-                    className={
-                      styles.insightEyebrow
-                    }
-                  >
-                    {insight.eyebrow}
-                  </span>
-
-                  <strong>
-                    {insight.title}
-                  </strong>
-
-                  <p>
-                    {insight.body}
-                  </p>
-                </article>
-              ),
-            )}
-          </div>
-        </section>
-      ) : null}
+      <section className={styles.consistencySection}>
+        <div>
+          <p className={styles.kicker}>Costanza</p>
+          <h2>Gli ultimi 7 giorni</h2>
+          <p className={styles.sectionSubtitle}>Una settimana è fatta di direzioni, non di giornate perfette.</p>
+        </div>
+        <div className={styles.consistencyDays}>
+          {(nutrition?.items ?? []).slice(-7).map((item) => {
+            const difference = item.difference_kcal;
+            const state = difference === null ? "empty" : difference > 100 ? "surplus" : difference < -100 ? "deficit" : "maintenance";
+            return (
+              <article key={`consistency-${item.date}`}>
+                <span className={`${styles.dayRing} ${styles[`dayRing_${state}`]}`}>{state === "deficit" ? "↓" : state === "surplus" ? "↑" : state === "maintenance" ? "=" : "·"}</span>
+                <strong>{new Date(`${item.date}T00:00:00`).toLocaleDateString("it-IT", { weekday: "short" })}</strong>
+                <small>{formatDate(item.date)}</small>
+              </article>
+            );
+          })}
+          {!nutrition?.items.length ? <p className={styles.muted}>Nessun dato disponibile per questa settimana.</p> : null}
+        </div>
+      </section>
 
       </main>
     </>
