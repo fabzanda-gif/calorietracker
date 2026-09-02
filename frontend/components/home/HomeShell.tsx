@@ -838,13 +838,10 @@ export function HomeShell() {
         const [
           dayPayload,
           budgetPayload,
-          briefingPayload,
           nextMealPayload,
           mealsPayload,
           activitiesPayload,
           latestWeightPayload,
-          weightHistoryPayload,
-          dayHistoryPayload,
           profilePayload,
         ] = await Promise.all([
           getDay(
@@ -855,13 +852,6 @@ export function HomeShell() {
             date,
             accessToken,
           ),
-          getDayBriefing(
-            date,
-            briefingMoment(),
-            experienceMode,
-            briefingHour,
-            accessToken,
-          ).catch(() => null),
           getNextMeal(
             date,
             accessToken,
@@ -877,41 +867,13 @@ export function HomeShell() {
           getLatestWeight(
             accessToken,
           ),
-          getWeightHistory(
-            accessToken,
-          ).catch(() => ({
-            count: 0,
-            items: [],
-          })),
-          getDayHistory(
-            accessToken,
-          ),
           getProfile(accessToken),
         ]);
-
-        const nextMealOptionsPayload =
-          nextMealPayload.next_slot
-            ? await getMealOptions(
-                date,
-                nextMealPayload.next_slot,
-                "auto",
-                accessToken,
-              )
-            : null;
 
         if (active) {
           setDay(dayPayload);
           setBudgetResult(budgetPayload);
-          setDayBriefing(
-            briefingPayload?.message ?? null,
-          );
           setNextMeal(nextMealPayload);
-          setNextMealOptions(nextMealOptionsPayload);
-          setDinnerOptions(
-            nextMealPayload.next_slot === "dinner"
-              ? nextMealOptionsPayload
-              : null,
-          );
           setActualMeals(mealsPayload.items);
           setActualActivities(
             activitiesPayload.items,
@@ -922,18 +884,12 @@ export function HomeShell() {
               ? Number(latestWeightPayload.item.weight)
               : null,
           );
-          setWeightHistory(
-            weightHistoryPayload.items,
-          );
           setActualDinner(
             mealsPayload.items.find(
               (meal) => meal.meal_type === "Cena",
             ) ?? null,
           );
 
-          setDayHistory(
-            dayHistoryPayload,
-          );
           setProfile(profilePayload);
 
           const metadata = profilePayload.metadata;
@@ -944,6 +900,49 @@ export function HomeShell() {
               !metadata.goal_mode ||
               latestWeightPayload.item?.weight == null,
           );
+
+          // The usable home is ready. AI briefing, recommendations and
+          // history are enhancements and must never hold up first paint.
+          setLoading(false);
+
+          void getDayBriefing(
+            date,
+            briefingMoment(),
+            experienceMode,
+            briefingHour,
+            accessToken,
+          ).then((payload) => {
+            if (active) setDayBriefing(payload.message);
+          }).catch(() => undefined);
+
+          if (nextMealPayload.next_slot) {
+            void getMealOptions(
+              date,
+              nextMealPayload.next_slot,
+              "auto",
+              accessToken,
+            ).then((payload) => {
+              if (!active) return;
+              setNextMealOptions(payload);
+              setDinnerOptions(
+                nextMealPayload.next_slot === "dinner"
+                  ? payload
+                  : null,
+              );
+            }).catch(() => undefined);
+          }
+
+          void getWeightHistory(accessToken)
+            .then((payload) => {
+              if (active) setWeightHistory(payload.items);
+            })
+            .catch(() => undefined);
+
+          void getDayHistory(accessToken)
+            .then((payload) => {
+              if (active) setDayHistory(payload);
+            })
+            .catch(() => undefined);
         }
       } catch (err) {
         if (active) {

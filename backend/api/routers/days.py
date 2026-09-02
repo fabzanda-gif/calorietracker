@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date as Date
 from datetime import datetime
+import hashlib
+import json
 import time
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -11,6 +13,7 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
+    get_day_briefings_repository,
     get_optional_decision_selections_repository,
     get_meal_prep_repository,
     get_meals_repository,
@@ -21,6 +24,7 @@ from backend.api.dependencies import (
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.day_briefings import DayBriefingsRepository
 from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
@@ -788,6 +792,9 @@ def get_day_briefing(
     weight_repo: WeightRepository = Depends(
         get_weight_repository
     ),
+    briefing_repo: DayBriefingsRepository = Depends(
+        get_day_briefings_repository
+    ),
 ):
     try:
         day = _build_day(
@@ -904,24 +911,42 @@ def get_day_briefing(
         ),
     }
 
-    effective_hour = (
-        hour
-        if hour is not None
-        else datetime.now().hour
-    )
-
     activity_signature = (
         _briefing_activity_signature(
             training_activities
         )
     )
 
+    input_signature = hashlib.sha256(
+        json.dumps(
+            {**payload, "activity_signature": activity_signature},
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    try:
+        persisted = briefing_repo.get(
+            current_user.id, day_date, moment, mode
+        )
+    except RepositoryError:
+        persisted = None
+
+    if persisted and persisted.get("input_signature") == input_signature:
+        return {
+            "date": str(day_date),
+            "mode": mode,
+            "message": persisted.get("message") or "",
+            "source": persisted.get("source") or "fallback",
+            "cached": True,
+        }
+
     cache_key = (
         current_user.id,
         str(day_date),
         mode,
         moment,
-        effective_hour,
         payload["day_type"],
         payload["activity_level"],
         payload["status_hint"],
@@ -976,6 +1001,22 @@ def get_day_briefing(
         "source": source,
         "cached": False,
     }
+
+    try:
+        briefing_repo.save({
+            "user_id": current_user.id,
+            "date": str(day_date),
+            "moment": moment,
+            "mode": mode,
+            "input_signature": input_signature,
+            "message": message,
+            "source": source,
+            "updated_at": datetime.utcnow().isoformat(),
+        })
+    except RepositoryError:
+        # Briefings remain available even before/while the cache migration is
+        # deployed; the in-process cache below is the graceful fallback.
+        pass
 
     if len(_DAY_BRIEFING_CACHE) >= 512:
         _DAY_BRIEFING_CACHE.clear()

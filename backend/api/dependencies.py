@@ -16,6 +16,7 @@ from supabase import Client, create_client
 
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.day_briefings import DayBriefingsRepository
 from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.ingredients import IngredientsRepository
 from backend.repositories.meal_ingredients import MealIngredientsRepository
@@ -242,6 +243,12 @@ def get_daily_logs_repository(
     return DailyLogsRepository(supabase)
 
 
+def get_day_briefings_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> DayBriefingsRepository:
+    return DayBriefingsRepository(supabase)
+
+
 def get_recipes_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> RecipesRepository:
@@ -292,4 +299,3 @@ def get_weekly_schedule_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> WeeklyScheduleRepository:
     return WeeklyScheduleRepository(supabase)
-
