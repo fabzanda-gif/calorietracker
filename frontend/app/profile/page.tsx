@@ -16,6 +16,11 @@ import {
   type WeeklyScheduleContext,
 } from "@/lib/api/profile";
 
+import {
+  getOuraAuthorization,
+  getOuraStatus,
+} from "@/lib/api/oura";
+
 import styles from "./ProfilePage.module.css";
 
 function firstNameValue(value: unknown): string {
@@ -132,6 +137,12 @@ export default function ProfilePage() {
     useState<string | null>(null);
   const [success, setSuccess] =
     useState<string | null>(null);
+  const [ouraConnected, setOuraConnected] =
+    useState(false);
+  const [ouraStatusLoading, setOuraStatusLoading] =
+    useState(true);
+  const [ouraConnecting, setOuraConnecting] =
+    useState(false);
 
   const [currentWeekSchedule, setCurrentWeekSchedule] =
     useState<Record<string, WeeklyScheduleContext> | null>(null);
@@ -275,6 +286,45 @@ export default function ProfilePage() {
     const token = accessToken;
     let active = true;
 
+    async function loadOuraStatus() {
+      try {
+        setOuraStatusLoading(true);
+
+        const response = await getOuraStatus(
+          token,
+        );
+
+        if (active) {
+          setOuraConnected(
+            response.connected,
+          );
+        }
+      } catch {
+        if (active) {
+          setOuraConnected(false);
+        }
+      } finally {
+        if (active) {
+          setOuraStatusLoading(false);
+        }
+      }
+    }
+
+    void loadOuraStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    const token = accessToken;
+    let active = true;
+
     async function loadCurrentWeek() {
       try {
         const weekStart = getCurrentWeekStart();
@@ -387,6 +437,33 @@ export default function ProfilePage() {
       [field]: value,
     }));
     setSuccess(null);
+  }
+
+  async function connectOura() {
+    if (!accessToken) {
+      return;
+    }
+
+    setOuraConnecting(true);
+    setError(null);
+
+    try {
+      const response =
+        await getOuraAuthorization(
+          accessToken,
+        );
+
+      window.location.assign(
+        response.authorization_url,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossibile collegare Oura.",
+      );
+      setOuraConnecting(false);
+    }
   }
 
   async function handleSubmit(
@@ -902,31 +979,35 @@ export default function ProfilePage() {
               <div className={styles.integrations}>
                 <div className={styles.integration}>
                   <div>
-                    <strong>Strava</strong>
-                    <span>
-                      Attività e allenamenti
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled
-                  >
-                    Collega
-                  </button>
-                </div>
-
-                <div className={styles.integration}>
-                  <div>
                     <strong>Oura</strong>
                     <span>
                       Sonno, recupero e attività
                     </span>
+                    <small>
+                      {ouraStatusLoading
+                        ? "Ver connessione…"
+                        : ouraConnected
+                        ? "Account collegato"
+                        : "Account non collegato"}
+                    </small>
                   </div>
+
                   <button
                     type="button"
-                    disabled
+                    disabled={
+                      ouraStatusLoading ||
+                      ouraConnecting ||
+                      ouraConnected
+                    }
+                    onClick={() => {
+                      void connectOura();
+                    }}
                   >
-                    Collega
+                    {ouraConnecting
+                      ? "Apro Oura…"
+                      : ouraConnected
+                      ? "Connesso"
+                      : "Collega"}
                   </button>
                 </div>
               </div>

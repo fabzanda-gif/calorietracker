@@ -21,6 +21,9 @@ from backend.repositories.ingredients import IngredientsRepository
 from backend.repositories.meal_ingredients import MealIngredientsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
+from backend.repositories.oura_connections import (
+    OuraConnectionsRepository,
+)
 from backend.repositories.recipe_ingredients import RecipeIngredientsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
@@ -172,6 +175,24 @@ def get_current_user(
         )
 
 
+@lru_cache(maxsize=1)
+def get_admin_supabase_client() -> Client:
+    url, _ = _supabase_settings()
+    secret_key = os.getenv(
+        "SUPABASE_SERVICE_ROLE_KEY"
+    )
+
+    if not secret_key:
+        raise RuntimeError(
+            "Missing SUPABASE_SERVICE_ROLE_KEY"
+        )
+
+    return create_client(
+        url,
+        secret_key,
+    )
+
+
 def get_authenticated_supabase(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Client:
@@ -179,6 +200,16 @@ def get_authenticated_supabase(
     client = create_client(url, key)
     client.postgrest.auth(current_user.access_token)
     return client
+
+
+def get_oura_connections_repository(
+    supabase: Client = Depends(
+        get_admin_supabase_client
+    ),
+) -> OuraConnectionsRepository:
+    return OuraConnectionsRepository(
+        supabase
+    )
 
 
 def get_meals_repository(
