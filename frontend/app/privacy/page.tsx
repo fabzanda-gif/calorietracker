@@ -2,7 +2,7 @@ import Link from "next/link";
 import styles from "../legal.module.css";
 
 const sections = [
-  ["1. Titolare e contatti", <>SanoSync è gestito da Fabio Zanda. Per richieste sulla privacy, accesso ai dati o cancellazione dell’account scrivi a <a href="mailto:fab.zanda@gmail.com">fab.zanda@gmail.com</a>.</>],
+  ["1. Titolare e contatti", <>SanoSync è gestito da Fabio Zanda. Per richieste sulla privacy, accesso ai dati o cancellazione dell’account scrivi a <a href="mailto:info@sanosync.app">info@sanosync.app</a>.</>],
   ["2. Dati trattati", <>Trattiamo dati identificativi e di accesso, informazioni del profilo, età, genere scelto per il calcolo, altezza, peso, obiettivi, pasti, attività, preferenze e contenuti inviati alle funzioni AI. Se colleghi Oura, riceviamo soltanto i dati compresi nelle autorizzazioni che concedi.</>],
   ["3. Finalità e basi giuridiche", <>Usiamo i dati per autenticarti, calcolare il piano, registrare le attività, personalizzare l’esperienza, proteggere il servizio e rispondere alle richieste. Il trattamento è necessario per erogare il servizio; per integrazioni facoltative e dati potenzialmente relativi alla salute ci basiamo sul tuo consenso, revocabile in ogni momento.</>],
   ["4. Servizi e destinatari", <>SanoSync utilizza fornitori di autenticazione e database (Supabase), hosting (Vercel e Render), elaborazione AI (Groq e, dove abilitato, OpenAI) e integrazioni scelte dall’utente, come Oura. Condividiamo solo quanto necessario e non vendiamo dati personali.</>],

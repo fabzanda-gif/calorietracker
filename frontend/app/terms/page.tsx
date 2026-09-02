@@ -10,7 +10,7 @@ const sections = [
   ["6. Servizi di terze parti", <>Collegamenti come Oura e i servizi di autenticazione o hosting restano soggetti ai termini dei rispettivi fornitori. SanoSync non controlla la loro disponibilità.</>],
   ["7. Disponibilità e responsabilità", <>Il servizio è fornito secondo disponibilità. Nei limiti consentiti dalla legge non garantiamo assenza di errori o continuità. Restano impregiudicati i diritti inderogabili riconosciuti al consumatore.</>],
   ["8. Sospensione e chiusura", <>Puoi smettere di usare il servizio e richiedere la cancellazione dell’account. Possiamo sospendere account utilizzati in violazione di questi Termini, con misure proporzionate.</>],
-  ["9. Modifiche e contatti", <>Le modifiche sostanziali saranno pubblicate con una nuova data di aggiornamento. Per domande scrivi a <a href="mailto:fab.zanda@gmail.com">fab.zanda@gmail.com</a>.</>],
+  ["9. Modifiche e contatti", <>Le modifiche sostanziali saranno pubblicate con una nuova data di aggiornamento. Per domande scrivi a <a href="mailto:info@sanosync.app">info@sanosync.app</a>.</>],
 ];
 
 export default function TermsPage() {
