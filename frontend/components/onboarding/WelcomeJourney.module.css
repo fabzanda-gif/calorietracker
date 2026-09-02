@@ -42,6 +42,7 @@
 .actions .back { background: transparent; color: #102846; border: 1px solid #dcd9d2; }
 .error { margin: 16px 0 0; padding: 12px; border-radius: 12px; background: #fff0ef; color: #a52d2a; }
 .consent { margin: 14px 0 0; color: #7b8490; text-align: right; font-size: 0.72rem; }
+.consent a { color: #d94d4a; font-weight: 800; }
 
 @media (max-width: 600px) {
   .backdrop { align-items: start; padding: 12px; }

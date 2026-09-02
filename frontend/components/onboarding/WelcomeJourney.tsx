@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import { updateProfile } from "@/lib/api/profile";
 import { createWeight } from "@/lib/api/weight";
@@ -176,7 +177,9 @@ export function WelcomeJourney({
               </button>
             </div>
             <p className={styles.consent}>
-              Continuando confermi di aver letto Privacy e Termini.
+              Continuando confermi di aver letto la
+              {" "}<Link href="/privacy">Privacy Policy</Link> e i
+              {" "}<Link href="/terms">Termini e condizioni</Link>.
             </p>
           </form>
         )}

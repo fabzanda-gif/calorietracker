@@ -223,6 +223,12 @@
 .field input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255, 105, 100, 0.12); }
 .button { margin-top: 3px; color: #fff; background: var(--navy); }
 .error { margin: 0; padding: 10px 12px; border-radius: 10px; color: #9f3030; background: #fff0ee; font-size: 0.82rem; line-height: 1.4; }
+.success { margin: 0; padding: 10px 12px; border-radius: 10px; color: #28633b; background: #edf8ef; font-size: 0.82rem; line-height: 1.4; }
+.legalConsent { display: grid; grid-template-columns: 18px 1fr; gap: 9px; align-items: start; color: #687587; font-size: .75rem; line-height: 1.45; }
+.legalConsent input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--coral); }
+.legalConsent a, .legalFooter a { color: var(--navy); font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+.authSwitch { margin: -8px 0 0; display: flex; justify-content: center; gap: 6px; color: #667287; font-size: .82rem; }
+.authSwitch button { padding: 0; border: 0; background: transparent; color: var(--coral); font: inherit; font-weight: 850; cursor: pointer; }
 .securityNote {
   margin: -3px 0 0;
   display: flex;
@@ -233,6 +239,7 @@
   font-size: 0.72rem;
 }
 .securityNote span { color: #4d9f68; font-weight: 900; }
+.legalFooter { margin-top: -12px; display: flex; justify-content: center; gap: 8px; color: #9a9b96; font-size: .7rem; }
 
 @media (max-width: 1050px) {
   .page { padding-inline: 28px; }

@@ -71,20 +71,45 @@ function ProductPreview() {
 }
 
 export function LoginCard() {
-  const { signInWithPassword, signInWithGoogle } = useAuth();
+  const {
+    signInWithPassword,
+    signInWithGoogle,
+    signUpWithPassword,
+  } = useAuth();
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setMessage(null);
     try {
-      await signInWithPassword(email.trim(), password);
+      if (mode === "signup") {
+        const needsConfirmation = await signUpWithPassword(
+          email.trim(),
+          password,
+        );
+        if (needsConfirmation) {
+          setMessage(
+            "Controlla la tua email e conferma l’account per iniziare.",
+          );
+        }
+      } else {
+        await signInWithPassword(email.trim(), password);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Accesso non riuscito");
+      setError(
+        err instanceof Error
+          ? err.message
+          : mode === "signup"
+          ? "Registrazione non riuscita"
+          : "Accesso non riuscito",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -93,6 +118,7 @@ export function LoginCard() {
   async function handleGoogleSignIn() {
     setSubmitting(true);
     setError(null);
+    setMessage(null);
     try {
       await signInWithGoogle();
     } catch (err) {
@@ -139,11 +165,22 @@ export function LoginCard() {
         <section className={styles.loginPanel} aria-labelledby="login-title">
           <p className={styles.brand}>SANOSYNC</p>
           <div className={styles.heading}>
-            <h2 id="login-title">Bentornato.</h2>
-            <p>Accedi con lo stesso account che usi su SanoSync.</p>
+            <h2 id="login-title">
+              {mode === "signup" ? "Inizia da qui." : "Bentornato."}
+            </h2>
+            <p>
+              {mode === "signup"
+                ? "Crea il tuo account e configura il tuo primo piano."
+                : "Accedi con lo stesso account che usi su SanoSync."}
+            </p>
           </div>
           <button className={styles.googleButton} type="button" disabled={submitting} onClick={handleGoogleSignIn}>
-            <GoogleIcon /><span>Continua con Google</span>
+            <GoogleIcon />
+            <span>
+              {mode === "signup"
+                ? "Registrati con Google"
+                : "Continua con Google"}
+            </span>
           </button>
           <div className={styles.divider}><span>oppure</span></div>
           <form className={styles.form} onSubmit={handleSubmit}>
@@ -153,17 +190,48 @@ export function LoginCard() {
             </label>
             <label className={styles.field}>
               <span>Password</span>
-              <input type="password" autoComplete="current-password" placeholder="La tua password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+              <input type="password" minLength={8} autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder={mode === "signup" ? "Almeno 8 caratteri" : "La tua password"} required value={password} onChange={(event) => setPassword(event.target.value)} />
             </label>
+            {mode === "signup" ? (
+              <label className={styles.legalConsent}>
+                <input type="checkbox" required />
+                <span>
+                  Accetto i <Link href="/terms">Termini e condizioni</Link>
+                  {" "}e dichiaro di aver letto la
+                  {" "}<Link href="/privacy">Privacy Policy</Link>.
+                </span>
+              </label>
+            ) : null}
             {error ? <p className={styles.error} role="alert">{error}</p> : null}
+            {message ? <p className={styles.success} role="status">{message}</p> : null}
             <button className={styles.button} type="submit" disabled={submitting}>
-              {submitting ? "Accesso…" : "Accedi"}
+              {submitting
+                ? mode === "signup" ? "Creazione account…" : "Accesso…"
+                : mode === "signup" ? "Crea account" : "Accedi"}
             </button>
           </form>
+          <p className={styles.authSwitch}>
+            {mode === "signup" ? "Hai già un account?" : "Non hai ancora un account?"}
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "signup" ? "login" : "signup");
+                setError(null);
+                setMessage(null);
+              }}
+            >
+              {mode === "signup" ? "Accedi" : "Registrati"}
+            </button>
+          </p>
           <p className={styles.securityNote}>
             <span aria-hidden="true">✓</span>
             I tuoi dati restano privati e sotto il tuo controllo.
           </p>
+          <footer className={styles.legalFooter}>
+            <Link href="/privacy">Privacy Policy</Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/terms">Termini e condizioni</Link>
+          </footer>
         </section>
       </div>
     </main>
