@@ -1,0 +1,476 @@
+From 9e3a11c129594c3056c3eca6ec0b1de37ac9cedf Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 17:44:38 +0100
+Subject: [PATCH] Add rolling activity overview and energy calendar
+
+---
+ backend/api/routers/activities.py             | 80 ++++++++++++++++-
+ .../app/activities/ActivitiesPage.module.css  | 77 ++++++++++++++++
+ frontend/app/activities/page.tsx              | 88 +++++++++++++++++--
+ frontend/components/navigation/AppNav.tsx     | 10 +--
+ frontend/lib/api/activities.ts                | 25 ++++++
+ 5 files changed, 265 insertions(+), 15 deletions(-)
+
+diff --git a/backend/api/routers/activities.py b/backend/api/routers/activities.py
+index e077e06..a958cb9 100644
+--- a/backend/api/routers/activities.py
++++ b/backend/api/routers/activities.py
+@@ -2,7 +2,7 @@ from __future__ import annotations
+ 
+ import base64
+ import binascii
+-from datetime import date
++from datetime import date, timedelta
+ from pathlib import Path
+ 
+ from fastapi import APIRouter, Depends, HTTPException, Query, status
+@@ -13,11 +13,13 @@ from backend.api.dependencies import (
+     get_activities_repository,
+     get_current_user,
+     get_daily_logs_repository,
++    get_meals_repository,
+     get_weight_repository,
+ )
+ from backend.repositories.activities import ActivitiesRepository
+ from backend.repositories.base import RepositoryError
+ from backend.repositories.daily_logs import DailyLogsRepository
++from backend.repositories.meals import MealsRepository
+ from backend.repositories.weight import WeightRepository
+ from backend.services.gpx_activity import (
+     GpxActivityError,
+@@ -31,11 +33,22 @@ from backend.services.activity_movement import (
+ from backend.services.activity_movement_sync import (
+     ActivityMovementSyncService,
+ )
++from backend.services.profile_goal import ProfileGoalService
+ 
+ 
+ router = APIRouter(prefix="/activities", tags=["activities"])
+ 
+ 
++def _is_training_activity(activity: dict) -> bool:
++    if activity.get("source") == "gpx":
++        return True
++    name = str(activity.get("activity_name") or "").strip().casefold()
++    return not any(
++        name == prefix or name.startswith(f"{prefix} ") or name.startswith(f"{prefix} (")
++        for prefix in ("passi", "steps", "bici", "bicicletta")
++    )
++
++
+ class ActivityCreate(BaseModel):
+     date: date
+     activity_name: str = Field(min_length=1)
+@@ -75,6 +88,71 @@ class GpxImportRequest(GpxPreviewRequest):
+     burned_calories: int | None = Field(default=None, ge=0)
+ 
+ 
++@router.get("/overview")
++def get_activity_overview(
++    start_date: date = Query(...),
++    end_date: date = Query(...),
++    current_user: CurrentUser = Depends(get_current_user),
++    repo: ActivitiesRepository = Depends(get_activities_repository),
++    meals_repo: MealsRepository = Depends(get_meals_repository),
++    weight_repo: WeightRepository = Depends(get_weight_repository),
++):
++    if end_date < start_date or (end_date - start_date).days > 62:
++        raise HTTPException(status_code=400, detail="Invalid overview date range")
++
++    try:
++        activities = repo.list_date_range(current_user.id, start_date, end_date)
++        meals = meals_repo.list_date_range(
++            current_user.id, start_date, end_date,
++            columns="date,calories",
++        )
++        latest_weight = weight_repo.latest(current_user.id)
++        profile = ProfileGoalService().build(
++            current_user.metadata,
++            current_weight=(latest_weight or {}).get("weight"),
++            on_date=end_date,
++        )
++    except RepositoryError as exc:
++        raise HTTPException(status_code=502, detail=str(exc)) from exc
++
++    training = [item for item in activities if _is_training_activity(item)]
++    calories_by_date: dict[str, float] = {}
++    for meal in meals:
++        key = str(meal.get("date") or "")
++        calories_by_date[key] = calories_by_date.get(key, 0) + float(meal.get("calories") or 0)
++    activity_by_date: dict[str, float] = {}
++    for item in training:
++        key = str(item.get("date") or "")
++        activity_by_date[key] = activity_by_date.get(key, 0) + float(item.get("burned_calories") or 0)
++
++    energy_days = []
++    bmr = float(profile.get("bmr") or 0)
++    if bmr > 0:
++        cursor = start_date
++        while cursor <= min(end_date, date.today()):
++            key = str(cursor)
++            if key in calories_by_date:
++                maintenance = bmr * 1.2 + activity_by_date.get(key, 0)
++                balance = round(calories_by_date[key] - maintenance)
++                state = "maintenance" if abs(balance) <= 100 else ("surplus" if balance > 0 else "deficit")
++                energy_days.append({"date": key, "state": state, "balance_kcal": balance})
++            cursor += timedelta(days=1)
++
++    return {
++        "start_date": str(start_date),
++        "end_date": str(end_date),
++        "count": len(activities),
++        "items": activities,
++        "energy_days": energy_days,
++        "summary": {
++            "workouts": len(training),
++            "duration_seconds": sum(int(item.get("duration_seconds") or 0) for item in training),
++            "distance_meters": sum(float(item.get("distance_meters") or 0) for item in training),
++            "burned_calories": sum(int(item.get("burned_calories") or 0) for item in training),
++        },
++    }
++
++
+ @router.get("/range")
+ def get_activities_for_range(
+     start_date: date = Query(...),
+diff --git a/frontend/app/activities/ActivitiesPage.module.css b/frontend/app/activities/ActivitiesPage.module.css
+index b8f761e..a7688c0 100644
+--- a/frontend/app/activities/ActivitiesPage.module.css
++++ b/frontend/app/activities/ActivitiesPage.module.css
+@@ -67,6 +67,43 @@
+   font-weight: 700;
+ }
+ 
++.summarySection {
++  margin-bottom: 20px;
++}
++
++.summaryHeading h2 {
++  margin: 0 0 12px;
++  letter-spacing: -0.035em;
++}
++
++.summaryGrid {
++  display: grid;
++  grid-template-columns: repeat(4, 1fr);
++  gap: 12px;
++}
++
++.summaryGrid > div {
++  padding: 16px 18px;
++  border: 1px solid #e5e2dc;
++  border-radius: 18px;
++  background: #fff;
++  box-shadow: 0 10px 28px rgba(16, 39, 68, 0.05);
++}
++
++.summaryGrid span {
++  display: block;
++  color: #747b84;
++  font-size: 0.72rem;
++  font-weight: 750;
++}
++
++.summaryGrid strong {
++  display: block;
++  margin-top: 5px;
++  color: #102744;
++  font-size: 1.35rem;
++}
++
+ .topGrid,
+ .contentGrid {
+   display: grid;
+@@ -195,6 +232,38 @@
+   transform: translateX(-50%);
+ }
+ 
++.energyState {
++  position: absolute;
++  top: 5px;
++  right: 7px;
++  font-size: 0.95rem;
++  font-weight: 900;
++}
++
++.energyDeficit { color: #35a85b; }
++.energyMaintenance { color: #d99a00; }
++.energySurplus { color: #ff5b57; }
++
++.energyLegend {
++  display: flex;
++  justify-content: center;
++  gap: 22px;
++  margin-top: 14px;
++  font-size: 0.78rem;
++  font-weight: 900;
++}
++
++.energyLegend span {
++  display: flex;
++  gap: 5px;
++}
++
++.energyLegend i {
++  color: #596576;
++  font-style: normal;
++  font-weight: 700;
++}
++
+ .uploadCard {
+   display: flex;
+   flex-direction: column;
+@@ -664,6 +733,10 @@
+   .charts {
+     grid-template-columns: 1fr;
+   }
++
++  .summaryGrid {
++    grid-template-columns: repeat(2, 1fr);
++  }
+ }
+ 
+ @media (max-width: 620px) {
+@@ -694,6 +767,10 @@
+     grid-template-columns: 1fr;
+   }
+ 
++  .summaryGrid {
++    grid-template-columns: 1fr 1fr;
++  }
++
+   .day {
+     border-radius: 9px;
+   }
+diff --git a/frontend/app/activities/page.tsx b/frontend/app/activities/page.tsx
+index 309aac4..510fc17 100644
+--- a/frontend/app/activities/page.tsx
++++ b/frontend/app/activities/page.tsx
+@@ -13,6 +13,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
+ import { AppNav } from "@/components/navigation/AppNav";
+ import {
+   getActivitiesForRange,
++  getActivityOverview,
+   deleteActivity,
+   importGpxActivity,
+   previewGpxActivity,
+@@ -20,6 +21,7 @@ import {
+   type ActivityRoutePoint,
+   type ActivitySeriesPoint,
+   type GpxActivityPreview,
++  type ActivityEnergyDay,
+ } from "@/lib/api/activities";
+ 
+ import styles from "./ActivitiesPage.module.css";
+@@ -438,6 +440,8 @@ export default function ActivitiesPage() {
+   const [activities, setActivities] = useState<
+     Activity[]
+   >([]);
++  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
++  const [energyDays, setEnergyDays] = useState<ActivityEnergyDay[]>([]);
+   const [selectedActivity, setSelectedActivity] =
+     useState<Activity | null>(null);
+   const [selectedDate, setSelectedDate] =
+@@ -483,16 +487,24 @@ export default function ActivitiesPage() {
+ 
+     try {
+       const bounds = monthBounds(month);
+-      const response = await getActivitiesForRange(
+-        bounds.start,
+-        bounds.end,
+-        accessToken,
+-      );
++      const today = new Date();
++      const rollingStart = new Date(today);
++      rollingStart.setDate(today.getDate() - 29);
++      const [response, recentResponse] = await Promise.all([
++        getActivityOverview(bounds.start, bounds.end, accessToken),
++        getActivitiesForRange(isoDate(rollingStart), isoDate(today), accessToken),
++      ]);
+ 
+       const sortedItems = [...response.items].sort(
+         (left, right) => activityTimestamp(right) - activityTimestamp(left),
+       );
+       setActivities(sortedItems);
++      setRecentActivities(
++        [...recentResponse.items].sort(
++          (left, right) => activityTimestamp(right) - activityTimestamp(left),
++        ),
++      );
++      setEnergyDays(response.energy_days);
+ 
+       setSelectedActivity((current) => {
+         const visibleItems = sortedItems.filter(
+@@ -538,6 +550,26 @@ export default function ActivitiesPage() {
+     [activities],
+   );
+ 
++  const rollingTrainingActivities = useMemo(
++    () => recentActivities.filter((activity) => !isDailyMovement(activity)),
++    [recentActivities],
++  );
++
++  const rollingSummary = useMemo(
++    () => ({
++      workouts: rollingTrainingActivities.length,
++      duration: rollingTrainingActivities.reduce((sum, item) => sum + Number(item.duration_seconds ?? 0), 0),
++      distance: rollingTrainingActivities.reduce((sum, item) => sum + Number(item.distance_meters ?? 0), 0),
++      calories: rollingTrainingActivities.reduce((sum, item) => sum + Number(item.burned_calories ?? 0), 0),
++    }),
++    [rollingTrainingActivities],
++  );
++
++  const energyByDate = useMemo(
++    () => new Map(energyDays.map((item) => [item.date, item])),
++    [energyDays],
++  );
++
+   const activitiesByDate = useMemo(() => {
+     const grouped = new Map<string, Activity[]>();
+ 
+@@ -750,15 +782,30 @@ export default function ActivitiesPage() {
+           </div>
+ 
+           <div className={styles.monthTotal}>
+-            <strong>{trainingActivities.length}</strong>
++            <strong>{rollingTrainingActivities.length}</strong>
+             <span>
+-              {trainingActivities.length === 1
+-                ? "allenamento nel mese"
+-                : "allenamenti nel mese"}
++              {rollingTrainingActivities.length === 1
++                ? "allenamento negli ultimi 30 giorni"
++                : "allenamenti negli ultimi 30 giorni"}
+             </span>
+           </div>
+         </header>
+ 
++        <section className={styles.summarySection}>
++          <div className={styles.summaryHeading}>
++            <div>
++              <p className={styles.eyebrow}>Il tuo movimento</p>
++              <h2>Ultimi 30 giorni</h2>
++            </div>
++          </div>
++          <div className={styles.summaryGrid}>
++            <div><span>Allenamenti</span><strong>{rollingSummary.workouts}</strong></div>
++            <div><span>Tempo totale</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
++            <div><span>Distanza</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
++            <div><span>Energia</span><strong>{rollingSummary.calories.toLocaleString("it-IT")} kcal</strong></div>
++          </div>
++        </section>
++
+         {error ? (
+           <div className={styles.error}>{error}</div>
+         ) : null}
+@@ -850,6 +897,7 @@ export default function ActivitiesPage() {
+                   selectedDate === date;
+                 const today =
+                   date === isoDate(new Date());
++                const energy = energyByDate.get(date);
+ 
+                 return (
+                   <button
+@@ -881,6 +929,22 @@ export default function ActivitiesPage() {
+                   >
+                     <span>{day.getDate()}</span>
+ 
++                    {energy ? (
++                      <span
++                        className={`${styles.energyState} ${
++                          energy.state === "deficit"
++                            ? styles.energyDeficit
++                            : energy.state === "surplus"
++                            ? styles.energySurplus
++                            : styles.energyMaintenance
++                        }`}
++                        title={`${energy.state === "deficit" ? "Deficit" : energy.state === "surplus" ? "Surplus" : "Mantenimento"}: ${Math.abs(energy.balance_kcal)} kcal`}
++                        aria-label={energy.state}
++                      >
++                        {energy.state === "deficit" ? "↓" : energy.state === "surplus" ? "↑" : "="}
++                      </span>
++                    ) : null}
++
+                     {active ? (
+                       <span
+                         className={styles.dayActivityIcon}
+@@ -912,6 +976,12 @@ export default function ActivitiesPage() {
+               })}
+             </div>
+ 
++            <div className={styles.energyLegend}>
++              <span className={styles.energyDeficit}>↓ <i>Deficit</i></span>
++              <span className={styles.energyMaintenance}>= <i>Mantenimento</i></span>
++              <span className={styles.energySurplus}>↑ <i>Surplus</i></span>
++            </div>
++
+             {loading ? (
+               <p className={styles.loading}>
+                 Carico il mese…
+diff --git a/frontend/components/navigation/AppNav.tsx b/frontend/components/navigation/AppNav.tsx
+index a5f0b8f..2369c18 100644
+--- a/frontend/components/navigation/AppNav.tsx
++++ b/frontend/components/navigation/AppNav.tsx
+@@ -13,11 +13,6 @@ const ITEMS = [
+     label: "Oggi",
+     icon: "⌂",
+   },
+-  {
+-    href: "/recipes",
+-    label: "Ricette",
+-    icon: "⌑",
+-  },
+   {
+     href: "/activities",
+     label: "Attività",
+@@ -33,6 +28,11 @@ const ITEMS = [
+       </svg>
+     ),
+   },
++  {
++    href: "/recipes",
++    label: "Ricette",
++    icon: "⌑",
++  },
+ ];
+ 
+ const MOBILE_ITEMS = ITEMS;
+diff --git a/frontend/lib/api/activities.ts b/frontend/lib/api/activities.ts
+index 01e4382..8a3d60c 100644
+--- a/frontend/lib/api/activities.ts
++++ b/frontend/lib/api/activities.ts
+@@ -152,6 +152,31 @@ export interface ActivityRangeResponse
+   end_date: string;
+ }
+ 
++export interface ActivityEnergyDay {
++  date: string;
++  state: "deficit" | "maintenance" | "surplus";
++  balance_kcal: number;
++}
++
++export interface ActivityOverviewResponse extends ActivityRangeResponse {
++  energy_days: ActivityEnergyDay[];
++  summary: {
++    workouts: number;
++    duration_seconds: number;
++    distance_meters: number;
++    burned_calories: number;
++  };
++}
++
++export function getActivityOverview(
++  startDate: string,
++  endDate: string,
++  accessToken?: string | null,
++): Promise<ActivityOverviewResponse> {
++  const query = new URLSearchParams({ start_date: startDate, end_date: endDate });
++  return apiRequest<ActivityOverviewResponse>(`/activities/overview?${query.toString()}`, { accessToken });
++}
++
+ export function previewGpxActivity(
+   input: {
+     file_name: string;
+-- 
+2.51.1
+
