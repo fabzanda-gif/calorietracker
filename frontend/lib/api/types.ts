@@ -66,7 +66,12 @@ export interface DayBudget {
 
 export interface NextMealResponse {
   date: string;
-  next_slot: "breakfast" | "lunch" | "dinner" | null;
+  next_slot:
+    | "breakfast"
+    | "lunch"
+    | "snack"
+    | "dinner"
+    | null;
   next_meal_type: string | null;
 }
 

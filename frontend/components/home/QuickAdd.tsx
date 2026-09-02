@@ -34,6 +34,7 @@ interface QuickAddProps {
   date: string;
   accessToken?: string | null;
   latestWeight?: number | null;
+  defaultMealType?: string;
   onSaved: () => Promise<void> | void;
 }
 
@@ -135,6 +136,7 @@ export function QuickAdd({
   date,
   accessToken,
   latestWeight = null,
+  defaultMealType = "Colazione",
   onSaved,
 }: QuickAddProps) {
   const [mode, setMode] =
@@ -144,7 +146,7 @@ export function QuickAdd({
     useState<MealEntryMode>("quick");
 
   const [mealType, setMealType] =
-    useState("Colazione");
+    useState(defaultMealType);
 
   const [name, setName] =
     useState("");
@@ -768,11 +770,14 @@ export function QuickAdd({
           }
           onClick={() => {
             setMessage(null);
-            setMode(
-              mode === "meal"
-                ? null
-                : "meal",
-            );
+
+            if (mode === "meal") {
+              setMode(null);
+              return;
+            }
+
+            setMealType(defaultMealType);
+            setMode("meal");
           }}
         >
           <span className={styles.actionIcon} aria-hidden="true">
@@ -792,11 +797,14 @@ export function QuickAdd({
           }
           onClick={() => {
             setMessage(null);
-            setMode(
-              mode === "snack"
-                ? null
-                : "snack",
-            );
+
+            if (mode === "snack") {
+              setMode(null);
+              return;
+            }
+
+            setMealType("Snack");
+            setMode("snack");
           }}
         >
           <span className={styles.actionIcon} aria-hidden="true">

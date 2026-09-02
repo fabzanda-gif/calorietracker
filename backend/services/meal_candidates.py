@@ -122,6 +122,10 @@ class MealCandidateService:
                     "confidence_level": prediction.get(
                         "confidence_level"
                     ),
+                    "components": prediction.get(
+                        "components",
+                        [],
+                    ),
                 }
             )
 

@@ -59,6 +59,10 @@ import type {
 } from "@/lib/api/types";
 
 import {
+  nextMealType,
+} from "@/lib/mealSlots";
+
+import {
   getLatestWeight,
   getWeightHistory,
   type WeightEntry,
@@ -442,6 +446,35 @@ export function HomeShell() {
     useState(false);
   const [conversationSuccess, setConversationSuccess] =
     useState<string | null>(null);
+
+  const recommendedMealType = useMemo(
+    () =>
+      nextMealType(
+        actualMeals.map(
+          (meal) => meal.meal_type,
+        ),
+      ),
+    [actualMeals],
+  );
+
+  useEffect(() => {
+    if (
+      conversationPreview ||
+      conversationText.trim() ||
+      conversationPhoto
+    ) {
+      return;
+    }
+
+    setConversationMealType(
+      recommendedMealType,
+    );
+  }, [
+    recommendedMealType,
+    conversationPreview,
+    conversationText,
+    conversationPhoto,
+  ]);
 
 
   function resizeDashboardWidget(
@@ -2443,11 +2476,11 @@ export function HomeShell() {
                 <option value="Pranzo">
                   Pranzo
                 </option>
+                <option value="Snack">
+                  Snack
+                </option>
                 <option value="Cena">
                   Cena
-                </option>
-                <option value="Spuntino">
-                  Spuntino
                 </option>
               </select>
 
@@ -3638,6 +3671,7 @@ export function HomeShell() {
               date={todayIso()}
               accessToken={accessToken}
               latestWeight={latestWeight}
+              defaultMealType={recommendedMealType}
               onSaved={refreshHome}
             />
           </div>

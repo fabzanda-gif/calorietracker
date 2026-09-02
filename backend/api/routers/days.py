@@ -165,6 +165,7 @@ def _briefing_activity_signature(
 MEAL_SLOT_TO_TYPE = {
     "breakfast": "Colazione",
     "lunch": "Pranzo",
+    "snack": "Snack",
     "dinner": "Cena",
 }
 

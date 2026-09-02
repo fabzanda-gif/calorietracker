@@ -480,3 +480,94 @@ def test_portion_routine_ignores_gram_based_observation_for_nutrition():
     assert result["estimated_quantity"] == 2
     assert result["estimated_calories"] == 695.5
     assert result["estimated_protein_g"] == 40.9
+
+def test_combination_rows_become_one_meal_routine():
+    meals = []
+
+    for day_date in (
+        "2026-08-28",
+        "2026-08-29",
+        "2026-08-30",
+        "2026-08-31",
+    ):
+        meals.extend([
+            {
+                "date": day_date,
+                "meal_type": "Colazione",
+                "name": "Latte macchiato d'avena",
+                "calories": 120,
+                "protein": 2,
+                "carbs": 18,
+                "fat": 4,
+            },
+            {
+                "date": day_date,
+                "meal_type": "Colazione",
+                "name": "Cheesecake",
+                "calories": 283,
+                "protein": 15,
+                "carbs": 25,
+                "fat": 12,
+            },
+        ])
+
+    logs = [
+        {
+            "date": day_date,
+            "day_type": (
+                "home"
+                if index % 2 == 0
+                else "free"
+            ),
+        }
+        for index, day_date in enumerate((
+            "2026-08-28",
+            "2026-08-29",
+            "2026-08-30",
+            "2026-08-31",
+        ))
+    ]
+
+    result = predict(
+        meals,
+        logs,
+        context="home",
+    )
+
+    assert result["value"] == (
+        "Cheesecake + "
+        "Latte macchiato d'avena"
+    )
+    assert result["confidence_level"] == "high"
+    assert result["estimated_calories"] == 403
+    assert len(result["components"]) == 2
+
+
+def test_home_and_free_share_breakfast_context():
+    result = predict(
+        [
+            {
+                "date": "2026-08-30",
+                "meal_type": "Colazione",
+                "name": "Latte d'avena",
+                "calories": 120,
+            },
+            {
+                "date": "2026-08-30",
+                "meal_type": "Colazione",
+                "name": "Cheesecake",
+                "calories": 280,
+            },
+        ],
+        [
+            {
+                "date": "2026-08-30",
+                "day_type": "free",
+            }
+        ],
+        context="home",
+    )
+
+    assert result["state"] == "predicted"
+    assert "Latte d'avena" in result["value"]
+    assert "Cheesecake" in result["value"]
