@@ -1,6 +1,7 @@
 "use client";
 
 import { AppNav } from "@/components/navigation/AppNav";
+import { WelcomeJourney } from "@/components/onboarding/WelcomeJourney";
 import { QuickAdd } from "@/components/home/QuickAdd";
 import {
   DayPlanner,
@@ -67,6 +68,10 @@ import {
   getWeightHistory,
   type WeightEntry,
 } from "@/lib/api/weight";
+import {
+  getProfile,
+  type ProfileResponse,
+} from "@/lib/api/profile";
 
 import styles from "./HomeShell.module.css";
 
@@ -388,6 +393,10 @@ export function HomeShell() {
 
   const [latestWeight, setLatestWeight] =
     useState<number | null>(null);
+  const [profile, setProfile] =
+    useState<ProfileResponse | null>(null);
+  const [showWelcomeJourney, setShowWelcomeJourney] =
+    useState(false);
   const [weightHistory, setWeightHistory] =
     useState<WeightEntry[]>([]);
 
@@ -837,6 +846,7 @@ export function HomeShell() {
           latestWeightPayload,
           weightHistoryPayload,
           dayHistoryPayload,
+          profilePayload,
         ] = await Promise.all([
           getDay(
             date,
@@ -877,6 +887,7 @@ export function HomeShell() {
           getDayHistory(
             accessToken,
           ),
+          getProfile(accessToken),
         ]);
 
         const nextMealOptionsPayload =
@@ -924,6 +935,16 @@ export function HomeShell() {
           setDayHistory(
             dayHistoryPayload,
           );
+          setProfile(profilePayload);
+
+          const metadata = profilePayload.metadata;
+          setShowWelcomeJourney(
+            !metadata.gender ||
+              !metadata.birth_date ||
+              !metadata.height ||
+              !metadata.goal_mode ||
+              latestWeightPayload.item?.weight == null,
+          );
         }
       } catch (err) {
         if (active) {
@@ -949,6 +970,8 @@ export function HomeShell() {
 
   const budget =
     budgetResult?.budget ?? null;
+
+  const bmr = Number(budgetResult?.profile?.bmr ?? 0);
 
   const burnedCalories = actualActivities.reduce(
     (total, activity) =>
@@ -1919,6 +1942,17 @@ export function HomeShell() {
     <>
       <AppNav experienceMode={experienceMode} />
 
+      {showWelcomeJourney && accessToken ? (
+        <WelcomeJourney
+          accessToken={accessToken}
+          initialName={
+            typeof profile?.metadata?.name === "string"
+              ? profile.metadata.name
+              : firstName
+          }
+        />
+      ) : null}
+
       <main
         className={
           experienceMode === "zero"
@@ -2086,6 +2120,25 @@ export function HomeShell() {
                         maintenanceBudgetKcal
                       ? "Sei ancora in deficit"
                       : "Hai raggiunto il mantenimento"}
+                  </span>
+                </div>
+
+                <div className={styles.budgetDivider} />
+
+                <div className={styles.budgetColumn}>
+                  <span className={styles.budgetLabel}>
+                    Metabolismo basale
+                  </span>
+
+                  <div className={styles.budgetValueRow}>
+                    <strong className={styles.budgetMainValue}>
+                      {bmr > 0 ? roundNumber(bmr) : "—"}
+                    </strong>
+                    <span className={styles.budgetKcal}>kcal</span>
+                  </div>
+
+                  <span className={styles.budgetSecondary}>
+                    BMR giornaliero
                   </span>
                 </div>
 

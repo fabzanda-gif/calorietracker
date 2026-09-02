@@ -1,83 +1,27 @@
+import Link from "next/link";
+import styles from "../legal.module.css";
+
+const sections = [
+  ["1. Accettazione e requisiti", <>Creando un account o utilizzando SanoSync accetti questi Termini e la Privacy Policy. Devi avere almeno 18 anni, fornire informazioni accurate e mantenere sicure le credenziali.</>],
+  ["2. Il servizio", <>SanoSync offre strumenti per registrare alimentazione, peso e attività, organizzare obiettivi e visualizzare stime personalizzate. Funzioni, disponibilità e integrazioni possono cambiare nel tempo.</>],
+  ["3. Non è un servizio medico", <>Calorie, BMR, nutrienti, suggerimenti e contenuti generati sono stime informative e non costituiscono diagnosi, terapia o consiglio medico. Non usare SanoSync per emergenze o decisioni sanitarie. Consulta un professionista prima di cambiare dieta o attività, soprattutto in presenza di patologie, gravidanza o disturbi alimentari.</>],
+  ["4. Responsabilità dell’utente", <>Sei responsabile dei dati inseriti, dell’uso delle stime e delle autorizzazioni concesse. È vietato usare il servizio illegalmente, tentare accessi non autorizzati o interferire con la sicurezza della piattaforma.</>],
+  ["5. Intelligenza artificiale", <>Alcune funzioni interpretano testi o immagini tramite sistemi AI. I risultati possono essere incompleti o inesatti: controlla sempre ingredienti, quantità, allergeni e valori nutrizionali.</>],
+  ["6. Servizi di terze parti", <>Collegamenti come Oura e i servizi di autenticazione o hosting restano soggetti ai termini dei rispettivi fornitori. SanoSync non controlla la loro disponibilità.</>],
+  ["7. Disponibilità e responsabilità", <>Il servizio è fornito secondo disponibilità. Nei limiti consentiti dalla legge non garantiamo assenza di errori o continuità. Restano impregiudicati i diritti inderogabili riconosciuti al consumatore.</>],
+  ["8. Sospensione e chiusura", <>Puoi smettere di usare il servizio e richiedere la cancellazione dell’account. Possiamo sospendere account utilizzati in violazione di questi Termini, con misure proporzionate.</>],
+  ["9. Modifiche e contatti", <>Le modifiche sostanziali saranno pubblicate con una nuova data di aggiornamento. Per domande scrivi a <a href="mailto:fab.zanda@gmail.com">fab.zanda@gmail.com</a>.</>],
+];
+
 export default function TermsPage() {
-  return (
-    <main
-      style={{
-        maxWidth: "800px",
-        margin: "0 auto",
-        padding: "48px 24px",
-        lineHeight: 1.7,
-      }}
-    >
-      <h1>Terms of Service</h1>
-
-      <p>
-        Ultimo aggiornamento: 30 agosto 2026
-      </p>
-
-      <h2>1. Accettazione</h2>
-      <p>
-        Utilizzando SanoSync, l'utente accetta i presenti Termini di
-        Servizio. Se non accetta questi termini, non deve utilizzare
-        l'applicazione.
-      </p>
-
-      <h2>2. Descrizione del servizio</h2>
-      <p>
-        SanoSync fornisce strumenti per organizzare informazioni relative
-        all'alimentazione, alla pianificazione dei pasti, all'attività
-        fisica e agli obiettivi personali.
-      </p>
-
-      <h2>3. Servizi esterni</h2>
-      <p>
-        SanoSync può consentire il collegamento a servizi di terze parti,
-        inclusi servizi di monitoraggio e wearable come Oura. Il loro
-        utilizzo è soggetto anche ai termini e alle condizioni del
-        relativo fornitore.
-      </p>
-
-      <h2>4. Dati forniti dall'utente</h2>
-      <p>
-        L'utente è responsabile dell'accuratezza delle informazioni
-        inserite nell'applicazione e delle autorizzazioni concesse ai
-        servizi esterni.
-      </p>
-
-      <h2>5. Informazioni nutrizionali</h2>
-      <p>
-        Le informazioni e le raccomandazioni fornite da SanoSync hanno
-        finalità informative e organizzative e non costituiscono
-        diagnosi, prescrizioni mediche o consulenza sanitaria
-        professionale.
-      </p>
-
-      <h2>6. Disponibilità del servizio</h2>
-      <p>
-        SanoSync può essere modificato, aggiornato, sospeso o
-        temporaneamente non disponibile. Non viene garantita la
-        disponibilità continua del servizio o dei servizi esterni
-        collegati.
-      </p>
-
-      <h2>7. Servizi di terze parti</h2>
-      <p>
-        SanoSync non controlla la disponibilità, le modifiche o le
-        politiche dei servizi esterni. L'utilizzo di tali servizi resta
-        soggetto alle condizioni dei rispettivi fornitori.
-      </p>
-
-      <h2>8. Modifiche ai termini</h2>
-      <p>
-        I presenti Termini possono essere modificati quando necessario.
-        La data dell'ultimo aggiornamento sarà riportata all'inizio
-        della pagina.
-      </p>
-
-      <h2>9. Contatti</h2>
-      <p>
-        Per informazioni relative a SanoSync o ai presenti Termini,
-        utilizzare i recapiti ufficiali dell'applicazione.
-      </p>
-    </main>
-  );
+  return <main className={styles.page}>
+    <header className={styles.header}>
+      <Link href="/" className={styles.brand}>SanoSync</Link>
+      <p className={styles.kicker}>Documenti legali</p><h1>Termini e condizioni</h1>
+      <p className={styles.lead}>Le regole essenziali per utilizzare SanoSync in modo consapevole.</p>
+      <p className={styles.updated}>Ultimo aggiornamento: 2 settembre 2026</p>
+    </header>
+    <article className={styles.content}>{sections.map(([title, body], index) => <section className={index === 2 ? styles.notice : undefined} key={String(title)}><h2>{title}</h2><p>{body}</p></section>)}</article>
+    <footer className={styles.footer}><Link href="/privacy">Privacy Policy</Link><Link href="/">Torna a SanoSync</Link></footer>
+  </main>;
 }
