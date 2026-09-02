@@ -718,6 +718,17 @@ def confirm_meal_prediction(
                     "estimated_fat_g": recommendation.get(
                         "fat_g"
                     ),
+                    "replanning_strategy": (
+                        recommendation.get("strategy")
+                    ),
+                    "components": recommendation.get(
+                        "components"
+                    ),
+                    "removed_components": (
+                        recommendation.get(
+                            "removed_components"
+                        )
+                    ),
                 }
 
         return MealConfirmationService(

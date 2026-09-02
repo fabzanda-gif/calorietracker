@@ -47,6 +47,54 @@ class MealReplanningContextService:
         )
 
         portion_changed = multiplier != 1.0
+        adaptation = recommendation.get(
+            "adaptation"
+        )
+        adaptation = (
+            adaptation
+            if isinstance(adaptation, dict)
+            else {}
+        )
+        removed_components = adaptation.get(
+            "removed_components"
+        )
+        removed_components = (
+            removed_components
+            if isinstance(
+                removed_components,
+                list,
+            )
+            else []
+        )
+
+        if removed_components:
+            removed_names = [
+                str(
+                    component.get("name") or ""
+                ).strip()
+                for component in removed_components
+                if isinstance(component, dict)
+                and str(
+                    component.get("name") or ""
+                ).strip()
+            ]
+
+            removed_label = ", ".join(
+                removed_names
+            ) or "un extra"
+
+            return {
+                "direction": "reduced",
+                "driver": "food",
+                "portion_changed": False,
+                "available_kcal": available_kcal,
+                "title": "Pasto alleggerito, porzioni invariate",
+                "message": (
+                    f"Rimuovo {removed_label} e mantengo "
+                    "invariato il piatto principale."
+                ),
+                "removed_components": removed_names,
+            }
 
         if multiplier < 1.0 and consumed_kcal > 0:
             return {

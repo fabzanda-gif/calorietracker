@@ -1828,6 +1828,15 @@ export function HomeShell() {
               fat_g:
                 nextMealOptions.recommended
                   .candidate.fat_g,
+              strategy:
+                nextMealOptions.recommended
+                  .strategy,
+              components:
+                nextMealOptions.recommended
+                  .candidate.components,
+              removed_components:
+                nextMealOptions.recommended
+                  .adaptation.removed_components,
             }
           : null;
 
@@ -3241,7 +3250,11 @@ export function HomeShell() {
                             >
                               {nextMealOptions.recommended
                                 .strategy ===
-                              "adapted_routine"
+                              "component_reduction"
+                                ? "Pasto alleggerito"
+                                : nextMealOptions.recommended
+                                    .strategy ===
+                                  "adapted_routine"
                                 ? "Adattata alla tua giornata"
                                 : "Oggi ti conviene cambiare"}
                             </span>

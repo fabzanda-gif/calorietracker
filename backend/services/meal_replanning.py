@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.services.meal_component_adaptation import (
+    MealComponentAdaptationService,
+)
+
 
 class MealReplanningService:
     """
@@ -43,6 +47,22 @@ class MealReplanningService:
                     candidate=dict(routine_candidate),
                     multiplier=1.0,
                     strategy="routine",
+                    original_candidate=routine_candidate,
+                )
+
+        if isinstance(routine_candidate, dict):
+            adapted = (
+                MealComponentAdaptationService().adapt(
+                    candidate=routine_candidate,
+                    available_kcal=available_kcal,
+                )
+            )
+
+            if adapted is not None:
+                return self._recommendation(
+                    candidate=adapted,
+                    multiplier=1.0,
+                    strategy="component_reduction",
                     original_candidate=routine_candidate,
                 )
 
@@ -129,7 +149,25 @@ class MealReplanningService:
             "strategy": strategy,
             "reason": cls._reason(strategy),
             "adaptation": {
-                "changed": multiplier != 1.0,
+                "changed": (
+                    multiplier != 1.0
+                    or bool(
+                        candidate.get(
+                            "removed_components"
+                        )
+                    )
+                ),
+                "type": (
+                    "component_removal"
+                    if candidate.get(
+                        "removed_components"
+                    )
+                    else "none"
+                ),
+                "removed_components": candidate.get(
+                    "removed_components",
+                    [],
+                ),
                 "original_calories": original_calories,
                 "recommended_calories": recommended_calories,
                 "calorie_delta": round(
@@ -146,6 +184,10 @@ class MealReplanningService:
             "routine": (
                 "La routine abituale è compatibile "
                 "con la giornata di oggi."
+            ),
+            "component_reduction": (
+                "Mantengo il piatto principale e rimuovo "
+                "un solo extra per rispettare il margine."
             ),
             "alternate_candidate": (
                 "La routine non entra nel margine disponibile, "

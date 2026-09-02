@@ -147,6 +147,7 @@ export interface DayDecisionContext {
 export type MealReplanningStrategy =
   | "routine"
   | "adapted_routine"
+  | "component_reduction"
   | "alternate_candidate"
   | "adapted_alternative";
 
@@ -157,6 +158,7 @@ export interface MealReplanningContext {
   available_kcal: number | null;
   title: string;
   message: string;
+  removed_components?: string[];
 }
 
 export interface MealReplanningRecommendation {
@@ -167,9 +169,15 @@ export interface MealReplanningRecommendation {
   reason: string;
   adaptation: {
     changed: boolean;
+    type?: "component_reduction";
     original_calories: number;
     recommended_calories: number;
     calorie_delta: number;
+    removed_components?: Array<{
+      name?: string;
+      calories?: number;
+      [key: string]: unknown;
+    }>;
   };
 }
 
