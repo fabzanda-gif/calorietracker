@@ -11,6 +11,7 @@ from backend.services.memory import MemoryService
 MEAL_SLOTS = {
     "breakfast": "Colazione",
     "lunch": "Pranzo",
+    "snack": "Snack",
     "dinner": "Cena",
 }
 
