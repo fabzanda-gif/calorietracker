@@ -5,6 +5,18 @@
   margin: 0 auto;
 }
 
+@media (min-width: 760px) {
+  .page {
+    width: min(960px, calc(100% - 236px));
+    margin-left: max(
+      236px,
+      calc((100vw - 960px + 236px) / 2)
+    );
+    margin-right: 0;
+    box-sizing: border-box;
+  }
+}
+
 .header {
   display: flex;
   align-items: flex-end;

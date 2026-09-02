@@ -256,6 +256,17 @@
   padding: 50px 0 80px;
 }
 
+@media (min-width: 760px) {
+  .page {
+    width: min(1120px, calc(100% - 268px));
+    margin-left: max(
+      252px,
+      calc((100vw - 1120px + 236px) / 2)
+    );
+    margin-right: 0;
+  }
+}
+
 
 /* ==========================================================
    HEADER

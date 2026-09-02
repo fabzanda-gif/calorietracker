@@ -609,6 +609,17 @@
   padding: 52px 0 72px;
 }
 
+@media (min-width: 760px) {
+  .page {
+    width: min(1120px, calc(100% - 268px));
+    margin-left: max(
+      252px,
+      calc((100vw - 1120px + 236px) / 2)
+    );
+    margin-right: 0;
+  }
+}
+
 .header {
   margin-bottom: 24px;
 }
