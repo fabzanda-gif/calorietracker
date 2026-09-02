@@ -100,3 +100,38 @@ def test_update_profile_sends_bearer_token_and_metadata(monkeypatch):
         "height": 182,
         "goal_mode": "loss",
     }
+
+
+def test_delete_account_uses_service_role_for_current_user(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        ok = True
+        status_code = 200
+
+    def fake_delete(url, headers, timeout):
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(profile.requests, "delete", fake_delete)
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-secret")
+
+    user = dependencies.CurrentUser(
+        id="user-1",
+        access_token="user-token",
+        metadata={},
+    )
+
+    result = profile.delete_account(user)
+
+    assert result == {"deleted": True}
+    assert captured["url"] == (
+        "https://example.supabase.co/auth/v1/admin/users/user-1"
+    )
+    assert captured["headers"] == {
+        "apikey": "service-secret",
+        "Authorization": "Bearer service-secret",
+    }

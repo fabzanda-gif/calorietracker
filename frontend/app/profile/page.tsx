@@ -9,6 +9,7 @@ import { AppNav } from "@/components/navigation/AppNav";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   getProfile,
+  deleteAccount,
   updateProfile,
   getWeeklySchedule,
   updateWeeklySchedule,
@@ -125,6 +126,7 @@ export default function ProfilePage() {
   const {
     user,
     accessToken,
+    signOut,
   } = useAuth();
 
   const [form, setForm] =
@@ -132,6 +134,8 @@ export default function ProfilePage() {
   const [loading, setLoading] =
     useState(true);
   const [saving, setSaving] =
+    useState(false);
+  const [deletingAccount, setDeletingAccount] =
     useState(false);
   const [error, setError] =
     useState<string | null>(null);
@@ -535,6 +539,37 @@ export default function ProfilePage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!accessToken || deletingAccount) {
+      return;
+    }
+
+    const confirmation = window.prompt(
+      "Questa operazione è definitiva. Scrivi ELIMINA per cancellare il tuo account e tutti i dati associati.",
+    );
+
+    if (confirmation !== "ELIMINA") {
+      return;
+    }
+
+    setDeletingAccount(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await deleteAccount(accessToken);
+      await signOut();
+      window.location.assign("/");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossibile eliminare l’account.",
+      );
+      setDeletingAccount(false);
     }
   }
 
@@ -1042,6 +1077,24 @@ export default function ProfilePage() {
                   : "Salva modifiche"}
               </button>
             </div>
+
+            <section className={`${styles.card} ${styles.dangerZone}`}>
+              <div className={styles.sectionHeader}>
+                <h2>Elimina account</h2>
+                <p>
+                  Cancella definitivamente il tuo account SanoSync e i dati associati.
+                  Questa operazione non può essere annullata.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.deleteAccount}
+                disabled={deletingAccount}
+                onClick={() => void handleDeleteAccount()}
+              >
+                {deletingAccount ? "Eliminazione…" : "Elimina il mio account"}
+              </button>
+            </section>
           </form>
         )}
       </main>

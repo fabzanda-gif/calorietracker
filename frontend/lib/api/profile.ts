@@ -48,6 +48,18 @@ export function updateProfile(
   );
 }
 
+export function deleteAccount(
+  accessToken: string,
+): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>(
+    "/profile/account",
+    {
+      method: "DELETE",
+      accessToken,
+    },
+  );
+}
+
 
 export type WeeklyScheduleContext =
   | "home"

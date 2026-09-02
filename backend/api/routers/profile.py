@@ -92,3 +92,43 @@ def update_profile(
         "id": user.get("id", current_user.id),
         "metadata": user.get("user_metadata") or {},
     }
+
+
+@router.delete("/account")
+def delete_account(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, bool]:
+    url = os.getenv("SUPABASE_URL")
+    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not url or not service_role_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Supabase admin configuration is missing",
+        )
+
+    try:
+        response = requests.delete(
+            (
+                f"{url.rstrip('/')}/auth/v1/admin/users/"
+                f"{current_user.id}"
+            ),
+            headers={
+                "apikey": service_role_key,
+                "Authorization": f"Bearer {service_role_key}",
+            },
+            timeout=10,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to delete Supabase account",
+        ) from exc
+
+    if not response.ok:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail="Unable to delete Supabase account",
+        )
+
+    return {"deleted": True}
