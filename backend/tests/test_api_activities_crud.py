@@ -6,6 +6,7 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
+    get_weight_repository,
 )
 from backend.api.main import app
 
@@ -64,6 +65,14 @@ fake_repo = FakeActivitiesRepository()
 fake_daily_logs_repo = FakeDailyLogsRepository()
 
 
+class FakeWeightRepository:
+    def latest(self, user_id):
+        return {"weight": 80}
+
+
+fake_weight_repo = FakeWeightRepository()
+
+
 def override_current_user():
     return CurrentUser(id="authenticated-user", access_token="fake-token")
 
@@ -82,6 +91,9 @@ def api_overrides():
     app.dependency_overrides[get_activities_repository] = override_repo
     app.dependency_overrides[get_daily_logs_repository] = (
         override_daily_logs_repo
+    )
+    app.dependency_overrides[get_weight_repository] = (
+        lambda: fake_weight_repo
     )
     yield
     app.dependency_overrides.clear()

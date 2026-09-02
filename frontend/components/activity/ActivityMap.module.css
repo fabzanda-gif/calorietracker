@@ -1,8 +1,37 @@
 .wrapper {
+  position: relative;
   overflow: hidden;
   border: 1px solid #deded9;
   border-radius: 18px;
   background: #edf0ec;
+}
+
+.fallbackRoute {
+  position: absolute;
+  inset: 0 0 42px;
+  z-index: 1;
+  width: 100%;
+  height: calc(100% - 42px);
+  padding: 18px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #edf0ec, #e3e7e2);
+}
+
+.routeShadow,
+.routeLine {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.routeShadow {
+  stroke: rgba(255, 61, 67, 0.18);
+  stroke-width: 13;
+}
+
+.routeLine {
+  stroke: #ff3d43;
+  stroke-width: 5;
 }
 
 .map {
@@ -15,6 +44,10 @@
       #edf0ec,
       #e3e7e2
     );
+}
+
+.compact {
+  height: 260px;
 }
 
 .legend {

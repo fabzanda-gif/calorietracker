@@ -1,6 +1,7 @@
 from backend.services.activity_movement import (
     activity_profile,
     estimated_activity_steps,
+    estimated_gpx_calories,
     movement_step_summary,
     suggested_activity_calories,
 )
@@ -24,6 +25,15 @@ def test_activity_calories_scale_with_duration():
         activity_type="Padel",
         duration_seconds=1800,
     ) == 250
+
+
+def test_gpx_calories_use_weight_and_distance_for_running():
+    assert estimated_gpx_calories(
+        activity_type="Corsa",
+        duration_seconds=3600,
+        distance_meters=10000,
+        weight_kg=80,
+    ) == 800
 
 
 def test_padel_steps_are_estimated_from_duration():

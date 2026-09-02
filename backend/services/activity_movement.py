@@ -46,6 +46,11 @@ ACTIVITY_PROFILES: dict[str, dict[str, Any]] = {
         "step_cadence": 100,
         "suggested_kcal_per_hour": 280,
     },
+    "Bicicletta": {
+        "icon": "🚴",
+        "step_cadence": 0,
+        "suggested_kcal_per_hour": 420,
+    },
     "Altro": {
         "icon": "🔥",
         "step_cadence": 0,
@@ -86,6 +91,10 @@ def normalize_activity_type(
         "hiking": "Escursione",
         "camminata": "Camminata",
         "walking": "Camminata",
+        "bici": "Bicicletta",
+        "bicicletta": "Bicicletta",
+        "cycling": "Bicicletta",
+        "ciclismo": "Bicicletta",
     }
 
     for fragment, activity_type in aliases.items():
@@ -123,6 +132,36 @@ def suggested_activity_calories(
         duration
         / 3600
         * profile["suggested_kcal_per_hour"]
+    )
+
+
+def estimated_gpx_calories(
+    *,
+    activity_type: Any,
+    duration_seconds: Any,
+    distance_meters: Any,
+    weight_kg: Any = None,
+) -> int:
+    """Estimate GPX energy while keeping the value explicitly editable."""
+    duration = max(0.0, _number(duration_seconds))
+    distance_km = max(0.0, _number(distance_meters)) / 1000
+    weight = _number(weight_kg)
+    normalized = normalize_activity_type(activity_type)
+
+    if weight > 0 and distance_km > 0:
+        distance_factors = {
+            "Corsa": 1.0,
+            "Camminata": 0.5,
+            "Escursione": 0.6,
+            "Bicicletta": 0.32,
+        }
+        factor = distance_factors.get(normalized)
+        if factor is not None:
+            return max(1, round(weight * distance_km * factor))
+
+    return suggested_activity_calories(
+        activity_type=normalized,
+        duration_seconds=duration,
     )
 
 

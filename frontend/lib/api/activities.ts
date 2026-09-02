@@ -27,8 +27,8 @@ export interface Activity {
   distance_meters?: number | null;
   average_cadence?: number | null;
   average_heart_rate?: number | null;
-  route_points?: ActivityRoutePoint[];
-  series_points?: ActivitySeriesPoint[];
+  route_points?: ActivityRoutePoint[] | string;
+  series_points?: ActivitySeriesPoint[] | string;
   original_point_count?: number | null;
   gpx_file_name?: string | null;
 }
@@ -129,6 +129,7 @@ export interface GpxActivityPreview
   extends Omit<Activity, "id" | "user_id" | "burned_calories"> {
   source: "gpx";
   original_point_count: number;
+  estimated_calories?: number;
 }
 
 export interface GpxPreviewResponse {
@@ -155,6 +156,7 @@ export function previewGpxActivity(
   input: {
     file_name: string;
     content_base64: string;
+    activity_type?: string;
   },
   accessToken?: string | null,
 ): Promise<GpxPreviewResponse> {

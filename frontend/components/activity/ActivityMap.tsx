@@ -17,11 +17,33 @@ import styles from "./ActivityMap.module.css";
 type ActivityMapProps = {
   points: ActivityRoutePoint[];
   activityName?: string;
+  compact?: boolean;
 };
+
+function routePath(points: ActivityRoutePoint[]): string {
+  const width = 600;
+  const height = 320;
+  const padding = 24;
+  const latitudes = points.map((point) => point.latitude);
+  const longitudes = points.map((point) => point.longitude);
+  const minLat = Math.min(...latitudes);
+  const maxLat = Math.max(...latitudes);
+  const minLon = Math.min(...longitudes);
+  const maxLon = Math.max(...longitudes);
+  const latRange = Math.max(maxLat - minLat, 0.000001);
+  const lonRange = Math.max(maxLon - minLon, 0.000001);
+
+  return points.map((point, index) => {
+    const x = padding + ((point.longitude - minLon) / lonRange) * (width - padding * 2);
+    const y = height - padding - ((point.latitude - minLat) / latRange) * (height - padding * 2);
+    return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+  }).join(" ");
+}
 
 export function ActivityMap({
   points,
   activityName = "attività",
+  compact = false,
 }: ActivityMapProps) {
   const containerRef =
     useRef<HTMLDivElement | null>(null);
@@ -196,10 +218,17 @@ export function ActivityMap({
     <div className={styles.wrapper}>
       <div
         ref={containerRef}
-        className={styles.map}
+        className={`${styles.map} ${compact ? styles.compact : ""}`}
         role="img"
         aria-label={`Mappa del percorso: ${activityName}`}
       />
+
+      {tilesUnavailable ? (
+        <svg className={styles.fallbackRoute} viewBox="0 0 600 320" aria-label={`Tracciato GPS: ${activityName}`}>
+          <path d={routePath(points)} className={styles.routeShadow} />
+          <path d={routePath(points)} className={styles.routeLine} />
+        </svg>
+      ) : null}
 
       <div className={styles.legend}>
         <span>

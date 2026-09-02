@@ -13,6 +13,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AppNav } from "@/components/navigation/AppNav";
 import {
   getActivitiesForRange,
+  deleteActivity,
   importGpxActivity,
   previewGpxActivity,
   type Activity,
@@ -261,6 +262,29 @@ function formatDuration(value?: number | null): string {
   return `${seconds}s`;
 }
 
+function formatActivityDate(value: string): string {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("it-IT", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function normalizedArray<T>(value: T[] | string | null | undefined): T[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function activityTimestamp(activity: Activity): number {
+  return new Date(activity.started_at ?? `${activity.date}T00:00:00`).getTime();
+}
+
 function MetricChart({
   points,
   metric,
@@ -435,6 +459,7 @@ export default function ActivitiesPage() {
     useState(false);
   const [importing, setImporting] =
     useState(false);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [importMessage, setImportMessage] =
     useState<string | null>(null);
 
@@ -464,10 +489,13 @@ export default function ActivitiesPage() {
         accessToken,
       );
 
-      setActivities(response.items);
+      const sortedItems = [...response.items].sort(
+        (left, right) => activityTimestamp(right) - activityTimestamp(left),
+      );
+      setActivities(sortedItems);
 
       setSelectedActivity((current) => {
-        const visibleItems = response.items.filter(
+        const visibleItems = sortedItems.filter(
           (item) => !isDailyMovement(item),
         );
 
@@ -559,6 +587,7 @@ export default function ActivitiesPage() {
         {
           file_name: file.name,
           content_base64: contentBase64,
+          activity_type: gpxType,
         },
         accessToken,
       );
@@ -566,6 +595,7 @@ export default function ActivitiesPage() {
       setGpxBase64(contentBase64);
       setGpxPreview(response.preview);
       setGpxName(response.preview.activity_name);
+      setGpxCalories(String(response.preview.estimated_calories ?? 0));
       const previewDate =
         response.preview.date || isoDate(new Date());
 
@@ -597,6 +627,23 @@ export default function ActivitiesPage() {
       );
     } finally {
       setPreviewing(false);
+    }
+  }
+
+  async function removeActivity(activity: Activity) {
+    if (!accessToken || activity.id == null) return;
+    if (!window.confirm(`Eliminare “${activity.activity_name}”?`)) return;
+
+    setDeletingId(activity.id);
+    setError(null);
+    try {
+      await deleteActivity(activity.id, accessToken);
+      setSelectedActivity(null);
+      await loadMonth();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Non riesco a eliminare l’attività.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -721,31 +768,6 @@ export default function ActivitiesPage() {
             {importMessage}
           </div>
         ) : null}
-
-        <section className={styles.loggerCard}>
-          <div className={styles.loggerHeading}>
-            <div>
-              <p className={styles.eyebrow}>
-                Registra
-              </p>
-              <h2>Attività e movimento</h2>
-              <p>
-                Aggiungi un allenamento oppure aggiorna
-                i passi totali rilevati nella giornata.
-              </p>
-            </div>
-          </div>
-
-          <ActivityLogger
-            date={
-              selectedDate ||
-              isoDate(new Date())
-            }
-            accessToken={accessToken}
-            showMovement
-            onSaved={loadMonth}
-          />
-        </section>
 
         <div className={styles.topGrid}>
           <section className={styles.card}>
@@ -939,6 +961,22 @@ export default function ActivitiesPage() {
           </section>
         </div>
 
+        <details className={styles.loggerCard}>
+          <summary className={styles.loggerHeading}>
+            <span>
+              <span className={styles.eyebrow}>Registra</span>
+              <strong>Nuova attività o passi</strong>
+            </span>
+            <span className={styles.openHint}>Apri modulo ＋</span>
+          </summary>
+          <ActivityLogger
+            date={selectedDate || isoDate(new Date())}
+            accessToken={accessToken}
+            showMovement
+            onSaved={loadMonth}
+          />
+        </details>
+
         {gpxPreview ? (
           <section className={styles.previewCard}>
             <div className={styles.cardHeading}>
@@ -1051,8 +1089,9 @@ export default function ActivitiesPage() {
             </div>
 
             <ActivityMap
-              points={gpxPreview.route_points ?? []}
+              points={normalizedArray<ActivityRoutePoint>(gpxPreview.route_points)}
               activityName={gpxPreview.activity_name}
+              compact
             />
 
             <button
@@ -1133,7 +1172,7 @@ export default function ActivitiesPage() {
                         {activity.activity_name}
                       </strong>
                       <small>
-                        {activity.activity_type ??
+                        {formatActivityDate(activity.date)} · {activity.activity_type ??
                           (activity.source === "gpx"
                             ? "Attività GPX"
                             : "Attività manuale")}
@@ -1170,14 +1209,24 @@ export default function ActivitiesPage() {
                     <h2>{detail.activity_name}</h2>
                   </div>
 
-                  <span className={styles.gpxBadge}>
-                    {detail.source === "gpx"
-                      ? "GPX"
-                      : "Manuale"}
-                  </span>
+                  <div className={styles.detailActions}>
+                    <span className={styles.gpxBadge}>{detail.source === "gpx" ? "GPX" : "Manuale"}</span>
+                    <button
+                      type="button"
+                      className={styles.deleteButton}
+                      disabled={deletingId === detail.id}
+                      onClick={() => void removeActivity(detail)}
+                    >
+                      {deletingId === detail.id ? "Elimino…" : "Elimina"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className={styles.detailStats}>
+                  <div>
+                    <span>Data</span>
+                    <strong>{formatActivityDate(detail.date)}</strong>
+                  </div>
                   <div>
                     <span>Distanza</span>
                     <strong>
@@ -1203,19 +1252,20 @@ export default function ActivitiesPage() {
                 </div>
 
                 <ActivityMap
-                  points={detail.route_points ?? []}
+                  points={normalizedArray<ActivityRoutePoint>(detail.route_points)}
                   activityName={detail.activity_name}
+                  compact
                 />
 
                 <div className={styles.charts}>
                   <MetricChart
-                    points={detail.series_points ?? []}
+                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
                     metric="cadence"
                     title="Cadenza"
                     unit="spm"
                   />
                   <MetricChart
-                    points={detail.series_points ?? []}
+                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
                     metric="heart_rate"
                     title="Frequenza cardiaca"
                     unit="bpm"

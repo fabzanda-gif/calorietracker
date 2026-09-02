@@ -13,16 +13,19 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
+    get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.weight import WeightRepository
 from backend.services.gpx_activity import (
     GpxActivityError,
     parse_gpx_activity,
 )
 from backend.services.activity_movement import (
     estimated_activity_steps,
+    estimated_gpx_calories,
     normalize_activity_type,
 )
 from backend.services.activity_movement_sync import (
@@ -55,6 +58,7 @@ class ActivityUpdate(BaseModel):
 class GpxPreviewRequest(BaseModel):
     file_name: str = Field(min_length=1, max_length=255)
     content_base64: str = Field(min_length=1)
+    activity_type: str | None = Field(default="Corsa", max_length=80)
 
 
 class GpxImportRequest(GpxPreviewRequest):
@@ -68,7 +72,7 @@ class GpxImportRequest(GpxPreviewRequest):
         max_length=80,
     )
     activity_date: date | None = None
-    burned_calories: int = Field(default=0, ge=0)
+    burned_calories: int | None = Field(default=None, ge=0)
 
 
 @router.get("/range")
@@ -109,6 +113,7 @@ def get_activities_for_range(
 def preview_gpx_activity(
     request: GpxPreviewRequest,
     current_user: CurrentUser = Depends(get_current_user),
+    weight_repo: WeightRepository = Depends(get_weight_repository),
 ):
     try:
         content = base64.b64decode(
@@ -137,6 +142,14 @@ def preview_gpx_activity(
             detail=str(exc),
         ) from exc
 
+    latest_weight = weight_repo.latest(current_user.id)
+    preview["estimated_calories"] = estimated_gpx_calories(
+        activity_type=request.activity_type or preview["activity_name"],
+        duration_seconds=preview["duration_seconds"],
+        distance_meters=preview["distance_meters"],
+        weight_kg=(latest_weight or {}).get("weight"),
+    )
+
     return {
         "preview": preview,
         "file_name": request.file_name,
@@ -156,6 +169,7 @@ def import_gpx_activity(
     daily_logs_repo: DailyLogsRepository = Depends(
         get_daily_logs_repository
     ),
+    weight_repo: WeightRepository = Depends(get_weight_repository),
 ):
     try:
         content = base64.b64decode(
@@ -205,6 +219,16 @@ def import_gpx_activity(
         else parsed["activity_name"]
     )
 
+    latest_weight = weight_repo.latest(current_user.id)
+    burned_calories = request.burned_calories
+    if burned_calories is None:
+        burned_calories = estimated_gpx_calories(
+            activity_type=request.activity_type or parsed["activity_name"],
+            duration_seconds=parsed["duration_seconds"],
+            distance_meters=parsed["distance_meters"],
+            weight_kg=(latest_weight or {}).get("weight"),
+        )
+
     payload = {
         "user_id": current_user.id,
         "date": str(effective_date),
@@ -214,7 +238,7 @@ def import_gpx_activity(
             if request.activity_type
             else None
         ),
-        "burned_calories": request.burned_calories,
+        "burned_calories": burned_calories,
         "source": "gpx",
         "started_at": parsed["started_at"],
         "duration_seconds": parsed[
