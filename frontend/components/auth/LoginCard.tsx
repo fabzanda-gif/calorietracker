@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { FormEvent, useState } from "react";
 
 import { useAuth } from "./AuthProvider";
@@ -22,10 +23,9 @@ function ProductPreview() {
     <div className={styles.preview} aria-label="Anteprima della dashboard SanoSync">
       <div className={styles.previewNav}>
         <strong>SanoSync</strong>
-        <span className={styles.previewNavActive}>Panoramica</span>
-        <span>Alimentazione</span>
+        <span className={styles.previewNavActive}>Oggi</span>
+        <span>Ricette</span>
         <span>Attività</span>
-        <span>Peso</span>
         <span>Progressi</span>
       </div>
       <div className={styles.previewContent}>
@@ -105,7 +105,13 @@ export function LoginCard() {
     <main className={styles.page}>
       <header className={styles.topbar}>
         <a className={styles.logo} href="#" aria-label="SanoSync">
-          <span aria-hidden="true">S</span><strong>SanoSync</strong>
+          <Image
+            src="/assets/LogoCoral.png"
+            alt="SanoSync"
+            width={72}
+            height={71}
+            priority
+          />
         </a>
         <nav aria-label="Link legali">
           <Link href="/privacy">Privacy</Link><Link href="/terms">Termini</Link>
@@ -116,7 +122,7 @@ export function LoginCard() {
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>IL TUO BENESSERE, IN SINCRONIA</p>
-            <h1>Mangia meglio.<br />Muoviti con più consapevolezza.</h1>
+            <h1>Tutto sotto controllo.</h1>
             <p className={styles.intro}>
               SanoSync unisce alimentazione, attività, peso e routine
               quotidiane in un piano che si adatta davvero a te.
