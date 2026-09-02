@@ -76,6 +76,22 @@ Se è "deficit", parla di deficit.
 Se è "over_maintenance", sii neutrale e incoraggiante.
 Se activity_count è zero, puoi valorizzare il risultato
 raggiunto anche senza attività fisica, senza rimproverare.
+
+Regola mattutina prioritaria:
+- se moment è "morning" e meal_count è zero, la giornata
+  non può essere descritta come un obiettivo già raggiunto;
+- non dire che l'utente ha rispettato il deficit o il piano;
+- invita con naturalezza a registrare la colazione;
+- rimanda ogni valutazione del bilancio calorico a più tardi.
+
+Contesto quotidiano:
+- daily_context contiene soltanto dati recuperati da fonti
+  esterne, quando disponibili;
+- puoi citare il meteo con parole naturali;
+- puoi scegliere al massimo una voce di on_this_day;
+- traduci e riassumi la ricorrenza in italiano;
+- non aggiungere date, temperature o fatti non presenti;
+- se daily_context è vuoto, non menzionarlo.
 """.strip()
 
 
@@ -104,6 +120,13 @@ Esempio di tono:
 "Buonasera Fabio! Mantenimento centrato senza attività
 fisica. Contro ogni previsione, il piano è ancora vivo.
 Per oggi può bastare."
+
+Contesto quotidiano:
+- se daily_context contiene meteo o ricorrenze, puoi usarli
+  con lo stesso tono asciutto;
+- cita al massimo una ricorrenza;
+- non inventare informazioni mancanti;
+- la regola mattutina sulla colazione resta prioritaria.
 """.strip()
 
 
@@ -176,6 +199,23 @@ def fallback_day_briefing(
     status = str(
         payload.get("status_hint") or ""
     )
+    meal_count = int(
+        payload.get("meal_count") or 0
+    )
+
+    if moment == "morning" and meal_count == 0:
+        if mode == "zero":
+            return (
+                f"{opening} Il bilancio di oggi non esiste "
+                "ancora. Registra la colazione, poi vedremo "
+                "quanto dureranno le buone intenzioni."
+            )
+
+        return (
+            f"{opening} La giornata è appena iniziata: "
+            "quando fai colazione, ricordati di registrarla. "
+            "Al bilancio penseremo più tardi."
+        )
 
     if mode == "zero":
         status_text = {

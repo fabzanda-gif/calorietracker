@@ -40,6 +40,7 @@ interface FormState {
   protein_goal_enabled: boolean;
   protein_goal_g: string;
   language: string;
+  city: string;
   office_lunch: boolean;
   weekly_schedule: Record<string, "home" | "office" | "free">;
 }
@@ -86,6 +87,7 @@ const EMPTY_FORM: FormState = {
   protein_goal_enabled: false,
   protein_goal_g: "",
   language: "it",
+  city: "",
   office_lunch: false,
   weekly_schedule: {
     monday: "home",
@@ -235,6 +237,8 @@ export default function ProfilePage() {
           language:
             stringValue(metadata.language) ||
             "it",
+          city:
+            stringValue(metadata.city),
           office_lunch:
             metadata.office_lunch === true,
           weekly_schedule: weeklySchedule,
@@ -426,6 +430,8 @@ export default function ProfilePage() {
           : null,
       language:
         form.language || null,
+      city:
+        form.city.trim() || null,
       office_lunch:
         form.office_lunch,
       weekly_schedule:
@@ -526,6 +532,21 @@ export default function ProfilePage() {
                       )
                     }
                     placeholder="Il tuo nome"
+                  />
+                </label>
+
+                <label>
+                  <span>Città</span>
+                  <input
+                    value={form.city}
+                    onChange={(event) =>
+                      updateField(
+                        "city",
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Es. Zaandam"
+                    autoComplete="address-level2"
                   />
                 </label>
 

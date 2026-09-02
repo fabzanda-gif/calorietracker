@@ -19,11 +19,6 @@ const ITEMS = [
     icon: "⌑",
   },
   {
-    href: "/inventory",
-    label: "Dispensa",
-    icon: "▦",
-  },
-  {
     href: "/activities",
     label: "Attività",
     icon: "⌁",
@@ -31,13 +26,11 @@ const ITEMS = [
   {
     href: "/progress",
     label: "Progressi",
-    icon: "⌁",
+    icon: "▥",
   },
 ];
 
-const MOBILE_ITEMS = ITEMS.filter(
-  (item) => item.href !== "/inventory",
-);
+const MOBILE_ITEMS = ITEMS;
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") {

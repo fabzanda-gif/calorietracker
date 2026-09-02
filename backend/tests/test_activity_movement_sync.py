@@ -23,6 +23,7 @@ class FakeActivitiesRepository:
     def __init__(self, activities):
         self.activities = activities
         self.upsert = None
+        self.deleted = None
 
     def list_for_date(
         self,
@@ -30,6 +31,20 @@ class FakeActivitiesRepository:
         day_date,
     ):
         return self.activities
+
+    def delete_named_for_date(
+        self,
+        *,
+        user_id,
+        log_date,
+        activity_name,
+    ):
+        self.deleted = {
+            "user_id": user_id,
+            "date": str(log_date),
+            "activity_name": activity_name,
+        }
+        return True
 
     def upsert_named_for_date(
         self,
@@ -143,4 +158,10 @@ def test_sync_caps_offset_at_total_steps():
     assert result["applied_step_offset"] == 3000
     assert result["net_daily_steps"] == 0
     assert result["step_calories"] == 0
-    assert activities.upsert["burned_calories"] == 0
+    assert result["step_activity"] is None
+    assert activities.upsert is None
+    assert activities.deleted == {
+        "user_id": "user-1",
+        "date": "2026-09-01",
+        "activity_name": "Passi (Stima)",
+    }

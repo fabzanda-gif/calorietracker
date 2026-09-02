@@ -28,6 +28,7 @@ class ProfileUpdate(BaseModel):
     protein_goal_enabled: bool | None = None
     protein_goal_g: float | None = Field(default=None, gt=0)
     language: str | None = None
+    city: str | None = None
     office_lunch: bool | None = None
     weekly_schedule: dict[str, str] | None = None
 

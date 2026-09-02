@@ -14,6 +14,7 @@ def _payload():
         "day_type": "free",
         "activity_level": "low",
         "activity_count": 0,
+        "meal_count": 3,
         "activity_kcal": 0,
         "consumed_kcal": 1703,
         "daily_budget_kcal": 1202,
@@ -101,3 +102,44 @@ def test_ai_generator_uses_structured_output():
         .__name__
         == "DayBriefingOutput"
     )
+
+
+
+def test_morning_without_meals_prompts_for_breakfast():
+    payload = {
+        **_payload(),
+        "moment": "morning",
+        "meal_count": 0,
+        "consumed_kcal": 0,
+        "available_kcal": 1202,
+        "status_hint": "deficit",
+    }
+
+    message = fallback_day_briefing(
+        payload,
+        mode="standard",
+    )
+
+    assert message.startswith("Buongiorno Fabio!")
+    assert "colazione" in message.lower()
+    assert "rispettato" not in message.lower()
+    assert "sei stato bravo" not in message.lower()
+
+
+def test_zero_morning_without_meals_is_not_celebratory():
+    payload = {
+        **_payload(),
+        "moment": "morning",
+        "meal_count": 0,
+        "consumed_kcal": 0,
+        "available_kcal": 1202,
+        "status_hint": "deficit",
+    }
+
+    message = fallback_day_briefing(
+        payload,
+        mode="zero",
+    )
+
+    assert "colazione" in message.lower()
+    assert "bravo" not in message.lower()

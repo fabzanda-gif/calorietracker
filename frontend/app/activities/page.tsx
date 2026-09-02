@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { ActivityLogger } from "@/components/activity/ActivityLogger";
+import { ActivityMap } from "@/components/activity/ActivityMap";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AppNav } from "@/components/navigation/AppNav";
 import {
@@ -258,120 +259,6 @@ function formatDuration(value?: number | null): string {
   }
 
   return `${seconds}s`;
-}
-
-function RouteMap({
-  points,
-}: {
-  points: ActivityRoutePoint[];
-}) {
-  if (!points.length) {
-    return (
-      <div className={styles.emptyVisual}>
-        Percorso non disponibile.
-      </div>
-    );
-  }
-
-  const width = 800;
-  const height = 360;
-  const padding = 28;
-  const latitudes = points.map(
-    (point) => point.latitude,
-  );
-  const longitudes = points.map(
-    (point) => point.longitude,
-  );
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLon = Math.min(...longitudes);
-  const maxLon = Math.max(...longitudes);
-  const latRange = maxLat - minLat || 0.001;
-  const lonRange = maxLon - minLon || 0.001;
-
-  const projected = points.map((point) => {
-    const x =
-      padding +
-      ((point.longitude - minLon) / lonRange) *
-        (width - padding * 2);
-    const y =
-      height -
-      padding -
-      ((point.latitude - minLat) / latRange) *
-        (height - padding * 2);
-
-    return { x, y };
-  });
-
-  const path = projected
-    .map(
-      (point, index) =>
-        `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`,
-    )
-    .join(" ");
-
-  return (
-    <div className={styles.mapFrame}>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label="Mappa stilizzata del percorso"
-      >
-        <defs>
-          <pattern
-            id="map-grid"
-            width="40"
-            height="40"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M 40 0 L 0 0 0 40"
-              className={styles.mapGrid}
-            />
-          </pattern>
-        </defs>
-
-        <rect
-          width={width}
-          height={height}
-          fill="url(#map-grid)"
-        />
-
-        <path
-          d={path}
-          className={styles.routeShadow}
-        />
-        <path
-          d={path}
-          className={styles.routeLine}
-        />
-
-        <circle
-          cx={projected[0].x}
-          cy={projected[0].y}
-          r="8"
-          className={styles.routeStart}
-        />
-        <circle
-          cx={projected.at(-1)?.x}
-          cy={projected.at(-1)?.y}
-          r="8"
-          className={styles.routeEnd}
-        />
-      </svg>
-
-      <div className={styles.mapLegend}>
-        <span>
-          <i className={styles.startDot} />
-          Partenza
-        </span>
-        <span>
-          <i className={styles.endDot} />
-          Arrivo
-        </span>
-      </div>
-    </div>
-  );
 }
 
 function MetricChart({
@@ -1163,8 +1050,9 @@ export default function ActivitiesPage() {
               </div>
             </div>
 
-            <RouteMap
+            <ActivityMap
               points={gpxPreview.route_points ?? []}
+              activityName={gpxPreview.activity_name}
             />
 
             <button
@@ -1314,8 +1202,9 @@ export default function ActivitiesPage() {
                   </div>
                 </div>
 
-                <RouteMap
+                <ActivityMap
                   points={detail.route_points ?? []}
+                  activityName={detail.activity_name}
                 />
 
                 <div className={styles.charts}>

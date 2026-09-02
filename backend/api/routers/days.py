@@ -35,6 +35,9 @@ from backend.services.day_briefing import (
     build_status_hint,
     fallback_day_briefing,
 )
+from backend.services.daily_context import (
+    DailyContextService,
+)
 from backend.services.decision_feedback import DecisionFeedbackService
 from backend.services.decision_learning_pipeline import DecisionLearningPipelineService
 from backend.services.decision_mode import (
@@ -839,13 +842,30 @@ def get_day_briefing(
         or ""
     )
     first_name = str(full_name).strip().split(" ")[0]
+    city = str(
+        metadata.get("city") or ""
+    ).strip()
+
+    daily_context = {}
+
+    if moment == "morning" and city:
+        daily_context = DailyContextService(
+            timeout=2.0,
+        ).build(
+            city=city,
+            day_date=day_date,
+        )
 
     payload = {
         "first_name": first_name,
         "moment": moment,
+        "daily_context": daily_context,
         "day_type": day.get("context", {}).get("value"),
         "activity_level": (
             day.get("activity_plan", {}).get("value")
+        ),
+        "meal_count": int(
+            actual.get("meal_count", 0) or 0
         ),
         "activity_count": len(
             training_activities
@@ -893,6 +913,8 @@ def get_day_briefing(
         payload["day_type"],
         payload["activity_level"],
         payload["status_hint"],
+        payload["meal_count"],
+        repr(payload["daily_context"]),
         _briefing_calorie_bucket(
             payload["available_kcal"]
         ),

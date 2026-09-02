@@ -65,17 +65,25 @@ class ActivityMovementSyncService:
             activities=activities,
         )
 
-        step_activity = (
-            self.activities_repo
-            .upsert_named_for_date(
+        if summary["net_daily_steps"] <= 0:
+            self.activities_repo.delete_named_for_date(
                 user_id=user_id,
                 log_date=day_date,
                 activity_name=self.STEP_ACTIVITY_NAME,
-                burned_calories=int(
-                    summary["step_calories"]
-                ),
             )
-        )
+            step_activity = None
+        else:
+            step_activity = (
+                self.activities_repo
+                .upsert_named_for_date(
+                    user_id=user_id,
+                    log_date=day_date,
+                    activity_name=self.STEP_ACTIVITY_NAME,
+                    burned_calories=int(
+                        summary["step_calories"]
+                    ),
+                )
+            )
 
         return {
             **summary,

@@ -18,6 +18,7 @@ export interface ProfileUpdate {
   protein_goal_enabled?: boolean | null;
   protein_goal_g?: number | null;
   language?: string | null;
+  city?: string | null;
   office_lunch?: boolean | null;
   weekly_schedule?: Record<string, string> | null;
 }

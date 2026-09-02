@@ -147,6 +147,32 @@ class ActivitiesRepository(BaseRepository):
             }
         )
 
+    def delete_named_for_date(
+        self,
+        *,
+        user_id: str,
+        log_date: Any,
+        activity_name: str,
+    ) -> bool:
+        try:
+            (
+                self.table
+                .delete()
+                .eq("user_id", user_id)
+                .eq("date", str(log_date))
+                .eq(
+                    "activity_name",
+                    activity_name,
+                )
+                .execute()
+            )
+            return True
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to delete automatic "
+                f"activity '{activity_name}': {exc}"
+            ) from exc
+
     def delete(self, activity_id: Any, user_id: str) -> bool:
         try:
             (

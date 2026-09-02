@@ -13,6 +13,7 @@ import {
   type Ingredient,
 } from "@/lib/api/ingredients";
 import { createMeal } from "@/lib/api/meals";
+import { createWeight } from "@/lib/api/weight";
 
 import styles from "./QuickAdd.module.css";
 
@@ -21,7 +22,8 @@ type QuickAddMode =
   | null
   | "meal"
   | "snack"
-  | "activity";
+  | "activity"
+  | "weight";
 
 type MealEntryMode =
   | "quick"
@@ -31,6 +33,7 @@ type MealEntryMode =
 interface QuickAddProps {
   date: string;
   accessToken?: string | null;
+  latestWeight?: number | null;
   onSaved: () => Promise<void> | void;
 }
 
@@ -131,6 +134,7 @@ function roundValue(
 export function QuickAdd({
   date,
   accessToken,
+  latestWeight = null,
   onSaved,
 }: QuickAddProps) {
   const [mode, setMode] =
@@ -185,6 +189,9 @@ export function QuickAdd({
     activityCalories,
     setActivityCalories,
   ] =
+    useState("");
+
+  const [weightValue, setWeightValue] =
     useState("");
 
   const [saving, setSaving] =
@@ -628,6 +635,51 @@ export function QuickAdd({
   }
 
 
+  async function saveWeight() {
+    if (!accessToken) {
+      return;
+    }
+
+    const weight = Number(weightValue);
+
+    if (
+      !Number.isFinite(weight) ||
+      weight <= 0
+    ) {
+      setMessage(
+        "Inserisci un peso valido.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      await createWeight(
+        {
+          date,
+          weight,
+        },
+        accessToken,
+      );
+
+      setWeightValue("");
+      setMode(null);
+      await onSaved();
+      setMessage("Peso registrato.");
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare il peso.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
   async function saveActivity() {
     if (!accessToken) {
       return;
@@ -779,6 +831,44 @@ export function QuickAdd({
             </svg>
           </span>
           <span className={styles.actionLabel}>+ Attività</span>
+        </button>
+
+        <button
+          type="button"
+          className={
+            mode === "weight"
+              ? styles.actionActive
+              : styles.action
+          }
+          onClick={() => {
+            setMessage(null);
+
+            if (mode === "weight") {
+              setMode(null);
+              return;
+            }
+
+            setWeightValue(
+              latestWeight != null
+                ? latestWeight.toFixed(1)
+                : "",
+            );
+            setMode("weight");
+          }}
+        >
+          <span
+            className={styles.actionIcon}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M5 7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5V20H5V7.5Z" />
+              <path d="M9 9a3 3 0 0 1 6 0" />
+              <path d="m12 9 1.7-1.7" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>
+            + Peso
+          </span>
         </button>
       </div>
 
@@ -1311,6 +1401,53 @@ export function QuickAdd({
               )}
             </>
           )}
+        </div>
+      ) : null}
+
+      {mode === "weight" ? (
+        <div className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <strong>Registra peso</strong>
+
+            <button
+              type="button"
+              className={styles.closeButton}
+              onClick={close}
+            >
+              Chiudi
+            </button>
+          </div>
+
+          <label>
+            <span>Peso (kg)</span>
+
+            <input
+              type="number"
+              min="1"
+              step="0.1"
+              inputMode="decimal"
+              value={weightValue}
+              placeholder="Es. 78,3"
+              onChange={(event) => {
+                setWeightValue(
+                  event.target.value,
+                );
+              }}
+            />
+          </label>
+
+          <button
+            type="button"
+            className={styles.saveButton}
+            disabled={saving}
+            onClick={() => {
+              void saveWeight();
+            }}
+          >
+            {saving
+              ? "Salvo…"
+              : "Registra peso"}
+          </button>
         </div>
       ) : null}
 

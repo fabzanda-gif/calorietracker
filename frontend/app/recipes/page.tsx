@@ -924,7 +924,7 @@ export default function RecipesPage() {
               href="/inventory"
               className={styles.inventoryLink}
             >
-              Inventario
+              Apri dispensa
             </Link>
 
           <p className={styles.headerSubtitle}>

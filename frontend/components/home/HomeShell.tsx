@@ -387,6 +387,11 @@ export function HomeShell() {
   const [weightHistory, setWeightHistory] =
     useState<WeightEntry[]>([]);
 
+  const [weightRange, setWeightRange] =
+    useState<
+      "14" | "30" | "90" | "180" | "365" | "all"
+    >("30");
+
   const [dayHistory, setDayHistory] =
     useState<DayHistoryResponse | null>(null);
 
@@ -704,17 +709,30 @@ export function HomeShell() {
     return "";
   }, [user]);
 
-  const recentWeights = useMemo(
-    () =>
-      [...weightHistory]
-        .sort(
-          (left, right) =>
-            new Date(left.date).getTime() -
-            new Date(right.date).getTime(),
-        )
-        .slice(-14),
-    [weightHistory],
-  );
+  const recentWeights = useMemo(() => {
+    const sorted = [...weightHistory].sort(
+      (left, right) =>
+        new Date(left.date).getTime() -
+        new Date(right.date).getTime(),
+    );
+
+    if (weightRange === "all") {
+      return sorted;
+    }
+
+    const days = Number(weightRange);
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(
+      cutoff.getDate() - days + 1,
+    );
+
+    return sorted.filter(
+      (entry) =>
+        new Date(entry.date).getTime() >=
+        cutoff.getTime(),
+    );
+  }, [weightHistory, weightRange]);
 
   const weightChartPoints = useMemo(() => {
     if (!recentWeights.length) {
@@ -3607,6 +3625,7 @@ export function HomeShell() {
             <QuickAdd
               date={todayIso()}
               accessToken={accessToken}
+              latestWeight={latestWeight}
               onSaved={refreshHome}
             />
           </div>
@@ -3628,9 +3647,41 @@ export function HomeShell() {
                 <h2>Trend peso</h2>
               </div>
 
-              <span className={styles.periodBadge}>
-                Ultimi 14
-              </span>
+              <select
+                className={styles.periodBadge}
+                value={weightRange}
+                aria-label="Intervallo del grafico peso"
+                onChange={(event) => {
+                  setWeightRange(
+                    event.target.value as
+                      | "14"
+                      | "30"
+                      | "90"
+                      | "180"
+                      | "365"
+                      | "all",
+                  );
+                }}
+              >
+                <option value="14">
+                  14 giorni
+                </option>
+                <option value="30">
+                  30 giorni
+                </option>
+                <option value="90">
+                  3 mesi
+                </option>
+                <option value="180">
+                  6 mesi
+                </option>
+                <option value="365">
+                  1 anno
+                </option>
+                <option value="all">
+                  Tutto
+                </option>
+              </select>
             </div>
 
             {recentWeights.length ? (
@@ -3663,7 +3714,11 @@ export function HomeShell() {
                   className={styles.weightChart}
                   viewBox="0 0 300 110"
                   role="img"
-                  aria-label="Andamento recente del peso"
+                  aria-label={`Andamento del peso: ${
+                    weightRange === "all"
+                      ? "tutto il periodo"
+                      : `ultimi ${weightRange} giorni`
+                  }`}
                 >
                   <line x1="12" y1="92" x2="288" y2="92" />
                   <line x1="12" y1="56" x2="288" y2="56" />
