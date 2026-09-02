@@ -53,12 +53,16 @@ export interface DayResponse {
 export interface DayBudget {
   goal_mode: "loss" | "maintenance" | "gain";
   goal_adjustment_kcal: number;
+  effective_goal_adjustment_kcal: number;
   maintenance_kcal: number;
+  base_daily_budget_kcal: number;
   daily_budget_kcal: number;
   consumed_kcal: number;
   planned_kcal: number;
   available_kcal: number;
   unallocated_kcal: number;
+  remaining_meal_reserve_kcal: number;
+  budget_adapted: boolean;
   protein_consumed_g: number;
   protein_target_g: number | null;
   protein_remaining_g: number | null;

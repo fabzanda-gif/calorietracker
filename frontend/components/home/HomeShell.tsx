@@ -360,8 +360,7 @@ export function HomeShell() {
 
   const maintenanceBudgetKcal =
     budgetResult?.budget
-      ? budgetResult.budget.daily_budget_kcal +
-        budgetResult.budget.goal_adjustment_kcal
+      ? budgetResult.budget.maintenance_kcal
       : 0;
   const [committingIndex, setCommittingIndex] =
     useState<number | null>(null);
@@ -2103,7 +2102,9 @@ export function HomeShell() {
               <div className={styles.budgetHeader}>
                 <div className={styles.budgetColumn}>
                   <span className={styles.budgetLabel}>
-                    Kcal disponibili
+                    {budget.budget_adapted
+                      ? "Per i pasti che restano"
+                      : "Kcal disponibili"}
                   </span>
 
                   <div className={styles.budgetValueRow}>
@@ -2114,7 +2115,9 @@ export function HomeShell() {
                   </div>
 
                   <span className={styles.budgetPositive}>
-                    {budget.consumed_kcal === 0
+                    {budget.budget_adapted
+                      ? "Il piano si è adattato alla giornata"
+                      : budget.consumed_kcal === 0
                       ? "Budget disponibile"
                       : budget.consumed_kcal <=
                         budget.daily_budget_kcal
@@ -2149,7 +2152,9 @@ export function HomeShell() {
 
                 <div className={styles.budgetColumn}>
                   <span className={styles.budgetLabel}>
-                    Obiettivo con deficit
+                    {budget.budget_adapted
+                      ? "Obiettivo aggiornato"
+                      : "Obiettivo con deficit"}
                   </span>
 
                   <div className={styles.budgetValueRow}>
@@ -2163,10 +2168,12 @@ export function HomeShell() {
                   </div>
 
                   <span className={styles.budgetSecondary}>
-                    {budget.goal_mode === "loss" &&
-                    budget.goal_adjustment_kcal > 0
+                    {budget.budget_adapted
+                      ? "Un deficit più sostenibile oggi"
+                      : budget.goal_mode === "loss" &&
+                    budget.effective_goal_adjustment_kcal > 0
                       ? `${roundNumber(
-                          budget.goal_adjustment_kcal,
+                          budget.effective_goal_adjustment_kcal,
                         )} kcal di deficit`
                       : "Target giornaliero"}
                   </span>
@@ -2228,6 +2235,8 @@ export function HomeShell() {
                     <strong>
                       {budget.consumed_kcal === 0
                         ? "Giornata da iniziare"
+                        : budget.budget_adapted
+                        ? "Piano riequilibrato"
                         : budget.consumed_kcal <
                           maintenanceBudgetKcal
                         ? "Deficit in corso"
@@ -2381,12 +2390,13 @@ export function HomeShell() {
                   <div className={styles.budgetExplanation}>
                     <span aria-hidden="true">ⓘ</span>
                     <span>
-                      Il target con deficit è il budget
-                      di mantenimento meno{" "}
-                      {roundNumber(
-                        budget.goal_adjustment_kcal,
-                      )}{" "}
-                      kcal di deficit.
+                      {budget.budget_adapted
+                        ? `Hai ancora una cena completa davanti. Il deficit di oggi è stato ridotto a circa ${roundNumber(
+                            budget.effective_goal_adjustment_kcal,
+                          )} kcal per mantenere il piano sostenibile.`
+                        : `Il target parte dal mantenimento e applica circa ${roundNumber(
+                            budget.effective_goal_adjustment_kcal,
+                          )} kcal di deficit.`}
                     </span>
                   </div>
                 </div>

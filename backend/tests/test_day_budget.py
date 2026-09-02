@@ -61,7 +61,9 @@ def test_day_budget_combines_profile_food_and_activity():
     assert result["actual"]["actual_activity_kcal"] == 450
 
     budget = result["budget"]
-    assert budget["maintenance_kcal"] == result["profile"]["bmr"] + 450
+    assert budget["maintenance_kcal"] == (
+        result["profile"]["bmr"] * 1.2
+    ) + 450
     assert budget["available_kcal"] == (
         budget["daily_budget_kcal"] - 1200
     )
@@ -164,6 +166,55 @@ def test_planned_calories_are_zero_until_planning_is_persisted():
         result["budget"]["available_kcal"]
         == result["budget"]["unallocated_kcal"]
     )
+
+
+def test_day_budget_reserves_a_realistic_dinner_until_logged():
+    result = service(
+        meals=[
+            {
+                "meal_type": "Pranzo",
+                "calories": 1007,
+                "protein": 55,
+            },
+        ]
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "loss",
+            "goal_adjustment_kcal": 500,
+        },
+        current_weight=80,
+    )
+
+    budget = result["budget"]
+    assert 600 <= budget["remaining_meal_reserve_kcal"] <= 750
+    assert budget["available_kcal"] >= 600
+    assert budget["budget_adapted"] is True
+
+
+def test_dinner_reserve_is_removed_once_dinner_is_logged():
+    result = service(
+        meals=[
+            {
+                "meal_type": "Cena",
+                "calories": 700,
+                "protein": 35,
+            },
+        ]
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "loss",
+            "goal_adjustment_kcal": 500,
+        },
+        current_weight=80,
+    )
+
+    assert result["budget"]["remaining_meal_reserve_kcal"] == 0
 
 
 def test_profile_incomplete_does_not_invent_budget():

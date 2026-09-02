@@ -71,16 +71,31 @@ class DayBudgetService:
                 "profile": profile,
             }
 
+        logged_meal_types = {
+            str(value).strip().casefold()
+            for value in metrics.get("logged_meal_types", [])
+        }
+        dinner_logged = bool(
+            logged_meal_types.intersection({"cena", "dinner"})
+        )
+        dinner_reserve = (
+            0.0
+            if dinner_logged
+            else min(750.0, max(600.0, float(profile["bmr"]) * 0.4))
+        )
+
         budget = self.budget_service.calculate(
             BudgetInput(
                 bmr=profile["bmr"],
                 activity_kcal=metrics["actual_activity_kcal"],
+                baseline_activity_factor=1.2,
                 consumed_kcal=metrics["consumed_kcal"],
                 planned_kcal=0.0,
                 protein_consumed_g=metrics["protein_consumed_g"],
                 protein_target_g=profile["protein_target_g"],
                 goal_mode=profile["goal_mode"],
                 goal_adjustment_kcal=profile["goal_adjustment_kcal"],
+                remaining_meal_reserve_kcal=dinner_reserve,
             )
         )
 
