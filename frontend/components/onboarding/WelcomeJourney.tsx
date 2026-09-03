@@ -11,11 +11,13 @@ import styles from "./WelcomeJourney.module.css";
 type WelcomeJourneyProps = {
   accessToken: string;
   initialName?: string;
+  testMode?: boolean;
 };
 
 export function WelcomeJourney({
   accessToken,
   initialName = "",
+  testMode = false,
 }: WelcomeJourneyProps) {
   const [step, setStep] = useState<"welcome" | "profile">(
     "welcome",
@@ -58,6 +60,7 @@ export function WelcomeJourney({
 
     try {
       await updateProfile(accessToken, {
+        onboarding_completed: true,
         name: name.trim() || null,
         gender,
         birth_date: birthDate,
@@ -76,6 +79,12 @@ export function WelcomeJourney({
         accessToken,
       );
 
+      if (testMode) {
+        window.sessionStorage.setItem(
+          "sanosync-onboarding-test-token",
+          accessToken,
+        );
+      }
       window.location.reload();
     } catch (err) {
       setError(

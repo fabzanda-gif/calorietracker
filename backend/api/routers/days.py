@@ -405,6 +405,8 @@ def get_ranked_meal_options(
         protein_remaining_g = budget.get(
             "protein_remaining_g"
         )
+        maintenance_kcal = float(budget.get("maintenance_kcal") or 0)
+        max_main_meal_kcal = 1400.0 if maintenance_kcal >= 2800 else 1000.0
 
         normalized_mode = str(mode or "auto").strip().lower()
 
@@ -520,6 +522,7 @@ def get_ranked_meal_options(
             mode=mode_result["mode"],
             preferred_lens=feedback["preferred_lens"],
             preferred_mode=feedback["preferred_mode"],
+            max_main_meal_kcal=max_main_meal_kcal,
         )
 
         routine_candidate = None
@@ -538,6 +541,7 @@ def get_ranked_meal_options(
             routine_candidate=routine_candidate,
             ranked_options=ranked["options"],
             available_kcal=available_kcal,
+            max_main_meal_kcal=max_main_meal_kcal,
         )
 
         replanning_context = MealReplanningContextService().build(

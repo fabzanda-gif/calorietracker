@@ -6,6 +6,7 @@ export interface ProfileResponse {
 }
 
 export interface ProfileUpdate {
+  onboarding_completed?: boolean | null;
   name?: string | null;
   gender?: string | null;
   birth_date?: string | null;

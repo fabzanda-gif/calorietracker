@@ -24,6 +24,7 @@ class DecisionRankingService:
         mode: str = "auto",
         preferred_lens: str | None = None,
         preferred_mode: str | None = None,
+        max_main_meal_kcal: float = 1000.0,
     ) -> dict:
         eligible = [
             self._normalize(item)
@@ -31,6 +32,7 @@ class DecisionRankingService:
             if self._is_eligible(
                 item,
                 available_kcal=available_kcal,
+                max_main_meal_kcal=max_main_meal_kcal,
             )
         ]
 
@@ -242,6 +244,7 @@ class DecisionRankingService:
         item: dict[str, Any],
         *,
         available_kcal: float | None,
+        max_main_meal_kcal: float = 1000.0,
     ) -> bool:
         try:
             calories = float(item.get("calories") or 0)
@@ -257,11 +260,14 @@ class DecisionRankingService:
 
         if (
             meal_type in {"Pranzo", "Cena"}
-            and calories < 300.0
+            and (
+                calories < 500.0
+                or calories > max_main_meal_kcal
+            )
         ):
             return False
 
-        if available_kcal is not None:
+        if available_kcal is not None and meal_type not in {"Pranzo", "Cena"}:
             available = float(available_kcal)
 
             # Calorie availability is a strong preference, not a

@@ -17,6 +17,7 @@ class ProfileUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = None
+    onboarding_completed: bool | None = None
     gender: str | None = None
     birth_date: str | None = None
     height: float | None = Field(default=None, gt=0)

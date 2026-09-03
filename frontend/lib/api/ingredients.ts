@@ -54,3 +54,25 @@ export async function createIngredient(
     },
   );
 }
+
+export async function updateIngredient(
+  ingredientId: string,
+  input: Partial<IngredientCreateInput>,
+  accessToken?: string | null,
+): Promise<{ item: Ingredient }> {
+  return apiRequest(`/ingredients/${encodeURIComponent(ingredientId)}`, {
+    method: "PATCH",
+    accessToken,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteIngredient(
+  ingredientId: string,
+  accessToken?: string | null,
+): Promise<{ deleted: boolean }> {
+  return apiRequest(`/ingredients/${encodeURIComponent(ingredientId)}`, {
+    method: "DELETE",
+    accessToken,
+  });
+}

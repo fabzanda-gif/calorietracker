@@ -949,6 +949,12 @@ export default function RecipesPage() {
             >
               Apri dispensa
             </Link>
+            <Link
+              href="/ingredients"
+              className={styles.inventoryLink}
+            >
+              Gestisci ingredienti
+            </Link>
 
           <p className={styles.headerSubtitle}>
             I piatti che conosci già, pronti da registrare

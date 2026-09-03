@@ -35,6 +35,7 @@ import {
   confirmConversationalMeal,
   deleteMeal,
   getMeal,
+  getMealHistory,
   getMealsForDate,
   previewConversationalMeal,
   previewPhotoMeal,
@@ -43,6 +44,10 @@ import {
   type LoggedMeal,
   type StructuredMealIngredient,
 } from "@/lib/api/meals";
+import {
+  getAvailableRecipes,
+  type Recipe,
+} from "@/lib/api/recipes";
 import {
   getDay,
   getDayBriefing,
@@ -337,6 +342,13 @@ export function HomeShell() {
     user,
     accessToken,
   } = useAuth();
+  const [onboardingTestCompleted] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.sessionStorage.getItem(
+        "sanosync-onboarding-test-token",
+      ) === accessToken,
+  );
 
   const [day, setDay] =
     useState<DayResponse | null>(null);
@@ -378,6 +390,15 @@ export function HomeShell() {
     useState("");
   const [alternateFat, setAlternateFat] =
     useState("");
+  const [knownAlternates, setKnownAlternates] = useState<Array<{
+    key: string;
+    name: string;
+    mealType: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  }>>([]);
   const [savingAlternate, setSavingAlternate] =
     useState(false);
   const [commitMessage, setCommitMessage] =
@@ -464,6 +485,56 @@ export function HomeShell() {
       ),
     [actualMeals],
   );
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let active = true;
+
+    Promise.allSettled([
+      getAvailableRecipes(accessToken),
+      getMealHistory(accessToken),
+    ]).then(([recipesResult, historyResult]) => {
+      if (!active) return;
+      const recipes = recipesResult.status === "fulfilled" ? recipesResult.value.items : [];
+      const history = historyResult.status === "fulfilled" ? historyResult.value.items : [];
+      const seen = new Set<string>();
+      const items = [
+        ...recipes.map((recipe: Recipe) => {
+          const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
+          return {
+            key: `recipe:${recipe.id}`,
+            name: recipe.name,
+            mealType: recipe.meal_type || "Pranzo",
+            calories: Number(recipe.calories || 0) / servings,
+            protein: Number(recipe.protein || 0) / servings,
+            carbs: Number(recipe.carbs || 0) / servings,
+            fat: Number(recipe.fat || 0) / servings,
+          };
+        }),
+        ...history.map((meal) => {
+          const quantity = Math.max(0.01, Number(meal.quantity) || 1);
+          const factor = meal.is_per_100g ? 100 / quantity : 1 / quantity;
+          return {
+            key: `history:${meal.id ?? `${meal.date}:${meal.name}`}`,
+            name: meal.base_name || meal.name,
+            mealType: meal.meal_type || "Pranzo",
+            calories: Number(meal.base_calories ?? Number(meal.calories || 0) * factor),
+            protein: Number(meal.base_protein ?? Number(meal.protein || 0) * factor),
+            carbs: Number(meal.base_carbs ?? Number(meal.carbs || 0) * factor),
+            fat: Number(meal.base_fat ?? Number(meal.fat || 0) * factor),
+          };
+        }),
+      ].filter((item) => {
+        const key = item.name.trim().toLocaleLowerCase("it");
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setKnownAlternates(items);
+    });
+
+    return () => { active = false; };
+  }, [accessToken]);
 
   useEffect(() => {
     if (
@@ -894,11 +965,11 @@ export function HomeShell() {
 
           const metadata = profilePayload.metadata;
           setShowWelcomeJourney(
-            !metadata.gender ||
-              !metadata.birth_date ||
-              !metadata.height ||
-              !metadata.goal_mode ||
-              latestWeightPayload.item?.weight == null,
+            metadata.onboarding_completed !== true &&
+              (!metadata.gender ||
+                !metadata.birth_date ||
+                !metadata.height ||
+                latestWeightPayload.item?.weight == null),
           );
 
           // The usable home is ready. AI briefing, recommendations and
@@ -970,9 +1041,27 @@ export function HomeShell() {
     budgetResult?.budget ?? null;
 
   const bmr = Number(budgetResult?.profile?.bmr ?? 0);
+  const onboardingTestEmails = [
+    process.env.NEXT_PUBLIC_ONBOARDING_TEST_EMAIL,
+    process.env.NEXT_PUBLIC_ONBOARDING_TEST_EMAILS,
+  ]
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(","))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const onboardingTestIds = String(
+    process.env.NEXT_PUBLIC_ONBOARDING_TEST_USER_IDS ??
+      process.env.NEXT_PUBLIC_ONBOARDING_TEST_USER_ID ??
+      "",
+  ).split(",").map((value) => value.trim()).filter(Boolean);
+  const isOnboardingTestAccount = Boolean(
+    (user?.email && onboardingTestEmails.includes(user.email.trim().toLowerCase())) ||
+      (user?.id && onboardingTestIds.includes(user.id)),
+  );
   const needsWelcomeJourney =
-    showWelcomeJourney ||
-    budgetResult?.status === "profile_incomplete";
+    (((showWelcomeJourney || budgetResult?.status === "profile_incomplete") &&
+      profile?.metadata.onboarding_completed !== true) ||
+      (isOnboardingTestAccount && !onboardingTestCompleted));
 
   const burnedCalories = actualActivities.reduce(
     (total, activity) =>
@@ -1198,6 +1287,17 @@ export function HomeShell() {
     setDayPlannerSaving(true);
     setDayPlannerMessage(null);
 
+    const previousDay = day;
+    setDay((current) => current ? {
+      ...current,
+      context: changes.day_type
+        ? { ...current.context, value: changes.day_type, state: "confirmed", source: "user" }
+        : current.context,
+      activity_plan: changes.activity_plan
+        ? { ...current.activity_plan, value: changes.activity_plan, state: "confirmed", source: "user" }
+        : current.activity_plan,
+    } : current);
+
     try {
       await updateDailyLog(
         accessToken,
@@ -1207,8 +1307,9 @@ export function HomeShell() {
 
       setDayPlannerMessage("Giornata aggiornata.");
 
-      await refreshHome();
+      void refreshHome().catch(() => undefined);
     } catch (err) {
+      setDay(previousDay);
       setDayPlannerMessage(
         err instanceof Error
           ? err.message
@@ -1951,6 +2052,7 @@ export function HomeShell() {
               ? profile.metadata.name
               : firstName
           }
+          testMode={isOnboardingTestAccount}
         />
       ) : null}
 
@@ -3466,6 +3568,27 @@ export function HomeShell() {
                           <div className={styles.alternateMealForm}>
                             <label>
                               Cosa hai mangiato?
+                              <select
+                                value=""
+                                onChange={(event) => {
+                                  const selected = knownAlternates.find((item) => item.key === event.target.value);
+                                  if (!selected) return;
+                                  setAlternateName(selected.name);
+                                  setAlternateCalories(String(Math.round(selected.calories)));
+                                  setAlternateProtein(String(Math.round(selected.protein)));
+                                  setAlternateCarbs(String(Math.round(selected.carbs)));
+                                  setAlternateFat(String(Math.round(selected.fat)));
+                                }}
+                              >
+                                <option value="">Scegli da ricette e pasti recenti…</option>
+                                {knownAlternates.filter((item) => {
+                                  const isSnack = ["spuntino", "snack"].includes(item.mealType.toLowerCase());
+                                  return slot === "snack" ? isSnack : !isSnack;
+                                }).map((item) => (
+                                  <option key={item.key} value={item.key}>{item.name}</option>
+                                ))}
+                              </select>
+                              <span className={styles.manualMealLabel}>oppure scrivi manualmente</span>
                               <input
                                 type="text"
                                 value={alternateName}

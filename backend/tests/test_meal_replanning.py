@@ -64,7 +64,7 @@ def test_keeps_routine_when_it_fits():
     assert result["strategy"] == "routine"
 
 
-def test_does_not_shrink_routine_to_fit():
+def test_keeps_real_main_meal_even_above_remaining_budget():
     routine = candidate(
         "Lasagna Fit",
         700,
@@ -80,13 +80,13 @@ def test_does_not_shrink_routine_to_fit():
     )
 
     assert result is not None
-    assert result["candidate"]["name"] == "Chicken Bowl"
-    assert result["candidate"]["calories"] == 500
+    assert result["candidate"]["name"] == "Lasagna Fit"
+    assert result["candidate"]["calories"] == 700
     assert result["portion_multiplier"] == 1.0
-    assert result["strategy"] == "alternate_candidate"
+    assert result["strategy"] == "routine"
 
 
-def test_uses_ranked_alternative_at_original_portion():
+def test_rejects_ranked_main_meal_below_minimum():
     routine = candidate(
         "Huge Lasagna",
         1200,
@@ -106,14 +106,10 @@ def test_uses_ranked_alternative_at_original_portion():
         available_kcal=500,
     )
 
-    assert result is not None
-    assert result["candidate"]["name"] == "Chicken Bowl"
-    assert result["candidate"]["calories"] == 480
-    assert result["portion_multiplier"] == 1.0
-    assert result["strategy"] == "alternate_candidate"
+    assert result is None
 
 
-def test_does_not_adapt_alternative_portion():
+def test_uses_realistic_alternative_even_above_remaining_budget():
     routine = candidate(
         "Huge Lasagna",
         1400,
@@ -133,7 +129,10 @@ def test_does_not_adapt_alternative_portion():
         available_kcal=470,
     )
 
-    assert result is None
+    assert result is not None
+    assert result["candidate"]["name"] == "Salmon Bowl"
+    assert result["candidate"]["calories"] == 650
+    assert result["strategy"] == "alternate_candidate"
 
 
 def test_returns_none_when_nothing_is_compatible():
@@ -149,6 +148,29 @@ def test_returns_none_when_nothing_is_compatible():
             option(candidate("Huge Bowl", 1200)),
         ],
         available_kcal=300,
+    )
+
+    assert result is None
+
+
+def test_main_meal_is_not_shrunk_to_tiny_remaining_budget():
+    dinner = candidate("Real dinner", 700, source="routine")
+
+    result = service.recommend(
+        routine_candidate=dinner,
+        ranked_options=[],
+        available_kcal=196,
+    )
+
+    assert result is not None
+    assert result["candidate"]["calories"] == 700
+
+
+def test_main_meal_never_falls_below_five_hundred_kcal():
+    result = service.recommend(
+        routine_candidate=None,
+        ranked_options=[option(candidate("Snack plate", 499))],
+        available_kcal=196,
     )
 
     assert result is None
@@ -179,7 +201,7 @@ def test_does_not_mutate_routine_or_ranked_candidate():
     assert alternative["calories"] == 500
     assert "portion_multiplier" not in alternative
 
-def test_removes_optional_apple_before_changing_main_meal():
+def test_does_not_dismantle_a_valid_main_meal():
     routine = candidate(
         "Pollo e riso + Mela",
         600,
@@ -209,13 +231,10 @@ def test_removes_optional_apple_before_changing_main_meal():
     )
 
     assert result is not None
-    assert result["strategy"] == "component_reduction"
-    assert result["candidate"]["name"] == "Pollo e riso"
-    assert result["candidate"]["calories"] == 500
-    assert (
-        result["adaptation"]["removed_components"][0]["name"]
-        == "Mela"
-    )
+    assert result["strategy"] == "routine"
+    assert result["candidate"]["name"] == "Pollo e riso + Mela"
+    assert result["candidate"]["calories"] == 600
+    assert result["adaptation"]["removed_components"] == []
     assert result["portion_multiplier"] == 1.0
 
 
@@ -248,7 +267,7 @@ def test_does_not_remove_oat_latte_from_breakfast():
     assert result is None
 
 
-def test_optional_removal_must_be_enough_to_fit():
+def test_valid_main_meal_wins_over_too_small_alternative():
     routine = candidate(
         "Pollo e riso + Mela",
         700,
@@ -279,8 +298,8 @@ def test_optional_removal_must_be_enough_to_fit():
     )
 
     assert result is not None
-    assert result["strategy"] == "alternate_candidate"
-    assert result["candidate"]["name"] == "Piatto alternativo"
+    assert result["strategy"] == "routine"
+    assert result["candidate"]["name"] == "Pollo e riso + Mela"
 
 
 def test_component_adaptation_does_not_mutate_routine():

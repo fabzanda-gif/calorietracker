@@ -33,10 +33,12 @@ const ITEMS = [
     label: "Ricette",
     icon: "⌑",
   },
+  { href: "/inventory", label: "Dispensa", icon: "·", subLink: true },
+  { href: "/ingredients", label: "Ingredienti", icon: "·", subLink: true },
 ];
 
 const MOBILE_ITEMS = [
-  ...ITEMS,
+  ...ITEMS.slice(0, 4),
   {
     href: "/profile",
     label: "Profilo",
@@ -51,6 +53,10 @@ function isActive(pathname: string, href: string): boolean {
 
   if (href === "#") {
     return false;
+  }
+
+  if (href === "/recipes" && (pathname.startsWith("/inventory") || pathname.startsWith("/ingredients"))) {
+    return true;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -122,7 +128,7 @@ export function AppNav({
         <nav className={styles.desktopLinks}>
           {ITEMS.map((item, index) => {
             const active = isActive(pathname, item.href);
-            const separatorBefore = index === 5;
+            const separatorBefore = index === 4;
 
             return (
               <div key={item.label}>
@@ -151,7 +157,7 @@ export function AppNav({
                   <Link
                     href={item.href}
                     className={
-                      item.href === "/inventory"
+                      "subLink" in item && item.subLink
                         ? active
                           ? styles.desktopSubLinkActive
                           : styles.desktopSubLink

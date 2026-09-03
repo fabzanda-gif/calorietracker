@@ -530,7 +530,8 @@
   font-weight: 700;
 }
 
-.alternateMealForm input {
+.alternateMealForm input,
+.alternateMealForm select {
   width: 100%;
   min-height: 42px;
   box-sizing: border-box;
@@ -540,6 +541,12 @@
   background: #ffffff;
   color: #171815;
   font: inherit;
+}
+
+.manualMealLabel {
+  color: #8a8a83;
+  font-size: 0.68rem;
+  font-weight: 600;
 }
 
 .alternateMealNumbers {

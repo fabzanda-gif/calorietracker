@@ -27,6 +27,7 @@ class MealReplanningService:
         routine_candidate: dict[str, Any] | None,
         ranked_options: list[dict[str, Any]],
         available_kcal: float | None,
+        max_main_meal_kcal: float = 1000.0,
     ) -> dict[str, Any] | None:
         """
         Prefer the normal routine when it fits.
@@ -42,6 +43,7 @@ class MealReplanningService:
             if self._fits_budget(
                 routine_candidate,
                 available_kcal,
+                max_main_meal_kcal,
             ):
                 return self._recommendation(
                     candidate=dict(routine_candidate),
@@ -50,7 +52,7 @@ class MealReplanningService:
                     original_candidate=routine_candidate,
                 )
 
-        if isinstance(routine_candidate, dict):
+        if isinstance(routine_candidate, dict) and str(routine_candidate.get("meal_type")) not in {"Pranzo", "Cena"}:
             adapted = (
                 MealComponentAdaptationService().adapt(
                     candidate=routine_candidate,
@@ -75,6 +77,7 @@ class MealReplanningService:
             if not self._fits_budget(
                 candidate,
                 available_kcal,
+                max_main_meal_kcal,
             ):
                 continue
 
@@ -92,13 +95,16 @@ class MealReplanningService:
         cls,
         candidate: dict[str, Any],
         available_kcal: float | None,
+        max_main_meal_kcal: float = 1000.0,
     ) -> bool:
+        meal_type = str(candidate.get("meal_type") or "").strip()
+        calories = cls._number(candidate.get("calories"))
+
+        if meal_type in {"Pranzo", "Cena"}:
+            return 500.0 <= calories <= max_main_meal_kcal
+
         if available_kcal is None:
             return True
-
-        calories = cls._number(
-            candidate.get("calories")
-        )
 
         available = cls._number(
             available_kcal
