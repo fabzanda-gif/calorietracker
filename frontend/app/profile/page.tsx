@@ -1078,6 +1078,25 @@ export default function ProfilePage() {
               </button>
             </div>
 
+            <section className={`${styles.card} ${styles.logoutZone}`}>
+              <div className={styles.sectionHeader}>
+                <h2>Sessione</h2>
+                <p>Puoi uscire da SanoSync su questo dispositivo.</p>
+              </div>
+              <button
+                type="button"
+                className={styles.logoutButton}
+                onClick={() => {
+                  window.sessionStorage.removeItem(
+                    "sanosync-onboarding-test-completed",
+                  );
+                  void signOut();
+                }}
+              >
+                Esci dall’account
+              </button>
+            </section>
+
             <section className={`${styles.card} ${styles.dangerZone}`}>
               <div className={styles.sectionHeader}>
                 <h2>Elimina account</h2>

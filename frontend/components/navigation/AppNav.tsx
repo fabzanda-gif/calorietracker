@@ -35,7 +35,14 @@ const ITEMS = [
   },
 ];
 
-const MOBILE_ITEMS = ITEMS;
+const MOBILE_ITEMS = [
+  ...ITEMS,
+  {
+    href: "/profile",
+    label: "Profilo",
+    icon: "●",
+  },
+];
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") {
@@ -219,7 +226,7 @@ export function AppNav({
         className={styles.mobileNav}
         aria-label="Navigazione principale"
       >
-        {MOBILE_ITEMS.slice(0, 4).map((item) => {
+        {MOBILE_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
 
           return (

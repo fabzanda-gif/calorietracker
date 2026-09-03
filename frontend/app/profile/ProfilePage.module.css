@@ -352,3 +352,24 @@
     width: 100%;
   }
 }
+
+.logoutZone {
+  border-color: rgba(255, 104, 100, 0.28);
+  background: #ffffff;
+}
+
+.logoutButton {
+  min-height: 46px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #ff6864;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.logoutButton:hover {
+  background: #e95250;
+}
