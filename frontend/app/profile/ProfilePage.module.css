@@ -116,6 +116,12 @@
   font-weight: 600;
 }
 
+.fieldHint {
+  color: #737a84;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 .grid input,
 .grid select {
   width: 100%;

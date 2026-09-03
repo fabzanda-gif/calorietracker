@@ -9,6 +9,10 @@ from backend.api.dependencies import (
     get_weight_repository,
 )
 from backend.api.main import app
+from backend.api.routers.activities import (
+    _is_training_activity,
+    _with_activity_defaults,
+)
 
 
 class FakeActivitiesRepository:
@@ -100,6 +104,16 @@ def api_overrides():
 
 
 client = TestClient(app)
+
+
+def test_legacy_padel_gets_default_duration_and_bikes_are_training():
+    padel = _with_activity_defaults(
+        {"activity_name": "Padel", "duration_seconds": None}
+    )
+
+    assert padel["duration_seconds"] == 90 * 60
+    assert _is_training_activity({"activity_name": "Bicicletta"}) is True
+    assert _is_training_activity({"activity_name": "Passi"}) is False
 
 
 def test_list_activities():

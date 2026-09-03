@@ -45,8 +45,22 @@ def _is_training_activity(activity: dict) -> bool:
     name = str(activity.get("activity_name") or "").strip().casefold()
     return not any(
         name == prefix or name.startswith(f"{prefix} ") or name.startswith(f"{prefix} (")
-        for prefix in ("passi", "steps", "bici", "bicicletta")
+        for prefix in ("passi", "steps")
     )
+
+
+def _with_activity_defaults(activity: dict) -> dict:
+    """Fill safe display defaults for legacy rows without changing storage."""
+    item = dict(activity)
+    activity_type = normalize_activity_type(
+        item.get("activity_type") or item.get("activity_name")
+    )
+    item["activity_type"] = activity_type
+
+    if activity_type == "Padel" and not item.get("duration_seconds"):
+        item["duration_seconds"] = 90 * 60
+
+    return item
 
 
 class ActivityCreate(BaseModel):
@@ -101,7 +115,10 @@ def get_activity_overview(
         raise HTTPException(status_code=400, detail="Invalid overview date range")
 
     try:
-        activities = repo.list_date_range(current_user.id, start_date, end_date)
+        activities = [
+            _with_activity_defaults(item)
+            for item in repo.list_date_range(current_user.id, start_date, end_date)
+        ]
         meals = meals_repo.list_date_range(
             current_user.id, start_date, end_date,
             columns="date,calories",
@@ -167,11 +184,14 @@ def get_activities_for_range(
         )
 
     try:
-        rows = repo.list_date_range(
-            user_id=current_user.id,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        rows = [
+            _with_activity_defaults(item)
+            for item in repo.list_date_range(
+                user_id=current_user.id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        ]
 
         return {
             "start_date": str(start_date),
@@ -411,7 +431,10 @@ def get_activities_for_date(
     repo: ActivitiesRepository = Depends(get_activities_repository),
 ):
     try:
-        rows = repo.list_for_date(current_user.id, activity_date)
+        rows = [
+            _with_activity_defaults(item)
+            for item in repo.list_for_date(current_user.id, activity_date)
+        ]
         return {
             "date": str(activity_date),
             "count": len(rows),

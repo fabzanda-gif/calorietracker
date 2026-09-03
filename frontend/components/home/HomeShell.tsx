@@ -150,6 +150,32 @@ function mealIcon(slot: string): string {
   }[slot] ?? "•";
 }
 
+function normalizedMealSlot(value: string):
+  "breakfast" | "lunch" | "dinner" | "snack" | "unknown" {
+  const normalized = value.trim().toLocaleLowerCase("it");
+
+  if (["colazione", "breakfast"].includes(normalized)) return "breakfast";
+  if (["pranzo", "lunch"].includes(normalized)) return "lunch";
+  if (["cena", "dinner"].includes(normalized)) return "dinner";
+  if (["spuntino", "snack"].includes(normalized)) return "snack";
+  return "unknown";
+}
+
+function mealFitsSlot(candidate: string, selected: string): boolean {
+  const candidateSlot = normalizedMealSlot(candidate);
+  const selectedSlot = normalizedMealSlot(selected);
+
+  if (selectedSlot === "breakfast" || selectedSlot === "snack") {
+    return candidateSlot === selectedSlot;
+  }
+
+  if (selectedSlot === "lunch" || selectedSlot === "dinner") {
+    return candidateSlot === "lunch" || candidateSlot === "dinner";
+  }
+
+  return false;
+}
+
 function roundNumber(value: number): string {
   return Math.round(value).toLocaleString("it-IT");
 }
@@ -3396,12 +3422,11 @@ export function HomeShell() {
                                 }}
                               >
                                 <option value="">Scegli da ricette e pasti recenti…</option>
-                                {knownAlternates.filter((item) => {
-                                  const isSnack = ["spuntino", "snack"].includes(item.mealType.toLowerCase());
-                                  return slot === "snack" ? isSnack : !isSnack;
-                                }).map((item) => (
-                                  <option key={item.key} value={item.key}>{item.name}</option>
-                                ))}
+                                {knownAlternates
+                                  .filter((item) => mealFitsSlot(item.mealType, slot))
+                                  .map((item) => (
+                                    <option key={item.key} value={item.key}>{item.name}</option>
+                                  ))}
                               </select>
                               <span className={styles.manualMealLabel}>oppure scrivi manualmente</span>
                               <input

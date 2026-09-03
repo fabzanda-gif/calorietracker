@@ -152,8 +152,6 @@ function isDailyMovement(
   return [
     "passi",
     "steps",
-    "bici",
-    "bicicletta",
   ].some(
     (prefix) =>
       name === prefix ||

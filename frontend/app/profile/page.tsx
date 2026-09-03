@@ -106,6 +106,33 @@ const EMPTY_FORM: FormState = {
   },
 };
 
+const DEFICIT_BY_PLAN = {
+  slow: 100,
+  balanced: 300,
+  fast: 500,
+} as const;
+
+function deficitPlanFromCalories(value: unknown): keyof typeof DEFICIT_BY_PLAN {
+  const calories = Number(value);
+  if (calories <= 150) return "slow";
+  if (calories >= 400) return "fast";
+  return "balanced";
+}
+
+function normalizedDeficitPlan(
+  value: unknown,
+  calories?: unknown,
+): keyof typeof DEFICIT_BY_PLAN {
+  if (value === "slow" || value === "balanced" || value === "fast") {
+    return value;
+  }
+  return deficitPlanFromCalories(calories);
+}
+
+function deficitCalories(value: unknown): number {
+  return DEFICIT_BY_PLAN[normalizedDeficitPlan(value)];
+}
+
 function stringValue(
   value: unknown,
 ): string {
@@ -238,8 +265,10 @@ export default function ProfilePage() {
           goal_mode:
             stringValue(metadata.goal_mode),
           deficit_plan:
-            stringValue(metadata.deficit_plan) ||
-            "balanced",
+            normalizedDeficitPlan(
+              metadata.deficit_plan,
+              metadata.goal_adjustment_kcal ?? metadata.deficit_target_kcal,
+            ),
           goal_adjustment_kcal:
             numberString(
               metadata.goal_adjustment_kcal ??
@@ -499,7 +528,11 @@ export default function ProfilePage() {
       goal_mode:
         form.goal_mode || null,
       goal_adjustment_kcal:
-        form.goal_adjustment_kcal
+        form.goal_mode === "loss"
+          ? deficitCalories(form.deficit_plan)
+          : form.goal_mode === "maintenance"
+          ? 0
+          : form.goal_adjustment_kcal
           ? Number(form.goal_adjustment_kcal)
           : null,
       protein_goal_enabled:
@@ -785,38 +818,20 @@ export default function ProfilePage() {
                         }
                       >
                         <option value="slow">
-                          Lenta
+                          Lento
                         </option>
                         <option value="balanced">
-                          Bilanciata
+                          Bilanciato
                         </option>
                         <option value="fast">
-                          Rapida
+                          Rapido
                         </option>
                       </select>
-                    </label>
-                  )}
-
-                  {form.goal_mode === "loss" && (
-                    <label>
-                      <span>
-                        Deficit calorico (kcal)
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={
-                          form.goal_adjustment_kcal
-                        }
-                        onChange={(event) =>
-                          updateField(
-                            "goal_adjustment_kcal",
-                            event.target.value,
-                          )
-                        }
-                        placeholder="Es. 300"
-                      />
+                      <small className={styles.fieldHint}>
+                        Verrà applicato un deficit di{" "}
+                        {deficitCalories(form.deficit_plan)}{" "}
+                        kcal, adattabile nelle giornate reali.
+                      </small>
                     </label>
                   )}
 

@@ -33,8 +33,6 @@ const ITEMS = [
     label: "Ricette",
     icon: "⌑",
   },
-  { href: "/inventory", label: "Dispensa", icon: "·", subLink: true },
-  { href: "/ingredients", label: "Ingredienti", icon: "·", subLink: true },
 ];
 
 const MOBILE_ITEMS = [
@@ -126,19 +124,11 @@ export function AppNav({
         </div>
 
         <nav className={styles.desktopLinks}>
-          {ITEMS.map((item, index) => {
+          {ITEMS.map((item) => {
             const active = isActive(pathname, item.href);
-            const separatorBefore = index === 4;
 
             return (
               <div key={item.label}>
-                {separatorBefore && (
-                  <div
-                    className={styles.separator}
-                    aria-hidden="true"
-                  />
-                )}
-
                 {item.href === "#" ? (
                   <button
                     type="button"
@@ -156,15 +146,9 @@ export function AppNav({
                 ) : (
                   <Link
                     href={item.href}
-                    className={
-                      "subLink" in item && item.subLink
-                        ? active
-                          ? styles.desktopSubLinkActive
-                          : styles.desktopSubLink
-                        : active
-                        ? styles.desktopLinkActive
-                        : styles.desktopLink
-                    }
+                    className={active
+                      ? styles.desktopLinkActive
+                      : styles.desktopLink}
                     aria-current={
                       active ? "page" : undefined
                     }

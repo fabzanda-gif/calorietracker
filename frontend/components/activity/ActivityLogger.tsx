@@ -31,52 +31,16 @@ const ACTIVITY_OPTIONS = [
     defaultMinutes: 90,
   },
   {
-    value: "Corsa",
-    label: "🏃 Corsa",
-    kcalPerHour: 650,
-    defaultMinutes: 60,
+    value: "Bicicletta",
+    label: "🚴 Bici",
+    kcalPerHour: 420,
+    defaultMinutes: 45,
   },
   {
-    value: "Tennis",
-    label: "🎾 Tennis",
-    kcalPerHour: 480,
-    defaultMinutes: 60,
-  },
-  {
-    value: "Palestra",
-    label: "🏋️ Palestra",
-    kcalPerHour: 350,
-    defaultMinutes: 60,
-  },
-  {
-    value: "Calcio",
-    label: "⚽ Calcio",
-    kcalPerHour: 600,
-    defaultMinutes: 60,
-  },
-  {
-    value: "Nuoto",
-    label: "🏊 Nuoto",
-    kcalPerHour: 500,
-    defaultMinutes: 60,
-  },
-  {
-    value: "Escursione",
-    label: "🥾 Escursione",
-    kcalPerHour: 400,
-    defaultMinutes: 120,
-  },
-  {
-    value: "Camminata",
-    label: "🚶 Camminata",
-    kcalPerHour: 280,
-    defaultMinutes: 60,
-  },
-  {
-    value: "Altro",
-    label: "🔥 Altro",
-    kcalPerHour: 300,
-    defaultMinutes: 60,
+    value: "Bici elettrica",
+    label: "⚡ E-bike",
+    kcalPerHour: 250,
+    defaultMinutes: 45,
   },
 ];
 
@@ -110,8 +74,6 @@ export function ActivityLogger({
 }: ActivityLoggerProps) {
   const [activityType, setActivityType] =
     useState("Padel");
-  const [customName, setCustomName] =
-    useState("");
   const [durationMinutes, setDurationMinutes] =
     useState("90");
   const [calories, setCalories] =
@@ -205,10 +167,7 @@ export function ActivityLogger({
 
     const minutes = Number(durationMinutes);
     const burned = Number(calories);
-    const name =
-      activityType === "Altro"
-        ? customName.trim()
-        : activityType;
+    const name = activityType;
 
     if (!name) {
       setError("Inserisci il nome dell’attività.");
@@ -254,7 +213,6 @@ export function ActivityLogger({
       }
 
       setMessage(`${name} registrato.`);
-      setCustomName("");
       await onSaved();
     } catch (err) {
       setError(
@@ -365,21 +323,6 @@ export function ActivityLogger({
               ))}
             </select>
           </label>
-
-          {activityType === "Altro" ? (
-            <label>
-              <span>Nome attività</span>
-              <input
-                value={customName}
-                placeholder="Es. Arrampicata"
-                onChange={(event) =>
-                  setCustomName(
-                    event.target.value,
-                  )
-                }
-              />
-            </label>
-          ) : null}
 
           <label>
             <span>Durata in minuti</span>

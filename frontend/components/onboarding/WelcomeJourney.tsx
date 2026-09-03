@@ -29,6 +29,7 @@ export function WelcomeJourney({
   const [weight, setWeight] = useState("");
   const [targetWeight, setTargetWeight] = useState("");
   const [goalMode, setGoalMode] = useState("loss");
+  const [adjustment, setAdjustment] = useState("300");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +69,7 @@ export function WelcomeJourney({
         target_weight: targetWeightValue,
         goal_mode: goalMode,
         goal_adjustment_kcal:
-          goalMode === "maintenance" ? 0 : 500,
+          goalMode === "maintenance" ? 0 : Number(adjustment),
       });
 
       await createWeight(
@@ -173,6 +174,16 @@ export function WelcomeJourney({
                   <option value="gain">Aumentare il peso</option>
                 </select>
               </label>
+              {goalMode !== "maintenance" ? (
+                <label className={styles.fullWidth}>
+                  <span>{goalMode === "loss" ? "Velocità di perdita" : "Velocità di aumento"}</span>
+                  <select value={adjustment} onChange={(e) => setAdjustment(e.target.value)}>
+                    <option value="100">Lento · {goalMode === "loss" ? "deficit" : "surplus"} di 100 kcal</option>
+                    <option value="300">Bilanciato · {goalMode === "loss" ? "deficit" : "surplus"} di 300 kcal</option>
+                    <option value="500">Rapido · {goalMode === "loss" ? "deficit" : "surplus"} di 500 kcal</option>
+                  </select>
+                </label>
+              ) : null}
             </div>
 
             {error ? <p className={styles.error}>{error}</p> : null}

@@ -65,6 +65,32 @@ type KnownMeal = {
   source: "Ricetta" | "Cronologia";
 };
 
+function normalizedMealSlot(value: string):
+  "breakfast" | "lunch" | "dinner" | "snack" | "unknown" {
+  const normalized = value.trim().toLocaleLowerCase("it");
+
+  if (["colazione", "breakfast"].includes(normalized)) return "breakfast";
+  if (["pranzo", "lunch"].includes(normalized)) return "lunch";
+  if (["cena", "dinner"].includes(normalized)) return "dinner";
+  if (["spuntino", "snack"].includes(normalized)) return "snack";
+  return "unknown";
+}
+
+function mealFitsSlot(candidate: string, selected: string): boolean {
+  const candidateSlot = normalizedMealSlot(candidate);
+  const selectedSlot = normalizedMealSlot(selected);
+
+  if (selectedSlot === "breakfast" || selectedSlot === "snack") {
+    return candidateSlot === selectedSlot;
+  }
+
+  if (selectedSlot === "lunch" || selectedSlot === "dinner") {
+    return candidateSlot === "lunch" || candidateSlot === "dinner";
+  }
+
+  return false;
+}
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 12000): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(
@@ -305,20 +331,16 @@ export function QuickAdd({
 
   const knownMealSuggestions = useMemo(() => {
     const query = name.trim().toLocaleLowerCase("it");
+    const selectedSlot = mode === "snack" ? "Snack" : mealType;
 
     return knownMeals
       .filter((meal) => {
-        const snack = ["spuntino", "snack"].includes(
-          meal.mealType.toLocaleLowerCase("it"),
-        );
-        const compatible = mode === "snack" ? snack : !snack;
-
-        return compatible && (
+        return mealFitsSlot(meal.mealType, selectedSlot) && (
           !query || meal.name.toLocaleLowerCase("it").includes(query)
         );
       })
       .slice(0, 8);
-  }, [knownMeals, mode, name]);
+  }, [knownMeals, mealType, mode, name]);
 
   useEffect(() => {
     if ((mode !== "meal" && mode !== "snack") || !accessToken) {
@@ -1694,6 +1716,7 @@ export function QuickAdd({
             date={date}
             accessToken={accessToken}
             compact
+            showMovement
             onSaved={async () => {
               setMode(null);
               await onSaved();
