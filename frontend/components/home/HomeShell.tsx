@@ -2195,310 +2195,125 @@ export function HomeShell() {
                   : styles.budgetHeroCollapsed
               }`}
             >
-              <div className={styles.budgetEyebrow}>
-                <span aria-hidden="true">◎</span>
-                <strong>Il tuo piano di oggi</strong>
-              </div>
-
-              <div className={styles.budgetHeader}>
-                <div className={styles.budgetColumn}>
-                  <span className={styles.budgetLabel}>
-                    {budget.budget_adapted
-                      ? "Per i pasti che restano"
-                      : "Kcal disponibili"}
+              <div className={styles.budgetSummary}>
+                <div className={styles.budgetQuestion}>
+                  <span className={styles.budgetEyebrow}>
+                    Il tuo piano di oggi
                   </span>
+                  <h2>Quanto posso ancora mangiare oggi?</h2>
+                </div>
 
+                <div className={styles.budgetHeadlineMetric}>
+                  <span className={styles.budgetLabel}>Consumate oggi</span>
                   <div className={styles.budgetValueRow}>
                     <strong className={styles.budgetAvailable}>
-                      {roundNumber(budget.available_kcal)}
-                    </strong>
-                    <span className={styles.budgetKcal}>kcal</span>
-                  </div>
-
-                  <span className={styles.budgetPositive}>
-                    {budget.budget_adapted
-                      ? "Il piano si è adattato alla giornata"
-                      : budget.consumed_kcal === 0
-                      ? "Budget disponibile"
-                      : budget.consumed_kcal <=
-                        budget.daily_budget_kcal
-                      ? "Stai rispettando il tuo deficit"
-                      : budget.consumed_kcal <
-                        maintenanceBudgetKcal
-                      ? "Sei ancora in deficit"
-                      : "Hai raggiunto il mantenimento"}
-                  </span>
-                </div>
-
-                <div className={styles.budgetDivider} />
-
-                <div className={styles.budgetColumn}>
-                  <span className={styles.budgetLabel}>
-                    Metabolismo basale
-                  </span>
-
-                  <div className={styles.budgetValueRow}>
-                    <strong className={styles.budgetMainValue}>
-                      {bmr > 0 ? roundNumber(bmr) : "—"}
-                    </strong>
-                    <span className={styles.budgetKcal}>kcal</span>
-                  </div>
-
-                  <span className={styles.budgetSecondary}>
-                    BMR giornaliero
-                  </span>
-                </div>
-
-                <div className={styles.budgetDivider} />
-
-                <div className={styles.budgetColumn}>
-                  <span className={styles.budgetLabel}>
-                    {budget.budget_adapted
-                      ? "Obiettivo aggiornato"
-                      : "Obiettivo con deficit"}
-                  </span>
-
-                  <div className={styles.budgetValueRow}>
-                    <strong className={styles.budgetMainValue}>
-                      {roundNumber(
-                        budget.consumed_kcal +
-                          budget.available_kcal,
-                      )}
-                    </strong>
-                    <span className={styles.budgetKcal}>kcal</span>
-                  </div>
-
-                  <span className={styles.budgetSecondary}>
-                    {budget.budget_adapted
-                      ? "Un deficit più sostenibile oggi"
-                      : budget.goal_mode === "loss" &&
-                    budget.effective_goal_adjustment_kcal > 0
-                      ? `${roundNumber(
-                          budget.effective_goal_adjustment_kcal,
-                        )} kcal di deficit`
-                      : "Target giornaliero"}
-                  </span>
-                </div>
-
-                <div className={styles.budgetDivider} />
-
-                <div className={styles.budgetColumn}>
-                  <span className={styles.budgetLabel}>
-                    Consumato oggi
-                  </span>
-
-                  <div className={styles.budgetValueRow}>
-                    <strong className={styles.budgetMainValue}>
                       {roundNumber(budget.consumed_kcal)}
                     </strong>
                     <span className={styles.budgetKcal}>kcal</span>
                   </div>
-
-                  <span className={styles.budgetSecondary}>
-                    {budget.available_kcal >= 0
-                      ? `${roundNumber(
-                          budget.available_kcal,
-                        )} kcal disponibili`
-                      : "Target superato"}
-                  </span>
                 </div>
 
-                <div className={styles.budgetDivider} />
-
-                <button
-                  type="button"
-                  className={styles.budgetStatus}
-                  aria-expanded={budgetExpanded}
-                  onClick={() =>
-                    setBudgetExpanded((current) => !current)
-                  }
-                >
+                <div className={styles.budgetHeadlineMetric}>
                   <span className={styles.budgetLabel}>
-                    Stato di oggi
+                    Puoi ancora mangiare
                   </span>
-
-                  <span
-                    className={`${styles.budgetStatusRow} ${
-                      budget.consumed_kcal === 0
-                        ? styles.budgetStatusPending
-                        : ""
-                    }`}
-                  >
-                    <span
-                      className={styles.budgetStatusIcon}
-                      aria-hidden="true"
-                    >
-                      {budget.consumed_kcal === 0
-                        ? "○"
-                        : "✓"}
-                    </span>
-
-                    <strong>
-                      {budget.consumed_kcal === 0
-                        ? "Giornata da iniziare"
-                        : budget.budget_adapted
-                        ? "Piano riequilibrato"
-                        : budget.consumed_kcal <
-                          maintenanceBudgetKcal
-                        ? "Deficit in corso"
-                        : "Mantenimento raggiunto"}
+                  <div className={styles.budgetValueRow}>
+                    <strong className={styles.budgetAvailable}>
+                      {roundNumber(Math.max(0, budget.available_kcal))}
                     </strong>
-                  </span>
-
-                  <span
-                    className={`${styles.budgetChevron} ${
-                      budgetExpanded
-                        ? styles.budgetChevronUp
-                        : ""
-                    }`}
-                    aria-hidden="true"
-                  />
-                </button>
-              </div>
-
-              <div className={styles.budgetScale}>
-                <span className={styles.budgetScaleStart}>
-                  0
-                </span>
-
-                <div className={styles.budgetScaleTrack}>
-                  <div
-                    className={styles.budgetScaleFill}
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        Math.max(
-                          0,
-                          maintenanceBudgetKcal > 0
-                            ? (budget.consumed_kcal /
-                                maintenanceBudgetKcal) *
-                                100
-                            : 0,
-                        ),
-                      )}%`,
-                    }}
-                  />
-
-                  <span
-                    className={styles.budgetScaleTarget}
-                    style={{
-                      left:
-                        maintenanceBudgetKcal > 0
-                          ? `${Math.min(
-                              100,
-                              Math.max(
-                                0,
-                                (budget.daily_budget_kcal /
-                                  maintenanceBudgetKcal) *
-                                  100,
-                              ),
-                            )}%`
-                          : "0%",
-                    }}
-                    aria-hidden="true"
-                  />
+                    <span className={styles.budgetKcal}>kcal</span>
+                  </div>
                 </div>
 
-                <div className={styles.budgetScaleLabels}>
-                  <span>
-                    {roundNumber(budget.consumed_kcal)} consumate
+                <div className={styles.budgetCalmStatus}>
+                  <span className={styles.budgetCalmIcon} aria-hidden="true">
+                    {budget.budget_adapted ? "✓" : "○"}
                   </span>
-
-                  <span>
-                    {roundNumber(
-                      budget.consumed_kcal +
-                        budget.available_kcal,
-                    )}{" "}
-                    target
-                  </span>
-
-                  <span>
-                    {roundNumber(
-                      maintenanceBudgetKcal,
-                    )}{" "}
-                    mantenimento
-                  </span>
+                  <p>
+                    {budget.budget_adapted
+                      ? "Oggi ti sei mosso meno del previsto. Abbiamo ridotto il deficit per lasciarti pasti completi."
+                      : budget.consumed_kcal === 0
+                      ? "Il piano è pronto e si adatterà con calma a quello che succede oggi."
+                      : budget.consumed_kcal < maintenanceBudgetKcal
+                      ? "Sei ancora sotto il mantenimento. Continua la giornata senza inseguire il singolo numero."
+                      : "Hai raggiunto il mantenimento: è un'informazione, non un giudizio."
+                    }
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.budgetToggle}
+                    aria-expanded={budgetExpanded}
+                    onClick={() => setBudgetExpanded((current) => !current)}
+                  >
+                    {budgetExpanded ? "Nascondi calcolo" : "Vedi calcolo"}
+                    <span
+                      className={`${styles.budgetChevron} ${
+                        budgetExpanded ? styles.budgetChevronUp : ""
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
                 </div>
               </div>
 
               {budgetExpanded ? (
                 <div className={styles.budgetExpandedPanel}>
-                  <div className={styles.budgetDetail}>
-                    <span className={styles.budgetDetailIcon}>
-                      🍴
-                    </span>
-                    <div>
-                      <span>Consumate</span>
-                      <strong>
-                        {roundNumber(
-                          budget.consumed_kcal,
-                        )}{" "}
-                        kcal
-                      </strong>
-                      <small>di cibo</small>
+                  <div className={styles.budgetDetailsGrid}>
+                    <div className={styles.budgetDetail}>
+                      <span>Metabolismo basale</span>
+                      <strong>{bmr > 0 ? roundNumber(bmr) : "—"} kcal</strong>
+                      <small>energia minima del corpo</small>
+                    </div>
+                    <div className={styles.budgetDetail}>
+                      <span>Mantenimento stimato</span>
+                      <strong>{roundNumber(maintenanceBudgetKcal)} kcal</strong>
+                      <small>con la giornata di oggi</small>
+                    </div>
+                    <div className={styles.budgetDetail}>
+                      <span>Deficit scelto</span>
+                      <strong>{roundNumber(budget.goal_adjustment_kcal)} kcal</strong>
+                      <small>dal tuo obiettivo</small>
+                    </div>
+                    <div className={styles.budgetDetail}>
+                      <span>Deficit di oggi</span>
+                      <strong>{roundNumber(budget.effective_goal_adjustment_kcal)} kcal</strong>
+                      <small>{budget.budget_adapted ? "adattato alla giornata" : "come programmato"}</small>
                     </div>
                   </div>
 
-                  <div className={styles.budgetDetail}>
-                    <span className={styles.budgetDetailIcon}>
-                      🏃
-                    </span>
-                    <div>
-                      <span>Attività</span>
-                      <strong>
-                        {roundNumber(burnedCalories)} kcal
-                      </strong>
-                      <small>bruciate</small>
+                  <div className={styles.budgetScale}>
+                    <div className={styles.budgetScaleTrack}>
+                      <div
+                        className={styles.budgetScaleFill}
+                        style={{
+                          width: `${Math.min(100, Math.max(0,
+                            maintenanceBudgetKcal > 0
+                              ? (budget.consumed_kcal / maintenanceBudgetKcal) * 100
+                              : 0,
+                          ))}%`,
+                        }}
+                      />
+                      <span
+                        className={styles.budgetScaleTarget}
+                        style={{
+                          left: maintenanceBudgetKcal > 0
+                            ? `${Math.min(100, Math.max(0,
+                                (budget.daily_budget_kcal / maintenanceBudgetKcal) * 100,
+                              ))}%`
+                            : "0%",
+                        }}
+                        aria-hidden="true"
+                      />
                     </div>
-                  </div>
-
-                  <div className={styles.budgetDetail}>
-                    <span className={styles.budgetDetailIcon}>
-                      ⚖
-                    </span>
-                    <div>
-                      <span>Rispetto al target</span>
-                      <strong>
-                        {roundNumber(
-                          budget.available_kcal,
-                        )}{" "}
-                        kcal
-                      </strong>
-                      <small>
-                        {budget.available_kcal >= 0
-                          ? "ancora disponibili"
-                          : "oltre il target"}
-                      </small>
-                    </div>
-                  </div>
-
-                  <div className={styles.budgetDetail}>
-                    <span className={styles.budgetDetailIcon}>
-                      ◉
-                    </span>
-                    <div>
-                      <span>Non allocate</span>
-                      <strong>
-                        {roundNumber(
-                          budget.unallocated_kcal,
-                        )}{" "}
-                        kcal
-                      </strong>
-                      <small>margine residuo</small>
+                    <div className={styles.budgetScaleLabels}>
+                      <span>{roundNumber(budget.consumed_kcal)} consumate</span>
+                      <span>{roundNumber(budget.daily_budget_kcal)} obiettivo adattato</span>
+                      <span>{roundNumber(maintenanceBudgetKcal)} mantenimento</span>
                     </div>
                   </div>
 
                   <div className={styles.budgetExplanation}>
-                    <span aria-hidden="true">ⓘ</span>
-                    <span>
-                      {budget.budget_adapted
-                        ? `Hai ancora una cena completa davanti. Il deficit di oggi è stato ridotto a circa ${roundNumber(
-                            budget.effective_goal_adjustment_kcal,
-                          )} kcal per mantenere il piano sostenibile.`
-                        : `Il target parte dal mantenimento e applica circa ${roundNumber(
-                            budget.effective_goal_adjustment_kcal,
-                          )} kcal di deficit.`}
-                    </span>
+                    L'obiettivo si adatta con calma per proteggere pasti completi e sostenibili.
                   </div>
                 </div>
               ) : null}
