@@ -79,6 +79,31 @@ export function ActivityMap({
         mapRef.current = null;
       }
 
+      setTilesUnavailable(false);
+
+      const coordinates = points
+        .filter(
+          (point) =>
+            Number.isFinite(point.latitude) &&
+            Number.isFinite(point.longitude) &&
+            point.latitude >= -90 &&
+            point.latitude <= 90 &&
+            point.longitude >= -180 &&
+            point.longitude <= 180,
+        )
+        .map(
+          (point) =>
+            [
+              point.latitude,
+              point.longitude,
+            ] as [number, number],
+        );
+
+      if (coordinates.length === 0) {
+        setTilesUnavailable(true);
+        return;
+      }
+
       const map = L.map(
         containerRef.current,
         {
@@ -89,6 +114,22 @@ export function ActivityMap({
       );
 
       mapRef.current = map;
+
+      /*
+       * Leaflet deve avere una vista valida prima di
+       * inizializzare correttamente i layer SVG.
+       */
+      if (coordinates.length === 1) {
+        map.setView(coordinates[0], 15);
+      } else {
+        map.fitBounds(
+          L.latLngBounds(coordinates),
+          {
+            padding: [28, 28],
+            maxZoom: 16,
+          },
+        );
+      }
 
       const tileLayer = L.tileLayer(
         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -105,25 +146,11 @@ export function ActivityMap({
 
       tileLayer.addTo(map);
 
-      const coordinates = points.map(
-        (point) =>
-          [
-            point.latitude,
-            point.longitude,
-          ] as [number, number],
-      );
-
-      const route = L.polyline(
-        coordinates,
-        {
-          color: "#ff3d43",
-          weight: 5,
-          opacity: 0.96,
-          lineCap: "round",
-          lineJoin: "round",
-        },
-      ).addTo(map);
-
+      /*
+       * Ombra prima, percorso sopra.
+       * In questo modo non serve bringToBack(), che
+       * causava l'eccezione prima del fitBounds.
+       */
       L.polyline(
         coordinates,
         {
@@ -133,9 +160,18 @@ export function ActivityMap({
           lineCap: "round",
           lineJoin: "round",
         },
-      )
-        .addTo(map)
-        .bringToBack();
+      ).addTo(map);
+
+      L.polyline(
+        coordinates,
+        {
+          color: "#ff3d43",
+          weight: 5,
+          opacity: 0.96,
+          lineCap: "round",
+          lineJoin: "round",
+        },
+      ).addTo(map);
 
       const start = coordinates[0];
       const end =
@@ -171,21 +207,21 @@ export function ActivityMap({
           `Arrivo · ${activityName}`,
         );
 
-      if (coordinates.length === 1) {
-        map.setView(start, 15);
-      } else {
-        map.fitBounds(
-          route.getBounds(),
-          {
-            padding: [28, 28],
-            maxZoom: 16,
-          },
-        );
-      }
-
       window.setTimeout(() => {
-        map.invalidateSize();
-      }, 80);
+        if (!cancelled) {
+          map.invalidateSize();
+
+          if (coordinates.length > 1) {
+            map.fitBounds(
+              L.latLngBounds(coordinates),
+              {
+                padding: [28, 28],
+                maxZoom: 16,
+              },
+            );
+          }
+        }
+      }, 120);
     }
 
     void createMap();
