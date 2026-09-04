@@ -67,3 +67,64 @@ body {
   background: var(--ss-bg);
   color: var(--ss-text);
 }
+
+/* ============================================================
+   SANOSYNC ZERO — GLOBAL SKIN
+   ============================================================ */
+
+:root {
+  --ss-zero-red: #f43d3d;
+  --ss-zero-red-strong: #df2525;
+  --ss-zero-red-soft: #fff0f0;
+
+  --ss-accent: var(--ss-coral-500);
+  --ss-accent-strong: var(--ss-coral-600);
+  --ss-accent-soft: var(--ss-coral-100);
+}
+
+html[data-experience-mode="zero"],
+body[data-experience-mode="zero"] {
+  --ss-accent: var(--ss-zero-red);
+  --ss-accent-strong: var(--ss-zero-red-strong);
+  --ss-accent-soft: var(--ss-zero-red-soft);
+
+  --ss-coral-600: var(--ss-zero-red-strong);
+  --ss-coral-500: var(--ss-zero-red);
+  --ss-coral-100: var(--ss-zero-red-soft);
+  --ss-coral-050: #fff7f7;
+}
+
+/*
+ * Zero è una skin, non una nuova applicazione:
+ * stessa struttura, accent e tono visivo diversi.
+ */
+
+body[data-experience-mode="zero"] {
+  accent-color: var(--ss-zero-red);
+}
+
+body[data-experience-mode="zero"] ::selection {
+  background: rgba(244, 61, 61, 0.2);
+}
+
+body[data-experience-mode="zero"] button:focus-visible,
+body[data-experience-mode="zero"] a:focus-visible,
+body[data-experience-mode="zero"] input:focus-visible,
+body[data-experience-mode="zero"] select:focus-visible,
+body[data-experience-mode="zero"] textarea:focus-visible {
+  outline-color: var(--ss-zero-red);
+}
+
+
+/* SanoSync Zero final tokens */
+:root {
+  --ss-zero-red: #f43d3d;
+  --ss-zero-red-hover: #df2929;
+  --ss-zero-red-soft: rgba(244, 61, 61, 0.12);
+  --ss-zero-red-border: rgba(244, 61, 61, 0.32);
+}
+
+html[data-experience-mode="zero"] {
+  --ss-accent: var(--ss-zero-red);
+  --ss-accent-strong: var(--ss-zero-red-hover);
+}

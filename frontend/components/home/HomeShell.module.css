@@ -8122,3 +8122,49 @@
     font-size: 0.72rem;
   }
 }
+
+
+/* ZERO FINAL HOME OVERRIDES */
+
+/* Titolo budget: mai più nero su nero */
+.pageZero .budgetQuestion h2 {
+  color: #f43d3d !important;
+}
+
+/* Pulsante + */
+.pageZero .mealsSection .addMealFab,
+.pageZero .mealsSection .addMealFab:hover,
+.pageZero .mealsSection .addMealFab:focus-visible {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 9px 24px rgba(244, 61, 61, 0.28) !important;
+}
+
+/* Icone di tutte le meal card */
+.pageZero .mealsSection .mealIcon,
+.pageZero
+  .mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .mealIcon {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  box-shadow:
+    0 8px 20px rgba(244, 61, 61, 0.24) !important;
+}
+
+/* Niente bordi corallo sulle meal card Zero */
+.pageZero .mealsSection .mealCard,
+.pageZero
+  .mealsSection
+  .mealCard:has(.registeredMealBadge) {
+  border-color:
+    rgba(244, 61, 61, 0.32) !important;
+}
+
+/* Wrapper della Quick Add */
+.pageZero .quickAddWidget {
+  border-color:
+    rgba(244, 61, 61, 0.34) !important;
+}

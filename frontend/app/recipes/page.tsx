@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
 import {
   createIngredient,
   getIngredients,
@@ -77,6 +78,8 @@ function todayLocalIso(): string {
 
 export default function RecipesPage() {
   const { accessToken, user } = useAuth();
+  const { experienceMode } = useExperienceMode();
+  const zero = experienceMode === "zero";
 
   const [recipes, setRecipes] =
     useState<Recipe[]>([]);
@@ -942,7 +945,11 @@ export default function RecipesPage() {
             Ricette
           </p>
 
-          <h1>Le tue ricette</h1>
+          <h1>
+            {zero
+              ? "Le ricette che almeno sai già gestire"
+              : "Le tue ricette"}
+          </h1>
             <Link
               href="/inventory"
               className={styles.inventoryLink}
@@ -957,8 +964,9 @@ export default function RecipesPage() {
             </Link>
 
           <p className={styles.headerSubtitle}>
-            I piatti che conosci già, pronti da registrare
-            quando servono.
+            {zero
+              ? "Piatti già collaudati. Almeno qui evitiamo esperimenti inutili."
+              : "I piatti che conosci già, pronti da registrare quando servono."}
           </p>
         </div>
       </header>
@@ -1187,7 +1195,9 @@ export default function RecipesPage() {
             <p className={styles.kicker}>
               Libreria personale
             </p>
-            <h2>Pronte quando ti servono</h2>
+            <h2>
+              {zero ? "Le solite affidabili" : "Pronte quando ti servono"}
+            </h2>
           </div>
 
           <button
@@ -1499,14 +1509,22 @@ export default function RecipesPage() {
           <div className={styles.recipeEmptyState}>
             <strong>
               {recipes.length
-                ? "Nessuna ricetta trovata"
-                : "La tua libreria è ancora vuota"}
+                ? zero
+                  ? "Niente. I filtri hanno lavorato fin troppo bene."
+                  : "Nessuna ricetta trovata"
+                : zero
+                  ? "Libreria vuota. Minimalismo non richiesto."
+                  : "La tua libreria è ancora vuota"}
             </strong>
 
             <p>
               {recipes.length
-                ? "Prova a cambiare ricerca o filtro."
-                : "Salva una ricetta e la troverai qui pronta da riutilizzare."}
+                ? zero
+                  ? "Cambia ricerca o filtro. Magari compare qualcosa."
+                  : "Prova a cambiare ricerca o filtro."
+                : zero
+                  ? "Salva una ricetta. Prima o poi servirà anche questa organizzazione."
+                  : "Salva una ricetta e la troverai qui pronta da riutilizzare."}
             </p>
 
             {recipes.length ? (

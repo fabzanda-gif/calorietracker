@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
 import {
   createWeight,
   getWeightHistory,
@@ -1133,6 +1134,8 @@ function DailyMetricsChart({
 
 export default function ProgressPage() {
   const { accessToken } = useAuth();
+  const { experienceMode } = useExperienceMode();
+  const zero = experienceMode === "zero";
 
   const [items, setItems] =
     useState<WeightEntry[]>([]);
@@ -1745,10 +1748,16 @@ export default function ProgressPage() {
             Progressi
           </p>
 
-          <h1>La tua direzione</h1>
+          <h1>
+            {zero
+              ? "Vediamo cosa dicono i numeri."
+              : "La tua direzione"}
+          </h1>
 
           <p className={styles.subtitle}>
-            Guarda la direzione, non il singolo numero.
+            {zero
+              ? "Trend, dati e nessuna favola motivazionale."
+              : "Guarda la direzione, non il singolo numero."}
           </p>
         </div>
       </header>
@@ -1796,8 +1805,22 @@ export default function ProgressPage() {
           <div className={styles.directionNote}>
             <span aria-hidden="true">↘</span>
             <div>
-              <strong>{stats && stats.change < 0 ? "Direzione costante" : "Il trend prende forma"}</strong>
-              <small>Conta la direzione, non la singola giornata.</small>
+              <strong>
+                {zero
+                  ? stats && stats.change < 0
+                    ? "Sta scendendo. Non fare il fenomeno."
+                    : stats && stats.change > 0
+                      ? "Sta salendo. I grafici non hanno tatto."
+                      : "Fermo lì. Almeno qualcuno."
+                  : stats && stats.change < 0
+                    ? "Direzione costante"
+                    : "Il trend prende forma"}
+              </strong>
+              <small>
+                {zero
+                  ? "Un dato fa scena. Il trend almeno prova a dire qualcosa."
+                  : "Conta la direzione, non la singola giornata."}
+              </small>
             </div>
           </div>
         </div>
@@ -1862,8 +1885,14 @@ export default function ProgressPage() {
             <p className={styles.kicker}>
               La tua storia
             </p>
-            <h2>Il quadro completo</h2>
-            <p className={styles.sectionSubtitle}>Peso, bilancio calorico e abitudini letti insieme.</p>
+            <h2>
+              {zero ? "I numeri non dimenticano" : "Il quadro completo"}
+            </h2>
+            <p className={styles.sectionSubtitle}>
+              {zero
+                ? "Peso, calorie e abitudini. Tutto nello stesso fascicolo."
+                : "Peso, bilancio calorico e abitudini letti insieme."}
+            </p>
           </div>
 
           <div
@@ -1894,13 +1923,21 @@ export default function ProgressPage() {
           </div>
           <aside className={styles.insightPanel}>
             <p className={styles.kicker}>Insight</p>
-            <h3>Cosa sta funzionando</h3>
+            <h3>
+              {zero ? "Cosa non è andato storto" : "Cosa sta funzionando"}
+            </h3>
             {progressInsights.length ? progressInsights.slice(0, 3).map((insight, index) => (
               <article key={`${insight.eyebrow}-summary-${index}`}>
                 <span aria-hidden="true">{index === 0 ? "↓" : index === 1 ? "◔" : "✓"}</span>
                 <div><strong>{insight.title}</strong><p>{insight.body}</p></div>
               </article>
-            )) : <p className={styles.muted}>Continua a registrare: presto troverai qui una lettura dei tuoi progressi.</p>}
+            )) : (
+              <p className={styles.muted}>
+                {zero
+                  ? "Continua a registrare. Prima o poi i dati avranno qualcosa da confessare."
+                  : "Continua a registrare: presto troverai qui una lettura dei tuoi progressi."}
+              </p>
+            )}
             <Link href="#nutrition-detail" className={styles.insightLink}>Vedi dettaglio nutrizione →</Link>
           </aside>
         </div>
@@ -2193,9 +2230,15 @@ export default function ProgressPage() {
       )}
       <section className={styles.consistencySection}>
         <div>
-          <p className={styles.kicker}>Costanza</p>
+          <p className={styles.kicker}>
+            {zero ? "Sette giorni di prove" : "Costanza"}
+          </p>
           <h2>Gli ultimi 7 giorni</h2>
-          <p className={styles.sectionSubtitle}>Una settimana è fatta di direzioni, non di giornate perfette.</p>
+          <p className={styles.sectionSubtitle}>
+            {zero
+              ? "Abbastanza per un trend. Troppo pochi per una leggenda."
+              : "Una settimana è fatta di direzioni, non di giornate perfette."}
+          </p>
         </div>
         <div className={styles.consistencyDays}>
           {(nutrition?.items ?? []).slice(-7).map((item) => {

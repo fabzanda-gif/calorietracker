@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
 
 import styles from "./AppNav.module.css";
 
@@ -60,15 +61,11 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-type AppNavProps = {
-  experienceMode?: "standard" | "zero";
-};
-
-export function AppNav({
-  experienceMode = "standard",
-}: AppNavProps) {
+export function AppNav() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const { experienceMode } =
+    useExperienceMode();
 
   const metadataName =
     user?.user_metadata?.full_name ??

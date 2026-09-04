@@ -78,26 +78,9 @@ import {
   type ProfileResponse,
 } from "@/lib/api/profile";
 
+import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
+
 import styles from "./HomeShell.module.css";
-
-type ExperienceMode =
-  | "standard"
-  | "zero";
-
-const EXPERIENCE_MODE_KEY =
-  "sanosync-experience-mode";
-
-function readExperienceMode(): ExperienceMode {
-  if (typeof window === "undefined") {
-    return "standard";
-  }
-
-  return window.localStorage.getItem(
-    EXPERIENCE_MODE_KEY,
-  ) === "zero"
-    ? "zero"
-    : "standard";
-}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -337,8 +320,10 @@ function readDashboardSizes():
 }
 
 export function HomeShell() {
-  const [experienceMode, setExperienceMode] =
-    useState<ExperienceMode>(readExperienceMode);
+  const {
+    experienceMode,
+    setExperienceMode,
+  } = useExperienceMode();
 
   const [dashboardOrder, setDashboardOrder] =
     useState<DashboardWidgetId[]>(readDashboardOrder);
@@ -2081,7 +2066,7 @@ export function HomeShell() {
 
   return (
     <>
-      <AppNav experienceMode={experienceMode} />
+      <AppNav />
 
       {!loading && needsWelcomeJourney && accessToken ? (
         <WelcomeJourney
@@ -2132,10 +2117,6 @@ export function HomeShell() {
             }
             onClick={() => {
               setExperienceMode("standard");
-              window.localStorage.setItem(
-                EXPERIENCE_MODE_KEY,
-                "standard",
-              );
             }}
           >
             Standard
@@ -2150,10 +2131,6 @@ export function HomeShell() {
             }
             onClick={() => {
               setExperienceMode("zero");
-              window.localStorage.setItem(
-                EXPERIENCE_MODE_KEY,
-                "zero",
-              );
             }}
           >
             Zero
@@ -2428,7 +2405,7 @@ export function HomeShell() {
                   <img
                     src={
                       experienceMode === "zero"
-                        ? "/assets/SanoSyncAIZero.png"
+                        ? "/assets/SanoSyncAIZeroNew.png"
                         : "/assets/AILogo.png"
                     }
                     alt={

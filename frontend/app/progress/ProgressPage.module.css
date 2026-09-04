@@ -1528,3 +1528,43 @@
     min-height: 0;
   }
 }
+
+
+/* ZERO FINAL PROGRESS */
+:global(html[data-experience-mode="zero"]) .page {
+  --zero-red: #f43d3d;
+}
+
+:global(html[data-experience-mode="zero"]) .header h1,
+:global(html[data-experience-mode="zero"]) .kicker {
+  color: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"]) .hero,
+:global(html[data-experience-mode="zero"]) .overviewSection,
+:global(html[data-experience-mode="zero"]) .analyticsSection,
+:global(html[data-experience-mode="zero"]) .consistencySection {
+  border-color:
+    rgba(244, 61, 61, 0.28) !important;
+}
+
+:global(html[data-experience-mode="zero"]) .weightForm button,
+:global(html[data-experience-mode="zero"]) .rangeActive {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-experience-mode="zero"]) .heroTrendLine,
+:global(html[data-experience-mode="zero"]) .weightLine {
+  stroke: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"]) .heroTrendPoint,
+:global(html[data-experience-mode="zero"]) .weightPoint {
+  fill: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"]) .insightLink {
+  color: #f43d3d !important;
+}

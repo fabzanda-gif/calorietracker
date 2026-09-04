@@ -608,3 +608,31 @@
     padding: 10px;
   }
 }
+
+
+/* ZERO FINAL QUICK ADD */
+:global(html[data-experience-mode="zero"]) .section {
+  border-color:
+    rgba(244, 61, 61, 0.38) !important;
+  box-shadow:
+    0 8px 28px rgba(244, 61, 61, 0.07);
+}
+
+:global(html[data-experience-mode="zero"]) .kicker {
+  color: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"]) .action:hover {
+  border-color:
+    rgba(244, 61, 61, 0.58) !important;
+}
+
+:global(html[data-experience-mode="zero"]) .actionActive {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-experience-mode="zero"]) .knownMealSuggestions b {
+  color: #f43d3d !important;
+}

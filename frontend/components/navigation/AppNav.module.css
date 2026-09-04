@@ -550,3 +550,23 @@
     background: #f05c59;
   }
 }
+
+
+/* ZERO FINAL NAVIGATION */
+.desktopNavZero .signOut,
+.desktopNavZero .signOut:hover {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+.desktopNavZero .desktopLinkActive {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-experience-mode="zero"]) .mobileLinkActive {
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}

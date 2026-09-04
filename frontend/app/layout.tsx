@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
+import { ExperienceModeProvider } from "@/components/experience/ExperienceModeProvider";
 
 import "./globals.css";
 
@@ -61,9 +62,11 @@ export default function RootLayout({
       <body>
         <RegisterServiceWorker />
         <AuthProvider>
-          <AuthGate>
-            {children}
-          </AuthGate>
+          <ExperienceModeProvider>
+            <AuthGate>
+              {children}
+            </AuthGate>
+          </ExperienceModeProvider>
         </AuthProvider>
       </body>
     </html>
