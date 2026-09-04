@@ -760,7 +760,7 @@ export default function ActivitiesPage() {
 
   return (
     <>
-      <AppNav experienceMode={experienceMode} />
+      <AppNav />
 
       <main
         className={`${styles.page} ${
