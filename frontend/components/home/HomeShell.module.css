@@ -6957,3 +6957,540 @@
     font-size: 0.94rem;
   }
 }
+
+/* ============================================================
+   Registered meal card V3
+   Visual target: approved SanoSync mockup
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Outer registered card
+   ------------------------------------------------------------ */
+
+.mealsSection .mealCard:has(.registeredMealBadge) {
+  padding: 22px 24px 20px;
+
+  border: 1px solid rgba(244, 127, 122, 0.38);
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 248, 246, 0.86) 0%,
+      #ffffff 62%
+    );
+
+  box-shadow:
+    0 9px 26px rgba(16, 40, 70, 0.045);
+
+  min-height: 0;
+  height: auto;
+}
+
+/* ------------------------------------------------------------
+   Header
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .mealCardTop {
+  min-height: 46px;
+
+  align-items: center;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .mealIcon {
+  width: 46px;
+  height: 46px;
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ff7773 0%,
+      #ff5f5d 100%
+    );
+
+  box-shadow:
+    0 8px 20px rgba(255, 96, 95, 0.2);
+
+  font-size: 1.35rem;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .mealLabel {
+  font-size: 0.82rem;
+  font-weight: 850;
+
+  color: var(--ss-navy-950, #102846);
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealBadge {
+  padding: 6px 11px;
+
+  background: #eaf5e8;
+  color: #28723b;
+
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+/* ------------------------------------------------------------
+   Registered meal content:
+   remove old inner-card appearance
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealList {
+  margin-top: 22px;
+
+  display: grid;
+  gap: 12px;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 0;
+
+  background: transparent;
+}
+
+/* Main title */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowInfo strong {
+  display: block;
+
+  margin: 0;
+
+  color: var(--ss-navy-950, #102846);
+
+  font-size: 1.36rem;
+  line-height: 1.16;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+}
+
+/* Quantity */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowInfo span {
+  display: block;
+
+  margin-top: 7px;
+
+  color: #73736d;
+
+  font-size: 0.84rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------
+   Edit / delete
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowActions {
+  display: flex;
+  align-items: center;
+
+  flex: 0 0 auto;
+
+  gap: 14px;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowActions button {
+  min-height: auto;
+
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+
+  color: #173b64;
+
+  font-size: 0.75rem;
+  line-height: 1.2;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowActions
+  .registeredMealRowDelete {
+  color: #e64f4b;
+}
+
+/* ------------------------------------------------------------
+   Macronutrients
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-top: 18px;
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+}
+
+/* Each macro becomes a real information chip */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem {
+  position: relative;
+
+  display: grid;
+
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+
+  column-gap: 9px;
+  row-gap: 0;
+
+  align-items: center;
+
+  min-width: 0;
+  min-height: 58px;
+
+  padding: 9px 12px;
+
+  border: 1px solid #e9e7e1;
+  border-radius: 13px;
+
+  background: rgba(255, 255, 255, 0.9);
+
+  box-shadow:
+    0 2px 8px rgba(16, 40, 70, 0.025);
+}
+
+/* Macro icon */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem::before {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 24px;
+
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(1)::before {
+  content: "🔥";
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(2)::before {
+  content: "💪";
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(3)::before {
+  content: "🌾";
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(4)::before {
+  content: "🥑";
+}
+
+/* Macro number */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem strong {
+  grid-column: 2;
+  grid-row: 1;
+
+  color: var(--ss-navy-950, #102846);
+
+  font-size: 1rem;
+  line-height: 1.05;
+  font-weight: 850;
+}
+
+/* Macro label */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem span {
+  grid-column: 2;
+  grid-row: 2;
+
+  margin: 2px 0 0;
+
+  color: #777770;
+
+  font-size: 0.65rem;
+  line-height: 1.15;
+  font-weight: 650;
+
+  text-transform: lowercase;
+}
+
+/* Add unit g automatically to all non-kcal macro values */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(n + 2)
+  strong::after {
+  content: " g";
+
+  font-size: 0.78em;
+}
+
+/* ------------------------------------------------------------
+   Conditional formatting row
+   Uses pseudo-elements so we don't duplicate values in JSX.
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition::before,
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition::after {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: flex-start;
+
+  width: fit-content;
+
+  min-height: 30px;
+
+  margin-top: 4px;
+  padding: 0 12px;
+
+  border-radius: 999px;
+
+  font-size: 0.68rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition::before {
+  content: "✓  Pasto registrato";
+
+  grid-column: 1 / span 1;
+  grid-row: 2;
+
+  background: #eaf5e8;
+  color: #2c7a42;
+}
+
+/* Protein conditional status */
+
+.mealsSection
+  .mealCard.mealProteinLow
+  .registeredMealNutrition::after {
+  content: "▮▮  Proteine basse";
+
+  grid-column: 2 / span 2;
+  grid-row: 2;
+
+  background: #fff1d8;
+  color: #c77808;
+}
+
+.mealsSection
+  .mealCard.mealProteinGood
+  .registeredMealNutrition::after {
+  content: "✓  Buon apporto proteico";
+
+  grid-column: 2 / span 2;
+  grid-row: 2;
+
+  background: #edf6e9;
+  color: #377645;
+}
+
+.mealsSection
+  .mealCard.mealProteinHigh
+  .registeredMealNutrition::after {
+  content: "↑  Ricco di proteine";
+
+  grid-column: 2 / span 2;
+  grid-row: 2;
+
+  background: #e7f4e8;
+  color: #226d37;
+}
+
+/* ------------------------------------------------------------
+   REMOVE duplicated total footer
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealSlotTotal {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------
+   Put actions below the information on wider cards
+   ------------------------------------------------------------ */
+
+@media (min-width: 900px) {
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealRow {
+    align-items: center;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition {
+    margin-bottom: 2px;
+  }
+}
+
+/* ------------------------------------------------------------
+   Tablet
+   ------------------------------------------------------------ */
+
+@media (max-width: 899px) {
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition::before {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .mealsSection
+    .mealCard.mealProteinLow
+    .registeredMealNutrition::after,
+  .mealsSection
+    .mealCard.mealProteinGood
+    .registeredMealNutrition::after,
+  .mealsSection
+    .mealCard.mealProteinHigh
+    .registeredMealNutrition::after {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
+/* ------------------------------------------------------------
+   Mobile
+   ------------------------------------------------------------ */
+
+@media (max-width: 600px) {
+  .mealsSection
+    .mealCard:has(.registeredMealBadge) {
+    padding: 17px;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealRowInfo strong {
+    font-size: 1.12rem;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition::before,
+  .mealsSection
+    .mealCard.mealProteinLow
+    .registeredMealNutrition::after,
+  .mealsSection
+    .mealCard.mealProteinGood
+    .registeredMealNutrition::after,
+  .mealsSection
+    .mealCard.mealProteinHigh
+    .registeredMealNutrition::after {
+    grid-column: 1 / -1;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition::before {
+    grid-row: 3;
+  }
+
+  .mealsSection
+    .mealCard.mealProteinLow
+    .registeredMealNutrition::after,
+  .mealsSection
+    .mealCard.mealProteinGood
+    .registeredMealNutrition::after,
+  .mealsSection
+    .mealCard.mealProteinHigh
+    .registeredMealNutrition::after {
+    grid-row: 4;
+  }
+}
