@@ -3580,9 +3580,10 @@ export function HomeShell() {
                 ),
               )}
 
-              <article
-                className={`${styles.mealCard} ${styles.snackCard}`}
-              >
+              {selectedMealSlot === "Snack" ? (
+                <article
+                  className={`${styles.mealCard} ${styles.snackCard}`}
+                >
                 <div className={styles.mealCardTop}>
                   <span className={styles.mealLabel}>
                     Snack
@@ -3619,7 +3620,8 @@ export function HomeShell() {
                     Aggiungi
                   </button>
                 </div>
-              </article>
+                </article>
+              ) : null}
             </div>
           </section>
 
