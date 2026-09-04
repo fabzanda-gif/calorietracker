@@ -2847,16 +2847,16 @@ export function HomeShell() {
                                     {registeredMeal.name}
                                   </strong>
 
-                                  <span className={styles.registeredMealEntryMeta}>
-                                    {registeredMeal.quantity &&
-                                    Number(registeredMeal.quantity) !== 1
+                                  <span>
+                                    {registeredMeal.recipe_servings
                                       ? `${roundNumber(
-                                          Number(registeredMeal.quantity),
-                                        )} porzioni · `
-                                      : ""}
-                                    {roundNumber(
-                                      registeredMeal.calories,
-                                    )} kcal
+                                          registeredMeal.recipe_servings,
+                                        )} ${
+                                          registeredMeal.recipe_servings === 1
+                                            ? "porzione"
+                                            : "porzioni"
+                                        }`
+                                      : "1 porzione"}
                                   </span>
                                 </div>
 

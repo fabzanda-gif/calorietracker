@@ -6502,3 +6502,69 @@
     font-size: 0.55rem;
   }
 }
+
+
+/* ============================================================
+   HOME MEALS — ENTRY ACTIONS BELOW
+   ============================================================ */
+
+.mealsSection .registeredMealRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mealsSection .registeredMealRowInfo {
+  width: 100%;
+  min-width: 0;
+}
+
+.mealsSection .registeredMealRowInfo strong {
+  display: block;
+  width: 100%;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mealsSection .registeredMealRowInfo span {
+  display: block;
+  margin-top: 3px;
+
+  color: #777770;
+
+  font-size: 0.63rem;
+  line-height: 1.25;
+}
+
+.mealsSection .registeredMealRowActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  width: 100%;
+  gap: 16px;
+
+  padding-top: 1px;
+}
+
+.mealsSection .registeredMealRowActions button {
+  min-height: 26px;
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.mealsSection .registeredMealRowActions button:first-child {
+  color: #21466f;
+}
+
+.mealsSection .registeredMealRowActions .registeredMealRowDelete {
+  color: #d84a46;
+}
