@@ -1861,6 +1861,15 @@ export function HomeShell() {
     setAlternateFat("");
   }
 
+  function openAlternateMeal(slot: string) {
+    setAlternateName("");
+    setAlternateCalories("");
+    setAlternateProtein("");
+    setAlternateCarbs("");
+    setAlternateFat("");
+    setAlternateSlot(slot);
+  }
+
   async function saveAlternateMeal(
     slot: string,
   ) {
@@ -2732,6 +2741,25 @@ export function HomeShell() {
                 </p>
                 <h2>I tuoi pasti</h2>
               </div>
+
+              <button
+                type="button"
+                className={styles.addMealFab}
+                aria-label={`Aggiungi ${selectedMealSlot}`}
+                title={`Aggiungi ${selectedMealSlot}`}
+                onClick={() => {
+                  const selectedSlot = Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  );
+
+                  if (selectedSlot) {
+                    openAlternateMeal(selectedSlot);
+                  }
+                }}
+              >
+                +
+              </button>
             </div>
 
             <div className={styles.mealTabs}>
@@ -3655,48 +3683,6 @@ export function HomeShell() {
                 ),
               )}
 
-              {selectedMealSlot === "Snack" ? (
-                <article
-                  className={`${styles.mealCard} ${styles.snackCard}`}
-                >
-                <div className={styles.mealCardTop}>
-                  <span className={styles.mealLabel}>
-                    Snack
-                  </span>
-
-                  <span className={styles.unknownBadge}>
-                    Da pianificare
-                  </span>
-                </div>
-
-                <div className={styles.snackIcon} aria-hidden="true">
-                  +
-                </div>
-
-                <strong className={styles.mealName}>
-                  Uno spuntino per la giornata
-                </strong>
-
-                <p className={styles.mealMeta}>
-                  Puoi aggiungerlo quando vuoi.
-                </p>
-
-                <div className={styles.mealActions}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      document
-                        .querySelector<HTMLTextAreaElement>(
-                          "textarea",
-                        )
-                        ?.focus();
-                    }}
-                  >
-                    Aggiungi
-                  </button>
-                </div>
-                </article>
-              ) : null}
             </div>
           </section>
 

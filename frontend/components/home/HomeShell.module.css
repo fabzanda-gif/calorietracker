@@ -6675,3 +6675,213 @@
     width: 52%;
   }
 }
+
+/* ============================================================
+   Meal section V2: universal add button + richer horizontal card
+   ============================================================ */
+
+.mealsSection .sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.mealsSection .addMealFab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 auto;
+
+  width: 46px;
+  height: 46px;
+
+  margin-top: 2px;
+  padding: 0;
+
+  border: 0;
+  border-radius: 999px;
+
+  background: #ff6967;
+  color: #ffffff;
+
+  box-shadow:
+    0 8px 20px rgba(255, 105, 103, 0.22);
+
+  font-size: 1.9rem;
+  line-height: 1;
+  font-weight: 400;
+
+  cursor: pointer;
+
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.mealsSection .addMealFab:hover {
+  transform: translateY(-2px);
+  background: #f85e5c;
+
+  box-shadow:
+    0 11px 25px rgba(255, 105, 103, 0.28);
+}
+
+.mealsSection .addMealFab:active {
+  transform: translateY(0) scale(0.96);
+}
+
+/* Card orizzontale principale */
+.mealsSection .mealCard {
+  border-color: rgba(244, 127, 122, 0.32);
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 248, 246, 0.88) 0%,
+      #ffffff 64%
+    );
+
+  box-shadow:
+    0 8px 24px rgba(16, 40, 70, 0.045);
+}
+
+/* Icona più presente */
+.mealsSection .mealIcon {
+  width: 38px;
+  height: 38px;
+
+  border-radius: 12px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ff7773 0%,
+      #ff605f 100%
+    );
+
+  box-shadow:
+    0 7px 17px rgba(255, 96, 95, 0.18);
+
+  font-size: 1.05rem;
+}
+
+/* Titolo */
+.mealsSection .mealName,
+.mealsSection .mealCard:has(.nextMealBadge) .mealName {
+  margin-top: 16px;
+
+  font-size: 1.12rem;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+/* Dati sintetici */
+.mealsSection .mealMeta,
+.mealsSection .mealCard:has(.nextMealBadge) .mealMeta {
+  margin-top: 7px;
+
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+/* Il contesto non deve più essere una fascia enorme */
+.mealsSection .replanningCompact {
+  width: fit-content;
+  max-width: 100%;
+
+  margin-top: 14px;
+
+  padding: 9px 13px;
+
+  border: 1px solid rgba(69, 139, 68, 0.1);
+  border-radius: 999px;
+
+  background: #eef7eb;
+}
+
+.mealsSection .replanningCompact strong {
+  font-size: 0.72rem;
+}
+
+/* Azioni più da vera card prodotto */
+.mealsSection .mealCard:has(.nextMealBadge) .mealActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  width: 100%;
+
+  margin-top: 16px;
+  padding-top: 14px;
+
+  border-top: 1px solid rgba(16, 40, 70, 0.07);
+
+  gap: 18px;
+}
+
+.mealsSection
+  .mealCard:has(.nextMealBadge)
+  .mealActions
+  button:first-child {
+  min-height: 38px;
+
+  padding: 0 18px;
+
+  border: 0;
+  border-radius: 11px;
+
+  background: #102846;
+  color: #ffffff;
+
+  font-weight: 800;
+}
+
+.mealsSection
+  .mealCard:has(.nextMealBadge)
+  .mealActions
+  button:last-child {
+  min-height: auto;
+
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+
+  color: #ed5d59;
+
+  font-weight: 800;
+}
+
+/* Non forzare altezza inutile */
+@media (min-width: 900px) {
+  .mealsSection .mealCard,
+  .desktopHomeGrid .mealsSection .mealCard {
+    min-height: 160px;
+  }
+
+  .mealsSection .mealCard:has(.nextMealBadge) {
+    padding: 20px 22px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mealsSection .addMealFab {
+    width: 40px;
+    height: 40px;
+
+    font-size: 1.6rem;
+  }
+
+  .mealsSection .mealCard:has(.nextMealBadge) {
+    padding: 16px;
+  }
+
+  .mealsSection .mealCard:has(.nextMealBadge) .mealActions {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
