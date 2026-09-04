@@ -67,6 +67,23 @@ class MealReplanningContextService:
             else []
         )
 
+        strategy = str(
+            recommendation.get("strategy") or ""
+        ).strip()
+
+        if strategy == "inventory_priority":
+            return {
+                "direction": "unchanged",
+                "driver": "inventory",
+                "portion_changed": portion_changed,
+                "available_kcal": available_kcal,
+                "title": "Prima quello che hai già pronto",
+                "message": (
+                    "Per il pranzo do priorità a un pasto "
+                    "disponibile nell'inventario."
+                ),
+            }
+
         if removed_components:
             removed_names = [
                 str(
@@ -111,14 +128,14 @@ class MealReplanningContextService:
 
         if activity_kcal > 0 and multiplier >= 1.0:
             return {
-                "direction": "expanded",
+                "direction": "unchanged",
                 "driver": "activity",
                 "portion_changed": portion_changed,
                 "available_kcal": available_kcal,
-                "title": "Più margine disponibile",
+                "title": "Attività registrata",
                 "message": (
-                    "L'attività registrata oggi ha aumentato "
-                    "il margine disponibile."
+                    "L'attività di oggi resta un dato osservato; "
+                    "il budget usa la baseline degli ultimi 7 giorni."
                 ),
             }
 

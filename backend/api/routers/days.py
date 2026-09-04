@@ -183,6 +183,87 @@ def _validate_slot(meal_slot: str) -> str:
     return MEAL_SLOT_TO_TYPE[meal_slot]
 
 
+def _is_home_day_context(value: object) -> bool:
+    normalized = " ".join(
+        str(value or "")
+        .strip()
+        .casefold()
+        .replace("_", " ")
+        .split()
+    )
+
+    return normalized in {
+        "home",
+        "casa",
+        "wfh",
+        "work from home",
+        "lavoro da casa",
+    }
+
+
+def _inventory_expiry_key(candidate: dict) -> tuple[int, str]:
+    expires_at = candidate.get("expires_at")
+
+    if expires_at:
+        return (0, str(expires_at))
+
+    return (1, "")
+
+
+def _deterministic_primary_recommendation(
+    *,
+    meal_slot: str,
+    day_context: object,
+    mode: str,
+    candidates: list[dict],
+    fallback: dict | None,
+) -> dict | None:
+    """
+    Apply simple explainable meal priorities before the general replanner.
+
+    Baseline rules:
+    - auto + home breakfast -> recurring routine first;
+    - auto + lunch -> available meal-prep first;
+    - everything else -> existing replanning result.
+
+    Candidate generation remains responsible for inventory validity
+    (available status, remaining portions and expiry).
+    """
+    if str(mode or "").strip().casefold() != "auto":
+        return fallback
+
+    if (
+        meal_slot == "breakfast"
+        and _is_home_day_context(day_context)
+    ):
+        routine = next(
+            (
+                candidate
+                for candidate in candidates
+                if candidate.get("source") == "routine"
+            ),
+            None,
+        )
+
+        if routine is not None:
+            return routine
+
+    if meal_slot == "lunch":
+        inventory = [
+            candidate
+            for candidate in candidates
+            if candidate.get("source") == "meal_prep"
+        ]
+
+        if inventory:
+            return min(
+                inventory,
+                key=_inventory_expiry_key,
+            )
+
+    return fallback
+
+
 def _meal_memory(
     meals_repo: MealsRepository,
     daily_logs_repo: DailyLogsRepository,
@@ -220,6 +301,7 @@ def _build_budget(
     day_date: Date,
     meals_repo: MealsRepository,
     activities_repo: ActivitiesRepository,
+    daily_logs_repo: DailyLogsRepository,
     weight_repo: WeightRepository,
 ) -> dict:
     latest_weight = weight_repo.latest(current_user.id)
@@ -232,6 +314,7 @@ def _build_budget(
     return DayBudgetService(
         meals_repo=meals_repo,
         activities_repo=activities_repo,
+        daily_logs_repo=daily_logs_repo,
     ).build(
         user_id=current_user.id,
         day_date=day_date,
@@ -331,6 +414,9 @@ def get_day_budget(
     activities_repo: ActivitiesRepository = Depends(
         get_activities_repository
     ),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
     weight_repo: WeightRepository = Depends(
         get_weight_repository
     ),
@@ -341,6 +427,7 @@ def get_day_budget(
             day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
         )
     except RepositoryError as exc:
@@ -397,6 +484,7 @@ def get_ranked_meal_options(
             day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
         )
 
@@ -537,12 +625,34 @@ def get_ranked_meal_options(
                 None,
             )
 
-        recommended = MealReplanningService().recommend(
+        fallback_recommended = MealReplanningService().recommend(
             routine_candidate=routine_candidate,
             ranked_options=ranked["options"],
             available_kcal=available_kcal,
             max_main_meal_kcal=max_main_meal_kcal,
         )
+
+        priority_candidate = _deterministic_primary_recommendation(
+            meal_slot=meal_slot,
+            day_context=day.get("context", {}).get("value"),
+            mode=mode_result["mode"],
+            candidates=feedback["candidates"],
+            fallback=None,
+        )
+
+        if priority_candidate is not None:
+            priority_strategy = (
+                "inventory_priority"
+                if priority_candidate.get("source") == "meal_prep"
+                else "routine"
+            )
+
+            recommended = MealReplanningService().recommend_candidate(
+                candidate=priority_candidate,
+                strategy=priority_strategy,
+            )
+        else:
+            recommended = fallback_recommended
 
         replanning_context = MealReplanningContextService().build(
             recommendation=recommended,
@@ -640,6 +750,7 @@ def get_meal_decision(
             day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
         )
 
@@ -813,6 +924,7 @@ def get_day_briefing(
             day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
         )
     except RepositoryError as exc:

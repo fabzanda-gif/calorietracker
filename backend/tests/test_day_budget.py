@@ -15,17 +15,52 @@ class FakeMealsRepository:
 
 
 class FakeActivitiesRepository:
-    def __init__(self, rows):
+    def __init__(self, rows, history_rows=None):
         self.rows = rows
+        self.history_rows = history_rows or []
 
     def list_for_date(self, user_id, log_date):
         return self.rows
 
+    def list_date_range(self, user_id, start_date, end_date):
+        return self.history_rows
 
-def service(meals=None, activities=None):
+
+class FakeDailyLogsRepository:
+    def __init__(self, today=None, history=None):
+        self.today = today or {}
+        self.history = history or []
+
+    def get_for_date_compatible(self, user_id, log_date):
+        return self.today
+
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+        columns=None,
+    ):
+        return self.history
+
+
+def service(
+    meals=None,
+    activities=None,
+    history_activities=None,
+    daily_log=None,
+    daily_log_history=None,
+):
     return DayBudgetService(
         meals_repo=FakeMealsRepository(meals or []),
-        activities_repo=FakeActivitiesRepository(activities or []),
+        activities_repo=FakeActivitiesRepository(
+            activities or [],
+            history_rows=history_activities or [],
+        ),
+        daily_logs_repo=FakeDailyLogsRepository(
+            today=daily_log,
+            history=daily_log_history,
+        ),
     )
 
 
@@ -61,9 +96,9 @@ def test_day_budget_combines_profile_food_and_activity():
     assert result["actual"]["actual_activity_kcal"] == 450
 
     budget = result["budget"]
-    assert budget["maintenance_kcal"] == (
-        result["profile"]["bmr"] * 1.2
-    ) + 450
+    # Today's activity stays observable but is not added directly
+    # to today's calorie target.
+    assert budget["maintenance_kcal"] == result["profile"]["bmr"]
     assert budget["available_kcal"] == (
         budget["daily_budget_kcal"] - 1200
     )
@@ -256,3 +291,140 @@ def test_negative_available_balance_is_preserved_end_to_end():
     )
 
     assert result["budget"]["available_kcal"] < 0
+
+
+def test_day_budget_uses_previous_seven_complete_days():
+    result = service(
+        history_activities=[
+            {"date": "2026-08-18", "burned_calories": 700},
+            {"date": "2026-08-19", "burned_calories": 700},
+            {"date": "2026-08-22", "burned_calories": 700},
+            {"date": "2026-08-24", "burned_calories": 700},
+            {"date": "2026-08-25", "burned_calories": 5000},
+        ],
+        daily_log={
+            "date": str(DAY),
+            "activity_plan": "Riposo",
+        },
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "maintenance",
+        },
+        current_weight=80,
+    )
+
+    baseline = result["energy_baseline"]
+
+    assert baseline["average_activity_kcal_7d"] == 400
+    assert baseline["activity_buffer_kcal"] == 0
+    assert baseline["activity_kcal_for_budget"] == 400
+
+    assert result["budget"]["maintenance_kcal"] == (
+        result["profile"]["bmr"] + 400
+    )
+
+
+def test_day_budget_adds_active_day_buffer():
+    result = service(
+        history_activities=[
+            {"date": "2026-08-18", "burned_calories": 350},
+            {"date": "2026-08-19", "burned_calories": 350},
+            {"date": "2026-08-20", "burned_calories": 350},
+            {"date": "2026-08-21", "burned_calories": 350},
+            {"date": "2026-08-22", "burned_calories": 350},
+            {"date": "2026-08-23", "burned_calories": 350},
+            {"date": "2026-08-24", "burned_calories": 350},
+        ],
+        daily_log={
+            "date": str(DAY),
+            "activity_plan": "Attiva",
+        },
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "maintenance",
+        },
+        current_weight=80,
+    )
+
+    baseline = result["energy_baseline"]
+
+    assert baseline["average_activity_kcal_7d"] == 350
+    assert baseline["activity_level"] == "Attiva"
+    assert baseline["activity_buffer_kcal"] == 300
+    assert baseline["activity_kcal_for_budget"] == 650
+
+    assert result["budget"]["maintenance_kcal"] == (
+        result["profile"]["bmr"] + 650
+    )
+
+
+def test_day_budget_moderate_buffer_is_150():
+    result = service(
+        daily_log={
+            "date": str(DAY),
+            "activity_plan": "Moderatamente attiva",
+        },
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "maintenance",
+        },
+        current_weight=80,
+    )
+
+    assert (
+        result["energy_baseline"]["activity_buffer_kcal"]
+        == 150
+    )
+
+
+def test_today_activity_does_not_change_today_budget():
+    before = service(
+        activities=[],
+        daily_log={
+            "date": str(DAY),
+            "activity_plan": "Riposo",
+        },
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "maintenance",
+        },
+        current_weight=80,
+    )
+
+    after = service(
+        activities=[{"burned_calories": 500}],
+        daily_log={
+            "date": str(DAY),
+            "activity_plan": "Riposo",
+        },
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "maintenance",
+        },
+        current_weight=80,
+    )
+
+    assert (
+        after["actual"]["actual_activity_kcal"]
+        == 500
+    )
+    assert (
+        after["budget"]["daily_budget_kcal"]
+        == before["budget"]["daily_budget_kcal"]
+    )
+

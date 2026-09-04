@@ -89,6 +89,16 @@ class FakeActivitiesRepository:
     def list_for_date(self, user_id, log_date):
         return list(self.today_activities)
 
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+    ):
+        # These API scenarios do not provide historical activity.
+        # Today's activity must not enter the 7-day baseline.
+        return []
+
 
 class FakeWeightRepository:
     def latest(self, user_id):
@@ -344,7 +354,7 @@ def test_snack_replans_lunch_without_changing_routine_identity():
     )
 
     assert before_recommendation is not None
-    assert before_recommendation["strategy"] == "routine"
+    assert before_recommendation["strategy"] == "inventory_priority"
     assert before_recommendation["portion_multiplier"] == 1.0
 
     fake_meals.today_meals.append(
@@ -384,7 +394,7 @@ def test_snack_replans_lunch_without_changing_routine_identity():
 
     assert (
         after_recommendation["strategy"]
-        == "routine"
+        == "inventory_priority"
     )
 
     assert (
@@ -437,7 +447,7 @@ def test_activity_can_relax_lunch_replanning():
     assert before_recommendation is not None
     assert (
         before_recommendation["strategy"]
-        == "routine"
+        == "inventory_priority"
     )
     assert (
         before_recommendation["portion_multiplier"]
@@ -472,7 +482,7 @@ def test_activity_can_relax_lunch_replanning():
 
     assert (
         after_budget["available_kcal"]
-        == before_budget["available_kcal"] + 500
+        == before_budget["available_kcal"]
     )
 
     assert (
@@ -523,7 +533,7 @@ def test_snack_exposes_food_replanning_context():
     assert payload["recommended"] is not None
     assert (
         payload["recommended"]["strategy"]
-        == "routine"
+        == "inventory_priority"
     )
 
     assert (
@@ -533,15 +543,15 @@ def test_snack_exposes_food_replanning_context():
 
     assert payload["replanning_context"] == {
         "direction": "unchanged",
-        "driver": "normal",
+        "driver": "inventory",
         "portion_changed": False,
         "available_kcal": payload[
             "replanning_context"
         ]["available_kcal"],
-        "title": "In linea con la giornata",
+        "title": "Prima quello che hai già pronto",
         "message": (
-            "Il pasto abituale è compatibile con "
-            "il margine disponibile."
+            "Per il pranzo do priorità a un pasto "
+            "disponibile nell'inventario."
         ),
     }
 
@@ -591,11 +601,27 @@ def test_activity_exposes_positive_replanning_context():
 
     context = payload["replanning_context"]
 
-    assert context["driver"] == "activity"
-    assert context["direction"] == "expanded"
-    assert context["title"] == "Più margine disponibile"
+    assert context["driver"] == "inventory"
+    assert context["direction"] == "unchanged"
+    assert context["title"] == "Prima quello che hai già pronto"
     assert (
         context["message"]
-        == "L'attività registrata oggi ha aumentato "
-        "il margine disponibile."
+        == "Per il pranzo do priorità a un pasto "
+        "disponibile nell'inventario."
     )
+
+def test_ranked_options_prioritizes_available_meal_prep_for_lunch():
+    response = client.get(
+        "/days/2026-09-01/meals/lunch/options"
+    )
+
+    assert response.status_code == 200
+
+    recommended = response.json()["recommended"]
+
+    assert recommended is not None
+    assert recommended["strategy"] == "inventory_priority"
+    assert recommended["portion_multiplier"] == 1.0
+    assert recommended["candidate"]["source"] == "meal_prep"
+    assert recommended["candidate"]["name"] == "Meal prep chili"
+

@@ -90,6 +90,23 @@ class MealReplanningService:
 
         return None
 
+    def recommend_candidate(
+        self,
+        *,
+        candidate: dict[str, Any],
+        strategy: str,
+    ) -> dict[str, Any]:
+        """
+        Wrap an explicitly selected deterministic candidate in the
+        same public recommendation contract used by recommend().
+        """
+        return self._recommendation(
+            candidate=dict(candidate),
+            multiplier=1.0,
+            strategy=strategy,
+            original_candidate=candidate,
+        )
+
     @classmethod
     def _fits_budget(
         cls,
@@ -199,6 +216,10 @@ class MealReplanningService:
                 "La routine non entra nel margine disponibile, "
                 "quindi scelgo la migliore alternativa "
                 "compatibile nel pool di oggi."
+            ),
+            "inventory_priority": (
+                "Per il pranzo do priorità a un pasto già "
+                "disponibile nell'inventario."
             ),
         }.get(
             strategy,

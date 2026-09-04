@@ -55,6 +55,66 @@ class DayHistoryService:
         self.daily_logs_repo = daily_logs_repo
         self.activities_repo = activities_repo
 
+    def average_activity_kcal(
+        self,
+        *,
+        user_id: str,
+        end_date: date,
+        lookback_days: int = 7,
+    ) -> dict[str, Any]:
+        """
+        Average burned calories across complete calendar days.
+
+        Days without recorded activity count as zero.
+        """
+        lookback_days = max(1, int(lookback_days))
+        start_date = end_date - timedelta(days=lookback_days - 1)
+
+        activities = self.activities_repo.list_date_range(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        calories_by_date: dict[str, float] = defaultdict(float)
+
+        for activity in activities:
+            raw_date = activity.get("date")
+            if raw_date is None:
+                continue
+
+            try:
+                activity_date = date.fromisoformat(str(raw_date))
+            except ValueError:
+                continue
+
+            if not start_date <= activity_date <= end_date:
+                continue
+
+            calories_by_date[str(activity_date)] += max(
+                0.0,
+                _number(activity.get("burned_calories")),
+            )
+
+        total = sum(
+            calories_by_date.get(
+                str(start_date + timedelta(days=offset)),
+                0.0,
+            )
+            for offset in range(lookback_days)
+        )
+
+        return {
+            "lookback_days": lookback_days,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "total_burned_calories": round(total, 2),
+            "average_burned_calories": round(
+                total / lookback_days,
+                2,
+            ),
+        }
+
     def activity_profile_by_day_type(
         self,
         user_id: str,

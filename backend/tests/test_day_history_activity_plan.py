@@ -140,3 +140,45 @@ def test_activity_plan_profile_keeps_negative_calories_at_zero():
     assert profile["average_burned_calories"] == 0
     assert profile["min_burned_calories"] == 0
     assert profile["max_burned_calories"] == 0
+
+
+def test_average_activity_kcal_uses_complete_calendar_window():
+    service = build_service(
+        [],
+        [
+            {"date": "2026-08-20", "burned_calories": 350},
+            {"date": "2026-08-20", "burned_calories": 150},
+            {"date": "2026-08-22", "burned_calories": 700},
+            {"date": "2026-08-26", "burned_calories": -100},
+        ],
+    )
+
+    result = service.average_activity_kcal(
+        user_id="u1",
+        end_date=date(2026, 8, 26),
+        lookback_days=7,
+    )
+
+    assert result["start_date"] == "2026-08-20"
+    assert result["end_date"] == "2026-08-26"
+    assert result["total_burned_calories"] == 1200
+    assert result["average_burned_calories"] == 171.43
+
+
+def test_average_activity_kcal_counts_missing_days_as_zero():
+    service = build_service(
+        [],
+        [
+            {"date": "2026-08-20", "burned_calories": 350},
+        ],
+    )
+
+    result = service.average_activity_kcal(
+        user_id="u1",
+        end_date=date(2026, 8, 26),
+        lookback_days=7,
+    )
+
+    assert result["total_burned_calories"] == 350
+    assert result["average_burned_calories"] == 50
+
