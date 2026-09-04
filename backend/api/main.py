@@ -16,6 +16,7 @@ from backend.api.routers.learned_insights import router as learned_insights_rout
 from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
 from backend.api.routers.oura import router as oura_router
+from backend.api.routers.pantry import router as pantry_router
 from backend.api.routers.recipes import router as recipes_router
 from backend.api.routers.progress import router as progress_router
 from backend.api.routers.profile import router as profile_router
@@ -64,6 +65,7 @@ app.include_router(recipes_router)
 app.include_router(ingredients_router)
 app.include_router(days_router)
 app.include_router(meal_prep_router)
+app.include_router(pantry_router)
 app.include_router(learned_insights_router)
 app.include_router(decision_selections_router)
 app.include_router(decision_learning_router)

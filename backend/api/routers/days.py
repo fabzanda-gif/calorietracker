@@ -467,6 +467,7 @@ def get_ranked_meal_options(
     weekly_schedule_repo: WeeklyScheduleRepository = Depends(
         get_weekly_schedule_repository
     ),
+
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -792,6 +793,9 @@ def confirm_meal_prediction(
     weekly_schedule_repo: WeeklyScheduleRepository = Depends(
         get_weekly_schedule_repository
     ),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -840,6 +844,12 @@ def confirm_meal_prediction(
                     "replanning_strategy": (
                         recommendation.get("strategy")
                     ),
+                    "recommendation_source": recommendation.get(
+                        "source"
+                    ),
+                    "recommendation_source_id": recommendation.get(
+                        "source_id"
+                    ),
                     "components": recommendation.get(
                         "components"
                     ),
@@ -851,7 +861,8 @@ def confirm_meal_prediction(
                 }
 
         return MealConfirmationService(
-            meals_repo
+            meals_repo,
+            meal_prep_repo,
         ).confirm(
             user_id=current_user.id,
             day_date=day_date,
