@@ -7930,3 +7930,97 @@
     border-radius: 22px;
   }
 }
+
+/* ============================================================
+   Meal card headers — unified across all states
+   ============================================================ */
+
+.mealsSection .mealCardTop,
+.mealsSection .mealCard:has(.registeredMealBadge) .mealCardTop,
+.mealsSection .mealCard:has(.nextMealBadge) .mealCardTop {
+  min-height: 48px;
+  align-items: center;
+}
+
+.mealsSection .mealIdentity {
+  gap: 12px;
+}
+
+/* Same icon size for Colazione / Pranzo / Snack / Cena */
+.mealsSection .mealIcon,
+.mealsSection .mealCard:has(.registeredMealBadge) .mealIcon,
+.mealsSection .mealCard:has(.nextMealBadge) .mealIcon {
+  width: 48px;
+  height: 48px;
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ff7773 0%,
+      #ff5f5d 100%
+    );
+
+  box-shadow:
+    0 8px 20px rgba(255, 96, 95, 0.18);
+
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+/* Same slot title typography everywhere */
+.mealsSection .mealLabel,
+.mealsSection .mealCard:has(.registeredMealBadge) .mealLabel,
+.mealsSection .mealCard:has(.nextMealBadge) .mealLabel {
+  color: #102846;
+
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 850;
+
+  letter-spacing: -0.02em;
+}
+
+/* Keep status pills visually balanced */
+.mealsSection .registeredMealBadge,
+.mealsSection .nextMealBadge,
+.mealsSection .predictedBadge,
+.mealsSection .unknownBadge {
+  padding: 6px 11px;
+
+  font-size: 0.72rem;
+  line-height: 1;
+  font-weight: 850;
+}
+
+/* Main meal title: same hierarchy for predicted and registered */
+.mealsSection .mealName,
+.mealsSection .mealCard:has(.nextMealBadge) .mealName,
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowInfo strong {
+  font-size: 1.35rem;
+  line-height: 1.18;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+
+  color: #102846;
+}
+
+@media (max-width: 600px) {
+  .mealsSection .mealIcon,
+  .mealsSection .mealCard:has(.registeredMealBadge) .mealIcon,
+  .mealsSection .mealCard:has(.nextMealBadge) .mealIcon {
+    width: 44px;
+    height: 44px;
+
+    font-size: 1.2rem;
+  }
+
+  .mealsSection .mealLabel,
+  .mealsSection .mealCard:has(.registeredMealBadge) .mealLabel,
+  .mealsSection .mealCard:has(.nextMealBadge) .mealLabel {
+    font-size: 0.94rem;
+  }
+}
