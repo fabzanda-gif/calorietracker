@@ -6885,3 +6885,75 @@
     flex-wrap: wrap;
   }
 }
+
+/* ============================================================
+   Meal cards: typography alignment
+   Predicted and registered meals share the same hierarchy
+   ============================================================ */
+
+/* Nome principale del pasto previsto */
+.mealsSection .mealName,
+.mealsSection .mealCard:has(.nextMealBadge) .mealName {
+  font-size: 1rem;
+  line-height: 1.28;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Nome principale del pasto registrato */
+.mealsSection .registeredMealRowInfo strong {
+  font-size: 1rem;
+  line-height: 1.28;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+
+  color: var(--ss-navy-950, #102846);
+
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+/* Informazione secondaria:
+   kcal/proteine nel previsto, porzioni nel registrato */
+.mealsSection .mealMeta,
+.mealsSection .mealCard:has(.nextMealBadge) .mealMeta,
+.mealsSection .registeredMealRowInfo span {
+  margin-top: 5px;
+
+  color: #73736d;
+
+  font-size: 0.72rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* Un po' più di respiro al contenuto registrato */
+.mealsSection .registeredMealRow {
+  padding: 12px 13px;
+  gap: 12px;
+}
+
+/* Le azioni devono restare gerarchicamente secondarie */
+.mealsSection .registeredMealRowActions button {
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+/* Totale: leggibile ma non deve competere con il nome del pasto */
+.mealsSection .registeredMealSlotTotal {
+  font-size: 0.66rem;
+}
+
+.mealsSection .registeredMealSlotTotal strong {
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+@media (max-width: 600px) {
+  .mealsSection .mealName,
+  .mealsSection .mealCard:has(.nextMealBadge) .mealName,
+  .mealsSection .registeredMealRowInfo strong {
+    font-size: 0.94rem;
+  }
+}
