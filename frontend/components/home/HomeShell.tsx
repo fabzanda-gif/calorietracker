@@ -144,10 +144,10 @@ function mealLabel(slot: string): string {
 function mealIcon(slot: string): string {
   return {
     breakfast: "☕",
-    lunch: "▦",
-    snack: "●",
-    dinner: "♨",
-  }[slot] ?? "•";
+    lunch: "🍽️",
+    snack: "🍎",
+    dinner: "🍲",
+  }[slot] ?? "🍴";
 }
 
 function normalizedMealSlot(value: string):

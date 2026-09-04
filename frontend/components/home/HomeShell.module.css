@@ -6568,3 +6568,35 @@
 .mealsSection .registeredMealRowActions .registeredMealRowDelete {
   color: #d84a46;
 }
+
+/* registered meal card compact */
+.mealCard:has(.registeredMealBadge) {
+  gap: 10px;
+  padding: 16px 18px;
+  min-height: 0;
+  height: auto;
+  align-content: start;
+}
+
+.mealCard:has(.registeredMealBadge) .mealCardTop {
+  margin-bottom: 0;
+}
+
+.mealCard:has(.registeredMealBadge) .registeredMealNutrition {
+  gap: 4px 10px;
+  margin: 0;
+}
+
+@media (min-width: 900px) {
+  .mealCard:has(.registeredMealBadge) {
+    min-height: 0;
+    height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .mealCard:has(.registeredMealBadge) {
+    padding: 14px;
+    gap: 8px;
+  }
+}
