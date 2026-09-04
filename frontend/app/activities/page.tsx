@@ -770,9 +770,9 @@ export default function ActivitiesPage() {
         <header className={styles.header}>
           <div>
             <p className={styles.eyebrow}>
-              Movimento
+              Attività
             </p>
-            <h1>Attività</h1>
+            <h1>Movimento</h1>
             <p>
               Gli allenamenti che aggiungono qualcosa
               al movimento naturale della tua giornata.
