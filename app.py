@@ -2243,7 +2243,7 @@ def require_groq_api_key():
     """
     Return the configured Groq API key or raise a safe, actionable error.
     """
-    api_key = require_groq_api_key()
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if api_key:
         return api_key
 
