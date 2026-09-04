@@ -456,6 +456,10 @@ export function HomeShell() {
 
   const [editingMealId, setEditingMealId] =
     useState<string | number | null>(null);
+
+  // Pannello "I tuoi pasti": mostra una sola fascia alla volta.
+  const [selectedMealSlot, setSelectedMealSlot] =
+    useState<string>("Colazione");
   const [mealEditType, setMealEditType] =
     useState("Colazione");
   const [
@@ -2730,8 +2734,45 @@ export function HomeShell() {
               </div>
             </div>
 
+            <div className={styles.mealTabs}>
+              {Object.entries(day.meals)
+                .sort(
+                  ([slotA], [slotB]) =>
+                    ["Colazione", "Pranzo", "Snack", "Cena"].indexOf(
+                      mealLabel(slotA),
+                    ) -
+                    ["Colazione", "Pranzo", "Snack", "Cena"].indexOf(
+                      mealLabel(slotB),
+                    ),
+                )
+                .map(([slot]) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    className={
+                      selectedMealSlot === mealLabel(slot)
+                        ? styles.mealTabActive
+                        : styles.mealTab
+                    }
+                    onClick={() =>
+                      setSelectedMealSlot(mealLabel(slot))
+                    }
+                    aria-pressed={
+                      selectedMealSlot === mealLabel(slot)
+                    }
+                  >
+                    {mealLabel(slot)}
+                  </button>
+                ))}
+            </div>
+
             <div className={styles.mealList}>
-              {Object.entries(day.meals).map(
+              {Object.entries(day.meals)
+                .filter(
+                  ([slot]) =>
+                    mealLabel(slot) === selectedMealSlot,
+                )
+                .map(
                 ([slot, meal]) => (
                   <article
                     key={slot}

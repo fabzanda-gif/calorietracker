@@ -6173,3 +6173,73 @@
     height: auto;
   }
 }
+
+
+/* ============================================================
+   HOME — MEAL TABS
+   Mostra un solo pasto alla volta
+   ============================================================ */
+
+.mealTabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 18px 0 16px;
+  padding: 5px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #e5e5df;
+  border-radius: 14px;
+  background: #f7f7f4;
+}
+
+.mealTab,
+.mealTabActive {
+  min-height: 38px;
+  padding: 7px 17px;
+  border-radius: 10px;
+  border: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.mealTab {
+  background: transparent;
+  color: #667085;
+}
+
+.mealTab:hover {
+  color: #172f4d;
+  background: #ffffff;
+}
+
+.mealTabActive {
+  background: #ffffff;
+  color: #102846;
+  box-shadow: 0 1px 4px rgba(16, 40, 70, 0.10);
+}
+
+.mealTab:active,
+.mealTabActive:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 600px) {
+  .mealTabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .mealTab,
+  .mealTabActive {
+    flex: 1 0 auto;
+  }
+}
