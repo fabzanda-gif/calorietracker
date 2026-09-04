@@ -7494,3 +7494,439 @@
     grid-row: 4;
   }
 }
+
+/* ============================================================
+   Registered meal card V3B — approved direction
+   ============================================================ */
+
+/* Card */
+.mealsSection .mealCard:has(.registeredMealBadge) {
+  padding: 22px 24px 20px;
+  min-height: 0;
+  height: auto;
+
+  border: 1px solid rgba(244, 127, 122, 0.38);
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 248, 246, 0.88) 0%,
+      #ffffff 65%
+    );
+
+  box-shadow:
+    0 9px 26px rgba(16, 40, 70, 0.045);
+}
+
+/* Header */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .mealCardTop {
+  min-height: 48px;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .mealIcon {
+  width: 48px;
+  height: 48px;
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ff7773 0%,
+      #ff5f5d 100%
+    );
+
+  box-shadow:
+    0 8px 20px rgba(255, 96, 95, 0.2);
+
+  font-size: 1.35rem;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .mealLabel {
+  color: #102846;
+
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealBadge {
+  padding: 6px 11px;
+
+  background: #eaf5e8;
+  color: #28723b;
+
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+/* ------------------------------------------------------------
+   Elimina l'aspetto "card dentro la card"
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealList {
+  margin-top: 22px;
+  gap: 16px;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 0;
+
+  background: transparent;
+}
+
+/* Titolo grande */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowInfo strong {
+  display: block;
+
+  margin: 0;
+
+  color: #102846;
+
+  font-size: 1.4rem;
+  line-height: 1.15;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+}
+
+/* Quantità */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowInfo span {
+  display: block;
+
+  margin-top: 7px;
+
+  color: #74746d;
+
+  font-size: 0.86rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+/* Modifica / elimina */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowActions {
+  display: flex;
+  align-items: center;
+
+  gap: 16px;
+
+  flex: 0 0 auto;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowActions button {
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+
+  color: #173b64;
+
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealRowDelete {
+  color: #e64f4b !important;
+}
+
+/* ------------------------------------------------------------
+   Macronutrienti: quattro box veri
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-top: 20px;
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem {
+  display: grid;
+
+  grid-template-columns: 30px 1fr;
+  grid-template-rows: auto auto;
+
+  align-items: center;
+
+  column-gap: 9px;
+
+  min-height: 62px;
+
+  padding: 10px 13px;
+
+  border: 1px solid #e9e7e1;
+  border-radius: 13px;
+
+  background: rgba(255,255,255,0.92);
+
+  box-shadow:
+    0 2px 8px rgba(16, 40, 70, 0.025);
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem::before {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 1.05rem;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(1)::before {
+  content: "🔥";
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(2)::before {
+  content: "💪";
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(3)::before {
+  content: "🌾";
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(4)::before {
+  content: "🥑";
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem strong {
+  grid-column: 2;
+  grid-row: 1;
+
+  color: #102846;
+
+  font-size: 1.05rem;
+  line-height: 1.05;
+  font-weight: 850;
+}
+
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem span {
+  grid-column: 2;
+  grid-row: 2;
+
+  margin: 2px 0 0;
+
+  color: #777770;
+
+  font-size: 0.67rem;
+  font-weight: 650;
+
+  text-transform: lowercase;
+}
+
+/* aggiunge l'unità ai macro non-kcal */
+.mealsSection
+  .mealCard:has(.registeredMealBadge)
+  .registeredMealNutrition
+  .nutritionItem:nth-child(n + 2)
+  strong::after {
+  content: " g";
+
+  font-size: 0.78em;
+}
+
+/* ------------------------------------------------------------
+   Conditional formatting
+   ------------------------------------------------------------ */
+
+.mealsSection
+  .registeredMealInsights {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  margin-top: 14px;
+
+  flex-wrap: wrap;
+}
+
+.mealsSection
+  .registeredMealInsightSuccess,
+.mealsSection
+  .registeredMealInsightWarning {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 31px;
+
+  padding: 0 12px;
+
+  border-radius: 999px;
+
+  font-size: 0.7rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.mealsSection
+  .registeredMealInsightSuccess {
+  background: #eaf5e8;
+  color: #2c7a42;
+}
+
+.mealsSection
+  .registeredMealInsightWarning {
+  background: #fff1d8;
+  color: #c77808;
+}
+
+/* il vecchio totale non deve comparire comunque */
+.mealsSection
+  .registeredMealSlotTotal {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------
+   Responsive
+   ------------------------------------------------------------ */
+
+@media (max-width: 899px) {
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .mealsSection
+    .mealCard:has(.registeredMealBadge) {
+    padding: 17px;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealRowInfo strong {
+    font-size: 1.15rem;
+  }
+
+  .mealsSection
+    .mealCard:has(.registeredMealBadge)
+    .registeredMealNutrition {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ============================================================
+   Home desktop — align Meals + SanoSyncAI cards
+   ============================================================ */
+
+@media (min-width: 1100px) {
+  /*
+   * Entrambe le colonne devono iniziare esattamente
+   * dalla stessa coordinata verticale.
+   */
+  .desktopHomeGrid {
+    align-items: start;
+  }
+
+  .desktopHomeGrid .mealsSection,
+  .desktopHomeGrid .homeAssistantSection {
+    align-self: start;
+
+    margin-top: 0 !important;
+
+    position: relative;
+    top: 0;
+
+    box-sizing: border-box;
+  }
+
+  /*
+   * Evita che padding/margini interni del widget spostino
+   * visivamente una card rispetto all'altra.
+   */
+  .desktopHomeGrid .mealsSection {
+    padding-top: 24px;
+  }
+
+  .desktopHomeGrid .homeAssistantSection {
+    padding-top: 24px;
+  }
+
+  /*
+   * Uniformiamo anche il bordo superiore percepito.
+   */
+  .desktopHomeGrid .mealsSection,
+  .desktopHomeGrid .homeAssistantSection {
+    border-radius: 22px;
+  }
+}

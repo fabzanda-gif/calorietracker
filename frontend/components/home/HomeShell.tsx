@@ -2416,7 +2416,7 @@ export function HomeShell() {
           <div className={styles.desktopHomeGrid}>
             <section
               {...dashboardWidgetProps("ai")}
-              className={`${styles.conversationCard} ${styles.dashboardWidget}`}
+              className={`${styles.homeAssistantSection} ${styles.conversationCard} ${styles.dashboardWidget}`}
             >
             {dashboardWidgetControls(
               "ai",
@@ -2880,7 +2880,10 @@ export function HomeShell() {
                                   }
                                 >
                                   <strong>
-                                    {registeredMeal.name}
+                                    {registeredMeal.name.replace(
+                                      /\s*\([^)]*porz\.\)\s*$/i,
+                                      "",
+                                    )}
                                   </strong>
 
                                   <span>
@@ -3021,41 +3024,62 @@ export function HomeShell() {
                             </div>
                           </div>
                         ) : null}
-
                         {actualMealsForSlot(slot).length > 0 ? (
                           <div
                             className={
-                              styles.registeredMealSlotTotal
+                              styles.registeredMealInsights
                             }
                           >
-                            <span>Totale {mealLabel(slot)}</span>
+                            <span
+                              className={
+                                styles.registeredMealInsightSuccess
+                              }
+                            >
+                              ✓ Pasto registrato
+                            </span>
 
-                            <strong>
-                              {roundNumber(
-                                actualMealsForSlot(slot).reduce(
-                                  (total, registeredMeal) =>
-                                    total +
-                                    Number(
-                                      registeredMeal.calories || 0,
-                                    ),
-                                  0,
+                            {actualMealsForSlot(slot).reduce(
+                              (total, registeredMeal) =>
+                                total +
+                                Number(
+                                  registeredMeal.protein || 0,
                                 ),
-                              )}{" "}
-                              kcal ·{" "}
-                              {roundNumber(
-                                actualMealsForSlot(slot).reduce(
-                                  (total, registeredMeal) =>
-                                    total +
-                                    Number(
-                                      registeredMeal.protein || 0,
-                                    ),
-                                  0,
-                                ),
-                              )}{" "}
-                              g proteine
-                            </strong>
+                              0,
+                            ) < 15 ? (
+                              <span
+                                className={
+                                  styles.registeredMealInsightWarning
+                                }
+                              >
+                                ▮▮ Proteine basse
+                              </span>
+                            ) : actualMealsForSlot(slot).reduce(
+                                (total, registeredMeal) =>
+                                  total +
+                                  Number(
+                                    registeredMeal.protein || 0,
+                                  ),
+                                0,
+                              ) <= 30 ? (
+                              <span
+                                className={
+                                  styles.registeredMealInsightSuccess
+                                }
+                              >
+                                ✓ Buon apporto proteico
+                              </span>
+                            ) : (
+                              <span
+                                className={
+                                  styles.registeredMealInsightSuccess
+                                }
+                              >
+                                ↑ Ricco di proteine
+                              </span>
+                            )}
                           </div>
                         ) : null}
+
 
                         {actualMealsForSlot(slot).some(
                           (registeredMeal) =>
