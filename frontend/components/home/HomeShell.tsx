@@ -2847,30 +2847,16 @@ export function HomeShell() {
                                     {registeredMeal.name}
                                   </strong>
 
-                                  <span className={styles.registeredMealMacros}>
-                                    <span>
-                                      {roundNumber(
-                                        registeredMeal.calories,
-                                      )} kcal
-                                    </span>
-
-                                    <span>
-                                      P {roundNumber(
-                                        registeredMeal.protein || 0,
-                                      )} g
-                                    </span>
-
-                                    <span>
-                                      C {roundNumber(
-                                        registeredMeal.carbs || 0,
-                                      )} g
-                                    </span>
-
-                                    <span>
-                                      G {roundNumber(
-                                        registeredMeal.fat || 0,
-                                      )} g
-                                    </span>
+                                  <span className={styles.registeredMealEntryMeta}>
+                                    {registeredMeal.quantity &&
+                                    Number(registeredMeal.quantity) !== 1
+                                      ? `${roundNumber(
+                                          Number(registeredMeal.quantity),
+                                        )} porzioni · `
+                                      : ""}
+                                    {roundNumber(
+                                      registeredMeal.calories,
+                                    )} kcal
                                   </span>
                                 </div>
 
@@ -2931,6 +2917,74 @@ export function HomeShell() {
                             ),
                           )}
                         </div>
+
+                        {actualMealsForSlot(slot).length > 0 ? (
+                          <div className={styles.registeredMealNutrition}>
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.calories || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>kcal</span>
+                            </div>
+
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.protein || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>Proteine</span>
+                            </div>
+
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.carbs || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>Carboidrati</span>
+                            </div>
+
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.fat || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>Grassi</span>
+                            </div>
+                          </div>
+                        ) : null}
 
                         {actualMealsForSlot(slot).length > 0 ? (
                           <div

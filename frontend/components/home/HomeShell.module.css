@@ -6282,3 +6282,223 @@
     gap: 3px 7px;
   }
 }
+
+
+/* ============================================================
+   HOME MEALS — nutrition card refinement
+   ============================================================ */
+
+/* La card deve seguire il contenuto, non avere spazio artificiale. */
+
+.mealsSection .mealCard,
+.desktopHomeGrid .mealsSection .mealCard {
+  min-height: 0;
+}
+
+/* Entry registrate */
+
+.mealsSection .registeredMealList {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.mealsSection .registeredMealRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-width: 0;
+
+  padding: 11px 12px;
+
+  border: 1px solid #eeeae4;
+  border-radius: 13px;
+
+  background: #fafaf8;
+}
+
+.mealsSection .registeredMealRowInfo {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mealsSection .registeredMealRowInfo strong {
+  display: block;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  color: #102846;
+
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.mealsSection .registeredMealEntryMeta {
+  display: block;
+
+  margin-top: 4px;
+
+  color: #777770;
+
+  font-size: 0.64rem;
+  line-height: 1.2;
+}
+
+/* Azioni della singola entry */
+
+.mealsSection .registeredMealRowActions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.mealsSection .registeredMealRowActions button {
+  min-height: 28px;
+
+  padding: 3px 6px;
+
+  border: 0;
+  border-radius: 7px;
+
+  background: transparent;
+  color: #24476e;
+
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.mealsSection .registeredMealRowActions button:hover {
+  background: #f1f3f1;
+}
+
+.mealsSection .registeredMealRowActions
+  .registeredMealRowDelete {
+  color: #d34f4b;
+}
+
+/* ============================================================
+   RIEPILOGO NUTRIZIONALE
+   ============================================================ */
+
+.mealsSection .registeredMealNutrition {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  margin-top: 16px;
+
+  padding: 13px 4px;
+
+  border-top: 1px solid #eeeae4;
+  border-bottom: 1px solid #eeeae4;
+}
+
+.mealsSection .nutritionItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  min-width: 0;
+
+  padding: 0 8px;
+
+  border-right: 1px solid #eeeae4;
+}
+
+.mealsSection .nutritionItem:last-child {
+  border-right: 0;
+}
+
+.mealsSection .nutritionItem strong {
+  color: #102846;
+
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.mealsSection .nutritionItem span {
+  margin-top: 4px;
+
+  color: #777770;
+
+  font-size: 0.59rem;
+  font-weight: 650;
+  line-height: 1.15;
+
+  text-align: center;
+}
+
+/* Il totale ora è più leggero: il dettaglio è già sopra. */
+
+.mealsSection .registeredMealSlotTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  margin-top: 0;
+  padding-top: 12px;
+
+  border-top: 0;
+
+  color: #73736d;
+
+  font-size: 0.62rem;
+}
+
+.mealsSection .registeredMealSlotTotal strong {
+  color: #102846;
+
+  white-space: nowrap;
+
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+/* Evita che una card con una sola entry sembri vuota. */
+
+.mealsSection .mealCard:has(.registeredMealNutrition) {
+  padding-bottom: 14px;
+}
+
+/* Mobile */
+
+@media (max-width: 600px) {
+  .mealsSection .registeredMealRow {
+    align-items: flex-start;
+  }
+
+  .mealsSection .registeredMealRowActions {
+    gap: 3px;
+  }
+
+  .mealsSection .registeredMealRowActions button {
+    font-size: 0.6rem;
+  }
+
+  .mealsSection .registeredMealNutrition {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .mealsSection .nutritionItem {
+    padding: 0 4px;
+  }
+
+  .mealsSection .nutritionItem strong {
+    font-size: 0.78rem;
+  }
+
+  .mealsSection .nutritionItem span {
+    font-size: 0.55rem;
+  }
+}
