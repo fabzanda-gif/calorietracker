@@ -2083,6 +2083,45 @@ def get_daily_totals(target_date):
 
 
 
+def get_streamlit_secret(name, default=None):
+    """
+    Read one secret without ever exposing its value.
+
+    Order:
+      1. direct st.secrets[...] access;
+      2. st.secrets.get(...);
+      3. environment variable fallback.
+
+    This keeps all Groq features on the same secret-loading path.
+    """
+    key = str(name or "").strip()
+    if not key:
+        return default
+
+    try:
+        value = st.secrets[key]
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    except Exception:
+        pass
+
+    try:
+        value = st.secrets.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    except Exception:
+        pass
+
+    try:
+        value = os.environ.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    except Exception:
+        pass
+
+    return default
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def get_groq_available_model_ids():
     """
@@ -2091,7 +2130,7 @@ def get_groq_available_model_ids():
     We use the REST /models endpoint directly instead of depending on a specific
     openai-python client version.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         return []
 
@@ -2119,23 +2158,29 @@ def get_groq_available_model_ids():
 
 def resolve_groq_text_model():
     """
-    Pick a text model that this specific Groq project can actually use.
+    Pick a text model available to this Groq project.
 
-    Preference intentionally starts with current GPT-OSS production models,
-    because the user's project has returned model_not_found for both Llama
-    production IDs.
+    GROQ_TEXT_MODEL from Streamlit Secrets is honored first when present.
     """
     available = set(get_groq_available_model_ids())
+    configured_model = get_streamlit_secret("GROQ_TEXT_MODEL")
 
-    preferred = [
+    if configured_model and not available:
+        return configured_model
+
+    preferred = []
+    if configured_model:
+        preferred.append(configured_model)
+
+    preferred.extend([
+        "qwen/qwen3.6-27b",
         "openai/gpt-oss-20b",
         "openai/gpt-oss-120b",
-        "qwen/qwen3.6-27b",
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
         "groq/compound-mini",
         "groq/compound",
-    ]
+    ])
 
     for model_id in preferred:
         if model_id in available:
@@ -2166,10 +2211,18 @@ def resolve_groq_text_model():
 def resolve_groq_vision_model():
     """Pick an actually available multimodal/vision model."""
     available = set(get_groq_available_model_ids())
+    configured_model = get_streamlit_secret("GROQ_TEXT_MODEL")
 
-    preferred = [
+    if configured_model and not available:
+        return configured_model
+
+    preferred = []
+    if configured_model:
+        preferred.append(configured_model)
+
+    preferred.extend([
         "qwen/qwen3.6-27b",
-    ]
+    ])
     for model_id in preferred:
         if model_id in available:
             return model_id
@@ -2538,7 +2591,7 @@ def generate_sanosync_coach_message(
     Generate wording only. All nutrition math is performed by SanoSync.
     Uses Groq through the already-installed OpenAI-compatible client.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         return None
 
@@ -2788,7 +2841,7 @@ def generate_can_i_eat_advice(
     Nutrition numbers for the user's day are deterministic; only the requested
     food estimate is delegated to AI.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY non configurata.")
 
@@ -10141,7 +10194,7 @@ def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
     o non parsabili che possono verificarsi leggendo response.output_text
     dalla Responses API beta.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError(
             "GROQ_API_KEY non configurata nei Secrets di Streamlit."
@@ -10623,7 +10676,7 @@ def regenerate_ai_recipe_if_empty(
     Second-pass fallback used only when the first AI result has no valid ingredients.
     Keeps the user's calorie target, but prioritizes a coherent recipe over strict ±10%.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
 
@@ -10755,7 +10808,7 @@ def generate_ai_recipe_with_groq(
     Groq creates the recipe AND estimates nutrition.
     Open Food Facts is intentionally not used for this feature.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
 
@@ -10979,7 +11032,7 @@ def transcribe_ingredient_audio_with_groq(audio_file, language="Italiano"):
     if audio_file is None:
         return ""
 
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError(
             "GROQ_API_KEY non configurata nei Secrets di Streamlit."
@@ -11211,7 +11264,7 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
     if not raw_text:
         return []
 
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError(
             "GROQ_API_KEY non configurata nei Secrets di Streamlit."
