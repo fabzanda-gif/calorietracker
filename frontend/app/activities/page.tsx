@@ -772,10 +772,15 @@ export default function ActivitiesPage() {
             <p className={styles.eyebrow}>
               Attività
             </p>
-            <h1>Movimento</h1>
+            <h1>
+              {zero
+                ? "Muoviti. Poi ne parliamo."
+                : "Movimento"}
+            </h1>
             <p>
-              Gli allenamenti che aggiungono qualcosa
-              al movimento naturale della tua giornata.
+              {zero
+                ? "La cronaca dei tuoi tentativi di non diventare arredamento."
+                : "Gli allenamenti che aggiungono qualcosa al movimento naturale della tua giornata."}
             </p>
           </div>
 

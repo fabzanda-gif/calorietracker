@@ -1756,7 +1756,7 @@ export default function ProgressPage() {
 
           <p className={styles.subtitle}>
             {zero
-              ? "Trend, dati e nessuna favola motivazionale."
+              ? "I dati non giudicano. Si limitano a ricordare tutto."
               : "Guarda la direzione, non il singolo numero."}
           </p>
         </div>

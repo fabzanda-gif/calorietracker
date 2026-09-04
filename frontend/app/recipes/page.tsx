@@ -965,7 +965,7 @@ export default function RecipesPage() {
 
           <p className={styles.headerSubtitle}>
             {zero
-              ? "Piatti già collaudati. Almeno qui evitiamo esperimenti inutili."
+              ? "Piatti già collaudati. Almeno qui evitiamo di fare i fenomeni."
               : "I piatti che conosci già, pronti da registrare quando servono."}
           </p>
         </div>
