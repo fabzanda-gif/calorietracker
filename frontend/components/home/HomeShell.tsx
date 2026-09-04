@@ -2104,38 +2104,6 @@ export function HomeShell() {
           </h1>
         </div>
 
-        <div
-          className={styles.experienceSwitch}
-          aria-label="Modalità SanoSync"
-        >
-          <button
-            type="button"
-            className={
-              experienceMode === "standard"
-                ? styles.experienceSwitchActive
-                : undefined
-            }
-            onClick={() => {
-              setExperienceMode("standard");
-            }}
-          >
-            Standard
-          </button>
-
-          <button
-            type="button"
-            className={
-              experienceMode === "zero"
-                ? styles.experienceSwitchZeroActive
-                : undefined
-            }
-            onClick={() => {
-              setExperienceMode("zero");
-            }}
-          >
-            Zero
-          </button>
-        </div>
       </header>
 
       {loading ? (

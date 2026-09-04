@@ -64,8 +64,10 @@ function isActive(pathname: string, href: string): boolean {
 export function AppNav() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { experienceMode } =
-    useExperienceMode();
+  const {
+    experienceMode,
+    setExperienceMode,
+  } = useExperienceMode();
 
   const metadataName =
     user?.user_metadata?.full_name ??
@@ -96,6 +98,35 @@ export function AppNav() {
 
   return (
     <>
+      <div
+        className={styles.globalExperienceSwitch}
+        aria-label="Modalità SanoSync"
+      >
+        <button
+          type="button"
+          className={
+            experienceMode === "standard"
+              ? styles.globalExperienceSwitchStandardActive
+              : undefined
+          }
+          onClick={() => setExperienceMode("standard")}
+        >
+          Standard
+        </button>
+
+        <button
+          type="button"
+          className={
+            experienceMode === "zero"
+              ? styles.globalExperienceSwitchZeroActive
+              : undefined
+          }
+          onClick={() => setExperienceMode("zero")}
+        >
+          Zero
+        </button>
+      </div>
+
       <aside
         className={
           experienceMode === "zero"

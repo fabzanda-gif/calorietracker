@@ -1568,3 +1568,62 @@
 :global(html[data-experience-mode="zero"]) .insightLink {
   color: #f43d3d !important;
 }
+
+
+/* ZERO PROGRESS LIGHT HERO */
+:global(html[data-experience-mode="zero"]) .hero {
+  border: 1px solid rgba(244, 61, 61, 0.28) !important;
+  background:
+    linear-gradient(
+      145deg,
+      #ffffff 0%,
+      #fffafa 58%,
+      #fff5f5 100%
+    ) !important;
+  color: #102f4f !important;
+  box-shadow:
+    0 16px 38px rgba(16, 47, 79, 0.06) !important;
+}
+
+:global(html[data-experience-mode="zero"]) .hero strong,
+:global(html[data-experience-mode="zero"]) .hero h2,
+:global(html[data-experience-mode="zero"]) .hero h3,
+:global(html[data-experience-mode="zero"]) .currentWeight {
+  color: #102f4f !important;
+}
+
+:global(html[data-experience-mode="zero"]) .hero .kicker {
+  color: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"]) .hero .muted,
+:global(html[data-experience-mode="zero"]) .hero small,
+:global(html[data-experience-mode="zero"]) .currentWeight span {
+  color: #697687 !important;
+}
+
+:global(html[data-experience-mode="zero"]) .weightForm {
+  border: 1px solid rgba(244, 61, 61, 0.18) !important;
+  background: #ffffff !important;
+}
+
+:global(html[data-experience-mode="zero"]) .weightForm input {
+  background: #f7f7f5 !important;
+  color: #102f4f !important;
+}
+
+:global(html[data-experience-mode="zero"]) .weightForm button {
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-experience-mode="zero"]) .heroTrendLine,
+:global(html[data-experience-mode="zero"]) .weightLine {
+  stroke: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"]) .heroTrendPoint,
+:global(html[data-experience-mode="zero"]) .weightPoint {
+  fill: #ffffff !important;
+  stroke: #f43d3d !important;
+}
