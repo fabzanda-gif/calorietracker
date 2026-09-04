@@ -10,6 +10,7 @@ from backend.api.dependencies import (
     get_authenticated_supabase,
     get_daily_logs_repository,
     get_meals_repository,
+    get_meal_prep_repository,
     get_weight_repository,
     get_weekly_schedule_repository,
 )
@@ -158,6 +159,10 @@ class FakeWeeklyScheduleRepository:
         return None
 
 
+class FakeMealPrepRepository:
+    pass
+
+
 class FakeWeightRepository:
     def latest(self, user_id):
         return {
@@ -201,6 +206,10 @@ def override_activities():
     return FakeActivitiesRepository()
 
 
+def override_meal_prep():
+    return FakeMealPrepRepository()
+
+
 def override_weight():
     return FakeWeightRepository()
 
@@ -218,6 +227,9 @@ def api_overrides():
         override_authenticated_supabase
     )
     app.dependency_overrides[get_meals_repository] = override_meals
+    app.dependency_overrides[get_meal_prep_repository] = (
+        override_meal_prep
+    )
     app.dependency_overrides[get_daily_logs_repository] = override_daily_logs
     app.dependency_overrides[get_activities_repository] = override_activities
     app.dependency_overrides[get_weight_repository] = override_weight

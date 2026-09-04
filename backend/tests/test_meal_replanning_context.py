@@ -50,14 +50,14 @@ def test_activity_is_exposed_as_positive_budget_context():
     )
 
     assert result == {
-        "direction": "expanded",
+        "direction": "unchanged",
         "driver": "activity",
         "portion_changed": False,
         "available_kcal": 900,
-        "title": "Più margine disponibile",
+        "title": "Attività registrata",
         "message": (
-            "L'attività registrata oggi ha aumentato "
-            "il margine disponibile."
+            "L'attività di oggi resta un dato osservato; "
+            "il budget usa la baseline degli ultimi 7 giorni."
         ),
     }
 

@@ -177,7 +177,7 @@ def update_pantry_item(
         not in {"weight", "portion"}
     ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid quantity mode",
         )
 
@@ -207,7 +207,7 @@ def update_pantry_item(
         if resulting_mode == "portion":
             if resulting_grams is None:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=(
                         "grams_per_portion is required "
                         "for portions"
