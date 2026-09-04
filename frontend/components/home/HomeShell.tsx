@@ -3630,6 +3630,9 @@ export function HomeShell() {
                           </button>
                         </div>
 
+                      </>
+                    ) : null}
+
                         {alternateSlot === slot ? (
                           <div className={styles.alternateMealForm}>
                             <label>
@@ -3758,8 +3761,6 @@ export function HomeShell() {
                             </div>
                           </div>
                         ) : null}
-                      </>
-                    ) : null}
                   </article>
                 ),
               )}
