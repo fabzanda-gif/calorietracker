@@ -1346,3 +1346,94 @@
   font-size: 1rem;
   line-height: 1.45;
 }
+
+/* ZERO RECIPES PALETTE V2 START */
+
+
+/* ==========================================================
+   PAGE HEADER
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.header .kicker {
+  color: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.header h1 {
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.header .headerSubtitle {
+  color: #6f7782 !important;
+}
+
+
+/* ==========================================================
+   SECTION HEADINGS
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.sectionHeader h2,
+:global(html[data-experience-mode="zero"])
+.ingredientsHeader h2 {
+  color: #111111 !important;
+}
+
+
+/* ==========================================================
+   RECIPE CARDS
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.recipeCard,
+:global(html[data-experience-mode="zero"])
+.editorCard,
+:global(html[data-experience-mode="zero"])
+.newIngredientCard,
+:global(html[data-experience-mode="zero"])
+.nutritionCard {
+  border-color:
+    rgba(244, 61, 61, 0.20) !important;
+}
+
+
+/* Placeholder graphics:
+   Zero uses black instead of Standard navy. */
+
+:global(html[data-experience-mode="zero"])
+.recipePlaceholder {
+  background:
+    linear-gradient(
+      145deg,
+      #111111,
+      #292929
+    ) !important;
+}
+
+
+/* ==========================================================
+   ZERO ACTIONS
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.primarySmallButton,
+:global(html[data-experience-mode="zero"])
+.saveButton,
+:global(html[data-experience-mode="zero"])
+.recipeFilterActive {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.inventoryLink,
+:global(html[data-experience-mode="zero"])
+.starActive {
+  color: #f43d3d !important;
+}
+
+
+/* ZERO RECIPES PALETTE V2 END */

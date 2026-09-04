@@ -939,3 +939,157 @@ summary.loggerHeading {
   font-size: 1rem;
   line-height: 1.45;
 }
+
+/* ZERO ACTIVITY PALETTE V2 START */
+
+
+/* ==========================================================
+   PAGE HEADER
+   Small label red, main title black
+   ========================================================== */
+
+.pageZero .header .eyebrow {
+  color: #f43d3d !important;
+}
+
+.pageZero .header h1 {
+  color: #111111 !important;
+}
+
+.pageZero .header > div > p:last-child {
+  color: #6f7782 !important;
+}
+
+
+/* ==========================================================
+   PRIMARY TEXT
+   ========================================================== */
+
+.pageZero .card h2,
+.pageZero .uploadCard h2,
+.pageZero .previewCard h2,
+.pageZero .detailCard h2,
+.pageZero .summaryHeading h2,
+.pageZero .summaryGrid strong,
+.pageZero .detailStats strong,
+.pageZero .previewStats strong {
+  color: #111111 !important;
+}
+
+
+/* ==========================================================
+   ZERO ACCENT
+   ========================================================== */
+
+.pageZero .monthTotal strong,
+.pageZero .chartHeading strong {
+  color: #f43d3d !important;
+}
+
+.pageZero .selectedDay {
+  border-color: #f43d3d !important;
+  box-shadow:
+    inset 0 0 0 1px
+    #f43d3d !important;
+}
+
+.pageZero .activeDay {
+  background: #fff1f0 !important;
+  color: #111111 !important;
+}
+
+.pageZero .activeDay i,
+.pageZero .uploadIcon,
+.pageZero .importButton {
+  background: #f43d3d !important;
+}
+
+
+/* ==========================================================
+   CHARTS
+   No Standard navy/coral in Zero
+   ========================================================== */
+
+.pageZero .chartGrid,
+.pageZero .mapGrid {
+  stroke: #e5e2de !important;
+}
+
+.pageZero .chartLine,
+.pageZero .routeLine {
+  stroke: #f43d3d !important;
+}
+
+.pageZero .routeShadow {
+  stroke:
+    rgba(244, 61, 61, 0.17) !important;
+}
+
+.pageZero .chartPoint {
+  fill: #ffffff !important;
+  stroke: #f43d3d !important;
+}
+
+.pageZero .routeEnd {
+  fill: #f43d3d !important;
+}
+
+
+/* Start point:
+   green remains semantic, but becomes softer. */
+
+.pageZero .routeStart {
+  fill: #8fb99a !important;
+}
+
+
+/* ==========================================================
+   ACTIVITY LIST
+   ========================================================== */
+
+.pageZero .activityRowActive {
+  border-color:
+    rgba(244, 61, 61, 0.45) !important;
+
+  background: #fff4f3 !important;
+}
+
+.pageZero .activityMark {
+  background: #fff0ef !important;
+  color: #f43d3d !important;
+}
+
+.pageZero .gpxBadge {
+  background: #fff0ef !important;
+  color: #f43d3d !important;
+}
+
+
+/* ==========================================================
+   DROP ZONE
+   ========================================================== */
+
+.pageZero .dropZone {
+  border-color:
+    rgba(244, 61, 61, 0.50) !important;
+
+  background: #fff8f7 !important;
+}
+
+
+/* ==========================================================
+   CARDS
+   ========================================================== */
+
+.pageZero .card,
+.pageZero .uploadCard,
+.pageZero .previewCard,
+.pageZero .detailCard,
+.pageZero .loggerCard,
+.pageZero .monthTotal {
+  border-color:
+    rgba(244, 61, 61, 0.20) !important;
+}
+
+
+/* ZERO ACTIVITY PALETTE V2 END */

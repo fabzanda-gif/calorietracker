@@ -1660,3 +1660,469 @@
   font-size: 1rem;
   line-height: 1.45;
 }
+
+/* ZERO PALETTE V2 START */
+
+/*
+  Zero visual language:
+  - red      = emphasis / trend
+  - black    = primary data
+  - soft red = secondary series
+  - gray     = tertiary data
+  Standard mode is intentionally untouched.
+*/
+
+
+/* ==========================================================
+   PAGE HEADER
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.header .brand,
+:global(html[data-experience-mode="zero"])
+.header .kicker {
+  color: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.header h1 {
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.header .subtitle {
+  color: #6f7782 !important;
+}
+
+
+/* ==========================================================
+   HERO / CURRENT WEIGHT
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.hero {
+  color: #111111 !important;
+}
+
+/* 78,2 */
+:global(html[data-experience-mode="zero"])
+.currentWeight {
+  color: #111111 !important;
+}
+
+/* kg */
+:global(html[data-experience-mode="zero"])
+.currentWeight span {
+  color: #5f6670 !important;
+}
+
+/* "PESO ATTUALE" */
+:global(html[data-experience-mode="zero"])
+.hero .kicker {
+  color: #f43d3d !important;
+}
+
+
+/* ==========================================================
+   WEIGHT CHANGE PILL
+   Fix contrast of -5,1 kg
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.hero .changeDown,
+:global(html[data-experience-mode="zero"])
+.hero .changeUp,
+:global(html[data-experience-mode="zero"])
+.hero .changeNeutral {
+  background: #dcebd7 !important;
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.hero .changeDown *,
+:global(html[data-experience-mode="zero"])
+.hero .changeUp *,
+:global(html[data-experience-mode="zero"])
+.hero .changeNeutral * {
+  color: #111111 !important;
+}
+
+
+/* ==========================================================
+   DIRECTION NOTE
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.directionNote {
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.directionNote > span {
+  border-color:
+    rgba(244, 61, 61, 0.55) !important;
+
+  color: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.directionNote strong {
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.directionNote small {
+  color: #6f7782 !important;
+}
+
+
+/* ==========================================================
+   HERO WEIGHT CHART
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.heroChartWrap {
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.heroChartTitle span {
+  color: #6f7782 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.heroChartTitle strong {
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.heroGridLine {
+  stroke: #e4e1dd !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.heroTrendLine {
+  stroke: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.heroTrendPoint {
+  fill: #ffffff !important;
+  stroke: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.heroChartDates {
+  color: #858b92 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.heroChartEmpty {
+  color: #6f7782 !important;
+}
+
+
+/* ==========================================================
+   SHARED CHART AXES / GRID
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.gridLine {
+  stroke: #e8e5e1 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.axisLabel,
+:global(html[data-experience-mode="zero"])
+.dateLabel {
+  fill: #7d838b !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.chartLegend {
+  color: #656c75 !important;
+}
+
+
+/* ==========================================================
+   WEIGHT HISTORY CHART
+   Primary = black
+   Trend   = red
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.weightLine {
+  stroke: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.weightPoint {
+  fill: #ffffff !important;
+  stroke: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.trendLine {
+  stroke: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendActual {
+  background: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendTrend {
+  background: #f43d3d !important;
+}
+
+
+/* ==========================================================
+   CALORIES / BUDGET
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.legendCalories {
+  background: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendBudget {
+  background: #aaa6a1 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.calorieBar {
+  fill: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.calorieBarOver {
+  fill: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.budgetLine {
+  stroke: #aaa6a1 !important;
+}
+
+
+/* ==========================================================
+   MACROS
+   Protein = red
+   Carbs   = black
+   Fat     = warm gray
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.legendProtein {
+  background: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendCarbs {
+  background: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendFat {
+  background: #aaa6a1 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.macroProteinBar {
+  fill: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.macroCarbsBar {
+  fill: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.macroFatBar {
+  fill: #aaa6a1 !important;
+}
+
+
+/* ==========================================================
+   MEAL DISTRIBUTION
+   Breakfast = soft red
+   Lunch     = red
+   Dinner    = black
+   Other     = gray
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.legendBreakfast,
+:global(html[data-experience-mode="zero"])
+.mealBreakfastBar {
+  fill: #ff8b87 !important;
+  background: #ff8b87 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendLunch,
+:global(html[data-experience-mode="zero"])
+.mealLunchBar {
+  fill: #f43d3d !important;
+  background: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendDinner,
+:global(html[data-experience-mode="zero"])
+.mealDinnerBar {
+  fill: #111111 !important;
+  background: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendOtherMeal,
+:global(html[data-experience-mode="zero"])
+.mealOtherBar {
+  fill: #aaa6a1 !important;
+  background: #aaa6a1 !important;
+}
+
+
+/* ==========================================================
+   ACTIVITY BARS INSIDE PROGRESS
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.activityBarLow {
+  fill: #ff8b87 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.activityBarHigh {
+  fill: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendActivityLow {
+  background: #ff8b87 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.legendActivityHigh {
+  background: #111111 !important;
+}
+
+
+/* ==========================================================
+   ANALYTICS CONTROLS
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.analyticsControls select {
+  border-color: #d8d5d1 !important;
+  background: #faf9f7 !important;
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.analyticsControls select:focus {
+  border-color: #f43d3d !important;
+  outline:
+    2px solid
+    rgba(244, 61, 61, 0.22) !important;
+}
+
+
+/* ==========================================================
+   SECTION TITLES / IMPORTANT TEXT
+   No navy in Zero
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.sectionHeader h2,
+:global(html[data-experience-mode="zero"])
+.insightsHeader h2,
+:global(html[data-experience-mode="zero"])
+.insightPanel h3,
+:global(html[data-experience-mode="zero"])
+.consistencySection h2 {
+  color: #111111 !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.statsGrid strong,
+:global(html[data-experience-mode="zero"])
+.topStatsGrid strong,
+:global(html[data-experience-mode="zero"])
+.nutritionStatsGrid strong,
+:global(html[data-experience-mode="zero"])
+.insightPanel article strong,
+:global(html[data-experience-mode="zero"])
+.consistencyDays article {
+  color: #111111 !important;
+}
+
+
+/* ==========================================================
+   ACTIVE RANGE
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.rangeSelector button.rangeActive {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+
+/* ==========================================================
+   ZERO SURFACES
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.chartSection,
+:global(html[data-experience-mode="zero"])
+.analyticsSection,
+:global(html[data-experience-mode="zero"])
+.overviewSection,
+:global(html[data-experience-mode="zero"])
+.consistencySection,
+:global(html[data-experience-mode="zero"])
+.insightsSection {
+  border-color:
+    rgba(244, 61, 61, 0.27) !important;
+}
+
+
+/* ==========================================================
+   INSIGHT ACCENTS
+   Remove navy/coral Standard language
+   ========================================================== */
+
+:global(html[data-experience-mode="zero"])
+.insightCardNavy,
+:global(html[data-experience-mode="zero"])
+.insightCardCoral {
+  border-color:
+    rgba(244, 61, 61, 0.20) !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(244, 61, 61, 0.055),
+      rgba(244, 61, 61, 0.015)
+    ) !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.insightCardNavy::before,
+:global(html[data-experience-mode="zero"])
+.insightCardCoral::before {
+  background: #f43d3d !important;
+}
+
+:global(html[data-experience-mode="zero"])
+.insightCard strong {
+  color: #111111 !important;
+}
+
+
+/* ZERO PALETTE V2 END */
