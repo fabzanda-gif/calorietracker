@@ -5818,129 +5818,348 @@
   }
 }
 
-/* MEALS UNIFIED LAYOUT — 2026-09-02
-   Un'unica struttura visiva per Colazione, Pranzo,
-   Snack e Cena. */
+/* ============================================================
+   HOME — MEALS REDESIGN
+   Layout pulito e compatto
+   ============================================================ */
+
+/*
+ * La sezione pasti deve sembrare una parte importante
+ * della dashboard, non quattro pannelli verticali separati.
+ */
+
+.mealsSection {
+  width: 100%;
+}
+
+.mealsSection .sectionHeader {
+  margin-bottom: 14px;
+}
+
 .mealsSection .mealList,
 .desktopHomeGrid .mealsSection .mealList {
   display: grid;
-  grid-template-columns:
-    repeat(4, minmax(0, 1fr));
-  align-items: stretch;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  width: 100%;
+  align-items: stretch;
 }
+
+/* Card */
 
 .mealsSection .mealCard,
 .desktopHomeGrid .mealsSection .mealCard {
   display: flex;
   flex-direction: column;
+
   width: 100%;
   min-width: 0;
-  min-height: 218px;
-  height: 100%;
-  padding: 16px;
-  gap: 10px;
+
+  min-height: 190px;
+  height: auto;
+
+  padding: 15px;
+
+  box-sizing: border-box;
   overflow: hidden;
+
+  border: 1px solid #e8e5df;
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 4px 16px rgba(16, 40, 70, 0.035);
+
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
+
+.mealsSection .mealCard:hover {
+  border-color: #ddd8d0;
+  box-shadow:
+    0 8px 22px rgba(16, 40, 70, 0.065);
+  transform: translateY(-1px);
+}
+
+/* Header della card */
 
 .mealsSection .mealCardTop {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  min-height: 34px;
+
   gap: 7px;
+
+  min-height: 30px;
+
+  flex-wrap: nowrap;
 }
 
 .mealsSection .mealIdentity {
-  flex: 1 1 125px;
+  display: flex;
+  align-items: center;
+
   min-width: 0;
+
+  flex: 1 1 auto;
+
+  gap: 8px;
+}
+
+.mealsSection .mealIcon {
+  flex: 0 0 auto;
+
+  width: 30px;
+  height: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
 }
 
 .mealsSection .mealLabel {
   min-width: 0;
+
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 
-/* “Prossimo” contiene già l'informazione che si tratta
-   della proposta prevista. Evitiamo due badge concorrenti. */
+/* Badge */
+
+.mealsSection .predictedBadge,
+.mealsSection .unknownBadge,
+.mealsSection .registeredMealBadge,
+.mealsSection .nextMealBadge {
+  flex: 0 0 auto;
+
+  padding: 4px 7px;
+
+  border-radius: 999px;
+
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+/*
+ * Se una card è "Prossimo", il badge Prossimo è
+ * l'informazione principale: non serve mostrare anche
+ * Previsto.
+ */
+
 .mealsSection
   .mealCard:has(.nextMealBadge)
   .predictedBadge {
   display: none;
 }
 
-.mealsSection .predictedBadge,
-.mealsSection .unknownBadge,
-.mealsSection .registeredMealBadge,
-.mealsSection .nextMealBadge,
-.mealsSection
-  .mealCard:has(.nextMealBadge)
-  .nextMealBadge {
-  flex: 0 0 auto;
-  padding: 4px 8px;
-  font-size: 0.6rem;
-  line-height: 1;
-}
+/* Contenuto */
 
 .mealsSection .mealName,
-.mealsSection
-  .mealCard:has(.nextMealBadge)
-  .mealName {
-  margin: 3px 0 0;
-  font-size: 0.86rem;
+.mealsSection .mealCard:has(.nextMealBadge) .mealName {
+  display: block;
+
+  margin: 18px 0 0;
+
+  max-width: 100%;
+
+  color: var(--ss-navy-950, #102846);
+
+  font-size: 0.92rem;
   line-height: 1.3;
   font-weight: 800;
+
+  letter-spacing: -0.018em;
+
+  overflow-wrap: anywhere;
 }
 
 .mealsSection .mealMeta,
-.mealsSection
-  .mealCard:has(.nextMealBadge)
-  .mealMeta {
-  margin: -3px 0 0;
-  font-size: 0.69rem;
-  line-height: 1.35;
+.mealsSection .mealCard:has(.nextMealBadge) .mealMeta {
+  margin: 6px 0 0;
+
+  color: #73736d;
+
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 
-.mealsSection .replanningCompact {
+/* Informazione "Prossimo" */
+
+.mealsSection .mealCard:has(.nextMealBadge) {
+  border-color: rgba(244, 127, 122, 0.38);
+
+  background:
+    linear-gradient(
+      145deg,
+      #fff8f6 0%,
+      #ffffff 72%
+    );
+
+  box-shadow:
+    0 7px 22px rgba(244, 127, 122, 0.075);
+}
+
+.mealsSection
+  .mealCard:has(.nextMealBadge)
+  .nextMealBadge {
+  background: #f47f7a;
+  color: #ffffff;
+}
+
+/* Pasti registrati */
+
+.mealsSection .registeredMealList {
+  display: grid;
+
+  gap: 7px;
+
+  margin-top: 14px;
+}
+
+.mealsSection .registeredMealRow {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  min-width: 0;
+
+  padding: 8px 9px;
+
+  border: 1px solid #eeeae4;
+  border-radius: 11px;
+
+  background: #fafaf8;
+}
+
+.mealsSection .registeredMealRowInfo {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mealsSection .registeredMealRowInfo strong {
+  display: block;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.mealsSection .registeredMealRowInfo span {
+  display: block;
+
   margin-top: 2px;
-  min-height: 38px;
-  padding: 8px 10px;
+
+  color: #777770;
+
+  font-size: 0.62rem;
+}
+
+/* Azioni */
+
+.mealsSection .mealActions,
+.mealsSection .mealCard:has(.nextMealBadge) .mealActions {
+  width: 100%;
+
+  margin-top: auto;
+  padding-top: 14px;
+
+  gap: 8px;
+}
+
+.mealsSection .mealActions button,
+.mealsSection .mealCard:has(.nextMealBadge) .mealActions button {
+  min-height: 34px;
+
+  border-radius: 10px;
+
+  font-size: 0.68rem;
+}
+
+/* Totale del pasto registrato */
+
+.mealsSection .registeredMealSlotTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  margin-top: auto;
+  padding-top: 12px;
+
+  border-top: 1px solid #eeeae4;
+
+  font-size: 0.62rem;
+}
+
+.mealsSection .registeredMealSlotTotal strong {
+  white-space: nowrap;
+
+  font-size: 0.68rem;
+}
+
+/* Editor: non deve deformare la card */
+
+.mealsSection .registeredMealEditor {
+  max-height: 280px;
+
+  margin-top: 10px;
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Replanning */
+
+.mealsSection .replanningCompact {
+  margin-top: 10px;
+
+  min-height: 34px;
+
+  padding: 7px 9px;
+
+  border-radius: 10px;
+
+  gap: 7px;
 }
 
 .mealsSection .replanningCompact p {
   display: none;
 }
 
-.mealsSection .mealActions,
-.mealsSection
-  .mealCard:has(.nextMealBadge)
-  .mealActions {
-  width: 100%;
-  margin-top: auto;
-  padding-top: 5px;
-  gap: 10px;
+.mealsSection .replanningCompact strong {
+  font-size: 0.66rem;
+  line-height: 1.2;
 }
 
-.mealsSection
-  .mealCard:has(.nextMealBadge)
-  .confirmMealButton,
-.mealsSection
-  .mealCard:has(.nextMealBadge)
-  .alternateMealButton {
-  min-height: 0;
-  padding: 0;
-  border-radius: 0;
-}
+/* Tablet */
 
 @media (max-width: 1099px) {
   .mealsSection .mealList,
   .desktopHomeGrid .mealsSection .mealList {
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mealsSection .mealCard,
+  .desktopHomeGrid .mealsSection .mealCard {
+    min-height: 180px;
   }
 }
+
+/* Mobile */
 
 @media (max-width: 600px) {
   .mealsSection .mealList,
