@@ -8,6 +8,7 @@ from .base import BaseRepository, RepositoryError
 
 PANTRY_COLUMNS = (
     "id,user_id,ingredient_id,quantity,unit,"
+    "quantity_mode,grams_per_portion,"
     "expires_at,created_at,updated_at,ingredients(name)"
 )
 

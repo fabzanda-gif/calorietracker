@@ -7,6 +7,8 @@ export interface PantryItem {
   ingredient_name: string | null;
   quantity: number;
   unit: string;
+  quantity_mode: "weight" | "portion";
+  grams_per_portion: number | null;
   expires_at: string | null;
   created_at?: string;
   updated_at?: string;
@@ -21,6 +23,8 @@ export interface PantryInput {
   ingredient_id: string;
   quantity: number;
   unit: string;
+  quantity_mode: "weight" | "portion";
+  grams_per_portion?: number | null;
   expires_at?: string | null;
 }
 

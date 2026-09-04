@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.api.dependencies import (
     CurrentUser,
@@ -26,12 +26,34 @@ class PantryCreate(BaseModel):
     ingredient_id: str
     quantity: float = Field(gt=0)
     unit: str = Field(min_length=1)
+    quantity_mode: str = "weight"
+    grams_per_portion: float | None = Field(default=None, gt=0)
     expires_at: date | None = None
+
+    @model_validator(mode="after")
+    def validate_quantity_mode(self):
+        if self.quantity_mode not in {"weight", "portion"}:
+            raise ValueError("Invalid quantity mode")
+
+        if (
+            self.quantity_mode == "portion"
+            and self.grams_per_portion is None
+        ):
+            raise ValueError(
+                "grams_per_portion is required for portions"
+            )
+
+        if self.quantity_mode == "weight":
+            self.grams_per_portion = None
+
+        return self
 
 
 class PantryUpdate(BaseModel):
     quantity: float | None = Field(default=None, gt=0)
     unit: str | None = Field(default=None, min_length=1)
+    quantity_mode: str | None = None
+    grams_per_portion: float | None = Field(default=None, gt=0)
     expires_at: date | None = None
 
 
@@ -97,6 +119,11 @@ def create_pantry_item(
         payload["user_id"] = current_user.id
         payload["unit"] = payload["unit"].strip()
 
+        if payload["quantity_mode"] == "portion":
+            payload["unit"] = "portion"
+        else:
+            payload["grams_per_portion"] = None
+
         item = repo.create(payload)
 
         if item is None:
@@ -144,6 +171,16 @@ def update_pantry_item(
     if "unit" in payload:
         payload["unit"] = payload["unit"].strip()
 
+    if (
+        "quantity_mode" in payload
+        and payload["quantity_mode"]
+        not in {"weight", "portion"}
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid quantity mode",
+        )
+
     try:
         existing = repo.get_by_id(
             item_id,
@@ -155,6 +192,31 @@ def update_pantry_item(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Pantry item not found",
             )
+
+        resulting_mode = payload.get(
+            "quantity_mode",
+            existing.get("quantity_mode", "weight"),
+        )
+
+        resulting_grams = (
+            payload.get("grams_per_portion")
+            if "grams_per_portion" in payload
+            else existing.get("grams_per_portion")
+        )
+
+        if resulting_mode == "portion":
+            if resulting_grams is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "grams_per_portion is required "
+                        "for portions"
+                    ),
+                )
+
+            payload["unit"] = "portion"
+        else:
+            payload["grams_per_portion"] = None
 
         item = repo.update(
             item_id,

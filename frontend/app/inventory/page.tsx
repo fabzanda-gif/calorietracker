@@ -27,7 +27,9 @@ import styles from "./InventoryPage.module.css";
 const EMPTY_PANTRY_FORM = {
   ingredientId: "",
   quantity: "",
+  quantityMode: "weight" as "weight" | "portion",
   unit: "g",
+  gramsPerPortion: "",
   expiresAt: "",
 };
 
@@ -152,13 +154,32 @@ export default function InventoryPage() {
     }
 
     const quantity = Number(pantryForm.quantity);
+    const gramsPerPortion =
+      pantryForm.quantityMode === "portion"
+        ? Number(pantryForm.gramsPerPortion)
+        : null;
 
     if (
       !pantryForm.ingredientId ||
       !Number.isFinite(quantity) ||
       quantity <= 0
     ) {
-      setError("Seleziona un alimento e inserisci una quantità valida.");
+      setError(
+        "Seleziona un alimento e inserisci una quantità valida.",
+      );
+      return;
+    }
+
+    if (
+      pantryForm.quantityMode === "portion" &&
+      (
+        !Number.isFinite(gramsPerPortion) ||
+        Number(gramsPerPortion) <= 0
+      )
+    ) {
+      setError(
+        "Inserisci il peso in grammi di una porzione.",
+      );
       return;
     }
 
@@ -172,7 +193,12 @@ export default function InventoryPage() {
           editingPantryId,
           {
             quantity,
-            unit: pantryForm.unit,
+            unit:
+              pantryForm.quantityMode === "portion"
+                ? "portion"
+                : pantryForm.unit,
+            quantity_mode: pantryForm.quantityMode,
+            grams_per_portion: gramsPerPortion,
             expires_at: pantryForm.expiresAt || null,
           },
         );
@@ -182,7 +208,12 @@ export default function InventoryPage() {
           {
             ingredient_id: pantryForm.ingredientId,
             quantity,
-            unit: pantryForm.unit,
+            unit:
+              pantryForm.quantityMode === "portion"
+                ? "portion"
+                : pantryForm.unit,
+            quantity_mode: pantryForm.quantityMode,
+            grams_per_portion: gramsPerPortion,
             expires_at: pantryForm.expiresAt || null,
           },
         );
@@ -207,7 +238,15 @@ export default function InventoryPage() {
     setPantryForm({
       ingredientId: item.ingredient_id,
       quantity: String(item.quantity),
-      unit: item.unit,
+      quantityMode: item.quantity_mode ?? "weight",
+      unit:
+        item.quantity_mode === "portion"
+          ? "g"
+          : item.unit,
+      gramsPerPortion:
+        item.grams_per_portion != null
+          ? String(item.grams_per_portion)
+          : "",
       expiresAt: item.expires_at || "",
     });
   }
@@ -317,12 +356,12 @@ export default function InventoryPage() {
 
           {ingredients.length === 0 ? (
             <div className={styles.pantryEmpty}>
-              <strong>Prima aggiungi un ingrediente alla libreria.</strong>
+              <strong>Prima aggiungi un alimento alla libreria.</strong>
               <p>
                 Gli alimenti della dispensa fanno riferimento alla tua libreria
                 nutrizionale.
               </p>
-              <a href="/ingredients">Vai agli ingredienti</a>
+              <a href="/ingredients">Vai alla libreria alimenti</a>
             </div>
           ) : (
             <form
@@ -357,11 +396,54 @@ export default function InventoryPage() {
               </label>
 
               <label>
-                <span>Quantità</span>
+                <span>Come la conteggi?</span>
+
+                <select
+                  value={pantryForm.quantityMode}
+                  onChange={(event) => {
+                    const quantityMode =
+                      event.target.value as
+                        | "weight"
+                        | "portion";
+
+                    setPantryForm({
+                      ...pantryForm,
+                      quantityMode,
+                      unit:
+                        quantityMode === "weight"
+                          ? "g"
+                          : pantryForm.unit,
+                      gramsPerPortion:
+                        quantityMode === "weight"
+                          ? ""
+                          : pantryForm.gramsPerPortion,
+                    });
+                  }}
+                >
+                  <option value="weight">
+                    A peso / volume
+                  </option>
+                  <option value="portion">
+                    A porzioni / pezzi
+                  </option>
+                </select>
+              </label>
+
+              <label>
+                <span>
+                  {pantryForm.quantityMode === "portion"
+                    ? "Numero di porzioni"
+                    : "Quantità"}
+                </span>
+
                 <input
                   type="number"
                   min="0.01"
-                  step="0.01"
+                  step={
+                    pantryForm.quantityMode === "portion"
+                      ? "1"
+                      : "0.01"
+                  }
                   required
                   value={pantryForm.quantity}
                   onChange={(event) =>
@@ -373,25 +455,48 @@ export default function InventoryPage() {
                 />
               </label>
 
-              <label>
-                <span>Unità</span>
+              {pantryForm.quantityMode === "portion" ? (
+                <label>
+                  <span>Peso per porzione</span>
 
-                <select
-                  value={pantryForm.unit}
-                  onChange={(event) =>
-                    setPantryForm({
-                      ...pantryForm,
-                      unit: event.target.value,
-                    })
-                  }
-                >
-                  <option value="g">g</option>
-                  <option value="kg">kg</option>
-                  <option value="ml">ml</option>
-                  <option value="l">l</option>
-                  <option value="pz">pz</option>
-                </select>
-              </label>
+                  <div>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      required
+                      value={pantryForm.gramsPerPortion}
+                      onChange={(event) =>
+                        setPantryForm({
+                          ...pantryForm,
+                          gramsPerPortion:
+                            event.target.value,
+                        })
+                      }
+                    />
+                    <small> grammi</small>
+                  </div>
+                </label>
+              ) : (
+                <label>
+                  <span>Unità</span>
+
+                  <select
+                    value={pantryForm.unit}
+                    onChange={(event) =>
+                      setPantryForm({
+                        ...pantryForm,
+                        unit: event.target.value,
+                      })
+                    }
+                  >
+                    <option value="g">g</option>
+                    <option value="kg">kg</option>
+                    <option value="ml">ml</option>
+                    <option value="l">l</option>
+                  </select>
+                </label>
+              )}
 
               <label>
                 <span>Scadenza</span>
@@ -453,8 +558,26 @@ export default function InventoryPage() {
                     </h3>
 
                     <strong>
-                      {item.quantity} {item.unit}
+                      {item.quantity_mode === "portion"
+                        ? `${item.quantity} ${
+                            item.quantity === 1
+                              ? "porzione"
+                              : "porzioni"
+                          }`
+                        : `${item.quantity} ${item.unit}`}
                     </strong>
+
+                    {item.quantity_mode === "portion" &&
+                    item.grams_per_portion != null ? (
+                      <p>
+                        {item.grams_per_portion} g per porzione
+                        {" · "}
+                        {Math.round(
+                          item.quantity *
+                            item.grams_per_portion,
+                        )} g equivalenti
+                      </p>
+                    ) : null}
 
                     {item.expires_at && (
                       <p>
