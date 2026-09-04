@@ -2544,50 +2544,107 @@ export function HomeShell() {
                 </>
               ) : (
                 <>
-                  <label
-                    className={styles.conversationPhotoPicker}
+                  <div
+                    className={styles.conversationPhotoActions}
                   >
-                    <span>
-                      {conversationPhoto
-                        ? conversationPhoto.name
-                        : "Scatta o scegli una foto"}
-                    </span>
+                    <label
+                      className={
+                        styles.conversationPhotoAction
+                      }
+                    >
+                      <span aria-hidden="true">📷</span>
+                      <strong>Scatta foto</strong>
 
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      capture="environment"
-                      onChange={(event) => {
-                        const file =
-                          event.target.files?.[0] ?? null;
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        capture="environment"
+                        onChange={(event) => {
+                          const file =
+                            event.target.files?.[0] ?? null;
 
-                        setConversationPhoto(file);
-                        setConversationPreview(null);
-                        setConversationError(null);
-                        setConversationSuccess(null);
+                          setConversationPhoto(file);
+                          setConversationPreview(null);
+                          setConversationError(null);
+                          setConversationSuccess(null);
 
-                        if (!file) {
-                          setConversationPhotoPreview(null);
-                          return;
-                        }
-
-                        const reader = new FileReader();
-
-                        reader.onload = () => {
-                          if (
-                            typeof reader.result ===
-                            "string"
-                          ) {
-                            setConversationPhotoPreview(
-                              reader.result,
-                            );
+                          if (!file) {
+                            setConversationPhotoPreview(null);
+                            return;
                           }
-                        };
 
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </label>
+                          const reader = new FileReader();
+
+                          reader.onload = () => {
+                            if (
+                              typeof reader.result ===
+                              "string"
+                            ) {
+                              setConversationPhotoPreview(
+                                reader.result,
+                              );
+                            }
+                          };
+
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+
+                    <label
+                      className={
+                        styles.conversationPhotoAction
+                      }
+                    >
+                      <span aria-hidden="true">🖼️</span>
+                      <strong>Carica foto</strong>
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const file =
+                            event.target.files?.[0] ?? null;
+
+                          setConversationPhoto(file);
+                          setConversationPreview(null);
+                          setConversationError(null);
+                          setConversationSuccess(null);
+
+                          if (!file) {
+                            setConversationPhotoPreview(null);
+                            return;
+                          }
+
+                          const reader = new FileReader();
+
+                          reader.onload = () => {
+                            if (
+                              typeof reader.result ===
+                              "string"
+                            ) {
+                              setConversationPhotoPreview(
+                                reader.result,
+                              );
+                            }
+                          };
+
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {conversationPhoto ? (
+                    <div
+                      className={
+                        styles.conversationPhotoSelected
+                      }
+                    >
+                      <span>Foto selezionata</span>
+                      <strong>{conversationPhoto.name}</strong>
+                    </div>
+                  ) : null}
 
                   {conversationPhotoPreview ? (
                     <div

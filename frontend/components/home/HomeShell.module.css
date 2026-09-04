@@ -8024,3 +8024,101 @@
     font-size: 0.94rem;
   }
 }
+
+/* ============================================================
+   SanoSyncAI — camera + gallery upload
+   ============================================================ */
+
+.conversationPhotoActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.conversationPhotoAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 48px;
+  padding: 0 12px;
+
+  border: 1px solid rgba(244, 127, 122, 0.32);
+  border-radius: 13px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #fff8f6 0%,
+      #ffffff 100%
+    );
+
+  color: #102846;
+
+  font-size: 0.74rem;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.conversationPhotoAction:hover {
+  border-color: #f47f7a;
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 7px 18px rgba(244, 127, 122, 0.1);
+}
+
+.conversationPhotoAction > span {
+  font-size: 1.05rem;
+}
+
+.conversationPhotoAction input {
+  display: none;
+}
+
+.conversationPhotoSelected {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  min-width: 0;
+
+  margin-top: 9px;
+  padding: 8px 10px;
+
+  border-radius: 10px;
+
+  background: #f7f7f3;
+
+  color: #707069;
+
+  font-size: 0.66rem;
+}
+
+.conversationPhotoSelected strong {
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  color: #102846;
+}
+
+@media (max-width: 600px) {
+  .conversationPhotoActions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .conversationPhotoAction {
+    min-height: 52px;
+    font-size: 0.72rem;
+  }
+}

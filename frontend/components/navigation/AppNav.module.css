@@ -414,3 +414,63 @@
   border-color: #e95250;
   background: #e95250;
 }
+
+/* ============================================================
+   Mobile SanoSync brand identity
+   ============================================================ */
+
+@media (max-width: 759px) {
+  .mobileNav {
+    border-top: 3px solid #ff6865;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 248, 246, 0.98) 0%,
+        rgba(255, 255, 255, 0.97) 42%
+      );
+
+    overflow: visible;
+  }
+
+  /*
+   * Piccolo brand tab integrato nella bottom navigation.
+   * Riutilizza lo stesso asset della sidebar desktop.
+   */
+  .mobileNav::before {
+    content: "";
+
+    position: absolute;
+    left: 50%;
+    top: -31px;
+
+    width: 104px;
+    height: 30px;
+
+    transform: translateX(-50%);
+
+    border: 1px solid rgba(244, 127, 122, 0.28);
+    border-bottom: 0;
+    border-radius: 14px 14px 0 0;
+
+    background:
+      rgba(255, 255, 255, 0.97)
+      url("/assets/LogoCoral.png")
+      center / 78px auto
+      no-repeat;
+
+    box-shadow:
+      0 -5px 15px rgba(16, 40, 70, 0.045);
+  }
+
+  .mobileLinkActive {
+    background:
+      linear-gradient(
+        145deg,
+        #173c62 0%,
+        #102846 100%
+      );
+
+    color: #ffffff;
+  }
+}
