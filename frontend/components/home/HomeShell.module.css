@@ -6600,3 +6600,34 @@
     gap: 8px;
   }
 }
+
+/* registered meal card width based on logged item count */
+@media (min-width: 900px) {
+  .mealsSection .mealList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mealsSection .mealCardOneItem {
+    width: 100%;
+    max-width: none;
+  }
+
+  .mealsSection .mealCardTwoItems {
+    width: 72%;
+    max-width: none;
+  }
+
+  .mealsSection .mealCardManyItems {
+    width: 52%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 899px) {
+  .mealsSection .mealCardOneItem,
+  .mealsSection .mealCardTwoItems,
+  .mealsSection .mealCardManyItems {
+    width: 100%;
+    max-width: none;
+  }
+}

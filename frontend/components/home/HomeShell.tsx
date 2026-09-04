@@ -2776,7 +2776,15 @@ export function HomeShell() {
                 ([slot, meal]) => (
                   <article
                     key={slot}
-                    className={styles.mealCard}
+                    className={`${styles.mealCard} ${
+                      actualMealForSlot(slot)
+                        ? actualMealsForSlot(slot).length <= 1
+                          ? styles.mealCardOneItem
+                          : actualMealsForSlot(slot).length === 2
+                            ? styles.mealCardTwoItems
+                            : styles.mealCardManyItems
+                        : ""
+                    }`}
                   >
                     <div
                       className={
