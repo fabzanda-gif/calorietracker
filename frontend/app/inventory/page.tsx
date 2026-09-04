@@ -409,14 +409,12 @@ export default function InventoryPage() {
                     setPantryForm({
                       ...pantryForm,
                       quantityMode,
+                      quantity: "",
                       unit:
                         quantityMode === "weight"
                           ? "g"
                           : pantryForm.unit,
-                      gramsPerPortion:
-                        quantityMode === "weight"
-                          ? ""
-                          : pantryForm.gramsPerPortion,
+                      gramsPerPortion: "",
                     });
                   }}
                 >
@@ -438,7 +436,11 @@ export default function InventoryPage() {
 
                 <input
                   type="number"
-                  min="0.01"
+                  min={
+                    pantryForm.quantityMode === "portion"
+                      ? "1"
+                      : "0.01"
+                  }
                   step={
                     pantryForm.quantityMode === "portion"
                       ? "1"
