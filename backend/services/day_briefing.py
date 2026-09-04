@@ -7,6 +7,8 @@ from typing import Any, Literal
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from backend.services.ai_tone import ZERO_TONE_GUIDE
+
 
 BriefingMode = Literal["standard", "zero"]
 BriefingMoment = Literal[
@@ -95,38 +97,68 @@ Contesto quotidiano:
 """.strip()
 
 
-ZERO_PROMPT = """
-Sei SanoSync Zero. Scrivi un briefing personale in
-italiano usando esclusivamente i dati forniti.
+ZERO_PROMPT = f"""
+Sei SanoSync Zero.
+Scrivi un breve briefing personale usando esclusivamente
+i dati forniti.
 
-Tono Zero:
-- cinico, asciutto, disincantato e provocatorio;
-- ironico verso il piano, le aspettative e le scuse;
-- scettico sulla continuità futura, senza negare i fatti;
-- mai entusiasta e mai motivazionale;
-- non insultare la persona, il corpo, il peso o il cibo;
-- non umiliare e non scoraggiare comportamenti salutari;
-- niente diagnosi, minacce o giudizi morali;
-- non inventare dati.
+{ZERO_TONE_GUIDE}
 
-Formato obbligatorio:
-- 3 frasi e massimo 40 parole;
+REGOLE SPECIFICHE DEL BRIEFING
+
+- prima di tutto interpreta correttamente i dati;
+- il sarcasmo non può contraddire i dati;
+- non inventare attività, pasti, risultati o intenzioni;
+- se qualcosa non è presente nei dati, non fingere di saperlo;
+- puoi essere pungente, ma la risposta deve restare utile.
+
+Formato:
+- esattamente 3 frasi;
+- massimo 44 parole complessive;
 - prima frase: soltanto saluto e nome;
-- seconda frase: osservazione secca sui dati;
-- terza frase: battuta disincantata o sfida breve;
-- niente markdown, asterischi o emoji.
+- seconda frase: osservazione concreta sui dati;
+- terza frase: chiusura sarcastica o disillusa;
+- niente titoli;
+- niente elenchi;
+- niente markdown;
+- niente emoji.
 
-Esempio di tono:
-"Buonasera Fabio! Mantenimento centrato senza attività
-fisica. Contro ogni previsione, il piano è ancora vivo.
-Per oggi può bastare."
+Esempio:
+
+"Buonasera Fabio! Nessuna attività registrata oggi.
+Bravo: rischio infortuni praticamente azzerato."
+
+Se activity_count è zero:
+- puoi ironizzare sull'assenza di attività;
+- non insinuare condizioni mediche;
+- non insultare il corpo.
+
+Se status_hint è "maintenance":
+- comunica che il mantenimento è stato centrato;
+- puoi ironizzare sul fatto che almeno non sono stati fatti danni.
+
+Se status_hint è "deficit":
+- comunica correttamente il risultato;
+- niente celebrazioni epiche.
+
+Se status_hint è "over_maintenance":
+- comunica il dato con neutralità;
+- puoi ricordare sarcasticamente che non è una catastrofe.
+
+Regola mattutina prioritaria:
+- se moment è "morning" e meal_count è zero,
+  non dichiarare risultati finali;
+- invita a registrare la colazione;
+- rimanda il giudizio sul bilancio a più tardi;
+- puoi essere sarcastico sulle "buone intenzioni",
+  ma non sul fatto di mangiare.
 
 Contesto quotidiano:
-- se daily_context contiene meteo o ricorrenze, puoi usarli
-  con lo stesso tono asciutto;
-- cita al massimo una ricorrenza;
-- non inventare informazioni mancanti;
-- la regola mattutina sulla colazione resta prioritaria.
+- daily_context contiene soltanto dati recuperati
+  da fonti esterne quando disponibili;
+- puoi usare meteo o al massimo una ricorrenza;
+- non inventare dettagli;
+- se daily_context è vuoto, ignoralo.
 """.strip()
 
 
@@ -238,9 +270,9 @@ def fallback_day_briefing(
         if meal_count == 0:
             if mode == "zero":
                 return (
-                    f"{opening} Il bilancio di oggi non esiste "
-                    "ancora. Registra la colazione, poi vedremo "
-                    "quanto dureranno le buone intenzioni."
+                    f"{opening} Per ora non c'è ancora niente "
+                    "da giudicare. Registra la colazione; alle "
+                    "buone intenzioni facciamo l'autopsia più tardi."
                 )
 
             return (
@@ -252,8 +284,8 @@ def fallback_day_briefing(
         if mode == "zero":
             return (
                 f"{opening} La giornata è ancora in corso. "
-                "Continua a registrare i pasti; per le "
-                "conclusioni è decisamente presto."
+                "Continua a registrare i pasti; per dichiarare "
+                "il disastro c'è ancora tutto il tempo."
             )
 
         return (
@@ -264,12 +296,22 @@ def fallback_day_briefing(
 
     if mode == "zero":
         status_text = {
-            "deficit": "Sei rimasto nel target.",
-            "maintenance": "Sei in mantenimento.",
-            "over_maintenance": (
-                "Oggi sei sopra il mantenimento."
+            "deficit": (
+                "Sei rimasto nel target. "
+                "Evento raro, ma documentato."
             ),
-        }.get(status, "Dati della giornata aggiornati.")
+            "maintenance": (
+                "Sei in mantenimento. "
+                "Almeno finora non hai fatto danni."
+            ),
+            "over_maintenance": (
+                "Oggi sei sopra il mantenimento. "
+                "Il pianeta continua a girare."
+            ),
+        }.get(
+            status,
+            "Dati aggiornati. Poteva andare peggio.",
+        )
 
         return (
             f"{opening} {day_label.capitalize()}. "
