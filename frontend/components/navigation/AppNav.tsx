@@ -112,7 +112,7 @@ export function AppNav({
             src={
               experienceMode === "zero"
                 ? "/assets/LogoZero.png"
-                : "/assets/LogoCoral.png"
+                : "/assets/LogoStandardNavy.png"
             }
             alt={
               experienceMode === "zero"

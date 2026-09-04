@@ -13,8 +13,13 @@
 
   padding: 28px 16px 24px;
 
-  border-right: 1px solid #eeeeea;
-  background: #ffffff;
+  border-right: 1px solid #173c62;
+  background:
+    linear-gradient(
+      180deg,
+      #102f4f 0%,
+      #0d2946 100%
+    );
 }
 
 .brandBlock {
@@ -472,5 +477,76 @@
       );
 
     color: #ffffff;
+  }
+}
+
+
+/* ============================================================
+   SanoSync Standard — Navy desktop sidebar
+   ============================================================ */
+
+@media (min-width: 760px) {
+  .desktopNav:not(.desktopNavZero) .desktopLink,
+  .desktopNav:not(.desktopNavZero) .desktopSubLink {
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .desktopNav:not(.desktopNavZero) .desktopLink:hover,
+  .desktopNav:not(.desktopNavZero) .desktopSubLink:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+  }
+
+  .desktopNav:not(.desktopNavZero) .desktopLinkActive {
+    background: rgba(255, 104, 101, 0.14);
+    color: #ff7d79;
+
+    box-shadow:
+      inset 3px 0 0 #ff6865;
+  }
+
+  .desktopNav:not(.desktopNavZero) .desktopSubLinkActive {
+    border-left-color: #ff6865;
+    background: rgba(255, 104, 101, 0.12);
+    color: #ff8a86;
+  }
+
+  .desktopNav:not(.desktopNavZero) .separator {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .desktopNav:not(.desktopNavZero) .profileCard {
+    border-color: rgba(255, 255, 255, 0.18);
+
+    background:
+      rgba(255, 255, 255, 0.06);
+
+    color: #ffffff;
+  }
+
+  .desktopNav:not(.desktopNavZero) .profileCard:hover {
+    border-color: rgba(255, 104, 101, 0.58);
+
+    background:
+      rgba(255, 255, 255, 0.09);
+
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .desktopNav:not(.desktopNavZero) .profileDetails small,
+  .desktopNav:not(.desktopNavZero) .profileArrow {
+    color: rgba(255, 255, 255, 0.66);
+  }
+
+  .desktopNav:not(.desktopNavZero) .signOut {
+    border-color: #ff6865;
+    background: #ff6865;
+    color: #ffffff;
+  }
+
+  .desktopNav:not(.desktopNavZero) .signOut:hover {
+    border-color: #f05c59;
+    background: #f05c59;
   }
 }
