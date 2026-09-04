@@ -6631,3 +6631,47 @@
     max-width: none;
   }
 }
+
+/* definitive registered meal dynamic width */
+@media (min-width: 1100px) {
+  .desktopHomeGrid .mealsSection .mealList {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .desktopHomeGrid .mealsSection .mealCard.mealCardOneItem {
+    width: 100%;
+    max-width: none;
+    justify-self: start;
+  }
+
+  .desktopHomeGrid .mealsSection .mealCard.mealCardTwoItems {
+    width: 72%;
+    max-width: none;
+    justify-self: start;
+  }
+
+  .desktopHomeGrid .mealsSection .mealCard.mealCardManyItems {
+    width: 52%;
+    max-width: none;
+    justify-self: start;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1099px) {
+  .mealsSection .mealList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mealsSection .mealCard.mealCardOneItem {
+    width: 100%;
+  }
+
+  .mealsSection .mealCard.mealCardTwoItems {
+    width: 72%;
+  }
+
+  .mealsSection .mealCard.mealCardManyItems {
+    width: 52%;
+  }
+}
