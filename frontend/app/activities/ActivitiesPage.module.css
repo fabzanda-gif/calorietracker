@@ -1093,3 +1093,18 @@ summary.loggerHeading {
 
 
 /* ZERO ACTIVITY PALETTE V2 END */
+
+/* ACTIVITY HEADER TOGGLE CLEARANCE START */
+
+/*
+  Su desktop il toggle globale occupa l'angolo
+  superiore destro. Abbassiamo leggermente solo
+  la card del conteggio, senza cambiare il mobile.
+*/
+@media (min-width: 760px) {
+  .monthTotal {
+    margin-top: 34px;
+  }
+}
+
+/* ACTIVITY HEADER TOGGLE CLEARANCE END */

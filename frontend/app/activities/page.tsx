@@ -775,7 +775,7 @@ export default function ActivitiesPage() {
             <h1>
               {zero
                 ? "Muoviti. Poi ne parliamo."
-                : "Movimento"}
+                : "La tua routine attiva"}
             </h1>
             <p>
               {zero
