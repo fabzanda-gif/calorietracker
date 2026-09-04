@@ -6243,3 +6243,42 @@
     flex: 1 0 auto;
   }
 }
+
+
+/* ============================================================
+   HOME MEALS — compact meal information
+   ============================================================ */
+
+.mealsSection .mealCard {
+  min-height: 0;
+}
+
+.mealsSection .registeredMealMacros {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  margin-top: 3px;
+  color: #777770;
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
+
+.mealsSection .registeredMealMacros > span {
+  white-space: nowrap;
+}
+
+.mealsSection .registeredMealMacros > span:first-child {
+  color: #62625d;
+  font-weight: 700;
+}
+
+.mealsSection .registeredMealMacros > span:not(:first-child) {
+  color: #777770;
+}
+
+@media (max-width: 760px) {
+  .mealsSection .registeredMealMacros {
+    gap: 3px 7px;
+  }
+}

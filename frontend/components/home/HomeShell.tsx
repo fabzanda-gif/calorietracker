@@ -2847,17 +2847,30 @@ export function HomeShell() {
                                     {registeredMeal.name}
                                   </strong>
 
-                                  <span>
-                                    {roundNumber(
-                                      registeredMeal.calories,
-                                    )}{" "}
-                                    kcal
-                                    {typeof registeredMeal.protein ===
-                                    "number"
-                                      ? ` · ${roundNumber(
-                                          registeredMeal.protein,
-                                        )} g proteine`
-                                      : ""}
+                                  <span className={styles.registeredMealMacros}>
+                                    <span>
+                                      {roundNumber(
+                                        registeredMeal.calories,
+                                      )} kcal
+                                    </span>
+
+                                    <span>
+                                      P {roundNumber(
+                                        registeredMeal.protein || 0,
+                                      )} g
+                                    </span>
+
+                                    <span>
+                                      C {roundNumber(
+                                        registeredMeal.carbs || 0,
+                                      )} g
+                                    </span>
+
+                                    <span>
+                                      G {roundNumber(
+                                        registeredMeal.fat || 0,
+                                      )} g
+                                    </span>
                                   </span>
                                 </div>
 
