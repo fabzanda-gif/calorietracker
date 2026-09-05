@@ -1698,8 +1698,10 @@ export default function ActivitiesPage() {
           </div>
         </details>
 
-        <section className={styles.plannerSection}>
-          <div className={styles.plannerHeading}>
+        <details
+          className={`${styles.plannerSection} ${styles.plannerCollapsible}`}
+        >
+          <summary className={styles.plannerHeading}>
             <div>
               <p className={styles.eyebrow}>
                 Pianifica
@@ -1720,7 +1722,8 @@ export default function ActivitiesPage() {
               }{" "}
               in programma
             </span>
-          </div>
+          </summary>
+
 
           <div className={styles.plannerGrid}>
             <div className={styles.plannerForm}>
@@ -2409,7 +2412,7 @@ export default function ActivitiesPage() {
               )}
             </div>
           </div>
-        </section>
+        </details>
 
         {error ? (
           <div className={styles.error}>{error}</div>

@@ -2128,3 +2128,73 @@ summary.loggerHeading {
     padding: 0 12px 12px;
   }
 }
+
+
+/* PLANNER COLLAPSIBLE V1 */
+
+.plannerCollapsible {
+  overflow: hidden;
+}
+
+.plannerCollapsible > .plannerHeading {
+  cursor: pointer;
+  list-style: none;
+  padding: 0;
+}
+
+.plannerCollapsible > .plannerHeading::-webkit-details-marker {
+  display: none;
+}
+
+.plannerCollapsible > .plannerHeading::after {
+  content: "＋";
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 8px;
+  border: 1px solid #d7d7d0;
+  border-radius: 999px;
+  background: #f7f7f3;
+  color: #102846;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.plannerCollapsible[open]
+> .plannerHeading::after {
+  content: "−";
+  background: #102846;
+  color: #ffffff;
+}
+
+.plannerCollapsible > .plannerGrid {
+  margin-top: 24px;
+}
+
+.pageZero
+.plannerCollapsible
+> .plannerHeading::after {
+  border-color: rgba(244, 61, 61, 0.35);
+}
+
+.pageZero
+.plannerCollapsible[open]
+> .plannerHeading::after {
+  border-color: #f43d3d;
+  background: #f43d3d;
+  color: #ffffff;
+}
+
+@media (max-width: 760px) {
+  .plannerCollapsible > .plannerHeading {
+    align-items: flex-start;
+  }
+
+  .plannerCollapsible
+  > .plannerHeading::after {
+    width: 32px;
+    height: 32px;
+  }
+}
