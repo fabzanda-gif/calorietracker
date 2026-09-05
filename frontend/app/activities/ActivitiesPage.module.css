@@ -1108,3 +1108,79 @@ summary.loggerHeading {
 }
 
 /* ACTIVITY HEADER TOGGLE CLEARANCE END */
+
+/* ACTIVITY CALENDAR FULL WIDTH V1 START */
+
+/*
+  Il calendario diventa il contenuto principale.
+  L'import GPX resta disponibile ma non occupa più
+  una colonna verticale dedicata.
+*/
+.topGrid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.uploadCard {
+  display: grid !important;
+  grid-template-columns:
+    minmax(230px, 0.75fr)
+    minmax(0, 1.25fr);
+  align-items: center;
+  gap: 22px;
+}
+
+.uploadCard > div {
+  min-width: 0;
+}
+
+.dropZone {
+  display: grid !important;
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto;
+  align-items: center;
+  place-items: initial !important;
+  gap: 14px;
+
+  min-height: 0 !important;
+  margin-top: 0 !important;
+  padding: 16px 18px !important;
+
+  text-align: left !important;
+}
+
+.dropZone .uploadIcon {
+  width: 42px;
+  height: 42px;
+  font-size: 1.2rem;
+}
+
+.dropZone strong {
+  justify-self: start;
+}
+
+.dropZone small {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+@media (max-width: 759px) {
+  .uploadCard {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .dropZone {
+    grid-template-columns:
+      auto
+      minmax(0, 1fr);
+  }
+
+  .dropZone small {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ACTIVITY CALENDAR FULL WIDTH V1 END */

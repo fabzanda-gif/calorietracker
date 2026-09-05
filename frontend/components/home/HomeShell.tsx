@@ -2373,7 +2373,7 @@ export function HomeShell() {
                   <img
                     src={
                       experienceMode === "zero"
-                        ? "/assets/SanoSyncAIZeroNew.png"
+                        ? "/assets/SanoSyncAIZero1.png"
                         : "/assets/AILogo.png"
                     }
                     alt={

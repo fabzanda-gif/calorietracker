@@ -636,3 +636,19 @@
 :global(html[data-experience-mode="zero"]) .knownMealSuggestions b {
   color: #f43d3d !important;
 }
+
+/* ZERO QUICK ADD TRUE RED V2 START */
+
+:global(html[data-experience-mode="zero"]) .action:first-child,
+:global(html[data-experience-mode="zero"]) .action:first-child:hover {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  box-shadow:
+    0 8px 22px rgba(244, 61, 61, 0.14) !important;
+}
+
+:global(html[data-experience-mode="zero"]) .action:first-child .actionIcon {
+  color: #ffffff !important;
+}
+
+/* ZERO QUICK ADD TRUE RED V2 END */

@@ -788,8 +788,8 @@ export default function ActivitiesPage() {
             <strong>{rollingTrainingActivities.length}</strong>
             <span>
               {rollingTrainingActivities.length === 1
-                ? "allenamento negli ultimi 30 giorni"
-                : "allenamenti negli ultimi 30 giorni"}
+                ? "attività negli ultimi 30 giorni"
+                : "attività negli ultimi 30 giorni"}
             </span>
           </div>
         </header>
@@ -802,7 +802,7 @@ export default function ActivitiesPage() {
             </div>
           </div>
           <div className={styles.summaryGrid}>
-            <div><span>Allenamenti</span><strong>{rollingSummary.workouts}</strong></div>
+            <div><span>Attività</span><strong>{rollingSummary.workouts}</strong></div>
             <div><span>Tempo totale</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
             <div><span>Distanza</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
             <div><span>Energia</span><strong>{rollingSummary.calories.toLocaleString("it-IT")} kcal</strong></div>
@@ -1199,7 +1199,7 @@ export default function ActivitiesPage() {
                       )
                     : "Mese"}
                 </p>
-                <h2>Allenamenti registrati</h2>
+                <h2>Attività registrate</h2>
               </div>
 
               {selectedDate ? (

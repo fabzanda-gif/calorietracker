@@ -1947,17 +1947,21 @@ export default function ProgressPage() {
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
-              Andamento
+              {zero ? "I conti" : "Andamento"}
             </p>
 
             <h2>
-              Nutrizione &amp; attività
+              {zero
+                ? "Nutrizione, attività e altre prove"
+                : "Nutrizione & attività"}
             </h2>
 
             <p className={styles.sectionSubtitle}>
-              {metricDescription(
-                nutritionMetric,
-              )}
+              {zero
+                ? "Vediamo cosa hai registrato. Il resto non può testimoniare."
+                : metricDescription(
+                    nutritionMetric,
+                  )}
             </p>
           </div>
         </div>
