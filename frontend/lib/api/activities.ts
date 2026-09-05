@@ -449,6 +449,7 @@ export interface RunningTrainingPlanCreateResponse {
   plan: TrainingPlan;
   session_count: number;
   sessions: PlannedActivity[];
+  replaced_plan_ids?: string[];
 }
 
 export interface RunningTrainingPlanPreviewResponse {
@@ -503,13 +504,20 @@ export function deleteTrainingPlan(
 export function createRunningTrainingPlan(
   input: RunningTrainingPlanInput,
   accessToken?: string | null,
+  options?: {
+    replaceActive?: boolean;
+  },
 ): Promise<RunningTrainingPlanCreateResponse> {
   return apiRequest(
     "/activities/training-plans/running",
     {
       method: "POST",
       accessToken,
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        ...input,
+        replace_active:
+          options?.replaceActive ?? false,
+      }),
     },
   );
 }

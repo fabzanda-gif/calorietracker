@@ -365,3 +365,29 @@
 }
 
 /* DELETE RUNNING PLAN END */
+
+
+/* REPLACE RUNNING PLAN START */
+
+.replaceWarning{
+  display:grid;
+  gap:4px;
+  margin-top:14px;
+  padding:12px 14px;
+  border:1px solid #eed5ae;
+  border-radius:12px;
+  background:#fff9ee;
+}
+
+.replaceWarning strong{
+  color:#7b5420;
+  font-size:.8rem;
+}
+
+.replaceWarning span{
+  color:#8b7558;
+  font-size:.75rem;
+  line-height:1.45;
+}
+
+/* REPLACE RUNNING PLAN END */

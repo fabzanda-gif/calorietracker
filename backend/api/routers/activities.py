@@ -240,6 +240,8 @@ class RunningTrainingPlanCreate(BaseModel):
         le=6,
     )
 
+    replace_active: bool = False
+
 
 class GpxPreviewRequest(BaseModel):
     file_name: str = Field(min_length=1, max_length=255)
@@ -448,6 +450,39 @@ def create_running_training_plan(
         for item in sessions
     )
 
+    try:
+        existing_plans = (
+            plans_repo.list_for_user(
+                current_user.id
+            )
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    active_plans = [
+        item
+        for item in existing_plans
+        if (
+            item.get("sport") == "running"
+            and item.get("status") == "active"
+        )
+    ]
+
+    if (
+        active_plans
+        and not request.replace_active
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Hai già un piano di corsa attivo. "
+                "Conferma la sostituzione per crearne uno nuovo."
+            ),
+        )
+
     plan_payload = {
         "user_id": current_user.id,
         "sport": "running",
@@ -500,6 +535,29 @@ def create_running_training_plan(
             )
         )
 
+        replaced_plan_ids = []
+
+        if request.replace_active:
+            for existing_plan in active_plans:
+                existing_id = (
+                    existing_plan.get("id")
+                )
+
+                if (
+                    not existing_id
+                    or existing_id == plan_id
+                ):
+                    continue
+
+                plans_repo.delete(
+                    existing_id,
+                    current_user.id,
+                )
+
+                replaced_plan_ids.append(
+                    existing_id
+                )
+
         return {
             "created": True,
             "plan": plan,
@@ -507,6 +565,8 @@ def create_running_training_plan(
                 len(created_sessions),
             "sessions":
                 created_sessions,
+            "replaced_plan_ids":
+                replaced_plan_ids,
         }
 
     except RepositoryError as exc:

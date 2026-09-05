@@ -331,10 +331,21 @@ export function RunningPlanBuilder({
         await createRunningTrainingPlan(
           previewInput,
           accessToken,
+          {
+            replaceActive:
+              Boolean(activePlan),
+          },
+        );
+
+      const replaced =
+        Boolean(
+          response.replaced_plan_ids?.length,
         );
 
       setMessage(
-        `Piano confermato: ${response.plan.total_weeks} settimane, ${response.session_count} sessioni aggiunte al calendario.`,
+        replaced
+          ? `Piano sostituito: ${response.plan.total_weeks} settimane, ${response.session_count} nuove sessioni aggiunte al calendario.`
+          : `Piano confermato: ${response.plan.total_weeks} settimane, ${response.session_count} sessioni aggiunte al calendario.`,
       );
 
       clearPreview();
@@ -611,6 +622,21 @@ export function RunningPlanBuilder({
             </div>
           </div>
 
+          {activePlan ? (
+            <div className={styles.replaceWarning}>
+              <strong>
+                Hai già un piano attivo.
+              </strong>
+
+              <span>
+                Se confermi, il piano attuale
+                e tutte le sue sessioni future
+                verranno sostituiti da questa
+                nuova pianificazione.
+              </span>
+            </div>
+          ) : null}
+
           <div className={styles.previewSessions}>
             {previewSessions
               .slice(0, 6)
@@ -689,7 +715,9 @@ export function RunningPlanBuilder({
             >
               {saving
                 ? "Salvo il piano…"
-                : "Conferma e aggiungi al calendario"}
+                : activePlan
+                  ? "Sostituisci piano attivo"
+                  : "Conferma e aggiungi al calendario"}
             </button>
 
             <button
