@@ -50,6 +50,9 @@ from backend.services.profile_goal import ProfileGoalService
 from backend.services.planned_activity_outcome import (
     PlannedActivityOutcomeService,
 )
+from backend.services.running_plan_adaptation import (
+    RunningPlanAdaptationService,
+)
 from backend.services.running_plan import (
     RunningPlanInput,
     build_running_plan,
@@ -211,6 +214,12 @@ class PlannedActivityUpdate(BaseModel):
     status: str | None = Field(
         default=None,
         pattern="^(planned|completed|skipped)$",
+    )
+
+
+class PlannedActivityAdaptationApply(BaseModel):
+    target_planned_activity_id: str = Field(
+        min_length=1,
     )
 
 
@@ -618,6 +627,73 @@ def create_running_training_plan(
         ) from exc
 
 
+def _build_planned_activity_adaptation(
+    *,
+    planned_id: str,
+    user_id: str,
+    planned_repo: PlannedActivitiesRepository,
+    activities_repo: ActivitiesRepository,
+) -> dict:
+    source = planned_repo.get(
+        planned_id,
+        user_id,
+    )
+
+    if source is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Planned activity not found",
+        )
+
+    plan_id = source.get(
+        "training_plan_id"
+    )
+
+    if not plan_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Planned activity does not belong "
+                "to a training plan"
+            ),
+        )
+
+    actual_activities = (
+        activities_repo.list_for_date(
+            user_id,
+            source["scheduled_date"],
+        )
+    )
+
+    outcome = (
+        PlannedActivityOutcomeService().build(
+            planned=source,
+            actual_activities=actual_activities,
+        )
+    )
+
+    plan_sessions = (
+        planned_repo.list_for_training_plan(
+            user_id,
+            plan_id,
+        )
+    )
+
+    proposal = (
+        RunningPlanAdaptationService().build(
+            source_session=source,
+            outcome=outcome,
+            plan_sessions=plan_sessions,
+        )
+    )
+
+    return {
+        "source": source,
+        "outcome": outcome,
+        "proposal": proposal,
+    }
+
+
 @router.get("/planned/{planned_id}/outcome")
 def get_planned_activity_outcome(
     planned_id: str,
@@ -654,6 +730,137 @@ def get_planned_activity_outcome(
             planned=planned,
             actual_activities=actual_activities,
         )
+
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/planned/{planned_id}/adaptation"
+)
+def preview_planned_activity_adaptation(
+    planned_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+):
+    try:
+        result = _build_planned_activity_adaptation(
+            planned_id=planned_id,
+            user_id=current_user.id,
+            planned_repo=planned_repo,
+            activities_repo=activities_repo,
+        )
+
+        return {
+            "applied": False,
+            "outcome": result["outcome"],
+            "proposal": result["proposal"],
+        }
+
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/planned/{planned_id}/adaptation"
+)
+def apply_planned_activity_adaptation(
+    planned_id: str,
+    request: PlannedActivityAdaptationApply,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+):
+    try:
+        result = _build_planned_activity_adaptation(
+            planned_id=planned_id,
+            user_id=current_user.id,
+            planned_repo=planned_repo,
+            activities_repo=activities_repo,
+        )
+
+        proposal = result["proposal"]
+
+        if not proposal.get(
+            "adaptation_required"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "No training adaptation is currently "
+                    "required"
+                ),
+            )
+
+        target = proposal.get("target") or {}
+        target_id = str(
+            target.get("id") or ""
+        )
+
+        if (
+            target_id
+            != request.target_planned_activity_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Training plan changed after preview. "
+                    "Refresh the adaptation proposal."
+                ),
+            )
+
+        changes = dict(
+            proposal.get("changes") or {}
+        )
+
+        if not changes:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Adaptation has no applicable changes",
+            )
+
+        updated = planned_repo.update(
+            target_id,
+            current_user.id,
+            changes,
+        )
+
+        if updated is None:
+            raise RepositoryError(
+                "Adapted session was not persisted"
+            )
+
+        return {
+            "applied": True,
+            "source_planned_activity_id": planned_id,
+            "target_planned_activity_id": target_id,
+            "outcome": result["outcome"],
+            "proposal": proposal,
+            "item": updated,
+        }
 
     except HTTPException:
         raise
