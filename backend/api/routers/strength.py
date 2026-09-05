@@ -35,6 +35,9 @@ from backend.services.strength_plan import (
     StrengthPlanInput,
     StrengthPlanService,
 )
+from backend.services.strength_outcome import (
+    StrengthOutcomeService,
+)
 
 
 router = APIRouter(
@@ -681,6 +684,113 @@ def log_strength_workout(
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+@router.get(
+    "/workouts/{workout_id}/outcome",
+)
+def get_strength_workout_outcome(
+    workout_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    workouts_repo:
+        StrengthWorkoutsRepository = Depends(
+            get_strength_workouts_repository
+        ),
+    exercises_repo:
+        StrengthWorkoutExercisesRepository = Depends(
+            get_strength_workout_exercises_repository
+        ),
+    workout_logs_repo:
+        StrengthWorkoutLogsRepository = Depends(
+            get_strength_workout_logs_repository
+        ),
+    set_logs_repo:
+        StrengthSetLogsRepository = Depends(
+            get_strength_set_logs_repository
+        ),
+):
+    try:
+        workout = workouts_repo.get(
+            current_user.id,
+            workout_id,
+        )
+
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Workout palestra non trovato."
+                ),
+            )
+
+        workout_log = (
+            workout_logs_repo.get_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        if not workout_log:
+            return {
+                "status": "pending",
+                "workout": workout,
+                "workout_log": None,
+                "outcome": None,
+                "message": (
+                    "Il workout non è ancora "
+                    "stato registrato."
+                ),
+            }
+
+        planned_exercises = (
+            exercises_repo.list_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        set_logs = (
+            set_logs_repo.list_for_workout_log(
+                current_user.id,
+                workout_log["id"],
+            )
+        )
+
+        try:
+            outcome = (
+                StrengthOutcomeService().evaluate(
+                    planned_exercises=
+                        planned_exercises,
+                    set_logs=set_logs,
+                )
+            )
+
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_422_UNPROCESSABLE_CONTENT
+                ),
+                detail=str(exc),
+            ) from exc
+
+        return {
+            "status": "evaluated",
+            "workout": workout,
+            "workout_log": workout_log,
+            "outcome": outcome,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
             detail=str(exc),
         ) from exc
 
