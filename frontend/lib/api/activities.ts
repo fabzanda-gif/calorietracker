@@ -408,6 +408,111 @@ export function deletePlannedActivity(
   );
 }
 
+/* RUNNING PLAN ADAPTATION API START */
+
+export type PlannedActivityOutcomeKind =
+  | "on_target"
+  | "under"
+  | "over"
+  | "skipped"
+  | "unmatched";
+
+export type RunningAdaptationAction =
+  | "keep_plan"
+  | "ease_next"
+  | "recover_next"
+  | "review";
+
+export interface PlannedActivityOutcome {
+  planned_activity_id?: string | null;
+  training_plan_id?: string | null;
+  training_week?: number | null;
+  session_kind?: string | null;
+  outcome: PlannedActivityOutcomeKind;
+  recommended_action: RunningAdaptationAction;
+  message: string;
+  load_ratio?: number | null;
+}
+
+export interface RunningAdaptationSession {
+  id?: string | null;
+  scheduled_date?: string | null;
+  scheduled_time?: string | null;
+  title?: string | null;
+  session_kind?: string | null;
+  training_week?: number | null;
+  distance_meters?: number | null;
+  duration_minutes?: number | null;
+  intensity?: PlannedActivityIntensity | null;
+}
+
+export interface RunningAdaptationProposal {
+  adaptation_required: boolean;
+  source_planned_activity_id?: string | null;
+  training_plan_id?: string | null;
+  outcome?: PlannedActivityOutcomeKind | null;
+  recommended_action?: RunningAdaptationAction | null;
+  title: string;
+  message: string;
+  target: RunningAdaptationSession | null;
+  changes: Partial<{
+    distance_meters: number;
+    duration_minutes: number;
+    intensity: PlannedActivityIntensity;
+  }>;
+  preview: RunningAdaptationSession | null;
+}
+
+export interface PlannedActivityAdaptationResponse {
+  applied: boolean;
+  outcome: PlannedActivityOutcome;
+  proposal: RunningAdaptationProposal;
+}
+
+export interface AppliedPlannedActivityAdaptationResponse
+  extends PlannedActivityAdaptationResponse {
+  applied: true;
+  source_planned_activity_id: string;
+  target_planned_activity_id: string;
+  item: PlannedActivity;
+}
+
+export function getPlannedActivityAdaptation(
+  id: string,
+  accessToken?: string | null,
+): Promise<PlannedActivityAdaptationResponse> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(
+      id,
+    )}/adaptation`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function applyPlannedActivityAdaptation(
+  sourceId: string,
+  targetId: string,
+  accessToken?: string | null,
+): Promise<AppliedPlannedActivityAdaptationResponse> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(
+      sourceId,
+    )}/adaptation`,
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        target_planned_activity_id: targetId,
+      }),
+    },
+  );
+}
+
+/* RUNNING PLAN ADAPTATION API END */
+
+
 /* PLANNED ACTIVITIES API END */
 
 

@@ -19,6 +19,8 @@ import {
   createPlannedActivity,
   updatePlannedActivity,
   deletePlannedActivity,
+  getPlannedActivityAdaptation,
+  applyPlannedActivityAdaptation,
   getActivityComment,
   deleteActivity,
   importGpxActivity,
@@ -30,6 +32,7 @@ import {
   type ActivityEnergyDay,
   type PlannedActivity,
   type PlannedActivityIntensity,
+  type PlannedActivityAdaptationResponse,
 } from "@/lib/api/activities";
 
 import styles from "./ActivitiesPage.module.css";
@@ -614,6 +617,36 @@ export default function ActivitiesPage() {
   const [busyPlanId, setBusyPlanId] =
     useState<string | null>(null);
 
+  const [
+    planAdaptations,
+    setPlanAdaptations,
+  ] = useState<
+    Record<
+      string,
+      PlannedActivityAdaptationResponse | null
+    >
+  >({});
+
+  const [
+    adaptationLoadingIds,
+    setAdaptationLoadingIds,
+  ] = useState<Record<string, boolean>>({});
+
+  const [
+    adaptationApplyingId,
+    setAdaptationApplyingId,
+  ] = useState<string | null>(null);
+
+  const [
+    dismissedAdaptations,
+    setDismissedAdaptations,
+  ] = useState<Record<string, boolean>>({});
+
+  const [
+    adaptationFeedback,
+    setAdaptationFeedback,
+  ] = useState<Record<string, string>>({});
+
   useEffect(() => {
     const stored = window.localStorage.getItem(
       "sanosync-experience-mode",
@@ -637,6 +670,11 @@ export default function ActivitiesPage() {
       const today = new Date();
       const rollingStart = new Date(today);
       rollingStart.setDate(today.getDate() - 29);
+      const plannedStart = new Date(today);
+      plannedStart.setDate(
+        today.getDate() - 7,
+      );
+
       const plannedEnd = new Date(today);
       plannedEnd.setDate(
         today.getDate() + 30,
@@ -658,7 +696,7 @@ export default function ActivitiesPage() {
           accessToken,
         ),
         getPlannedActivities(
-          isoDate(today),
+          isoDate(plannedStart),
           isoDate(plannedEnd),
           accessToken,
         ),
@@ -845,6 +883,53 @@ export default function ActivitiesPage() {
     }
   }
 
+  async function loadPlanAdaptation(
+    item: PlannedActivity,
+  ) {
+    if (
+      !accessToken ||
+      !item.training_plan_id ||
+      !["completed", "skipped"].includes(
+        item.status,
+      ) ||
+      dismissedAdaptations[item.id]
+    ) {
+      return;
+    }
+
+    setAdaptationLoadingIds(
+      (current) => ({
+        ...current,
+        [item.id]: true,
+      }),
+    );
+
+    try {
+      const response =
+        await getPlannedActivityAdaptation(
+          item.id,
+          accessToken,
+        );
+
+      setPlanAdaptations(
+        (current) => ({
+          ...current,
+          [item.id]: response,
+        }),
+      );
+    } catch {
+      // Adaptation is an enhancement.
+      // The planner must remain usable if it fails.
+    } finally {
+      setAdaptationLoadingIds(
+        (current) => ({
+          ...current,
+          [item.id]: false,
+        }),
+      );
+    }
+  }
+
   async function setPlannedStatus(
     item: PlannedActivity,
     status:
@@ -862,6 +947,18 @@ export default function ActivitiesPage() {
         { status },
         accessToken,
       );
+
+      const updatedItem: PlannedActivity = {
+        ...item,
+        status,
+      };
+
+      if (item.training_plan_id) {
+        await loadPlanAdaptation(
+          updatedItem,
+        );
+      }
+
       await loadMonth();
     } catch (err) {
       setError(
@@ -904,6 +1001,119 @@ export default function ActivitiesPage() {
     } finally {
       setBusyPlanId(null);
     }
+  }
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    for (const item of plannedActivities) {
+      if (
+        !item.training_plan_id ||
+        !["completed", "skipped"].includes(
+          item.status,
+        ) ||
+        dismissedAdaptations[item.id] ||
+        planAdaptations[item.id] !== undefined ||
+        adaptationLoadingIds[item.id]
+      ) {
+        continue;
+      }
+
+      void loadPlanAdaptation(item);
+    }
+  }, [
+    accessToken,
+    plannedActivities,
+    dismissedAdaptations,
+    planAdaptations,
+    adaptationLoadingIds,
+  ]);
+
+  async function applyAdaptation(
+    source: PlannedActivity,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    const response =
+      planAdaptations[source.id];
+
+    const targetId =
+      response?.proposal.target?.id;
+
+    if (
+      !response?.proposal.adaptation_required ||
+      !targetId
+    ) {
+      return;
+    }
+
+    setAdaptationApplyingId(
+      source.id,
+    );
+    setError(null);
+
+    try {
+      await applyPlannedActivityAdaptation(
+        source.id,
+        targetId,
+        accessToken,
+      );
+
+      setDismissedAdaptations(
+        (current) => ({
+          ...current,
+          [source.id]: true,
+        }),
+      );
+
+      setAdaptationFeedback(
+        (current) => ({
+          ...current,
+          [source.id]:
+            "Adattamento applicato al piano.",
+        }),
+      );
+
+      setPlanAdaptations(
+        (current) => ({
+          ...current,
+          [source.id]: null,
+        }),
+      );
+
+      await loadMonth();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad applicare l’adattamento.",
+      );
+    } finally {
+      setAdaptationApplyingId(null);
+    }
+  }
+
+  function keepCurrentPlan(
+    source: PlannedActivity,
+  ) {
+    setDismissedAdaptations(
+      (current) => ({
+        ...current,
+        [source.id]: true,
+      }),
+    );
+
+    setAdaptationFeedback(
+      (current) => ({
+        ...current,
+        [source.id]:
+          "Piano mantenuto senza modifiche.",
+      }),
+    );
   }
 
   async function chooseGpx(file: File | null) {
@@ -1581,6 +1791,260 @@ export default function ActivitiesPage() {
                           <small>
                             {item.notes}
                           </small>
+                        ) : null}
+
+                        {adaptationFeedback[
+                          item.id
+                        ] ? (
+                          <div
+                            className={
+                              styles.adaptationFeedback
+                            }
+                          >
+                            {
+                              adaptationFeedback[
+                                item.id
+                              ]
+                            }
+                          </div>
+                        ) : null}
+
+                        {item.training_plan_id &&
+                        !dismissedAdaptations[
+                          item.id
+                        ] &&
+                        planAdaptations[
+                          item.id
+                        ]?.proposal
+                          .adaptation_required ? (
+                          <div
+                            className={
+                              styles.adaptationCard
+                            }
+                          >
+                            <div
+                              className={
+                                styles.adaptationHeading
+                              }
+                            >
+                              <span
+                                className={
+                                  styles.adaptationEyebrow
+                                }
+                              >
+                                ADATTAMENTO DEL PIANO
+                              </span>
+
+                              <strong>
+                                {zero
+                                  ? "Il piano ha notato quello che hai combinato."
+                                  : planAdaptations[
+                                      item.id
+                                    ]!.proposal.title}
+                              </strong>
+                            </div>
+
+                            <p>
+                              {
+                                planAdaptations[
+                                  item.id
+                                ]!.proposal.message
+                              }
+                            </p>
+
+                            {planAdaptations[
+                              item.id
+                            ]!.proposal.target &&
+                            planAdaptations[
+                              item.id
+                            ]!.proposal.preview ? (
+                              <div
+                                className={
+                                  styles.adaptationComparison
+                                }
+                              >
+                                <div>
+                                  <span>
+                                    Prima
+                                  </span>
+                                  <strong>
+                                    {
+                                      planAdaptations[
+                                        item.id
+                                      ]!.proposal
+                                        .target!.title
+                                    }
+                                  </strong>
+                                  <small>
+                                    {planAdaptations[
+                                      item.id
+                                    ]!.proposal
+                                      .target!
+                                      .distance_meters
+                                      ? `${(
+                                          Number(
+                                            planAdaptations[
+                                              item.id
+                                            ]!.proposal
+                                              .target!
+                                              .distance_meters,
+                                          ) / 1000
+                                        ).toLocaleString(
+                                          "it-IT",
+                                          {
+                                            maximumFractionDigits:
+                                              1,
+                                          },
+                                        )} km`
+                                      : ""}
+                                    {planAdaptations[
+                                      item.id
+                                    ]!.proposal
+                                      .target!
+                                      .duration_minutes
+                                      ? `${
+                                          planAdaptations[
+                                            item.id
+                                          ]!.proposal
+                                            .target!
+                                            .distance_meters
+                                            ? " · "
+                                            : ""
+                                        }${
+                                          planAdaptations[
+                                            item.id
+                                          ]!.proposal
+                                            .target!
+                                            .duration_minutes
+                                        } min`
+                                      : ""}
+                                  </small>
+                                </div>
+
+                                <span
+                                  className={
+                                    styles.adaptationArrow
+                                  }
+                                  aria-hidden="true"
+                                >
+                                  →
+                                </span>
+
+                                <div>
+                                  <span>
+                                    Proposta
+                                  </span>
+                                  <strong>
+                                    {
+                                      planAdaptations[
+                                        item.id
+                                      ]!.proposal
+                                        .preview!.title
+                                    }
+                                  </strong>
+                                  <small>
+                                    {planAdaptations[
+                                      item.id
+                                    ]!.proposal
+                                      .preview!
+                                      .distance_meters
+                                      ? `${(
+                                          Number(
+                                            planAdaptations[
+                                              item.id
+                                            ]!.proposal
+                                              .preview!
+                                              .distance_meters,
+                                          ) / 1000
+                                        ).toLocaleString(
+                                          "it-IT",
+                                          {
+                                            maximumFractionDigits:
+                                              1,
+                                          },
+                                        )} km`
+                                      : ""}
+                                    {planAdaptations[
+                                      item.id
+                                    ]!.proposal
+                                      .preview!
+                                      .duration_minutes
+                                      ? `${
+                                          planAdaptations[
+                                            item.id
+                                          ]!.proposal
+                                            .preview!
+                                            .distance_meters
+                                            ? " · "
+                                            : ""
+                                        }${
+                                          planAdaptations[
+                                            item.id
+                                          ]!.proposal
+                                            .preview!
+                                            .duration_minutes
+                                        } min`
+                                      : ""}
+                                  </small>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            <div
+                              className={
+                                styles.adaptationActions
+                              }
+                            >
+                              <button
+                                type="button"
+                                className={
+                                  styles.keepPlanButton
+                                }
+                                disabled={
+                                  adaptationApplyingId ===
+                                  item.id
+                                }
+                                onClick={() => {
+                                  keepCurrentPlan(
+                                    item,
+                                  );
+                                }}
+                              >
+                                Mantieni piano
+                              </button>
+
+                              <button
+                                type="button"
+                                className={
+                                  styles.applyAdaptationButton
+                                }
+                                disabled={
+                                  adaptationApplyingId ===
+                                  item.id
+                                }
+                                onClick={() => {
+                                  void applyAdaptation(
+                                    item,
+                                  );
+                                }}
+                              >
+                                {adaptationApplyingId ===
+                                item.id
+                                  ? "Applico…"
+                                  : "Applica adattamento"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : adaptationLoadingIds[
+                            item.id
+                          ] ? (
+                          <div
+                            className={
+                              styles.adaptationLoading
+                            }
+                          >
+                            Valuto se il piano va adattato…
+                          </div>
                         ) : null}
 
                         <div

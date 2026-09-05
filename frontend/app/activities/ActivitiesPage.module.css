@@ -1749,3 +1749,161 @@ summary.loggerHeading {
 }
 
 /* RUNNING SESSION CARDS END */
+
+
+/* RUNNING ADAPTATION UI START */
+
+.adaptationCard {
+  margin-top: 14px;
+  padding: 15px;
+  border: 1px solid #ccd9e5;
+  border-radius: 16px;
+  background: #f5f8fb;
+}
+
+.adaptationHeading {
+  display: grid;
+  gap: 3px;
+}
+
+.adaptationEyebrow {
+  color: #6e8094;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.adaptationHeading strong {
+  color: #102744;
+  font-size: 0.9rem;
+}
+
+.adaptationCard > p {
+  margin: 8px 0 0;
+  color: #66778a;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.adaptationComparison {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    auto
+    minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.adaptationComparison > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.adaptationComparison span {
+  color: #8390a0;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.adaptationComparison strong {
+  color: #102744;
+  font-size: 0.78rem;
+}
+
+.adaptationComparison small {
+  color: #6c7888;
+}
+
+.adaptationArrow {
+  font-size: 1.1rem !important;
+  color: #102744 !important;
+}
+
+.adaptationActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.adaptationActions button {
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.keepPlanButton {
+  border: 1px solid #ccd4dd;
+  background: #fff;
+  color: #415268;
+}
+
+.applyAdaptationButton {
+  border: 1px solid #102744;
+  background: #102744;
+  color: #fff;
+}
+
+.adaptationLoading,
+.adaptationFeedback {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.adaptationLoading {
+  background: #f5f6f7;
+  color: #76808b;
+}
+
+.adaptationFeedback {
+  background: #eef8f1;
+  color: #35724a;
+}
+
+.pageZero .adaptationCard {
+  border-color: rgba(244, 61, 61, 0.28);
+  background: rgba(244, 61, 61, 0.055);
+}
+
+.pageZero .adaptationEyebrow,
+.pageZero .adaptationHeading strong {
+  color: #f43d3d;
+}
+
+.pageZero .applyAdaptationButton {
+  border-color: #f43d3d;
+  background: #f43d3d;
+}
+
+.pageZero .adaptationFeedback {
+  background: rgba(244, 61, 61, 0.08);
+  color: #b83d3d;
+}
+
+@media (max-width: 560px) {
+  .adaptationComparison {
+    grid-template-columns: 1fr;
+  }
+
+  .adaptationArrow {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+
+  .adaptationActions {
+    flex-direction: column;
+  }
+}
+
+/* RUNNING ADAPTATION UI END */
