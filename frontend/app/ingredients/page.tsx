@@ -31,7 +31,7 @@ export default function IngredientsPage() {
       const response = await getIngredients(accessToken);
       setItems(response.items);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossibile caricare gli ingredienti.");
+      setMessage(error instanceof Error ? error.message : "Impossibile caricare gli alimenti.");
     } finally { setLoading(false); }
   }
 
@@ -75,7 +75,7 @@ export default function IngredientsPage() {
       setEditingId(null);
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossibile salvare l'ingrediente.");
+      setMessage(error instanceof Error ? error.message : "Impossibile salvare l'alimento.");
     } finally { setSaving(false); }
   }
 
@@ -85,14 +85,14 @@ export default function IngredientsPage() {
       await deleteIngredient(item.id, accessToken);
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossibile eliminare l'ingrediente.");
+      setMessage(error instanceof Error ? error.message : "Impossibile eliminare l'alimento.");
     }
   }
 
   return <><AppNav /><main className={styles.page}>
-    <header><p>LIBRERIA</p><h1>Ingredienti</h1><span>La base nutrizionale delle tue ricette.</span></header>
+    <header><p>LIBRERIA</p><h1>Alimenti</h1><span>La tua libreria nutrizionale: ingredienti, prodotti e cibi pronti.</span></header>
     <section className={styles.editor}>
-      <div><p>{editingId ? "MODIFICA" : "NUOVO"}</p><h2>{editingId ? "Aggiorna ingrediente" : "Aggiungi ingrediente"}</h2></div>
+      <div><p>{editingId ? "MODIFICA" : "NUOVO"}</p><h2>{editingId ? "Aggiorna alimento" : "Aggiungi alimento"}</h2></div>
       <form onSubmit={save}>
         <label className={styles.name}>Nome<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
         {(["calories", "protein", "carbs", "fat"] as const).map((field) => <label key={field}>{({calories:"Kcal",protein:"Proteine",carbs:"Carboidrati",fat:"Grassi"})[field]} / 100 g<input type="number" min="0" step="0.1" value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })} /></label>)}
@@ -102,7 +102,7 @@ export default function IngredientsPage() {
     </section>
     {message ? <p className={styles.message}>{message}</p> : null}
     <section className={styles.library}>
-      <div className={styles.libraryHead}><div><p>ARCHIVIO</p><h2>I tuoi ingredienti</h2></div><input placeholder="Cerca ingrediente…" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+      <div className={styles.libraryHead}><div><p>ARCHIVIO</p><h2>I tuoi alimenti</h2></div><input placeholder="Cerca alimento…" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       {loading ? <p>Caricamento…</p> : <div className={styles.grid}>{visible.map((item) => <article key={item.id}><h3>{item.name}</h3><strong>{Math.round(item.calories_per_100g)} kcal</strong><dl><div><dt>Proteine</dt><dd>{item.protein_per_100g} g</dd></div><div><dt>Carboidrati</dt><dd>{item.carbs_per_100g} g</dd></div><div><dt>Grassi</dt><dd>{item.fat_per_100g} g</dd></div></dl><footer><button onClick={() => edit(item)}>Modifica</button><button onClick={() => void remove(item)}>Elimina</button></footer></article>)}</div>}
     </section>
   </main></>;
