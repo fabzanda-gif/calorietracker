@@ -491,6 +491,26 @@ export function getPlannedActivityAdaptation(
   );
 }
 
+export function keepPlannedActivityAdaptation(
+  sourceId: string,
+  accessToken?: string | null,
+): Promise<{
+  kept: boolean;
+  outcome: PlannedActivityOutcome;
+  proposal: RunningAdaptationProposal;
+}> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(
+      sourceId,
+    )}/adaptation/keep`,
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
+}
+
+
 export function applyPlannedActivityAdaptation(
   sourceId: string,
   targetId: string,

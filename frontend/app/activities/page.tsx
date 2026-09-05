@@ -21,6 +21,7 @@ import {
   deletePlannedActivity,
   getPlannedActivityAdaptation,
   applyPlannedActivityAdaptation,
+  keepPlannedActivityAdaptation,
   getActivityComment,
   deleteActivity,
   importGpxActivity,
@@ -1097,23 +1098,47 @@ export default function ActivitiesPage() {
     }
   }
 
-  function keepCurrentPlan(
+  async function keepCurrentPlan(
     source: PlannedActivity,
   ) {
-    setDismissedAdaptations(
-      (current) => ({
-        ...current,
-        [source.id]: true,
-      }),
-    );
+    if (!accessToken) {
+      return;
+    }
 
-    setAdaptationFeedback(
-      (current) => ({
-        ...current,
-        [source.id]:
-          "Piano mantenuto senza modifiche.",
-      }),
+    setAdaptationApplyingId(
+      source.id,
     );
+    setError(null);
+
+    try {
+      await keepPlannedActivityAdaptation(
+        source.id,
+        accessToken,
+      );
+
+      setDismissedAdaptations(
+        (current) => ({
+          ...current,
+          [source.id]: true,
+        }),
+      );
+
+      setAdaptationFeedback(
+        (current) => ({
+          ...current,
+          [source.id]:
+            "Piano mantenuto senza modifiche.",
+        }),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a salvare la decisione.",
+      );
+    } finally {
+      setAdaptationApplyingId(null);
+    }
   }
 
   async function chooseGpx(file: File | null) {
@@ -2005,7 +2030,7 @@ export default function ActivitiesPage() {
                                   item.id
                                 }
                                 onClick={() => {
-                                  keepCurrentPlan(
+                                  void keepCurrentPlan(
                                     item,
                                   );
                                 }}

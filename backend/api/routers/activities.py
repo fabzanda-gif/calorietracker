@@ -16,6 +16,7 @@ from backend.api.dependencies import (
     get_meals_repository,
     get_planned_activities_repository,
     get_training_plans_repository,
+    get_training_plan_adaptations_repository,
     get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
@@ -27,6 +28,9 @@ from backend.repositories.planned_activities import (
 )
 from backend.repositories.training_plans import (
     TrainingPlansRepository,
+)
+from backend.repositories.training_plan_adaptations import (
+    TrainingPlanAdaptationsRepository,
 )
 from backend.repositories.weight import WeightRepository
 from backend.services.gpx_activity import (
@@ -627,6 +631,48 @@ def create_running_training_plan(
         ) from exc
 
 
+def _adaptation_history_payload(
+    *,
+    user_id: str,
+    source: dict,
+    outcome: dict,
+    proposal: dict,
+    decision: str,
+    after_state: dict | None,
+) -> dict:
+    target = proposal.get("target") or {}
+
+    return {
+        "user_id": user_id,
+        "training_plan_id": source.get(
+            "training_plan_id"
+        ),
+        "source_planned_activity_id": (
+            source.get("id")
+        ),
+        "target_planned_activity_id": (
+            target.get("id")
+        ),
+        "outcome": outcome.get("outcome"),
+        "recommended_action": outcome.get(
+            "recommended_action"
+        ),
+        "decision": decision,
+        "load_ratio": outcome.get(
+            "load_ratio"
+        ),
+        "title": proposal.get("title"),
+        "message": proposal.get("message"),
+        "proposed_changes": (
+            proposal.get("changes") or {}
+        ),
+        "before_state": (
+            target or None
+        ),
+        "after_state": after_state,
+    }
+
+
 def _build_planned_activity_adaptation(
     *,
     planned_id: str,
@@ -793,6 +839,9 @@ def apply_planned_activity_adaptation(
     activities_repo: ActivitiesRepository = Depends(
         get_activities_repository
     ),
+    adaptation_repo: TrainingPlanAdaptationsRepository = Depends(
+        get_training_plan_adaptations_repository
+    ),
 ):
     try:
         result = _build_planned_activity_adaptation(
@@ -853,6 +902,17 @@ def apply_planned_activity_adaptation(
                 "Adapted session was not persisted"
             )
 
+        history = adaptation_repo.create(
+            _adaptation_history_payload(
+                user_id=current_user.id,
+                source=result["source"],
+                outcome=result["outcome"],
+                proposal=proposal,
+                decision="applied",
+                after_state=updated,
+            )
+        )
+
         return {
             "applied": True,
             "source_planned_activity_id": planned_id,
@@ -860,10 +920,98 @@ def apply_planned_activity_adaptation(
             "outcome": result["outcome"],
             "proposal": proposal,
             "item": updated,
+            "history": history,
         }
 
     except HTTPException:
         raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/planned/{planned_id}/adaptation/keep"
+)
+def keep_planned_activity_adaptation(
+    planned_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    adaptation_repo: TrainingPlanAdaptationsRepository = Depends(
+        get_training_plan_adaptations_repository
+    ),
+):
+    try:
+        result = _build_planned_activity_adaptation(
+            planned_id=planned_id,
+            user_id=current_user.id,
+            planned_repo=planned_repo,
+            activities_repo=activities_repo,
+        )
+
+        history = adaptation_repo.create(
+            _adaptation_history_payload(
+                user_id=current_user.id,
+                source=result["source"],
+                outcome=result["outcome"],
+                proposal=result["proposal"],
+                decision="kept",
+                after_state=(
+                    result["proposal"].get(
+                        "target"
+                    )
+                ),
+            )
+        )
+
+        return {
+            "kept": True,
+            "outcome": result["outcome"],
+            "proposal": result["proposal"],
+            "history": history,
+        }
+
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/training-plans/{plan_id}/adaptations"
+)
+def list_training_plan_adaptations(
+    plan_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    adaptation_repo: TrainingPlanAdaptationsRepository = Depends(
+        get_training_plan_adaptations_repository
+    ),
+):
+    try:
+        items = adaptation_repo.list_for_plan(
+            current_user.id,
+            plan_id,
+        )
+
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
