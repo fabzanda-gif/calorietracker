@@ -47,6 +47,9 @@ from backend.services.activity_comment import (
     fallback_activity_comment,
 )
 from backend.services.profile_goal import ProfileGoalService
+from backend.services.planned_activity_outcome import (
+    PlannedActivityOutcomeService,
+)
 from backend.services.running_plan import (
     RunningPlanInput,
     build_running_plan,
@@ -609,6 +612,52 @@ def create_running_training_plan(
             except RepositoryError:
                 pass
 
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/planned/{planned_id}/outcome")
+def get_planned_activity_outcome(
+    planned_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+):
+    try:
+        planned = planned_repo.get(
+            planned_id,
+            current_user.id,
+        )
+
+        if planned is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Planned activity not found",
+            )
+
+        actual_activities = (
+            activities_repo.list_for_date(
+                current_user.id,
+                planned["scheduled_date"],
+            )
+        )
+
+        return PlannedActivityOutcomeService().build(
+            planned=planned,
+            actual_activities=actual_activities,
+        )
+
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),

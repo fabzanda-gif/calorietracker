@@ -17,6 +17,30 @@ PLANNED_ACTIVITY_SELECT = (
 class PlannedActivitiesRepository(BaseRepository):
     table_name = "planned_activities"
 
+    def get(
+        self,
+        activity_id: Any,
+        user_id: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(PLANNED_ACTIVITY_SELECT)
+                .eq("id", activity_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+
+            rows = self._data(response)
+            return rows[0] if rows else None
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to load planned activity: "
+                f"{exc}"
+            ) from exc
+
     def list_range(
         self,
         user_id: str,
