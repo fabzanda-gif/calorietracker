@@ -5,6 +5,15 @@ from typing import Any
 from .base import BaseRepository, RepositoryError
 
 
+ACTIVITY_SELECT = (
+    "id,user_id,date,activity_name,burned_calories,"
+    "source,activity_type,started_at,duration_seconds,"
+    "distance_meters,average_cadence,"
+    "average_heart_rate,route_points,series_points,"
+    "original_point_count,gpx_file_name,estimated_steps"
+)
+
+
 class ActivitiesRepository(BaseRepository):
     table_name = "activities"
 
@@ -12,7 +21,7 @@ class ActivitiesRepository(BaseRepository):
         try:
             response = (
                 self.table
-                .select("id,user_id,date,activity_name,burned_calories")
+                .select(ACTIVITY_SELECT)
                 .eq("user_id", user_id)
                 .eq("date", str(log_date))
                 .execute()
@@ -32,11 +41,12 @@ class ActivitiesRepository(BaseRepository):
         try:
             response = (
                 self.table
-                .select("id,user_id,date,activity_name,burned_calories")
+                .select(ACTIVITY_SELECT)
                 .eq("user_id", user_id)
                 .gte("date", str(start_date))
                 .lte("date", str(end_date))
-                .order("date")
+                .order("date", desc=True)
+                .order("started_at", desc=True)
                 .execute()
             )
             return self._data(response)
@@ -54,7 +64,7 @@ class ActivitiesRepository(BaseRepository):
         try:
             response = (
                 self.table
-                .select("id,user_id,date,activity_name,burned_calories")
+                .select(ACTIVITY_SELECT)
                 .eq("user_id", user_id)
                 .eq("date", str(log_date))
                 .eq("activity_name", activity_name)
@@ -137,6 +147,32 @@ class ActivitiesRepository(BaseRepository):
                 "burned_calories": int(burned_calories),
             }
         )
+
+    def delete_named_for_date(
+        self,
+        *,
+        user_id: str,
+        log_date: Any,
+        activity_name: str,
+    ) -> bool:
+        try:
+            (
+                self.table
+                .delete()
+                .eq("user_id", user_id)
+                .eq("date", str(log_date))
+                .eq(
+                    "activity_name",
+                    activity_name,
+                )
+                .execute()
+            )
+            return True
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to delete automatic "
+                f"activity '{activity_name}': {exc}"
+            ) from exc
 
     def delete(self, activity_id: Any, user_id: str) -> bool:
         try:

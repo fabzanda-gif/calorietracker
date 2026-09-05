@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 import { useAuth } from "./AuthProvider";
 import { LoginCard } from "./LoginCard";
@@ -12,6 +13,11 @@ export function AuthGate({
   children: ReactNode;
 }) {
   const { loading, user } = useAuth();
+  const pathname = usePathname();
+
+  if (pathname === "/privacy" || pathname === "/terms") {
+    return children;
+  }
 
   if (loading) {
     return (

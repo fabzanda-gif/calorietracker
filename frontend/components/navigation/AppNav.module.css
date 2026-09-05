@@ -1,74 +1,180 @@
 .desktopNav {
-  width: min(1180px, calc(100% - 32px));
-  min-height: 68px;
-  margin: 0 auto;
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  bottom: 0;
+
   display: none;
-  align-items: center;
-  gap: 28px;
-  border-bottom: 1px solid #deded8;
+  flex-direction: column;
+
+  width: 236px;
+  box-sizing: border-box;
+
+  padding: 28px 16px 24px;
+
+  border-right: 1px solid #173c62;
+  background:
+    linear-gradient(
+      180deg,
+      #102f4f 0%,
+      #0d2946 100%
+    );
 }
 
-.brand {
-  color: #171815;
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  text-decoration: none;
+.brandBlock {
+  display: grid;
+  justify-items: center;
+  margin-bottom: 24px;
+  padding: 0 8px;
+}
+
+.brandLogo {
+  display: block;
+  width: 150px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.logoMark {
+  display: grid;
+  place-items: center;
+
+  width: 78px;
+  height: 78px;
+
+  border: 2px solid #ff5b57;
+  border-radius: 50%;
+
+  color: #ff5b57;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+
+  font-size: 3.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.brandName {
+  color: #ff514d;
+
+  font-family:
+    "Trebuchet MS",
+    Arial,
+    sans-serif;
+
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 
 .desktopLinks {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 6px;
 }
 
 .desktopLink,
 .desktopLinkActive {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 38px;
-  padding: 0 13px;
-  border-radius: 999px;
-  color: #686862;
-  font-size: 0.82rem;
-  font-weight: 750;
+  gap: 15px;
+
+  width: 100%;
+  min-height: 49px;
+  box-sizing: border-box;
+
+  padding: 0 14px;
+
+  border: 0;
+  border-radius: 13px;
+
+  background: transparent;
+
+  color: #122746;
+
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+
   text-decoration: none;
+  text-align: left;
+
+  cursor: pointer;
+
   transition:
     background 140ms ease,
     color 140ms ease;
 }
 
 .desktopLink:hover {
-  background: #efefeb;
-  color: #171815;
+  background: #fff3f2;
+  color: #ff514d;
 }
 
 .desktopLinkActive {
-  background: #171815;
-  color: #ffffff;
+  background: #fff0ef;
+  color: #ff514d;
+}
+
+.desktopIcon {
+  display: grid;
+  place-items: center;
+
+  width: 24px;
+  min-width: 24px;
+
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.desktopIcon svg,
+.mobileIcon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.separator {
+  height: 1px;
+  margin: 18px 14px;
+  background: #e5e5df;
 }
 
 .signOut {
-  min-height: 38px;
-  margin-left: auto;
-  padding: 0 14px;
-  border: 1px solid #d8d8d1;
+  margin-top: auto;
+
+  min-height: 42px;
+  padding: 0 16px;
+
+  border: 1px solid #ff6865;
   border-radius: 999px;
-  background: #ffffff;
-  color: #30302d;
+
+  background: #ff6865;
+  color: #ffffff;
+
   cursor: pointer;
-  font-size: 0.78rem;
+
+  font-size: 0.8rem;
   font-weight: 750;
 }
 
 .signOut:hover {
-  background: #f0f0ec;
+  border-color: #e95250;
+  background: #e95250;
 }
 
 .mobileNav {
   position: fixed;
   z-index: 100;
+
   left: 12px;
   right: 12px;
   bottom: max(
@@ -77,7 +183,7 @@
   );
 
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 
   min-height: 64px;
   padding: 6px;
@@ -100,14 +206,18 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+
   gap: 3px;
 
   min-width: 0;
+
   border-radius: 16px;
 
   color: #777771;
+
   font-size: 0.68rem;
   font-weight: 750;
+
   text-decoration: none;
 }
 
@@ -118,10 +228,10 @@
 
 .mobileIcon {
   height: 18px;
+
   font-size: 1rem;
   line-height: 1;
 }
-
 
 @media (min-width: 760px) {
   .desktopNav {
@@ -130,5 +240,387 @@
 
   .mobileNav {
     display: none;
+  }
+}
+
+
+/* Profilo utente nella sidebar */
+.profileArea {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.profileCard {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e1db;
+  border-radius: 15px;
+  background: #ffffff;
+  color: #102846;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.profileCard:hover {
+  border-color: #f2aaa6;
+  box-shadow: 0 8px 20px rgba(16, 40, 70, 0.07);
+  transform: translateY(-1px);
+}
+
+.profileAvatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 50%;
+  background:
+    linear-gradient(145deg, #173c62, #102846);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.profileAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profileDetails {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.profileDetails strong,
+.profileDetails small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileDetails strong {
+  font-size: 0.78rem;
+}
+
+.profileDetails small {
+  color: #777771;
+  font-size: 0.62rem;
+}
+
+.profileArrow {
+  color: #718096;
+  font-size: 1.25rem;
+}
+
+.profileArea .signOut {
+  width: 100%;
+  margin-top: 0;
+}
+
+
+/* Dispensa come voce secondaria di Ricette */
+.desktopSubLink,
+.desktopSubLinkActive {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 24px);
+  min-height: 38px;
+  margin: -2px 0 4px 24px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 0;
+  border-left: 2px solid #eeeae5;
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+  color: #66758a;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.desktopSubLink:hover {
+  background: #faf7f5;
+  color: #102846;
+}
+
+.desktopSubLinkActive {
+  border-left-color: #ff625e;
+  background: #fff3f2;
+  color: #e9534f;
+}
+
+
+/* Sidebar Zero Mode */
+.desktopNavZero {
+  border-right-color: #242424;
+  background:
+    linear-gradient(
+      180deg,
+      #080808 0%,
+      #111111 100%
+    );
+}
+
+.desktopNavZero .desktopLink,
+.desktopNavZero .desktopSubLink {
+  color: #f3f3f3;
+}
+
+.desktopNavZero .desktopLink:hover,
+.desktopNavZero .desktopSubLink:hover {
+  background: #1d1d1d;
+  color: #ffffff;
+}
+
+.desktopNavZero .desktopLinkActive,
+.desktopNavZero .desktopSubLinkActive {
+  background:
+    linear-gradient(
+      135deg,
+      #f43d3d,
+      #df2525
+    );
+  color: #ffffff;
+}
+
+.desktopNavZero .separator {
+  background: #2a2a2a;
+}
+
+.desktopNavZero .profileCard {
+  border-color: #343434;
+  background: #151515;
+  color: #ffffff;
+}
+
+.desktopNavZero .profileDetails small {
+  color: #aaaaaa;
+}
+
+.desktopNavZero .signOut {
+  border-color: #ff6865;
+  background: #ff6865;
+  color: #ffffff;
+}
+
+.desktopNavZero .signOut:hover {
+  border-color: #e95250;
+  background: #e95250;
+}
+
+/* ============================================================
+   Mobile SanoSync brand identity
+   ============================================================ */
+
+@media (max-width: 759px) {
+  .mobileNav {
+    border-top: 3px solid #ff6865;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 248, 246, 0.98) 0%,
+        rgba(255, 255, 255, 0.97) 42%
+      );
+
+    overflow: visible;
+  }
+
+  /*
+   * Piccolo brand tab integrato nella bottom navigation.
+   * Riutilizza lo stesso asset della sidebar desktop.
+   */
+  .mobileNav::before {
+    content: "";
+
+    position: absolute;
+    left: 50%;
+    top: -48px;
+
+    width: 122px;
+    height: 52px;
+
+    transform: translateX(-50%);
+
+    border: 1px solid rgba(244, 127, 122, 0.28);
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+
+    background-color: rgba(255, 255, 255, 0.98);
+    background-image: url("/assets/LogoCoral.png");
+    background-repeat: no-repeat;
+    background-position: center 8px;
+    background-size: 56px auto;
+
+    box-shadow:
+      0 -5px 15px rgba(16, 40, 70, 0.045);
+  }
+
+  .mobileLinkActive {
+    background:
+      linear-gradient(
+        145deg,
+        #173c62 0%,
+        #102846 100%
+      );
+
+    color: #ffffff;
+  }
+}
+
+
+/* ============================================================
+   SanoSync Standard — Navy desktop sidebar
+   ============================================================ */
+
+@media (min-width: 760px) {
+  .desktopNav:not(.desktopNavZero) .desktopLink,
+  .desktopNav:not(.desktopNavZero) .desktopSubLink {
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .desktopNav:not(.desktopNavZero) .desktopLink:hover,
+  .desktopNav:not(.desktopNavZero) .desktopSubLink:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+  }
+
+  .desktopNav:not(.desktopNavZero) .desktopLinkActive {
+    background: rgba(255, 104, 101, 0.14);
+    color: #ff7d79;
+
+    box-shadow:
+      inset 3px 0 0 #ff6865;
+  }
+
+  .desktopNav:not(.desktopNavZero) .desktopSubLinkActive {
+    border-left-color: #ff6865;
+    background: rgba(255, 104, 101, 0.12);
+    color: #ff8a86;
+  }
+
+  .desktopNav:not(.desktopNavZero) .separator {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .desktopNav:not(.desktopNavZero) .profileCard {
+    border-color: rgba(255, 255, 255, 0.18);
+
+    background:
+      rgba(255, 255, 255, 0.06);
+
+    color: #ffffff;
+  }
+
+  .desktopNav:not(.desktopNavZero) .profileCard:hover {
+    border-color: rgba(255, 104, 101, 0.58);
+
+    background:
+      rgba(255, 255, 255, 0.09);
+
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .desktopNav:not(.desktopNavZero) .profileDetails small,
+  .desktopNav:not(.desktopNavZero) .profileArrow {
+    color: rgba(255, 255, 255, 0.66);
+  }
+
+  .desktopNav:not(.desktopNavZero) .signOut {
+    border-color: #ff6865;
+    background: #ff6865;
+    color: #ffffff;
+  }
+
+  .desktopNav:not(.desktopNavZero) .signOut:hover {
+    border-color: #f05c59;
+    background: #f05c59;
+  }
+}
+
+
+/* ZERO FINAL NAVIGATION */
+.desktopNavZero .signOut,
+.desktopNavZero .signOut:hover {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+.desktopNavZero .desktopLinkActive {
+  border-color: #f43d3d !important;
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-experience-mode="zero"]) .mobileLinkActive {
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+
+/* GLOBAL EXPERIENCE SWITCH */
+.globalExperienceSwitch {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(16, 47, 79, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(16, 47, 79, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.globalExperienceSwitch button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 14px;
+  background: transparent;
+  color: #5f6872;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.globalExperienceSwitchStandardActive {
+  background: #102f4f !important;
+  color: #ffffff !important;
+}
+
+.globalExperienceSwitchZeroActive {
+  background: #f43d3d !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 760px) {
+  .globalExperienceSwitch {
+    top: auto;
+    right: 12px;
+    bottom: 82px;
+  }
+
+  .globalExperienceSwitch button {
+    min-height: 32px;
+    padding: 0 11px;
+    font-size: 0.72rem;
   }
 }

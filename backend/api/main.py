@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.daily_logs import router as daily_logs_router
+from backend.api.routers.day_history import router as day_history_router
 from backend.api.routers.decision_learning import router as decision_learning_router
 from backend.api.routers.decision_outcomes import router as decision_outcomes_router
 from backend.api.routers.decision_selections import router as decision_selections_router
@@ -14,8 +15,13 @@ from backend.api.routers.ingredients import router as ingredients_router
 from backend.api.routers.learned_insights import router as learned_insights_router
 from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
+from backend.api.routers.oura import router as oura_router
+from backend.api.routers.pantry import router as pantry_router
 from backend.api.routers.recipes import router as recipes_router
 from backend.api.routers.progress import router as progress_router
+from backend.api.routers.profile import router as profile_router
+from backend.api.routers.strength import router as strength_router
+from backend.api.routers.weekly_schedule import router as weekly_schedule_router
 from backend.api.routers.weight import router as weight_router
 
 
@@ -48,14 +54,20 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(meals_router)
+app.include_router(oura_router)
 app.include_router(activities_router)
 app.include_router(weight_router)
 app.include_router(progress_router)
+app.include_router(profile_router)
+app.include_router(strength_router)
+app.include_router(weekly_schedule_router)
 app.include_router(daily_logs_router)
+app.include_router(day_history_router)
 app.include_router(recipes_router)
 app.include_router(ingredients_router)
 app.include_router(days_router)
 app.include_router(meal_prep_router)
+app.include_router(pantry_router)
 app.include_router(learned_insights_router)
 app.include_router(decision_selections_router)
 app.include_router(decision_learning_router)

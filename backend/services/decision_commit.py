@@ -29,6 +29,7 @@ class DecisionCommitService:
     MEAL_SLOT_TO_TYPE = {
         "breakfast": "Colazione",
         "lunch": "Pranzo",
+        "snack": "Snack",
         "dinner": "Cena",
     }
 

@@ -22,6 +22,20 @@ export function getWeightHistory(
   );
 }
 
+
+export function getLatestWeight(
+  accessToken?: string | null,
+): Promise<{
+  item: WeightEntry | null;
+}> {
+  return apiRequest(
+    "/weight/latest",
+    {
+      accessToken,
+    },
+  );
+}
+
 export function createWeight(
   input: {
     date: string;

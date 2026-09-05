@@ -51,6 +51,8 @@ class RecipeCreate(BaseModel):
     structured_ingredients: list[StructuredRecipeIngredient] | None = None
     is_shared: bool = False
     image_url: str | None = None
+    taste_rating: int | None = Field(default=None, ge=1, le=5)
+    ease_rating: int | None = Field(default=None, ge=1, le=5)
 
 
 class RecipeUpdate(BaseModel):
@@ -66,6 +68,8 @@ class RecipeUpdate(BaseModel):
     ingredients_json: Any | None = None
     structured_ingredients: list[StructuredRecipeIngredient] | None = None
     image_url: str | None = None
+    taste_rating: int | None = Field(default=None, ge=1, le=5)
+    ease_rating: int | None = Field(default=None, ge=1, le=5)
 
 
 class RecipeShareUpdate(BaseModel):

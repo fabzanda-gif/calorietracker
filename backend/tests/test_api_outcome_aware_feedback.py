@@ -73,6 +73,16 @@ class FakeMealsRepository:
 
 
 class FakeActivitiesRepository:
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+    ):
+        # These scenarios do not provide historical activity.
+        # Missing days count as zero in the 7-day baseline.
+        return []
+
     def list_for_date(self, user_id, log_date):
         return []
 

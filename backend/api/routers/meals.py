@@ -18,12 +18,16 @@ from backend.services.meal_text_interpreter import (
 from backend.services.groq_meal_interpreter import (
     GroqMealInterpreter,
 )
+from backend.services.groq_meal_vision_interpreter import (
+    GroqMealVisionInterpreter,
+)
 
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
     get_ingredients_repository,
     get_meal_ingredients_repository,
+    get_meal_prep_repository,
     get_meals_repository,
     get_recipe_ingredients_repository,
     get_recipes_repository,
@@ -33,6 +37,7 @@ from backend.repositories.ingredients import IngredientsRepository
 from backend.repositories.meal_ingredients import (
     MealIngredientsRepository,
 )
+from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipe_ingredients import (
     RecipeIngredientsRepository,
@@ -99,6 +104,10 @@ class ConversationalMealPreviewRequest(BaseModel):
     meal_type: str
 
 
+class PhotoMealPreviewRequest(BaseModel):
+    image_base64: str = Field(min_length=1)
+    mime_type: str = "image/jpeg"
+    meal_type: str
 class ConversationalMealItem(BaseModel):
     name: str = Field(min_length=1)
     quantity: float = Field(gt=0)
@@ -171,6 +180,42 @@ def preview_conversational_meal(
     )
 
 
+
+@router.post("/photo/preview")
+def preview_photo_meal(
+    request: PhotoMealPreviewRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    import base64
+
+    try:
+        image_bytes = base64.b64decode(
+            request.image_base64,
+            validate=True,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid image_base64",
+        ) from exc
+
+    raw_interpretation = (
+        GroqMealVisionInterpreter().interpret(
+            image_bytes=image_bytes,
+            mime_type=request.mime_type,
+            meal_type=request.meal_type,
+        )
+    )
+
+    normalized = MealTextInterpreter().normalize(
+        raw_interpretation
+    )
+
+    return ConversationalMealLoggingService().build_preview(
+        text="[photo]",
+        meal_type=normalized["meal_type"],
+        interpreted_items=normalized["items"],
+    )
 @router.post(
     "/conversational/confirm",
     status_code=status.HTTP_201_CREATED,
@@ -229,7 +274,7 @@ def get_meal_history(
     repo: MealsRepository = Depends(get_meals_repository),
 ):
     try:
-        meals = repo.list_history_compatible(current_user.id)
+        meals, _enhanced = repo.list_history_compatible(current_user.id)
 
         return {
             "count": len(meals),
@@ -645,13 +690,22 @@ def update_meal(
         None,
     )
 
-    if (
-        "calories" in payload
-        and payload["calories"] is not None
+    # Keep PATCH consistent with POST: the database stores all
+    # nutrition columns as integers, while clients may send floats
+    # after scaling grams or portions.
+    for field in (
+        "calories",
+        "protein",
+        "carbs",
+        "fat",
     ):
-        payload["calories"] = int(
-            round(float(payload["calories"]))
-        )
+        if (
+            field in payload
+            and payload[field] is not None
+        ):
+            payload[field] = int(
+                round(float(payload[field]))
+            )
 
     try:
         if structured is not None:
@@ -713,8 +767,72 @@ def delete_meal(
     meal_id: str,
     current_user: CurrentUser = Depends(get_current_user),
     repo: MealsRepository = Depends(get_meals_repository),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
 ):
     try:
+        meal = repo.get_by_id(
+            meal_id=meal_id,
+            user_id=current_user.id,
+        )
+
+        if meal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meal not found",
+            )
+
+        is_meal_prep = (
+            meal.get("category") == "meal_prep"
+        )
+
+        batch_id = None
+
+        if is_meal_prep:
+            notes = str(meal.get("notes") or "")
+            prefix = "Meal prep batch: "
+
+            if prefix in notes:
+                batch_id = (
+                    notes.split(prefix, 1)[1]
+                    .split(";", 1)[0]
+                    .strip()
+                )
+
+        restored = False
+
+        if batch_id:
+            batch = meal_prep_repo.get_by_id(
+                batch_id,
+                current_user.id,
+            )
+
+            if batch is not None:
+                remaining = int(
+                    batch.get("portions_remaining") or 0
+                )
+                prepared = int(
+                    batch.get("portions_prepared") or 0
+                )
+
+                new_remaining = min(
+                    prepared,
+                    remaining + 1,
+                )
+
+                updated_batch = meal_prep_repo.update(
+                    batch_id,
+                    current_user.id,
+                    {
+                        "portions_remaining": new_remaining,
+                        "status": "available",
+                    },
+                )
+
+                if updated_batch is not None:
+                    restored = True
+
         repo.delete(
             meal_id=meal_id,
             user_id=current_user.id,
@@ -723,7 +841,12 @@ def delete_meal(
         return {
             "deleted": True,
             "id": meal_id,
+            "inventory_restored": restored,
+            "meal_prep_batch_id": batch_id,
         }
+
+    except HTTPException:
+        raise
 
     except RepositoryError as exc:
         raise HTTPException(

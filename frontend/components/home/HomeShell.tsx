@@ -1,11 +1,36 @@
 "use client";
 
 import { AppNav } from "@/components/navigation/AppNav";
+import { WelcomeJourney } from "@/components/onboarding/WelcomeJourney";
 import { QuickAdd } from "@/components/home/QuickAdd";
-import { RegisteredToday } from "@/components/home/RegisteredToday";
-import { getActivitiesForDate, type Activity } from "@/lib/api/activities";
+import {
+  DayPlanner,
+  type DayType,
+  type ActivityLevel,
+} from "@/components/home/DayPlanner";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  buildDayMessage,
+  buildDayMessageContext,
+} from "@/components/home/dayMessage";
+import {
+  getDayHistory,
+  type DayHistoryResponse,
+} from "@/lib/api/dayHistory";
+import { RegisteredToday } from "@/components/home/RegisteredToday";
+import {
+  getActivitiesForDate,
+  getPlannedActivities,
+  type Activity,
+  type PlannedActivity,
+} from "@/lib/api/activities";
+
+import {
+  type DragEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { confirmMealPrediction } from "@/lib/api/confirm";
@@ -15,18 +40,30 @@ import {
   confirmConversationalMeal,
   deleteMeal,
   getMeal,
+  getMealHistory,
   getMealsForDate,
   previewConversationalMeal,
+  previewPhotoMeal,
   updateMeal,
   type ConversationalMealPreview,
   type LoggedMeal,
   type StructuredMealIngredient,
 } from "@/lib/api/meals";
 import {
+  getAvailableRecipes,
+  type Recipe,
+} from "@/lib/api/recipes";
+import {
+  getIngredients,
+  type Ingredient,
+} from "@/lib/api/ingredients";
+import {
   getDay,
+  getDayBriefing,
   getDayBudget,
   getMealOptions,
   getNextMeal,
+  updateDailyLog,
 } from "@/lib/api/day";
 import type {
   DayBudgetResponse,
@@ -36,10 +73,107 @@ import type {
   RankedMealOption,
 } from "@/lib/api/types";
 
+import {
+  nextMealType,
+} from "@/lib/mealSlots";
+
+import {
+  getLatestWeight,
+  getWeightHistory,
+  type WeightEntry,
+} from "@/lib/api/weight";
+import {
+  getProfile,
+  type ProfileResponse,
+} from "@/lib/api/profile";
+
+import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
+
 import styles from "./HomeShell.module.css";
 
+function localIsoDate(
+  date: Date,
+): string {
+  const year = date.getFullYear();
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0");
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localIsoDate(new Date());
+}
+
+
+function futureIso(
+  days: number,
+): string {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(
+    date.getDate() + days,
+  );
+
+  return localIsoDate(date);
+}
+
+
+function plannedTrainingDateLabel(
+  value: string,
+): string {
+  if (value === todayIso()) {
+    return "Oggi";
+  }
+
+  if (value === futureIso(1)) {
+    return "Domani";
+  }
+
+  return new Date(
+    `${value}T00:00:00`,
+  ).toLocaleDateString(
+    "it-IT",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "short",
+    },
+  );
+}
+
+
+function plannedTrainingKindLabel(
+  value?: string | null,
+): string {
+  return {
+    easy: "Facile",
+    recovery: "Recupero",
+    tempo: "Tempo",
+    interval: "Intervalli",
+    long: "Lungo",
+    race: "Gara",
+  }[value ?? ""] ?? "Corsa";
+}
+
+function briefingMoment():
+  "morning" | "afternoon" | "evening" {
+  const hour = new Date().getHours();
+
+  if (hour < 12) {
+    return "morning";
+  }
+
+  if (hour < 18) {
+    return "afternoon";
+  }
+
+  return "evening";
 }
 
 function greeting(): string {
@@ -60,8 +194,44 @@ function mealLabel(slot: string): string {
   return {
     breakfast: "Colazione",
     lunch: "Pranzo",
+    snack: "Snack",
     dinner: "Cena",
   }[slot] ?? slot;
+}
+
+function mealIcon(slot: string): string {
+  return {
+    breakfast: "☕",
+    lunch: "🍽️",
+    snack: "🍎",
+    dinner: "🍲",
+  }[slot] ?? "🍴";
+}
+
+function normalizedMealSlot(value: string):
+  "breakfast" | "lunch" | "dinner" | "snack" | "unknown" {
+  const normalized = value.trim().toLocaleLowerCase("it");
+
+  if (["colazione", "breakfast"].includes(normalized)) return "breakfast";
+  if (["pranzo", "lunch"].includes(normalized)) return "lunch";
+  if (["cena", "dinner"].includes(normalized)) return "dinner";
+  if (["spuntino", "snack"].includes(normalized)) return "snack";
+  return "unknown";
+}
+
+function mealFitsSlot(candidate: string, selected: string): boolean {
+  const candidateSlot = normalizedMealSlot(candidate);
+  const selectedSlot = normalizedMealSlot(selected);
+
+  if (selectedSlot === "breakfast" || selectedSlot === "snack") {
+    return candidateSlot === selectedSlot;
+  }
+
+  if (selectedSlot === "lunch" || selectedSlot === "dinner") {
+    return candidateSlot === "lunch" || candidateSlot === "dinner";
+  }
+
+  return false;
 }
 
 function roundNumber(value: number): string {
@@ -99,11 +269,172 @@ function optionSourceLabel(
   }[source] ?? source;
 }
 
+function normalizeDayType(
+  value: unknown,
+): DayType {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized === "home" ||
+    normalized.includes("casa")
+  ) {
+    return "home";
+  }
+
+  if (
+    normalized === "free" ||
+    normalized === "rest" ||
+    normalized.includes("liber")
+  ) {
+    return "free";
+  }
+
+  return "office";
+}
+
+type DashboardWidgetSize = 4 | 8 | 12;
+
+type DashboardWidgetId =
+  | "meals"
+  | "ai"
+  | "dinner"
+  | "quick-add"
+  | "weight"
+  | "goal"
+  | "summary";
+
+const DEFAULT_DASHBOARD_ORDER: DashboardWidgetId[] = [
+  "meals",
+  "ai",
+  "dinner",
+  "quick-add",
+  "weight",
+  "goal",
+  "summary",
+];
+
+const DASHBOARD_ORDER_KEY =
+  "sanosync-dashboard-widget-order";
+
+const DASHBOARD_SIZE_KEY =
+  "sanosync-dashboard-widget-sizes";
+
+const DEFAULT_DASHBOARD_SIZES:
+  Record<DashboardWidgetId, DashboardWidgetSize> = {
+    meals: 8,
+    ai: 4,
+    dinner: 12,
+    "quick-add": 12,
+    weight: 8,
+    goal: 4,
+    summary: 12,
+  };
+
+function readDashboardOrder(): DashboardWidgetId[] {
+  if (typeof window === "undefined") {
+    return DEFAULT_DASHBOARD_ORDER;
+  }
+
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(
+        DASHBOARD_ORDER_KEY,
+      ) ?? "null",
+    );
+
+    if (
+      Array.isArray(stored) &&
+      DEFAULT_DASHBOARD_ORDER.every(
+        (widget) => stored.includes(widget),
+      )
+    ) {
+      return stored as DashboardWidgetId[];
+    }
+  } catch {
+    // Usa l'ordine iniziale se il dato locale non è valido.
+  }
+
+  return DEFAULT_DASHBOARD_ORDER;
+}
+
+function readDashboardSizes():
+  Record<DashboardWidgetId, DashboardWidgetSize> {
+  if (typeof window === "undefined") {
+    return DEFAULT_DASHBOARD_SIZES;
+  }
+
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(
+        DASHBOARD_SIZE_KEY,
+      ) ?? "null",
+    );
+
+    if (
+      stored &&
+      typeof stored === "object" &&
+      DEFAULT_DASHBOARD_ORDER.every(
+        (widget) =>
+          stored[widget] === 4 ||
+          stored[widget] === 8 ||
+          stored[widget] === 12,
+      )
+    ) {
+      return stored as Record<
+        DashboardWidgetId,
+        DashboardWidgetSize
+      >;
+    }
+  } catch {
+    // Usa le dimensioni iniziali.
+  }
+
+  return DEFAULT_DASHBOARD_SIZES;
+}
+
 export function HomeShell() {
+  const {
+    experienceMode,
+    setExperienceMode,
+  } = useExperienceMode();
+
+  const [dashboardOrder, setDashboardOrder] =
+    useState<DashboardWidgetId[]>(readDashboardOrder);
+  const [dashboardSizes, setDashboardSizes] =
+    useState<
+      Record<DashboardWidgetId, DashboardWidgetSize>
+    >(readDashboardSizes);
+  const [
+    customizingDashboard,
+    setCustomizingDashboard,
+  ] = useState(false);
+  const [draggedWidget, setDraggedWidget] =
+    useState<DashboardWidgetId | null>(null);
+
+  const [dayPlannerSaving, setDayPlannerSaving] =
+    useState(false);
+  const [dayPlannerMessage, setDayPlannerMessage] =
+    useState<string | null>(null);
+  const [dayBriefing, setDayBriefing] =
+    useState<string | null>(null);
+
+  const [briefingHour, setBriefingHour] =
+    useState(() => new Date().getHours());
+
+
   const {
     user,
     accessToken,
   } = useAuth();
+  const [onboardingTestCompleted] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.sessionStorage.getItem(
+        "sanosync-onboarding-test-token",
+      ) === accessToken,
+  );
 
   const [day, setDay] =
     useState<DayResponse | null>(null);
@@ -122,6 +453,13 @@ export function HomeShell() {
   ] = useState(false);
   const [loading, setLoading] =
     useState(true);
+  const [budgetExpanded, setBudgetExpanded] =
+    useState(false);
+
+  const maintenanceBudgetKcal =
+    budgetResult?.budget
+      ? budgetResult.budget.maintenance_kcal
+      : 0;
   const [committingIndex, setCommittingIndex] =
     useState<number | null>(null);
   const [confirmingSlot, setConfirmingSlot] =
@@ -138,6 +476,16 @@ export function HomeShell() {
     useState("");
   const [alternateFat, setAlternateFat] =
     useState("");
+  const [knownAlternates, setKnownAlternates] = useState<Array<{
+    key: string;
+    name: string;
+    mealType: string | null;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    source: "recipe" | "history" | "ingredient";
+  }>>([]);
   const [savingAlternate, setSavingAlternate] =
     useState(false);
   const [commitMessage, setCommitMessage] =
@@ -150,8 +498,42 @@ export function HomeShell() {
   const [actualActivities, setActualActivities] =
     useState<Activity[]>([]);
 
+  const [
+    nextRunningSession,
+    setNextRunningSession,
+  ] = useState<PlannedActivity | null>(
+    null,
+  );
+
+  const [latestWeight, setLatestWeight] =
+    useState<number | null>(null);
+  const [profile, setProfile] =
+    useState<ProfileResponse | null>(null);
+  const [showWelcomeJourney, setShowWelcomeJourney] =
+    useState(false);
+  const [weightHistory, setWeightHistory] =
+    useState<WeightEntry[]>([]);
+
+  const [weightRange, setWeightRange] =
+    useState<
+      "14" | "30" | "90" | "180" | "365" | "all"
+    >("30");
+
+  const [dayHistory, setDayHistory] =
+    useState<DayHistoryResponse | null>(null);
+
   const [editingMealId, setEditingMealId] =
     useState<string | number | null>(null);
+
+  // Pannello "I tuoi pasti": mostra una sola fascia alla volta.
+  const [selectedMealSlot, setSelectedMealSlot] =
+    useState<string>("Colazione");
+  const [mealEditType, setMealEditType] =
+    useState("Colazione");
+  const [
+    mealEditRecipeServings,
+    setMealEditRecipeServings,
+  ] = useState(1);
 
   const [mealEditIngredients, setMealEditIngredients] =
     useState<StructuredMealIngredient[]>([]);
@@ -171,6 +553,14 @@ export function HomeShell() {
 
   const [conversationText, setConversationText] =
     useState("");
+  const [conversationMode, setConversationMode] =
+    useState<"text" | "photo">("text");
+  const [conversationPhoto, setConversationPhoto] =
+    useState<File | null>(null);
+  const [
+    conversationPhotoPreview,
+    setConversationPhotoPreview,
+  ] = useState<string | null>(null);
   const [conversationMealType, setConversationMealType] =
     useState("Pranzo");
   const [conversationPreview, setConversationPreview] =
@@ -184,6 +574,473 @@ export function HomeShell() {
   const [conversationSuccess, setConversationSuccess] =
     useState<string | null>(null);
 
+  const recommendedMealType = useMemo(
+    () =>
+      nextMealType(
+        actualMeals.map(
+          (meal) => meal.meal_type,
+        ),
+      ),
+    [actualMeals],
+  );
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let active = true;
+
+    Promise.allSettled([
+      getAvailableRecipes(accessToken),
+      getMealHistory(accessToken),
+      getIngredients(accessToken),
+    ]).then(([
+      recipesResult,
+      historyResult,
+      ingredientsResult,
+    ]) => {
+      if (!active) return;
+
+      const recipes =
+        recipesResult.status === "fulfilled"
+          ? recipesResult.value.items
+          : [];
+
+      const history =
+        historyResult.status === "fulfilled"
+          ? historyResult.value.items
+          : [];
+
+      const ingredients =
+        ingredientsResult.status === "fulfilled"
+          ? ingredientsResult.value.items
+          : [];
+
+      const seen = new Set<string>();
+
+      const ingredientPortionGrams = (
+        ingredient: Ingredient,
+      ): number => {
+        const defaultQuantity =
+          Number(ingredient.default_quantity);
+
+        const gramsPerUnit =
+          Number(ingredient.grams_per_unit);
+
+        if (
+          ingredient.default_unit !== "g" &&
+          Number.isFinite(defaultQuantity) &&
+          defaultQuantity > 0 &&
+          Number.isFinite(gramsPerUnit) &&
+          gramsPerUnit > 0
+        ) {
+          return defaultQuantity * gramsPerUnit;
+        }
+
+        if (
+          ingredient.default_unit === "g" &&
+          Number.isFinite(defaultQuantity) &&
+          defaultQuantity > 0
+        ) {
+          return defaultQuantity;
+        }
+
+        if (
+          Number.isFinite(gramsPerUnit) &&
+          gramsPerUnit > 0
+        ) {
+          return gramsPerUnit;
+        }
+
+        return 100;
+      };
+
+      const items = [
+        ...recipes.map((recipe: Recipe) => {
+          const servings = Math.max(
+            1,
+            Number(recipe.recipe_servings) || 1,
+          );
+
+          return {
+            key: `recipe:${recipe.id}`,
+            name: recipe.name,
+            mealType: recipe.meal_type || "Pranzo",
+            calories:
+              Number(recipe.calories || 0) / servings,
+            protein:
+              Number(recipe.protein || 0) / servings,
+            carbs:
+              Number(recipe.carbs || 0) / servings,
+            fat:
+              Number(recipe.fat || 0) / servings,
+            source: "recipe" as const,
+          };
+        }),
+
+        ...history.map((meal) => {
+          const quantity = Math.max(
+            0.01,
+            Number(meal.quantity) || 1,
+          );
+
+          const factor = meal.is_per_100g
+            ? 100 / quantity
+            : 1 / quantity;
+
+          return {
+            key:
+              `history:${
+                meal.id ??
+                `${meal.date}:${meal.name}`
+              }`,
+            name: meal.base_name || meal.name,
+            mealType:
+              meal.meal_type || "Pranzo",
+            calories: Number(
+              meal.base_calories ??
+                Number(meal.calories || 0) *
+                  factor,
+            ),
+            protein: Number(
+              meal.base_protein ??
+                Number(meal.protein || 0) *
+                  factor,
+            ),
+            carbs: Number(
+              meal.base_carbs ??
+                Number(meal.carbs || 0) *
+                  factor,
+            ),
+            fat: Number(
+              meal.base_fat ??
+                Number(meal.fat || 0) *
+                  factor,
+            ),
+            source: "history" as const,
+          };
+        }),
+
+        ...ingredients.map(
+          (ingredient: Ingredient) => {
+            const portionGrams =
+              ingredientPortionGrams(
+                ingredient,
+              );
+
+            const factor =
+              portionGrams / 100;
+
+            return {
+              key: `ingredient:${ingredient.id}`,
+              name: ingredient.name,
+              mealType: null,
+              calories:
+                Number(
+                  ingredient.calories_per_100g ||
+                    0,
+                ) * factor,
+              protein:
+                Number(
+                  ingredient.protein_per_100g ||
+                    0,
+                ) * factor,
+              carbs:
+                Number(
+                  ingredient.carbs_per_100g ||
+                    0,
+                ) * factor,
+              fat:
+                Number(
+                  ingredient.fat_per_100g ||
+                    0,
+                ) * factor,
+              source: "ingredient" as const,
+            };
+          },
+        ),
+      ].filter((item) => {
+        const key = item.name
+          .trim()
+          .toLocaleLowerCase("it");
+
+        if (!key || seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+
+      setKnownAlternates(items);
+    });
+
+    return () => { active = false; };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (
+      conversationPreview ||
+      conversationText.trim() ||
+      conversationPhoto
+    ) {
+      return;
+    }
+
+    setConversationMealType(
+      recommendedMealType,
+    );
+  }, [
+    recommendedMealType,
+    conversationPreview,
+    conversationText,
+    conversationPhoto,
+  ]);
+
+
+  function resizeDashboardWidget(
+    widget: DashboardWidgetId,
+    direction: -1 | 1,
+  ) {
+    const allowedSizes: DashboardWidgetSize[] =
+      widget === "ai" || widget === "goal"
+        ? [4, 8, 12]
+        : [8, 12];
+
+    const currentSize = dashboardSizes[widget];
+    const currentIndex = allowedSizes.indexOf(
+      currentSize,
+    );
+    const safeIndex =
+      currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = Math.min(
+      allowedSizes.length - 1,
+      Math.max(0, safeIndex + direction),
+    );
+
+    if (nextIndex === safeIndex) {
+      return;
+    }
+
+    const nextSizes = {
+      ...dashboardSizes,
+      [widget]: allowedSizes[nextIndex],
+    };
+
+    setDashboardSizes(nextSizes);
+    window.localStorage.setItem(
+      DASHBOARD_SIZE_KEY,
+      JSON.stringify(nextSizes),
+    );
+  }
+
+  function saveDashboardOrder(
+    nextOrder: DashboardWidgetId[],
+  ) {
+    setDashboardOrder(nextOrder);
+
+    window.localStorage.setItem(
+      DASHBOARD_ORDER_KEY,
+      JSON.stringify(nextOrder),
+    );
+  }
+
+  function moveDashboardWidget(
+    widget: DashboardWidgetId,
+    direction: -1 | 1,
+  ) {
+    const currentIndex = dashboardOrder.indexOf(widget);
+    const nextIndex = currentIndex + direction;
+
+    if (
+      currentIndex < 0 ||
+      nextIndex < 0 ||
+      nextIndex >= dashboardOrder.length
+    ) {
+      return;
+    }
+
+    const nextOrder = [...dashboardOrder];
+    [
+      nextOrder[currentIndex],
+      nextOrder[nextIndex],
+    ] = [
+      nextOrder[nextIndex],
+      nextOrder[currentIndex],
+    ];
+
+    saveDashboardOrder(nextOrder);
+  }
+
+  function dashboardWidgetProps(
+    widget: DashboardWidgetId,
+  ) {
+    return {
+      draggable: customizingDashboard,
+      style: {
+        order: dashboardOrder.indexOf(widget),
+      },
+      "data-widget-size":
+        dashboardSizes[widget],
+      "aria-grabbed":
+        customizingDashboard
+          ? draggedWidget === widget
+          : undefined,
+      onDragStart: () => {
+        if (customizingDashboard) {
+          setDraggedWidget(widget);
+        }
+      },
+      onDragOver: (
+        event: DragEvent<HTMLElement>,
+      ) => {
+        if (customizingDashboard) {
+          event.preventDefault();
+        }
+      },
+      onDrop: () => {
+        if (
+          !customizingDashboard ||
+          !draggedWidget ||
+          draggedWidget === widget
+        ) {
+          return;
+        }
+
+        const nextOrder = dashboardOrder.filter(
+          (item) => item !== draggedWidget,
+        );
+        const targetIndex =
+          nextOrder.indexOf(widget);
+
+        nextOrder.splice(
+          targetIndex,
+          0,
+          draggedWidget,
+        );
+
+        saveDashboardOrder(nextOrder);
+        setDraggedWidget(null);
+      },
+      onDragEnd: () => setDraggedWidget(null),
+    };
+  }
+
+  function dashboardWidgetControls(
+    widget: DashboardWidgetId,
+    label: string,
+  ) {
+    if (!customizingDashboard) {
+      return null;
+    }
+
+    const position = dashboardOrder.indexOf(widget);
+
+    return (
+      <div className={styles.widgetControls}>
+        <span>Trascina {label}</span>
+
+        <div className={styles.widgetControlActions}>
+          <div className={styles.widgetSizeControls}>
+            <button
+              type="button"
+              aria-label={`Riduci ${label}`}
+              disabled={
+                dashboardSizes[widget] <=
+                (
+                  widget === "ai" ||
+                  widget === "goal"
+                    ? 4
+                    : 8
+                )
+              }
+              onClick={() =>
+                resizeDashboardWidget(widget, -1)
+              }
+            >
+              −
+            </button>
+
+            <span>
+              {dashboardSizes[widget] === 4
+                ? "Compatto"
+                : dashboardSizes[widget] === 8
+                ? "Medio"
+                : "Largo"}
+            </span>
+
+            <button
+              type="button"
+              aria-label={`Allarga ${label}`}
+              disabled={dashboardSizes[widget] >= 12}
+              onClick={() =>
+                resizeDashboardWidget(widget, 1)
+              }
+            >
+              +
+            </button>
+          </div>
+
+          <button
+            type="button"
+            aria-label={`Sposta ${label} prima`}
+            disabled={position <= 0}
+            onClick={() =>
+              moveDashboardWidget(widget, -1)
+            }
+          >
+            ↑
+          </button>
+
+          <button
+            type="button"
+            aria-label={`Sposta ${label} dopo`}
+            disabled={
+              position >= dashboardOrder.length - 1
+            }
+            onClick={() =>
+              moveDashboardWidget(widget, 1)
+            }
+          >
+            ↓
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    let timeoutId: ReturnType<
+      typeof setTimeout
+    >;
+
+    function scheduleNextHour() {
+      const now = new Date();
+      const nextHour = new Date(now);
+
+      nextHour.setHours(
+        now.getHours() + 1,
+        0,
+        0,
+        50,
+      );
+
+      timeoutId = setTimeout(() => {
+        setBriefingHour(
+          new Date().getHours(),
+        );
+        scheduleNextHour();
+      }, Math.max(
+        1000,
+        nextHour.getTime() - now.getTime(),
+      ));
+    }
+
+    scheduleNextHour();
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
 
   const firstName = useMemo(() => {
     const metadataName =
@@ -194,7 +1051,7 @@ export function HomeShell() {
       typeof metadataName === "string" &&
       metadataName.trim()
     ) {
-      return metadataName.trim();
+      return metadataName.trim().split(/\s+/)[0];
     }
 
     if (user?.email) {
@@ -203,6 +1060,77 @@ export function HomeShell() {
 
     return "";
   }, [user]);
+
+  const recentWeights = useMemo(() => {
+    const sorted = [...weightHistory].sort(
+      (left, right) =>
+        new Date(left.date).getTime() -
+        new Date(right.date).getTime(),
+    );
+
+    if (weightRange === "all") {
+      return sorted;
+    }
+
+    const days = Number(weightRange);
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(
+      cutoff.getDate() - days + 1,
+    );
+
+    return sorted.filter(
+      (entry) =>
+        new Date(entry.date).getTime() >=
+        cutoff.getTime(),
+    );
+  }, [weightHistory, weightRange]);
+
+  const weightChartPoints = useMemo(() => {
+    if (!recentWeights.length) {
+      return "";
+    }
+
+    const values = recentWeights.map(
+      (entry) => Number(entry.weight),
+    );
+    const minimum = Math.min(...values);
+    const maximum = Math.max(...values);
+    const range = Math.max(maximum - minimum, 1);
+
+    return recentWeights
+      .map((entry, index) => {
+        const x =
+          recentWeights.length === 1
+            ? 150
+            : 12 +
+              (index /
+                (recentWeights.length - 1)) *
+                276;
+        const y =
+          92 -
+          ((Number(entry.weight) - minimum) /
+            range) *
+            72;
+
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [recentWeights]);
+
+  const weightChange =
+    recentWeights.length >= 2
+      ? Number(
+          (
+            Number(
+              recentWeights[
+                recentWeights.length - 1
+              ].weight,
+            ) -
+            Number(recentWeights[0].weight)
+          ).toFixed(1),
+        )
+      : null;
 
   useEffect(() => {
     if (!accessToken) {
@@ -224,6 +1152,9 @@ export function HomeShell() {
           nextMealPayload,
           mealsPayload,
           activitiesPayload,
+          plannedActivitiesPayload,
+          latestWeightPayload,
+          profilePayload,
         ] = await Promise.all([
           getDay(
             date,
@@ -245,37 +1176,117 @@ export function HomeShell() {
             date,
             accessToken,
           ),
+          getPlannedActivities(
+            date,
+            futureIso(7),
+            accessToken,
+          ),
+          getLatestWeight(
+            accessToken,
+          ),
+          getProfile(accessToken),
         ]);
-
-        const nextMealOptionsPayload =
-          nextMealPayload.next_slot
-            ? await getMealOptions(
-                date,
-                nextMealPayload.next_slot,
-                "auto",
-                accessToken,
-              )
-            : null;
 
         if (active) {
           setDay(dayPayload);
           setBudgetResult(budgetPayload);
           setNextMeal(nextMealPayload);
-          setNextMealOptions(nextMealOptionsPayload);
-          setDinnerOptions(
-            nextMealPayload.next_slot === "dinner"
-              ? nextMealOptionsPayload
-              : null,
-          );
           setActualMeals(mealsPayload.items);
           setActualActivities(
             activitiesPayload.items,
+          );
+
+          setNextRunningSession(
+            plannedActivitiesPayload.items
+              .filter(
+                (item) =>
+                  item.status === "planned" &&
+                  Boolean(
+                    item.training_plan_id,
+                  ) &&
+                  item.activity_type
+                    .trim()
+                    .toLocaleLowerCase(
+                      "it-IT",
+                    ) === "corsa",
+              )
+              .sort(
+                (left, right) =>
+                  left.scheduled_date.localeCompare(
+                    right.scheduled_date,
+                  ) ||
+                  (
+                    left.scheduled_time ?? ""
+                  ).localeCompare(
+                    right.scheduled_time ?? "",
+                  ),
+              )[0] ?? null,
+          );
+
+          setLatestWeight(
+            latestWeightPayload.item?.weight != null
+              ? Number(latestWeightPayload.item.weight)
+              : null,
           );
           setActualDinner(
             mealsPayload.items.find(
               (meal) => meal.meal_type === "Cena",
             ) ?? null,
           );
+
+          setProfile(profilePayload);
+
+          const metadata = profilePayload.metadata;
+          setShowWelcomeJourney(
+            metadata.onboarding_completed !== true &&
+              (!metadata.gender ||
+                !metadata.birth_date ||
+                !metadata.height ||
+                latestWeightPayload.item?.weight == null),
+          );
+
+          // The usable home is ready. AI briefing, recommendations and
+          // history are enhancements and must never hold up first paint.
+          setLoading(false);
+
+          void getDayBriefing(
+            date,
+            briefingMoment(),
+            experienceMode,
+            briefingHour,
+            accessToken,
+          ).then((payload) => {
+            if (active) setDayBriefing(payload.message);
+          }).catch(() => undefined);
+
+          if (nextMealPayload.next_slot) {
+            void getMealOptions(
+              date,
+              nextMealPayload.next_slot,
+              "auto",
+              accessToken,
+            ).then((payload) => {
+              if (!active) return;
+              setNextMealOptions(payload);
+              setDinnerOptions(
+                nextMealPayload.next_slot === "dinner"
+                  ? payload
+                  : null,
+              );
+            }).catch(() => undefined);
+          }
+
+          void getWeightHistory(accessToken)
+            .then((payload) => {
+              if (active) setWeightHistory(payload.items);
+            })
+            .catch(() => undefined);
+
+          void getDayHistory(accessToken)
+            .then((payload) => {
+              if (active) setDayHistory(payload);
+            })
+            .catch(() => undefined);
         }
       } catch (err) {
         if (active) {
@@ -297,10 +1308,53 @@ export function HomeShell() {
     return () => {
       active = false;
     };
-  }, [accessToken]);
+  }, [accessToken, experienceMode, briefingHour]);
 
   const budget =
     budgetResult?.budget ?? null;
+
+  const bmr = Number(budgetResult?.profile?.bmr ?? 0);
+  const onboardingTestEmails = [
+    process.env.NEXT_PUBLIC_ONBOARDING_TEST_EMAIL,
+    process.env.NEXT_PUBLIC_ONBOARDING_TEST_EMAILS,
+  ]
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(","))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const onboardingTestIds = String(
+    process.env.NEXT_PUBLIC_ONBOARDING_TEST_USER_IDS ??
+      process.env.NEXT_PUBLIC_ONBOARDING_TEST_USER_ID ??
+      "",
+  ).split(",").map((value) => value.trim()).filter(Boolean);
+  const isOnboardingTestAccount = Boolean(
+    (user?.email && onboardingTestEmails.includes(user.email.trim().toLowerCase())) ||
+      (user?.id && onboardingTestIds.includes(user.id)),
+  );
+  const needsWelcomeJourney =
+    (((showWelcomeJourney || budgetResult?.status === "profile_incomplete") &&
+      profile?.metadata.onboarding_completed !== true) ||
+      (isOnboardingTestAccount && !onboardingTestCompleted));
+
+  const burnedCalories = actualActivities.reduce(
+    (total, activity) =>
+      total + Number(activity.burned_calories || 0),
+    0,
+  );
+
+  const currentDayType = day
+    ? normalizeDayType(day.context.value)
+    : null;
+
+  const dayBriefingBody =
+    dayBriefing
+      ?.replace(/^[^!]+!\s*/, "")
+      .trim() || null;
+
+  const historicalProfile =
+    currentDayType && dayHistory
+      ? dayHistory.profiles[currentDayType]
+      : null;
 
   const budgetProgress =
     budget && budget.daily_budget_kcal > 0
@@ -357,6 +1411,77 @@ export function HomeShell() {
     }
   }
 
+  async function analyzePhotoMeal() {
+    if (!accessToken || !conversationPhoto) {
+      return;
+    }
+
+    setConversationLoading(true);
+    setConversationError(null);
+    setConversationPreview(null);
+    setConversationSuccess(null);
+
+    try {
+      const dataUrl = await new Promise<string>(
+        (resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onload = () => {
+            if (typeof reader.result === "string") {
+              resolve(reader.result);
+              return;
+            }
+
+            reject(
+              new Error(
+                "Impossibile leggere la foto selezionata.",
+              ),
+            );
+          };
+
+          reader.onerror = () => {
+            reject(
+              new Error(
+                "Impossibile leggere la foto selezionata.",
+              ),
+            );
+          };
+
+          reader.readAsDataURL(conversationPhoto);
+        },
+      );
+
+      const separatorIndex = dataUrl.indexOf(",");
+
+      if (separatorIndex < 0) {
+        throw new Error(
+          "Formato immagine non valido.",
+        );
+      }
+
+      const imageBase64 = dataUrl.slice(
+        separatorIndex + 1,
+      );
+
+      const preview = await previewPhotoMeal(
+        imageBase64,
+        conversationPhoto.type || "image/jpeg",
+        conversationMealType,
+        accessToken,
+      );
+
+      setConversationPreview(preview);
+    } catch (err) {
+      setConversationError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad analizzare questa foto.",
+      );
+    } finally {
+      setConversationLoading(false);
+    }
+  }
+
   async function confirmConversationMeal() {
     if (
       !accessToken ||
@@ -386,6 +1511,8 @@ export function HomeShell() {
 
       setConversationText("");
       setConversationPreview(null);
+      setConversationPhoto(null);
+      setConversationPhotoPreview(null);
 
       await refreshHome();
     } catch (err) {
@@ -396,6 +1523,73 @@ export function HomeShell() {
       );
     } finally {
       setConversationConfirming(false);
+    }
+  }
+  function normalizeActivityLevel(
+    value: string | null | undefined,
+  ) {
+    const normalized = (value ?? "").toLowerCase();
+
+    if (
+      normalized === "low" ||
+      normalized.includes("poco")
+    ) {
+      return "low" as const;
+    }
+
+    if (
+      normalized === "high" ||
+      normalized.includes("molto")
+    ) {
+      return "high" as const;
+    }
+
+    return "moderate" as const;
+  }
+
+  async function handleDayPlannerChange(
+    changes: {
+      day_type?: DayType;
+      activity_plan?: "low" | "moderate" | "high";
+    },
+  ) {
+    if (!accessToken || !day) {
+      return;
+    }
+
+    setDayPlannerSaving(true);
+    setDayPlannerMessage(null);
+
+    const previousDay = day;
+    setDay((current) => current ? {
+      ...current,
+      context: changes.day_type
+        ? { ...current.context, value: changes.day_type, state: "confirmed", source: "user" }
+        : current.context,
+      activity_plan: changes.activity_plan
+        ? { ...current.activity_plan, value: changes.activity_plan, state: "confirmed", source: "user" }
+        : current.activity_plan,
+    } : current);
+
+    try {
+      await updateDailyLog(
+        accessToken,
+        todayIso(),
+        changes,
+      );
+
+      setDayPlannerMessage("Giornata aggiornata.");
+
+      void refreshHome().catch(() => undefined);
+    } catch (err) {
+      setDay(previousDay);
+      setDayPlannerMessage(
+        err instanceof Error
+          ? err.message
+          : "Impossibile aggiornare la giornata.",
+      );
+    } finally {
+      setDayPlannerSaving(false);
     }
   }
 
@@ -412,6 +1606,7 @@ export function HomeShell() {
       nextMealPayload,
       mealsPayload,
       activitiesPayload,
+      plannedActivitiesPayload,
     ] = await Promise.all([
       getDay(date, accessToken),
       getDayBudget(date, accessToken),
@@ -425,6 +1620,11 @@ export function HomeShell() {
       ),
       getActivitiesForDate(
         date,
+        accessToken,
+      ),
+      getPlannedActivities(
+        date,
+        futureIso(7),
         accessToken,
       ),
     ]);
@@ -452,6 +1652,34 @@ export function HomeShell() {
     setActualActivities(
       activitiesPayload.items,
     );
+
+    setNextRunningSession(
+      plannedActivitiesPayload.items
+        .filter(
+          (item) =>
+            item.status === "planned" &&
+            Boolean(
+              item.training_plan_id,
+            ) &&
+            item.activity_type
+              .trim()
+              .toLocaleLowerCase(
+                "it-IT",
+              ) === "corsa",
+        )
+        .sort(
+          (left, right) =>
+            left.scheduled_date.localeCompare(
+              right.scheduled_date,
+            ) ||
+            (
+              left.scheduled_time ?? ""
+            ).localeCompare(
+              right.scheduled_time ?? "",
+            ),
+        )[0] ?? null,
+    );
+
     setActualDinner(
       mealsPayload.items.find(
         (meal) => meal.meal_type === "Cena",
@@ -459,16 +1687,20 @@ export function HomeShell() {
     );
   }
 
+  function actualMealsForSlot(
+    slot: string,
+  ): LoggedMeal[] {
+    const type = mealLabel(slot);
+
+    return actualMeals.filter(
+      (meal) => meal.meal_type === type,
+    );
+  }
+
   function actualMealForSlot(
     slot: string,
   ): LoggedMeal | null {
-    const type = mealLabel(slot);
-
-    return (
-      actualMeals.find(
-        (meal) => meal.meal_type === type,
-      ) ?? null
-    );
+    return actualMealsForSlot(slot)[0] ?? null;
   }
 
   async function openMealEditor(
@@ -494,6 +1726,11 @@ export function HomeShell() {
         response.item.structured_ingredients ?? [];
 
       setEditingMealId(meal.id);
+      setMealEditType(
+        response.item.meal_type ||
+          meal.meal_type ||
+          "Colazione",
+      );
 
       if (!structured.length) {
         setMealEditIngredients([]);
@@ -505,12 +1742,57 @@ export function HomeShell() {
       }
 
       setSimpleMealEdit(null);
+
+      const storedRecipeServings = Math.max(
+        1,
+        Number(response.item.recipe_servings) || 1,
+      );
+      const currentCalories = Math.max(
+        0,
+        Number(response.item.calories) || 0,
+      );
+      const baseCalories = Math.max(
+        0,
+        Number(response.item.base_calories) || 0,
+      );
+
+      const inferredRecipeServings =
+        baseCalories > 0 &&
+        currentCalories > baseCalories * 1.05
+          ? currentCalories / baseCalories
+          : 1;
+
+      const effectiveRecipeServings = Math.max(
+        storedRecipeServings,
+        inferredRecipeServings,
+      );
+      const consumedPortions = Math.max(
+        0.01,
+        Number(response.item.quantity) || 1,
+      );
+      const portionScale =
+        effectiveRecipeServings > 1
+          ? consumedPortions /
+            effectiveRecipeServings
+          : 1;
+
+      setMealEditRecipeServings(
+        effectiveRecipeServings,
+      );
       setMealEditIngredients(
-        structured.map((item) => ({
-          ...item,
-          original_quantity_g:
-            Number(item.quantity_g) || 0,
-        })),
+        structured.map((item) => {
+          const portionQuantity =
+            (Number(item.quantity_g) || 0) *
+            portionScale;
+
+          return {
+            ...item,
+            quantity: portionQuantity,
+            quantity_g: portionQuantity,
+            original_quantity_g:
+              portionQuantity,
+          };
+        }),
       );
     } catch (err) {
       setError(
@@ -526,6 +1808,8 @@ export function HomeShell() {
     setMealEditIngredients([]);
     setSimpleMealEdit(null);
     setSimpleMealQuantity(1);
+    setMealEditType("Colazione");
+    setMealEditRecipeServings(1);
   }
 
   function updateMealIngredientQuantity(
@@ -650,6 +1934,7 @@ export function HomeShell() {
       await updateMeal(
         meal.id,
         {
+          meal_type: mealEditType,
           quantity: simpleMealQuantity,
           calories: nutrition.calories,
           protein: nutrition.protein,
@@ -703,26 +1988,56 @@ export function HomeShell() {
     setError(null);
 
     try {
-      await updateMeal(
-        meal.id,
-        {
-          name: meal.name,
-          meal_type: meal.meal_type,
-          structured_ingredients:
-            mealEditIngredients.map(
-              (item) => ({
-                ingredient_id:
-                  item.ingredient_id,
-                quantity:
-                  Number(item.quantity_g),
-                unit: item.unit || "g",
-                quantity_g:
-                  Number(item.quantity_g),
-              }),
-            ),
-        },
-        accessToken,
-      );
+      const ingredientsChanged =
+        mealEditIngredients.some(
+          (item) =>
+            Math.abs(
+              Number(item.quantity_g) -
+                Number(
+                  item.original_quantity_g ??
+                    item.quantity_g,
+                ),
+            ) > 0.001,
+        );
+
+      const needsPortionNormalization =
+        mealEditRecipeServings > 1;
+
+      if (
+        !ingredientsChanged &&
+        !needsPortionNormalization
+      ) {
+        await updateMeal(
+          meal.id,
+          {
+            meal_type: mealEditType,
+          },
+          accessToken,
+        );
+      } else {
+        await updateMeal(
+          meal.id,
+          {
+            name: meal.name,
+            meal_type: mealEditType,
+            quantity: 1,
+            recipe_servings: 1,
+            structured_ingredients:
+              mealEditIngredients.map(
+                (item) => ({
+                  ingredient_id:
+                    item.ingredient_id,
+                  quantity:
+                    Number(item.quantity_g),
+                  unit: item.unit || "g",
+                  quantity_g:
+                    Number(item.quantity_g),
+                }),
+              ),
+          },
+          accessToken,
+        );
+      }
 
       closeMealEditor();
       await refreshHome();
@@ -821,6 +2136,15 @@ export function HomeShell() {
     setAlternateProtein("");
     setAlternateCarbs("");
     setAlternateFat("");
+  }
+
+  function openAlternateMeal(slot: string) {
+    setAlternateName("");
+    setAlternateCalories("");
+    setAlternateProtein("");
+    setAlternateCarbs("");
+    setAlternateFat("");
+    setAlternateSlot(slot);
   }
 
   async function saveAlternateMeal(
@@ -945,6 +2269,15 @@ export function HomeShell() {
               fat_g:
                 nextMealOptions.recommended
                   .candidate.fat_g,
+              strategy:
+                nextMealOptions.recommended
+                  .strategy,
+              components:
+                nextMealOptions.recommended
+                  .candidate.components,
+              removed_components:
+                nextMealOptions.recommended
+                  .adaptation.removed_components,
             }
           : null;
 
@@ -1027,20 +2360,42 @@ export function HomeShell() {
     <>
       <AppNav />
 
-      <main className={styles.page}>
+      {!loading && needsWelcomeJourney && accessToken ? (
+        <WelcomeJourney
+          accessToken={accessToken}
+          initialName={
+            typeof profile?.metadata?.name === "string"
+              ? profile.metadata.name
+              : firstName
+          }
+          testMode={isOnboardingTestAccount}
+        />
+      ) : null}
+
+      <main
+        className={
+          experienceMode === "zero"
+            ? `${styles.page} ${styles.pageZero}`
+            : styles.page
+        }
+      >
       <header className={styles.header}>
         <div>
-          <p className={styles.brand}>
-            SANOSYNC
-          </p>
-
           <h1>
             {greeting()}
             {firstName
               ? `, ${firstName}`
               : ""}
+            <span
+              className={styles.greetingWave}
+              role="img"
+              aria-label="Ciao"
+            >
+              👋
+            </span>
           </h1>
         </div>
+
       </header>
 
       {loading ? (
@@ -1062,85 +2417,305 @@ export function HomeShell() {
 
       {day ? (
         <>
-          <section className={styles.dayIntro}>
-            <p className={styles.kicker}>
-              Oggi
+          <DayPlanner
+            message={
+              dayBriefingBody ??
+              buildDayMessage(
+              buildDayMessageContext(
+                user?.user_metadata?.first_name ||
+                  user?.user_metadata?.name ||
+                  "",
+                normalizeDayType(
+                  day.context.value,
+                ),
+                normalizeActivityLevel(
+                  day.activity_plan.value,
+                ),
+                burnedCalories,
+                actualActivities.length,
+                historicalProfile?.average_burned_calories ?? null,
+                historicalProfile?.days ?? 0,
+              ),
+            )}
+            dayType={normalizeDayType(
+              day.context.value,
+            )}
+            activityLevel={normalizeActivityLevel(
+              day.activity_plan.value,
+            )}
+            onDayTypeChange={(value) => {
+              void handleDayPlannerChange({
+                day_type: value,
+              });
+            }}
+            onActivityLevelChange={(value) => {
+              void handleDayPlannerChange({
+                activity_plan: value,
+              });
+            }}
+          />
+
+          {dayPlannerMessage ? (
+            <p className={styles.muted}>
+              {dayPlannerSaving
+                ? "Salvataggio..."
+                : dayPlannerMessage}
             </p>
+          ) : null}
 
-            <h2>
-              {day.context.value ||
-                "Giornata da definire"}
-            </h2>
+          {nextRunningSession ? (
+            <section
+              className={
+                styles.nextTrainingCard
+              }
+            >
+              <div
+                className={
+                  styles.nextTrainingTop
+                }
+              >
+                <div>
+                  <span
+                    className={
+                      styles.nextTrainingEyebrow
+                    }
+                  >
+                    PROSSIMO ALLENAMENTO ·{" "}
+                    {plannedTrainingDateLabel(
+                      nextRunningSession
+                        .scheduled_date,
+                    )}
+                  </span>
 
-            <p className={styles.subtitle}>
-              {day.activity_plan.value
-                ? `${day.activity_plan.value} prevista`
-                : "Attività non ancora prevista"}
-            </p>
-          </section>
+                  <h2>
+                    {nextRunningSession.title}
+                  </h2>
+                </div>
 
-          {budget ? (
-            <section className={styles.budgetHero}>
-              <div className={styles.budgetTopline}>
-                <span>Kcal disponibili</span>
-                <span>
-                  Budget{" "}
-                  {roundNumber(
-                    budget.daily_budget_kcal,
+                <span
+                  className={
+                    styles.nextTrainingKind
+                  }
+                >
+                  {plannedTrainingKindLabel(
+                    nextRunningSession
+                      .session_kind,
                   )}
                 </span>
               </div>
 
-              <div className={styles.budgetNumber}>
-                {roundNumber(
-                  budget.available_kcal,
-                )}
-              </div>
-
-              <div className={styles.budgetUnit}>
-                kcal
-              </div>
-
               <div
-                className={styles.progressTrack}
-                aria-label="Calorie consumate"
+                className={
+                  styles.nextTrainingMetrics
+                }
               >
-                <div
-                  className={styles.progressFill}
-                  style={{
-                    width: `${budgetProgress}%`,
-                  }}
-                />
+                {nextRunningSession
+                  .training_week ? (
+                  <span>
+                    Settimana{" "}
+                    {
+                      nextRunningSession
+                        .training_week
+                    }
+                  </span>
+                ) : null}
+
+                {nextRunningSession
+                  .distance_meters ? (
+                  <strong>
+                    {(
+                      nextRunningSession
+                        .distance_meters /
+                      1000
+                    ).toLocaleString(
+                      "it-IT",
+                      {
+                        maximumFractionDigits:
+                          2,
+                      },
+                    )}{" "}
+                    km
+                  </strong>
+                ) : null}
+
+                {nextRunningSession
+                  .duration_minutes ? (
+                  <span>
+                    {
+                      nextRunningSession
+                        .duration_minutes
+                    }{" "}
+                    min
+                  </span>
+                ) : null}
+
+                {nextRunningSession
+                  .scheduled_time ? (
+                  <span>
+                    ore{" "}
+                    {nextRunningSession
+                      .scheduled_time
+                      .slice(0, 5)}
+                  </span>
+                ) : null}
               </div>
 
-              <div className={styles.budgetBreakdown}>
-                <div>
-                  <span>Consumate</span>
-                  <strong>
-                    {roundNumber(
-                      budget.consumed_kcal,
-                    )}
-                  </strong>
+              <p
+                className={
+                  styles.nextTrainingMessage
+                }
+              >
+                {experienceMode === "zero"
+                  ? `${
+                      plannedTrainingDateLabel(
+                        nextRunningSession
+                          .scheduled_date,
+                      )
+                    }: ${
+                      nextRunningSession.title
+                    }. Non si correrà da solo.`
+                  : `${
+                      plannedTrainingDateLabel(
+                        nextRunningSession
+                          .scheduled_date,
+                      )
+                    } hai ${
+                      nextRunningSession.title
+                    }. Tienilo presente mentre organizzi la giornata.`}
+              </p>
+            </section>
+          ) : null}
+
+          {budget ? (
+            <section
+              className={`${styles.budgetHero} ${
+                budgetExpanded
+                  ? styles.budgetHeroExpanded
+                  : styles.budgetHeroCollapsed
+              }`}
+            >
+              <div className={styles.budgetSummary}>
+                <div className={styles.budgetQuestion}>
+                  <span className={styles.budgetEyebrow}>
+                    Il tuo piano di oggi
+                  </span>
+                  <h2>Quanto posso ancora mangiare oggi?</h2>
                 </div>
 
-                <div>
-                  <span>Pianificate</span>
-                  <strong>
-                    {roundNumber(
-                      budget.planned_kcal,
-                    )}
-                  </strong>
+                <div className={styles.budgetHeadlineMetric}>
+                  <span className={styles.budgetLabel}>Consumate oggi</span>
+                  <div className={styles.budgetValueRow}>
+                    <strong className={styles.budgetAvailable}>
+                      {roundNumber(budget.consumed_kcal)}
+                    </strong>
+                    <span className={styles.budgetKcal}>kcal</span>
+                  </div>
                 </div>
 
-                <div>
-                  <span>Non allocate</span>
-                  <strong>
-                    {roundNumber(
-                      budget.unallocated_kcal,
-                    )}
-                  </strong>
+                <div className={styles.budgetHeadlineMetric}>
+                  <span className={styles.budgetLabel}>
+                    Puoi ancora mangiare
+                  </span>
+                  <div className={styles.budgetValueRow}>
+                    <strong className={styles.budgetAvailable}>
+                      {roundNumber(Math.max(0, budget.available_kcal))}
+                    </strong>
+                    <span className={styles.budgetKcal}>kcal</span>
+                  </div>
+                </div>
+
+                <div className={styles.budgetCalmStatus}>
+                  <span className={styles.budgetCalmIcon} aria-hidden="true">
+                    {budget.budget_adapted ? "✓" : "○"}
+                  </span>
+                  <p>
+                    {budget.budget_adapted
+                      ? "Oggi ti sei mosso meno del previsto. Abbiamo ridotto il deficit per lasciarti pasti completi."
+                      : budget.consumed_kcal === 0
+                      ? "Il piano è pronto e si adatterà con calma a quello che succede oggi."
+                      : budget.consumed_kcal < maintenanceBudgetKcal
+                      ? "Sei ancora sotto il mantenimento. Continua la giornata senza inseguire il singolo numero."
+                      : "Hai raggiunto il mantenimento: è un'informazione, non un giudizio."
+                    }
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.budgetToggle}
+                    aria-expanded={budgetExpanded}
+                    onClick={() => setBudgetExpanded((current) => !current)}
+                  >
+                    {budgetExpanded ? "Nascondi calcolo" : "Vedi calcolo"}
+                    <span
+                      className={`${styles.budgetChevron} ${
+                        budgetExpanded ? styles.budgetChevronUp : ""
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
                 </div>
               </div>
+
+              {budgetExpanded ? (
+                <div className={styles.budgetExpandedPanel}>
+                  <div className={styles.budgetDetailsGrid}>
+                    <div className={styles.budgetDetail}>
+                      <span>Metabolismo basale</span>
+                      <strong>{bmr > 0 ? roundNumber(bmr) : "—"} kcal</strong>
+                      <small>energia minima del corpo</small>
+                    </div>
+                    <div className={styles.budgetDetail}>
+                      <span>Mantenimento stimato</span>
+                      <strong>{roundNumber(maintenanceBudgetKcal)} kcal</strong>
+                      <small>con la giornata di oggi</small>
+                    </div>
+                    <div className={styles.budgetDetail}>
+                      <span>Deficit scelto</span>
+                      <strong>{roundNumber(budget.goal_adjustment_kcal)} kcal</strong>
+                      <small>dal tuo obiettivo</small>
+                    </div>
+                    <div className={styles.budgetDetail}>
+                      <span>Deficit di oggi</span>
+                      <strong>{roundNumber(budget.effective_goal_adjustment_kcal)} kcal</strong>
+                      <small>{budget.budget_adapted ? "adattato alla giornata" : "come programmato"}</small>
+                    </div>
+                  </div>
+
+                  <div className={styles.budgetScale}>
+                    <div className={styles.budgetScaleTrack}>
+                      <div
+                        className={styles.budgetScaleFill}
+                        style={{
+                          width: `${Math.min(100, Math.max(0,
+                            maintenanceBudgetKcal > 0
+                              ? (budget.consumed_kcal / maintenanceBudgetKcal) * 100
+                              : 0,
+                          ))}%`,
+                        }}
+                      />
+                      <span
+                        className={styles.budgetScaleTarget}
+                        style={{
+                          left: maintenanceBudgetKcal > 0
+                            ? `${Math.min(100, Math.max(0,
+                                (budget.daily_budget_kcal / maintenanceBudgetKcal) * 100,
+                              ))}%`
+                            : "0%",
+                        }}
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <div className={styles.budgetScaleLabels}>
+                      <span>{roundNumber(budget.consumed_kcal)} consumate</span>
+                      <span>{roundNumber(budget.daily_budget_kcal)} obiettivo adattato</span>
+                      <span>{roundNumber(maintenanceBudgetKcal)} mantenimento</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.budgetExplanation}>
+                    L'obiettivo si adatta con calma per proteggere pasti completi e sostenibili.
+                  </div>
+                </div>
+              ) : null}
             </section>
           ) : (
             <section className={styles.card}>
@@ -1154,79 +2729,125 @@ export function HomeShell() {
             </section>
           )}
 
-          <section
-            className={styles.metricsGrid}
-          >
-            <article className={styles.metricCard}>
-              <span>Peso</span>
-              <strong>
-                {day.actual.weight != null
-                  ? `${day.actual.weight} kg`
-                  : "—"}
-              </strong>
-            </article>
+          <div className={styles.dashboardToolbar}>
+            <button
+              type="button"
+              className={
+                customizingDashboard
+                  ? styles.dashboardCustomizeActive
+                  : styles.dashboardCustomizeButton
+              }
+              onClick={() => {
+                setCustomizingDashboard(
+                  (current) => !current,
+                );
+                setDraggedWidget(null);
+              }}
+            >
+              {customizingDashboard
+                ? "Fine personalizzazione"
+                : "Personalizza Home"}
+            </button>
 
-            <article className={styles.metricCard}>
-              <span>Passi</span>
-              <strong>
-                {day.actual.steps != null
-                  ? day.actual.steps.toLocaleString(
-                      "it-IT",
-                    )
-                  : "—"}
-              </strong>
-            </article>
-          </section>
+            {customizingDashboard ? (
+              <button
+                type="button"
+                className={styles.dashboardResetButton}
+                onClick={() => {
+                  saveDashboardOrder([
+                    ...DEFAULT_DASHBOARD_ORDER,
+                  ]);
+                  setDashboardSizes({
+                    ...DEFAULT_DASHBOARD_SIZES,
+                  });
+                  window.localStorage.setItem(
+                    DASHBOARD_SIZE_KEY,
+                    JSON.stringify(
+                      DEFAULT_DASHBOARD_SIZES,
+                    ),
+                  );
+                }}
+              >
+                Ripristina ordine
+              </button>
+            ) : null}
+          </div>
 
-          {budget?.protein_target_g != null ? (
-            <section className={styles.proteinCard}>
-              <div className={styles.proteinTop}>
-                <div>
-                  <span>Proteine</span>
-                  <strong>
-                    {roundNumber(
-                      budget.protein_consumed_g,
-                    )}{" "}
-                    /{" "}
-                    {roundNumber(
-                      budget.protein_target_g,
-                    )}{" "}
-                    g
-                  </strong>
-                </div>
-
-                <span className={styles.proteinRemaining}>
-                  {roundNumber(
-                    budget.protein_remaining_g ?? 0,
-                  )}{" "}
-                  g rimaste
-                </span>
-              </div>
-
-              <div className={styles.proteinTrack}>
-                <div
-                  className={styles.proteinFill}
-                  style={{
-                    width: `${proteinProgress}%`,
-                  }}
-                />
-              </div>
-            </section>
-          ) : null}
-
-          <section className={styles.conversationCard}>
+          <div className={styles.desktopHomeGrid}>
+            <section
+              {...dashboardWidgetProps("ai")}
+              className={`${styles.homeAssistantSection} ${styles.conversationCard} ${styles.dashboardWidget}`}
+            >
+            {dashboardWidgetControls(
+              "ai",
+              "SanoSync AI",
+            )}
             <div className={styles.conversationHeader}>
               <div>
                 <span className={styles.conversationEyebrow}>
-                  SanoSync AI
+                  <img
+                    src={
+                      experienceMode === "zero"
+                        ? "/assets/SanoSyncAIZero1.png"
+                        : "/assets/AILogo.png"
+                    }
+                    alt={
+                      experienceMode === "zero"
+                        ? "SanoSync AI Zero"
+                        : "SanoSync AI"
+                    }
+                    className={styles.conversationAiLogo}
+                  />
                 </span>
-                <h2>Raccontami cosa hai mangiato</h2>
+                <h2>
+                  {conversationMode === "text"
+                    ? "Raccontami cosa hai mangiato"
+                    : "Fammi vedere cosa hai mangiato"}
+                </h2>
                 <p>
-                  Scrivilo come lo diresti normalmente.
+                  {conversationMode === "text"
+                    ? "Scrivilo come lo diresti normalmente. "
+                    : "Scatta una foto o scegline una dalla galleria. "}
                   Prima di registrare qualcosa ti mostro
                   sempre una preview.
                 </p>
               </div>
+            </div>
+
+            <div className={styles.conversationModeSwitch}>
+              <button
+                type="button"
+                className={
+                  conversationMode === "text"
+                    ? styles.conversationModeActive
+                    : undefined
+                }
+                onClick={() => {
+                  setConversationMode("text");
+                  setConversationPreview(null);
+                  setConversationError(null);
+                  setConversationSuccess(null);
+                }}
+              >
+                Testo
+              </button>
+
+              <button
+                type="button"
+                className={
+                  conversationMode === "photo"
+                    ? styles.conversationModeActive
+                    : undefined
+                }
+                onClick={() => {
+                  setConversationMode("photo");
+                  setConversationPreview(null);
+                  setConversationError(null);
+                  setConversationSuccess(null);
+                }}
+              >
+                Foto
+              </button>
             </div>
 
             <div className={styles.conversationControls}>
@@ -1245,39 +2866,175 @@ export function HomeShell() {
                 <option value="Pranzo">
                   Pranzo
                 </option>
+                <option value="Snack">
+                  Snack
+                </option>
                 <option value="Cena">
                   Cena
                 </option>
-                <option value="Spuntino">
-                  Spuntino
-                </option>
               </select>
 
-              <textarea
-                value={conversationText}
-                onChange={(event) =>
-                  setConversationText(
-                    event.target.value,
-                  )
-                }
-                placeholder="Es. Ho mangiato una carbonara e una mela"
-                rows={3}
-              />
+              {conversationMode === "text" ? (
+                <>
+                  <textarea
+                    value={conversationText}
+                    onChange={(event) =>
+                      setConversationText(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Es. Ho mangiato una carbonara e una mela"
+                    rows={3}
+                  />
 
-              <button
-                type="button"
-                onClick={() => {
-                  void analyzeConversationMeal();
-                }}
-                disabled={
-                  conversationLoading ||
-                  !conversationText.trim()
-                }
-              >
-                {conversationLoading
-                  ? "Analizzo..."
-                  : "Analizza"}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void analyzeConversationMeal();
+                    }}
+                    disabled={
+                      conversationLoading ||
+                      !conversationText.trim()
+                    }
+                  >
+                    {conversationLoading
+                      ? "Analizzo..."
+                      : "Analizza"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div
+                    className={styles.conversationPhotoActions}
+                  >
+                    <label
+                      className={
+                        styles.conversationPhotoAction
+                      }
+                    >
+                      <span aria-hidden="true">📷</span>
+                      <strong>Scatta foto</strong>
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        capture="environment"
+                        onChange={(event) => {
+                          const file =
+                            event.target.files?.[0] ?? null;
+
+                          setConversationPhoto(file);
+                          setConversationPreview(null);
+                          setConversationError(null);
+                          setConversationSuccess(null);
+
+                          if (!file) {
+                            setConversationPhotoPreview(null);
+                            return;
+                          }
+
+                          const reader = new FileReader();
+
+                          reader.onload = () => {
+                            if (
+                              typeof reader.result ===
+                              "string"
+                            ) {
+                              setConversationPhotoPreview(
+                                reader.result,
+                              );
+                            }
+                          };
+
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+
+                    <label
+                      className={
+                        styles.conversationPhotoAction
+                      }
+                    >
+                      <span aria-hidden="true">🖼️</span>
+                      <strong>Carica foto</strong>
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const file =
+                            event.target.files?.[0] ?? null;
+
+                          setConversationPhoto(file);
+                          setConversationPreview(null);
+                          setConversationError(null);
+                          setConversationSuccess(null);
+
+                          if (!file) {
+                            setConversationPhotoPreview(null);
+                            return;
+                          }
+
+                          const reader = new FileReader();
+
+                          reader.onload = () => {
+                            if (
+                              typeof reader.result ===
+                              "string"
+                            ) {
+                              setConversationPhotoPreview(
+                                reader.result,
+                              );
+                            }
+                          };
+
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {conversationPhoto ? (
+                    <div
+                      className={
+                        styles.conversationPhotoSelected
+                      }
+                    >
+                      <span>Foto selezionata</span>
+                      <strong>{conversationPhoto.name}</strong>
+                    </div>
+                  ) : null}
+
+                  {conversationPhotoPreview ? (
+                    <div
+                      className={
+                        styles.conversationPhotoPreview
+                      }
+                    >
+                      <img
+                        src={conversationPhotoPreview}
+                        alt="Anteprima del pasto"
+                      />
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void analyzePhotoMeal();
+                    }}
+                    disabled={
+                      conversationLoading ||
+                      !conversationPhoto
+                    }
+                  >
+                    {conversationLoading
+                      ? "Analizzo..."
+                      : "Analizza foto"}
+                  </button>
+                </>
+              )}
             </div>
 
             {conversationError ? (
@@ -1291,7 +3048,6 @@ export function HomeShell() {
                 {conversationSuccess}
               </p>
             ) : null}
-
 
             {conversationPreview ? (
               <div className={styles.conversationPreview}>
@@ -1378,14 +3134,23 @@ export function HomeShell() {
                       setConversationPreview(null)
                     }
                   >
-                    Modifica testo
+                    {conversationMode === "photo"
+                      ? "Cambia foto"
+                      : "Modifica testo"}
                   </button>
                 </div>
               </div>
             ) : null}
           </section>
 
-          <section className={styles.section}>
+          <section
+            {...dashboardWidgetProps("meals")}
+            className={`${styles.section} ${styles.mealsSection} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "meals",
+              "I tuoi pasti",
+            )}
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
@@ -1393,27 +3158,109 @@ export function HomeShell() {
                 </p>
                 <h2>I tuoi pasti</h2>
               </div>
+
+              <button
+                type="button"
+                className={styles.addMealFab}
+                aria-label={`Aggiungi ${selectedMealSlot}`}
+                title={`Aggiungi ${selectedMealSlot}`}
+                onClick={() => {
+                  const selectedSlot = Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  );
+
+                  if (selectedSlot) {
+                    if (
+                      alternateSlot === selectedSlot
+                    ) {
+                      closeAlternateMeal();
+                    } else {
+                      openAlternateMeal(
+                        selectedSlot,
+                      );
+                    }
+                  }
+                }}
+              >
+                +
+              </button>
+            </div>
+
+            <div className={styles.mealTabs}>
+              {Object.entries(day.meals)
+                .sort(
+                  ([slotA], [slotB]) =>
+                    ["Colazione", "Pranzo", "Snack", "Cena"].indexOf(
+                      mealLabel(slotA),
+                    ) -
+                    ["Colazione", "Pranzo", "Snack", "Cena"].indexOf(
+                      mealLabel(slotB),
+                    ),
+                )
+                .map(([slot]) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    className={
+                      selectedMealSlot === mealLabel(slot)
+                        ? styles.mealTabActive
+                        : styles.mealTab
+                    }
+                    onClick={() => {
+                      closeAlternateMeal();
+                      setSelectedMealSlot(
+                        mealLabel(slot),
+                      );
+                    }}
+                    aria-pressed={
+                      selectedMealSlot === mealLabel(slot)
+                    }
+                  >
+                    {mealLabel(slot)}
+                  </button>
+                ))}
             </div>
 
             <div className={styles.mealList}>
-              {Object.entries(day.meals).map(
+              {Object.entries(day.meals)
+                .filter(
+                  ([slot]) =>
+                    mealLabel(slot) === selectedMealSlot,
+                )
+                .map(
                 ([slot, meal]) => (
                   <article
                     key={slot}
-                    className={styles.mealCard}
+                    className={`${styles.mealCard} ${
+                      actualMealForSlot(slot)
+                        ? actualMealsForSlot(slot).length <= 1
+                          ? styles.mealCardOneItem
+                          : actualMealsForSlot(slot).length === 2
+                            ? styles.mealCardTwoItems
+                            : styles.mealCardManyItems
+                        : ""
+                    }`}
                   >
                     <div
                       className={
                         styles.mealCardTop
                       }
                     >
-                      <span
-                        className={
-                          styles.mealLabel
-                        }
-                      >
-                        {mealLabel(slot)}
-                      </span>
+                      <div className={styles.mealIdentity}>
+                        <span
+                          className={styles.mealIcon}
+                          aria-hidden="true"
+                        >
+                          {mealIcon(slot)}
+                        </span>
+
+                        <span
+                          className={styles.mealLabel}
+                        >
+                          {mealLabel(slot)}
+                        </span>
+                      </div>
 
                       <span
                         className={
@@ -1441,297 +3288,266 @@ export function HomeShell() {
                       ) : null}
                     </div>
 
-                    <strong
-                      className={styles.mealName}
-                    >
-                      {actualMealForSlot(slot)?.name ||
-                        meal.value ||
-                        "Nessuna routine abbastanza forte"}
-                    </strong>
-
                     {actualMealForSlot(slot) ? (
-                      <p className={styles.mealMeta}>
-                        {roundNumber(
-                          actualMealForSlot(slot)!.calories,
-                        )} kcal
-                        {typeof actualMealForSlot(slot)!
-                          .protein === "number"
-                          ? ` · ${roundNumber(
-                              actualMealForSlot(slot)!
-                                .protein,
-                            )} g proteine`
-                          : ""}
-                      </p>
-                    ) : typeof meal.estimated_calories ===
-                      "number" ? (
-                      <p
-                        className={
-                          styles.mealMeta
-                        }
-                      >
-                        {Math.round(
-                          meal.estimated_calories,
-                        )}{" "}
-                        kcal
-                        {typeof meal.estimated_protein_g ===
-                        "number"
-                          ? ` · ${Math.round(
-                              meal.estimated_protein_g,
-                            )} g proteine`
-                          : ""}
-                      </p>
-                    ) : null}
+                      <>
+                        <div className={styles.registeredMealList}>
+                          {actualMealsForSlot(slot).map(
+                            (registeredMeal) => (
+                              <div
+                                key={String(
+                                  registeredMeal.id ??
+                                    registeredMeal.name,
+                                )}
+                                className={
+                                  styles.registeredMealRow
+                                }
+                              >
+                                <div
+                                  className={
+                                    styles.registeredMealRowInfo
+                                  }
+                                >
+                                  <strong>
+                                    {registeredMeal.name.replace(
+                                      /\s*\([^)]*porz\.\)\s*$/i,
+                                      "",
+                                    )}
+                                  </strong>
 
-                    {slot === nextMeal?.next_slot &&
-                    !actualMealForSlot(slot) &&
-                    nextMealOptions?.recommended ? (
-                      nextMealOptions.recommended.strategy ===
-                      "routine" ? (
-                        <div
-                          className={
-                            styles.replanningCompact
-                          }
-                        >
-                          <span
-                            className={
-                              styles.replanningCompactIcon
-                            }
-                            aria-hidden="true"
-                          >
-                            ✓
-                          </span>
+                                  <span>
+                                    {registeredMeal.recipe_servings
+                                      ? `${roundNumber(
+                                          registeredMeal.recipe_servings,
+                                        )} ${
+                                          registeredMeal.recipe_servings === 1
+                                            ? "porzione"
+                                            : "porzioni"
+                                        }`
+                                      : "1 porzione"}
+                                  </span>
+                                </div>
 
-                          <div>
-                            <strong>
-                              {nextMealOptions
-                                .replanning_context?.title ??
-                                "Già adatta alla giornata"}
-                            </strong>
-                            <p>
-                              {nextMealOptions
-                                .replanning_context?.message ??
-                                "Il tuo pasto abituale va bene così com'è oggi."}
-                            </p>
-                          </div>
+                                <div
+                                  className={
+                                    styles.registeredMealRowActions
+                                  }
+                                >
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      deletingMealId !== null ||
+                                      savingMealEdit
+                                    }
+                                    onClick={() => {
+                                      if (
+                                        editingMealId ===
+                                        registeredMeal.id
+                                      ) {
+                                        closeMealEditor();
+                                      } else {
+                                        void openMealEditor(
+                                          registeredMeal,
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    ✎{" "}
+                                    {editingMealId ===
+                                    registeredMeal.id
+                                      ? "Chiudi"
+                                      : "Modifica"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className={
+                                      styles.registeredMealRowDelete
+                                    }
+                                    disabled={
+                                      deletingMealId !== null ||
+                                      savingMealEdit
+                                    }
+                                    onClick={() => {
+                                      void deleteRegisteredMeal(
+                                        registeredMeal,
+                                      );
+                                    }}
+                                  >
+                                    🗑{" "}
+                                    {deletingMealId ===
+                                    registeredMeal.id
+                                      ? "Elimino…"
+                                      : "Elimina"}
+                                  </button>
+                                </div>
+                              </div>
+                            ),
+                          )}
                         </div>
-                      ) : (
-                        <div
-                          className={
-                            styles.replanningPreview
-                          }
-                        >
+
+                        {actualMealsForSlot(slot).length > 0 ? (
+                          <div className={styles.registeredMealNutrition}>
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.calories || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>kcal</span>
+                            </div>
+
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.protein || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>Proteine</span>
+                            </div>
+
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.carbs || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>Carboidrati</span>
+                            </div>
+
+                            <div className={styles.nutritionItem}>
+                              <strong>
+                                {roundNumber(
+                                  actualMealsForSlot(slot).reduce(
+                                    (total, registeredMeal) =>
+                                      total +
+                                      Number(
+                                        registeredMeal.fat || 0,
+                                      ),
+                                    0,
+                                  ),
+                                )}
+                              </strong>
+                              <span>Grassi</span>
+                            </div>
+                          </div>
+                        ) : null}
+                        {actualMealsForSlot(slot).length > 0 ? (
                           <div
                             className={
-                              styles.replanningPreviewTop
+                              styles.registeredMealInsights
                             }
                           >
                             <span
                               className={
-                                styles.replanningBadge
+                                styles.registeredMealInsightSuccess
                               }
                             >
-                              {nextMealOptions.recommended
-                                .strategy ===
-                              "adapted_routine"
-                                ? "Adattata alla tua giornata"
-                                : "Oggi ti conviene cambiare"}
+                              ✓ Pasto registrato
                             </span>
-                          </div>
 
-                          <strong
-                            className={
-                              styles.replanningMealName
-                            }
-                          >
-                            {
-                              nextMealOptions.recommended
-                                .candidate.name
-                            }
-                          </strong>
-
-                          <p
-                            className={
-                              styles.replanningNutrition
-                            }
-                          >
-                            {typeof nextMealOptions.recommended
-                              .recommended_quantity === "number"
-                              ? `${roundNumber(
-                                  nextMealOptions.recommended
-                                    .recommended_quantity,
-                                )} porz. · `
-                              : ""}
-                            {roundNumber(
-                              nextMealOptions.recommended
-                                .candidate.calories,
-                            )}{" "}
-                            kcal
-                            {typeof nextMealOptions
-                              .recommended.candidate
-                              .protein_g === "number"
-                              ? ` · ${roundNumber(
-                                  nextMealOptions.recommended
-                                    .candidate.protein_g,
-                                )} g proteine`
-                              : ""}
-                          </p>
-
-                          <div>
-                            {nextMealOptions
-                              .replanning_context?.title ? (
-                              <strong
+                            {actualMealsForSlot(slot).reduce(
+                              (total, registeredMeal) =>
+                                total +
+                                Number(
+                                  registeredMeal.protein || 0,
+                                ),
+                              0,
+                            ) < 15 ? (
+                              <span
                                 className={
-                                  styles.replanningContextTitle
+                                  styles.registeredMealInsightWarning
                                 }
                               >
-                                {
-                                  nextMealOptions
-                                    .replanning_context.title
-                                }
-                              </strong>
-                            ) : null}
-
-                            <p
-                              className={
-                                styles.replanningReason
-                              }
-                            >
-                              {nextMealOptions
-                                .replanning_context?.message ??
-                                nextMealOptions.recommended
-                                  .reason}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    ) : null}
-
-                    {actualMealForSlot(slot) ? (
-                      <>
-                        <div
-                          className={
-                            styles.registeredMealPrimaryActions
-                          }
-                        >
-                          <button
-                            type="button"
-                            className={
-                              styles.editRegisteredMealButton
-                            }
-                            disabled={
-                              deletingMealId !== null
-                            }
-                            onClick={() => {
-                              const actual =
-                                actualMealForSlot(slot);
-
-                              if (actual) {
-                                if (
-                                  editingMealId ===
-                                  actual.id
-                                ) {
-                                  closeMealEditor();
-                                } else {
-                                  void openMealEditor(
-                                    actual,
-                                  );
-                                }
-                              }
-                            }}
-                          >
-                            {editingMealId ===
-                            actualMealForSlot(slot)?.id
-                              ? "Chiudi modifica"
-                              : "Modifica"}
-                          </button>
-
-                          <details
-                            className={
-                              styles.registeredMealActionMenu
-                            }
-                          >
-                            <summary
-                              className={
-                                styles.registeredMealMoreButton
-                              }
-                              aria-label="Altre azioni"
-                              title="Altre azioni"
-                            >
-                              •••
-                            </summary>
-
-                            <div
-                              className={
-                                styles.registeredMealMenuPanel
-                              }
-                            >
-                              <button
-                                type="button"
-                                disabled={
-                                  deletingMealId !== null ||
-                                  savingMealEdit
-                                }
-                                onClick={(event) => {
-                                  const actual =
-                                    actualMealForSlot(slot);
-
-                                  if (actual) {
-                                    void toggleRegisteredMealReusable(
-                                      actual,
-                                    );
-                                  }
-
-                                  event.currentTarget
-                                    .closest("details")
-                                    ?.removeAttribute("open");
-                                }}
-                              >
-                                {actualMealForSlot(slot)
-                                  ?.is_reusable === false
-                                  ? "Riusa nei suggerimenti"
-                                  : "Non suggerire più"}
-                              </button>
-
-                              <button
-                                type="button"
+                                ▮▮ Proteine basse
+                              </span>
+                            ) : actualMealsForSlot(slot).reduce(
+                                (total, registeredMeal) =>
+                                  total +
+                                  Number(
+                                    registeredMeal.protein || 0,
+                                  ),
+                                0,
+                              ) <= 30 ? (
+                              <span
                                 className={
-                                  styles.registeredMealMenuDelete
+                                  styles.registeredMealInsightSuccess
                                 }
-                                disabled={
-                                  deletingMealId !== null ||
-                                  savingMealEdit
-                                }
-                                onClick={(event) => {
-                                  const actual =
-                                    actualMealForSlot(slot);
-
-                                  if (actual) {
-                                    void deleteRegisteredMeal(
-                                      actual,
-                                    );
-                                  }
-
-                                  event.currentTarget
-                                    .closest("details")
-                                    ?.removeAttribute("open");
-                                }}
                               >
-                                {deletingMealId ===
-                                actualMealForSlot(slot)?.id
-                                  ? "Elimino…"
-                                  : "Elimina"}
-                              </button>
-                            </div>
-                          </details>
-                        </div>
+                                ✓ Buon apporto proteico
+                              </span>
+                            ) : (
+                              <span
+                                className={
+                                  styles.registeredMealInsightSuccess
+                                }
+                              >
+                                ↑ Ricco di proteine
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
 
-                        {editingMealId ===
-                        actualMealForSlot(slot)?.id ? (
+
+                        {actualMealsForSlot(slot).some(
+                          (registeredMeal) =>
+                            registeredMeal.id === editingMealId,
+                        ) ? (
                           <div
                             className={
                               styles.registeredMealEditor
                             }
                           >
+                            <label
+                              className={
+                                styles.registeredMealTypeField
+                              }
+                            >
+                              <span>Sposta nel pasto</span>
+
+                              <select
+                                value={mealEditType}
+                                onChange={(event) =>
+                                  setMealEditType(
+                                    event.target.value,
+                                  )
+                                }
+                              >
+                                <option value="Colazione">
+                                  Colazione
+                                </option>
+                                <option value="Pranzo">
+                                  Pranzo
+                                </option>
+                                <option value="Snack">
+                                  Snack
+                                </option>
+                                <option value="Cena">
+                                  Cena
+                                </option>
+                              </select>
+                            </label>
+
                             {simpleMealEdit ? (
                               <>
                                 <label>
@@ -1859,8 +3675,7 @@ export function HomeShell() {
                               >
                                 <strong>
                                   {Math.round(
-                                    mealEditNutrition()
-                                      .calories,
+                                    mealEditNutrition().calories,
                                   )} kcal
                                 </strong>
 
@@ -1897,7 +3712,11 @@ export function HomeShell() {
                                 disabled={savingMealEdit}
                                 onClick={() => {
                                   const actual =
-                                    actualMealForSlot(slot);
+                                    actualMealsForSlot(slot).find(
+                                      (registeredMeal) =>
+                                        registeredMeal.id ===
+                                        editingMealId,
+                                    );
 
                                   if (actual) {
                                     if (simpleMealEdit) {
@@ -1905,9 +3724,7 @@ export function HomeShell() {
                                         actual,
                                       );
                                     } else {
-                                      void saveMealEditor(
-                                        actual,
-                                      );
+                                      void saveMealEditor(actual);
                                     }
                                   }
                                 }}
@@ -1923,9 +3740,7 @@ export function HomeShell() {
                                   styles.cancelRegisteredMealButton
                                 }
                                 disabled={savingMealEdit}
-                                onClick={
-                                  closeMealEditor
-                                }
+                                onClick={closeMealEditor}
                               >
                                 Annulla
                               </button>
@@ -1933,9 +3748,192 @@ export function HomeShell() {
                           </div>
                         ) : null}
                       </>
+                    ) : (
+                      <>
+                        <strong
+                          className={styles.mealName}
+                        >
+                          {slot === nextMeal?.next_slot &&
+                          !actualMealForSlot(slot) &&
+                          nextMealOptions?.recommended
+                            ? nextMealOptions.recommended
+                                .candidate.name
+                            : meal.value ||
+                              "Nessuna routine abbastanza forte"}
+                        </strong>
+
+                        {slot === nextMeal?.next_slot &&
+                        !actualMealForSlot(slot) &&
+                        nextMealOptions?.recommended ? (
+                          <p className={styles.mealMeta}>
+                            {typeof nextMealOptions.recommended
+                              .recommended_quantity === "number"
+                              ? `${roundNumber(
+                                  nextMealOptions.recommended
+                                    .recommended_quantity,
+                                )} porz. · `
+                              : ""}
+                            {roundNumber(
+                              nextMealOptions.recommended
+                                .candidate.calories,
+                            )}{" "}
+                            kcal
+                            {typeof nextMealOptions.recommended
+                              .candidate.protein_g === "number"
+                              ? ` · ${roundNumber(
+                                  nextMealOptions.recommended
+                                    .candidate.protein_g,
+                                )} g proteine`
+                              : ""}
+                          </p>
+                        ) : typeof meal.estimated_calories ===
+                          "number" ? (
+                          <p className={styles.mealMeta}>
+                            {Math.round(
+                              meal.estimated_calories,
+                            )}{" "}
+                            kcal
+                            {typeof meal.estimated_protein_g ===
+                            "number"
+                              ? ` · ${Math.round(
+                                  meal.estimated_protein_g,
+                                )} g proteine`
+                              : ""}
+                          </p>
+                        ) : null}
+                      </>
+                    )}
+
+                    {slot === nextMeal?.next_slot &&
+                    !actualMealForSlot(slot) &&
+                    nextMealOptions?.recommended ? (
+                      nextMealOptions.recommended.strategy ===
+                      "routine" ? (
+                        <div
+                          className={
+                            styles.replanningCompact
+                          }
+                        >
+                          <span
+                            className={
+                              styles.replanningCompactIcon
+                            }
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+
+                          <div>
+                            <strong>
+                              {nextMealOptions
+                                .replanning_context?.title ??
+                                "Già adatta alla giornata"}
+                            </strong>
+                            <p>
+                              {nextMealOptions
+                                .replanning_context?.message ??
+                                "Il tuo pasto abituale va bene così com'è oggi."}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className={
+                            styles.replanningPreview
+                          }
+                        >
+                          <div
+                            className={
+                              styles.replanningPreviewTop
+                            }
+                          >
+                            <span
+                              className={
+                                styles.replanningBadge
+                              }
+                            >
+                              {nextMealOptions.recommended
+                                .strategy ===
+                              "component_reduction"
+                                ? "Pasto alleggerito"
+                                : nextMealOptions.recommended
+                                    .strategy ===
+                                  "adapted_routine"
+                                ? "Adattata alla tua giornata"
+                                : "Oggi ti conviene cambiare"}
+                            </span>
+                          </div>
+
+                          <strong
+                            className={
+                              styles.replanningMealName
+                            }
+                          >
+                            {
+                              nextMealOptions.recommended
+                                .candidate.name
+                            }
+                          </strong>
+
+                          <p
+                            className={
+                              styles.replanningNutrition
+                            }
+                          >
+                            {typeof nextMealOptions.recommended
+                              .recommended_quantity === "number"
+                              ? `${roundNumber(
+                                  nextMealOptions.recommended
+                                    .recommended_quantity,
+                                )} porz. · `
+                              : ""}
+                            {roundNumber(
+                              nextMealOptions.recommended
+                                .candidate.calories,
+                            )}{" "}
+                            kcal
+                            {typeof nextMealOptions
+                              .recommended.candidate
+                              .protein_g === "number"
+                              ? ` · ${roundNumber(
+                                  nextMealOptions.recommended
+                                    .candidate.protein_g,
+                                )} g proteine`
+                              : ""}
+                          </p>
+
+                          <div>
+                            {nextMealOptions
+                              .replanning_context?.title ? (
+                              <strong
+                                className={
+                                  styles.replanningContextTitle
+                                }
+                              >
+                                {
+                                  nextMealOptions
+                                    .replanning_context.title
+                                }
+                              </strong>
+                            ) : null}
+
+                            <p
+                              className={
+                                styles.replanningReason
+                              }
+                            >
+                              {nextMealOptions
+                                .replanning_context?.message ??
+                                nextMealOptions.recommended
+                                  .reason}
+                            </p>
+                          </div>
+                        </div>
+                      )
                     ) : null}
 
-                    {!actualMealForSlot(slot) &&
+                    {slot === nextMeal?.next_slot &&
+                    !actualMealForSlot(slot) &&
                     meal.state === "predicted" ? (
                       <>
                         <div className={styles.mealActions}>
@@ -2003,10 +4001,161 @@ export function HomeShell() {
                           </button>
                         </div>
 
+                      </>
+                    ) : null}
+
+                    {slot === "dinner" &&
+                    slot === nextMeal?.next_slot &&
+                    !actualMealForSlot(slot) &&
+                    nextMealOptions?.day_context?.kind ===
+                      "training_prep" ? (
+                      <div
+                        className={
+                          styles.trainingPrepNotice
+                        }
+                      >
+                        <div
+                          className={
+                            styles.trainingPrepIcon
+                          }
+                          aria-hidden="true"
+                        >
+                          ↗
+                        </div>
+
+                        <div>
+                          <span
+                            className={
+                              styles.trainingPrepEyebrow
+                            }
+                          >
+                            ALLENAMENTO DI DOMANI
+                          </span>
+
+                          <strong>
+                            {experienceMode === "zero"
+                              ? "Domani si corre. Sorpresa: serve carburante."
+                              : "Preparazione per domani"}
+                          </strong>
+
+                          <p>
+                            {
+                              nextMealOptions
+                                .day_context.message
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
                         {alternateSlot === slot ? (
                           <div className={styles.alternateMealForm}>
                             <label>
                               Cosa hai mangiato?
+                              <select
+                                value=""
+                                onChange={(event) => {
+                                  const selected = knownAlternates.find((item) => item.key === event.target.value);
+                                  if (!selected) return;
+                                  setAlternateName(selected.name);
+                                  setAlternateCalories(String(Math.round(selected.calories)));
+                                  setAlternateProtein(String(Math.round(selected.protein)));
+                                  setAlternateCarbs(String(Math.round(selected.carbs)));
+                                  setAlternateFat(String(Math.round(selected.fat)));
+                                }}
+                              >
+                                <option value="">
+                                  Scegli da ricette, recenti e alimenti…
+                                </option>
+
+                                {knownAlternates.some(
+                                  (item) =>
+                                    item.source === "recipe" &&
+                                    item.mealType &&
+                                    mealFitsSlot(
+                                      item.mealType,
+                                      slot,
+                                    ),
+                                ) ? (
+                                  <optgroup label="Ricette">
+                                    {knownAlternates
+                                      .filter(
+                                        (item) =>
+                                          item.source ===
+                                            "recipe" &&
+                                          item.mealType &&
+                                          mealFitsSlot(
+                                            item.mealType,
+                                            slot,
+                                          ),
+                                      )
+                                      .map((item) => (
+                                        <option
+                                          key={item.key}
+                                          value={item.key}
+                                        >
+                                          {item.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                ) : null}
+
+                                {knownAlternates.some(
+                                  (item) =>
+                                    item.source === "history" &&
+                                    item.mealType &&
+                                    mealFitsSlot(
+                                      item.mealType,
+                                      slot,
+                                    ),
+                                ) ? (
+                                  <optgroup label="Pasti recenti">
+                                    {knownAlternates
+                                      .filter(
+                                        (item) =>
+                                          item.source ===
+                                            "history" &&
+                                          item.mealType &&
+                                          mealFitsSlot(
+                                            item.mealType,
+                                            slot,
+                                          ),
+                                      )
+                                      .map((item) => (
+                                        <option
+                                          key={item.key}
+                                          value={item.key}
+                                        >
+                                          {item.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                ) : null}
+
+                                {knownAlternates.some(
+                                  (item) =>
+                                    item.source ===
+                                    "ingredient",
+                                ) ? (
+                                  <optgroup label="Alimenti">
+                                    {knownAlternates
+                                      .filter(
+                                        (item) =>
+                                          item.source ===
+                                          "ingredient",
+                                      )
+                                      .map((item) => (
+                                        <option
+                                          key={item.key}
+                                          value={item.key}
+                                        >
+                                          {item.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                ) : null}
+                              </select>
+                              <span className={styles.manualMealLabel}>oppure scrivi manualmente</span>
                               <input
                                 type="text"
                                 value={alternateName}
@@ -2111,17 +4260,23 @@ export function HomeShell() {
                             </div>
                           </div>
                         ) : null}
-                      </>
-                    ) : null}
                   </article>
                 ),
               )}
+
             </div>
           </section>
 
           {!actualDinner &&
           showDinnerAlternatives ? (
-            <section className={styles.decisionSection}>
+            <section
+              {...dashboardWidgetProps("dinner")}
+              className={`${styles.decisionSection} ${styles.dashboardWidget}`}
+            >
+            {dashboardWidgetControls(
+              "dinner",
+              "Alternative cena",
+            )}
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
@@ -2229,18 +4384,240 @@ export function HomeShell() {
           </section>
           ) : null}
 
-          <QuickAdd
-            date={todayIso()}
-            accessToken={accessToken}
-            onSaved={refreshHome}
-          />
+          <div
+            {...dashboardWidgetProps("quick-add")}
+            className={`${styles.quickAddWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "quick-add",
+              "Aggiunta rapida",
+            )}
 
-          <RegisteredToday
-            meals={actualMeals}
-            activities={actualActivities}
-            accessToken={accessToken}
-            onChanged={refreshHome}
-          />
+            <QuickAdd
+              date={todayIso()}
+              accessToken={accessToken}
+              latestWeight={latestWeight}
+              defaultMealType={recommendedMealType}
+              onSaved={refreshHome}
+            />
+          </div>
+
+          <section
+            {...dashboardWidgetProps("weight")}
+            className={`${styles.insightWidget} ${styles.weightWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "weight",
+              "Trend peso",
+            )}
+
+            <div className={styles.insightWidgetHeader}>
+              <div>
+                <p className={styles.kicker}>
+                  Andamento
+                </p>
+                <h2>Trend peso</h2>
+              </div>
+
+              <select
+                className={styles.periodBadge}
+                value={weightRange}
+                aria-label="Intervallo del grafico peso"
+                onChange={(event) => {
+                  setWeightRange(
+                    event.target.value as
+                      | "14"
+                      | "30"
+                      | "90"
+                      | "180"
+                      | "365"
+                      | "all",
+                  );
+                }}
+              >
+                <option value="14">
+                  14 giorni
+                </option>
+                <option value="30">
+                  30 giorni
+                </option>
+                <option value="90">
+                  3 mesi
+                </option>
+                <option value="180">
+                  6 mesi
+                </option>
+                <option value="365">
+                  1 anno
+                </option>
+                <option value="all">
+                  Tutto
+                </option>
+              </select>
+            </div>
+
+            {recentWeights.length ? (
+              <>
+                <div className={styles.weightSummary}>
+                  <strong>
+                    {Number(
+                      recentWeights[
+                        recentWeights.length - 1
+                      ].weight,
+                    ).toFixed(1)}{" "}
+                    kg
+                  </strong>
+
+                  {weightChange !== null ? (
+                    <span
+                      className={
+                        weightChange <= 0
+                          ? styles.weightChangePositive
+                          : styles.weightChangeNeutral
+                      }
+                    >
+                      {weightChange > 0 ? "+" : ""}
+                      {weightChange.toFixed(1)} kg
+                    </span>
+                  ) : null}
+                </div>
+
+                <svg
+                  className={styles.weightChart}
+                  viewBox="0 0 300 110"
+                  role="img"
+                  aria-label={`Andamento del peso: ${
+                    weightRange === "all"
+                      ? "tutto il periodo"
+                      : `ultimi ${weightRange} giorni`
+                  }`}
+                >
+                  <line x1="12" y1="92" x2="288" y2="92" />
+                  <line x1="12" y1="56" x2="288" y2="56" />
+                  <line x1="12" y1="20" x2="288" y2="20" />
+
+                  <polyline
+                    points={weightChartPoints}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                  />
+
+                  {recentWeights.map((entry, index) => {
+                    const [x, y] =
+                      weightChartPoints
+                        .split(" ")[index]
+                        .split(",");
+
+                    return (
+                      <circle
+                        key={`${entry.date}-${entry.id}`}
+                        cx={x}
+                        cy={y}
+                        r="3.5"
+                      />
+                    );
+                  })}
+                </svg>
+
+                <div className={styles.weightDates}>
+                  <span>
+                    {new Date(
+                      recentWeights[0].date,
+                    ).toLocaleDateString("it-IT", {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}
+                  </span>
+                  <span>
+                    {new Date(
+                      recentWeights[
+                        recentWeights.length - 1
+                      ].date,
+                    ).toLocaleDateString("it-IT", {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className={styles.insightEmpty}>
+                <strong>Nessun peso registrato</strong>
+                <p>
+                  Aggiungi il primo peso dal tuo profilo.
+                </p>
+              </div>
+            )}
+          </section>
+
+          <section
+            {...dashboardWidgetProps("goal")}
+            className={`${styles.insightWidget} ${styles.goalWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "goal",
+              "Obiettivo calorico",
+            )}
+
+            <div className={styles.insightWidgetHeader}>
+              <div>
+                <p className={styles.kicker}>
+                  Obiettivo
+                </p>
+                <h2>Obiettivo calorico</h2>
+              </div>
+
+              <span
+                className={styles.goalIcon}
+                aria-hidden="true"
+              >
+                ◎
+              </span>
+            </div>
+
+            <div className={styles.goalValue}>
+              <span>Deficit giornaliero</span>
+              <strong>
+                {budget
+                  ? roundNumber(
+                      budget.goal_adjustment_kcal,
+                    )
+                  : "—"}{" "}
+                kcal
+              </strong>
+            </div>
+
+            <p className={styles.goalDescription}>
+              Il target viene calcolato dal tuo
+              mantenimento e dal piano scelto.
+            </p>
+
+            <a
+              href="/profile"
+              className={styles.goalEditLink}
+            >
+              Modifica nel profilo →
+            </a>
+          </section>
+
+          <div
+            {...dashboardWidgetProps("summary")}
+            className={`${styles.summaryWidget} ${styles.dashboardWidget}`}
+          >
+            {dashboardWidgetControls(
+              "summary",
+              "Resoconto della giornata",
+            )}
+
+            <RegisteredToday
+              meals={actualMeals}
+              activities={actualActivities}
+              accessToken={accessToken}
+              onChanged={refreshHome}
+            />
+          </div>
+
+          </div>
 
         </>
       ) : null}

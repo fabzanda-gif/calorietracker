@@ -1,14 +1,19 @@
 "use client";
 
+import Link from "next/link";
+
 import { AppNav } from "@/components/navigation/AppNav";
+import { RecipeShareButton } from "@/components/recipes/RecipeShareButton";
 
 import {
+  useRef,
   useEffect,
   useMemo,
   useState,
 } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
 import {
   createIngredient,
   getIngredients,
@@ -30,6 +35,8 @@ import {
 import {
   createMeal,
 } from "@/lib/api/meals";
+
+import { createMealPrep } from "@/lib/api/mealPrep";
 
 import styles from "./RecipesPage.module.css";
 
@@ -71,6 +78,8 @@ function todayLocalIso(): string {
 
 export default function RecipesPage() {
   const { accessToken, user } = useAuth();
+  const { experienceMode } = useExperienceMode();
+  const zero = experienceMode === "zero";
 
   const [recipes, setRecipes] =
     useState<Recipe[]>([]);
@@ -85,6 +94,10 @@ export default function RecipesPage() {
     useState("Cena");
   const [servings, setServings] =
     useState("1");
+  const [tasteRating, setTasteRating] =
+    useState("");
+  const [easeRating, setEaseRating] =
+    useState("");
 
   const [imageUrl, setImageUrl] =
     useState<string | null>(null);
@@ -110,6 +123,14 @@ export default function RecipesPage() {
   const [message, setMessage] =
     useState<string | null>(null);
 
+  const [recipeSearch, setRecipeSearch] =
+    useState("");
+
+  const [recipeMealFilter, setRecipeMealFilter] =
+    useState("Tutte");
+  const [recipeSort, setRecipeSort] =
+    useState<"recent" | "taste" | "ease">("recent");
+
 
   const [mealDraft, setMealDraft] =
     useState<{
@@ -124,6 +145,101 @@ export default function RecipesPage() {
 
   const [loggingMeal, setLoggingMeal] =
     useState(false);
+  const [cookRecipe, setCookRecipe] =
+    useState<Recipe | null>(null);
+  const [cookPortions, setCookPortions] =
+    useState("1");
+  const [cooking, setCooking] =
+    useState(false);
+  const actionPanelRef = useRef<HTMLElement | null>(null);
+  const editorRef = useRef<HTMLElement | null>(null);
+
+  function reveal(ref: React.RefObject<HTMLElement | null>) {
+    window.requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
+  const availableRecipeMealTypes = useMemo(() => {
+    const values = recipes
+      .map((recipe) =>
+        String(recipe.meal_type || "").trim(),
+      )
+      .filter(Boolean);
+
+    return Array.from(
+      new Set(values),
+    ).sort((a, b) =>
+      a.localeCompare(
+        b,
+        "it",
+        {
+          sensitivity: "base",
+        },
+      ),
+    );
+  }, [recipes]);
+
+  const filteredRecipes = useMemo(() => {
+    const query = recipeSearch
+      .trim()
+      .toLocaleLowerCase("it");
+
+    const matches = recipes.filter((recipe) => {
+      const recipeType =
+        String(
+          recipe.meal_type || "",
+        ).trim();
+
+      const matchesMealType =
+        recipeMealFilter === "Tutte" ||
+        recipeType.localeCompare(
+          recipeMealFilter,
+          "it",
+          {
+            sensitivity: "base",
+          },
+        ) === 0;
+
+      if (!matchesMealType) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const searchableText = [
+        recipe.name,
+        recipe.meal_type,
+        recipe.category,
+        recipe.notes,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("it");
+
+      return searchableText.includes(query);
+    });
+
+    if (recipeSort === "taste") {
+      return matches.sort((a, b) => Number(b.taste_rating || 0) - Number(a.taste_rating || 0));
+    }
+
+    if (recipeSort === "ease") {
+      return matches.sort((a, b) => Number(b.ease_rating || 0) - Number(a.ease_rating || 0));
+    }
+
+    return matches;
+  }, [
+    recipes,
+    recipeSearch,
+    recipeMealFilter,
+    recipeSort,
+  ]);
 
   useEffect(() => {
     if (!accessToken) {
@@ -166,57 +282,12 @@ export default function RecipesPage() {
     setName("");
     setMealType("Cena");
     setServings("1");
+    setTasteRating("");
+    setEaseRating("");
     setImageUrl(null);
     setNotes("");
     setDraftIngredients([]);
     setMessage(null);
-  }
-
-  async function editRecipe(recipeId: string) {
-    if (!accessToken) {
-      return;
-    }
-
-    setMessage(null);
-
-    try {
-      const response = await getRecipe(
-        recipeId,
-        accessToken,
-      );
-
-      const recipe = response.item;
-
-      setEditingId(recipe.id);
-      setName(recipe.name);
-      setMealType(
-        recipe.meal_type || "Cena",
-      );
-      setServings(
-        String(recipe.recipe_servings || 1),
-      );
-      setImageUrl(
-        recipe.image_url || null,
-      );
-      setNotes(
-        recipe.notes || "",
-      );
-
-      setDraftIngredients(
-        (recipe.structured_ingredients ?? []).map(
-          (item) => ({
-            ingredientId: item.ingredient_id,
-            quantityG: item.quantity_g,
-          }),
-        ),
-      );
-    } catch (err) {
-      setMessage(
-        err instanceof Error
-          ? err.message
-          : "Non riesco ad aprire la ricetta.",
-      );
-    }
   }
 
   function addIngredientRow() {
@@ -303,6 +374,71 @@ export default function RecipesPage() {
     );
   }, [draftIngredients, ingredients]);
 
+  function openCookDialog(recipe: Recipe) {
+    setMealDraft(null);
+    setCookRecipe(recipe);
+    reveal(actionPanelRef);
+    setCookPortions("1");
+    setMessage(null);
+  }
+
+  function closeCookDialog() {
+    if (cooking) {
+      return;
+    }
+
+    setCookRecipe(null);
+    setCookPortions("1");
+  }
+
+  async function confirmCook() {
+    if (!accessToken || !cookRecipe) {
+      return;
+    }
+
+    const portions = Number(cookPortions);
+
+    if (
+      !Number.isInteger(portions) ||
+      portions <= 0
+    ) {
+      setMessage(
+        "Inserisci un numero intero di porzioni.",
+      );
+      return;
+    }
+
+    setCooking(true);
+    setMessage(null);
+
+    try {
+      await createMealPrep(accessToken, {
+        recipe_id: cookRecipe.id,
+        prepared_at: todayLocalIso(),
+        portions_prepared: portions,
+      });
+
+      setCookRecipe(null);
+      setCookPortions("1");
+
+      setMessage(
+        `${cookRecipe.name}: ${portions} ${
+          portions === 1
+            ? "porzione aggiunta"
+            : "porzioni aggiunte"
+        } all'inventario.`,
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Impossibile aggiungere la preparazione all'inventario.",
+      );
+    } finally {
+      setCooking(false);
+    }
+  }
+
   async function startMealFromRecipe(
     recipeId: string,
   ) {
@@ -349,6 +485,7 @@ export default function RecipesPage() {
       const initialScale =
         1 / recipeServings;
 
+      setCookRecipe(null);
       setMealDraft({
         recipeId: recipe.id,
         name: recipe.name,
@@ -367,6 +504,7 @@ export default function RecipesPage() {
             }),
           ),
       });
+      reveal(actionPanelRef);
     } catch (err) {
       setMessage(
         err instanceof Error
@@ -595,6 +733,39 @@ export default function RecipesPage() {
     }
   }
 
+  async function rateRecipe(
+    recipe: Recipe,
+    field: "taste_rating" | "ease_rating",
+    rating: number,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    setMessage(null);
+
+    try {
+      await updateRecipe(
+        recipe.id,
+        { [field]: rating },
+        accessToken,
+      );
+      setRecipes((current) =>
+        current.map((item) =>
+          item.id === recipe.id
+            ? { ...item, [field]: rating }
+            : item,
+        ),
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a salvare la valutazione.",
+      );
+    }
+  }
+
   async function handleRecipeImage(
     file: File,
   ) {
@@ -655,6 +826,8 @@ export default function RecipesPage() {
         ),
       image_url: imageUrl,
       notes: notes.trim() || null,
+      taste_rating: tasteRating ? Number(tasteRating) : null,
+      ease_rating: easeRating ? Number(easeRating) : null,
       structured_ingredients:
         draftIngredients.map((item) => ({
           ingredient_id:
@@ -769,17 +942,33 @@ export default function RecipesPage() {
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>
-            SanoSync
+            Ricette
           </p>
-          <h1>Ricette</h1>
-        </div>
 
-        <a
-          href="/"
-          className={styles.homeLink}
-        >
-          Home
-        </a>
+          <h1>
+            {zero
+              ? "Le ricette che almeno sai già gestire"
+              : "Le tue ricette"}
+          </h1>
+            <Link
+              href="/inventory"
+              className={styles.inventoryLink}
+            >
+              Apri dispensa
+            </Link>
+            <Link
+              href="/ingredients"
+              className={styles.inventoryLink}
+            >
+              Gestisci ingredienti
+            </Link>
+
+          <p className={styles.headerSubtitle}>
+            {zero
+              ? "Piatti già collaudati. Almeno qui evitiamo di fare i fenomeni."
+              : "I piatti che conosci già, pronti da registrare quando servono."}
+          </p>
+        </div>
       </header>
 
       {message ? (
@@ -788,8 +977,63 @@ export default function RecipesPage() {
         </p>
       ) : null}
 
+      {cookRecipe ? (
+        <section ref={actionPanelRef} className={styles.editorCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.kicker}>
+                Meal prep
+              </p>
+              <h2>Cucina</h2>
+            </div>
+
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={closeCookDialog}
+              disabled={cooking}
+            >
+              Annulla
+            </button>
+          </div>
+
+          <p>
+            <strong>{cookRecipe.name}</strong>
+          </p>
+
+          <label className={styles.field}>
+            <span>Quante porzioni hai cucinato?</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={cookPortions}
+              onChange={(event) => {
+                setCookPortions(
+                  event.target.value,
+                );
+              }}
+              disabled={cooking}
+            />
+          </label>
+
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={() => {
+              void confirmCook();
+            }}
+            disabled={cooking}
+          >
+            {cooking
+              ? "Salvataggio..."
+              : "Aggiungi all'inventario"}
+          </button>
+        </section>
+      ) : null}
+
       {mealDraft ? (
-        <section className={styles.editorCard}>
+        <section ref={actionPanelRef} className={styles.editorCard}>
           <div className={styles.sectionHeader}>
             <div>
               <p className={styles.kicker}>
@@ -945,7 +1189,362 @@ export default function RecipesPage() {
         </section>
       ) : null}
 
-      <section className={styles.editorCard}>
+      <section>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.kicker}>
+              Libreria personale
+            </p>
+            <h2>
+              {zero ? "Le solite affidabili" : "Pronte quando ti servono"}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            disabled={saving}
+            onClick={() => {
+              void migrateLegacyLibrary();
+            }}
+          >
+            Aggiorna ricette legacy
+          </button>
+        </div>
+
+        <div className={styles.recipeToolbar}>
+          <label className={styles.recipeSearch}>
+            <span className={styles.searchIcon}>
+              ⌕
+            </span>
+
+            <input
+              type="search"
+              value={recipeSearch}
+              placeholder="Cerca una ricetta…"
+              aria-label="Cerca una ricetta"
+              onChange={(event) => {
+                setRecipeSearch(
+                  event.target.value,
+                );
+              }}
+            />
+
+            {recipeSearch ? (
+              <button
+                type="button"
+                className={styles.clearSearch}
+                aria-label="Cancella ricerca"
+                onClick={() => {
+                  setRecipeSearch("");
+                }}
+              >
+                ×
+              </button>
+            ) : null}
+          </label>
+
+          <div
+            className={styles.recipeFilters}
+            aria-label="Filtra per tipo di pasto"
+          >
+            <button
+              type="button"
+              className={
+                recipeMealFilter === "Tutte"
+                  ? styles.recipeFilterActive
+                  : styles.recipeFilter
+              }
+              onClick={() => {
+                setRecipeMealFilter("Tutte");
+              }}
+            >
+              Tutte
+            </button>
+
+            {availableRecipeMealTypes.map(
+              (type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={
+                    recipeMealFilter === type
+                      ? styles.recipeFilterActive
+                      : styles.recipeFilter
+                  }
+                  onClick={() => {
+                    setRecipeMealFilter(type);
+                  }}
+                >
+                  {type}
+                </button>
+              ),
+            )}
+          </div>
+
+          <div className={styles.recipeResultCount}>
+            <strong>
+              {filteredRecipes.length}
+            </strong>{" "}
+            {filteredRecipes.length === 1
+              ? "ricetta"
+              : "ricette"}
+          </div>
+          <label className={styles.recipeSort}>
+            <span>Ordina</span>
+            <select value={recipeSort} onChange={(event) => setRecipeSort(event.target.value as "recent" | "taste" | "ease")}>
+              <option value="recent">Più recenti</option>
+              <option value="taste">Gusto</option>
+              <option value="ease">Facilità</option>
+            </select>
+          </label>
+        </div>
+
+        {loading ? (
+          <p>Caricamento…</p>
+        ) : filteredRecipes.length ? (
+          <div className={styles.recipeList}>
+            {filteredRecipes.map((recipe) => (
+              <article
+                key={recipe.id}
+                className={styles.recipeCard}
+              >
+                <div className={styles.recipeVisual}>
+                  {recipe.image_url ? (
+                    <img
+                      src={recipe.image_url}
+                      alt={recipe.name}
+                      className={styles.recipeThumb}
+                    />
+                  ) : (
+                    <div
+                      className={
+                        styles.recipePlaceholder
+                      }
+                    >
+                      <span>S</span>
+                    </div>
+                  )}
+
+                  <span className={styles.recipeTypeBadge}>
+                    {recipe.meal_type || "Ricetta"}
+                  </span>
+                </div>
+
+                <div className={styles.recipeContent}>
+                  <div className={styles.recipeMain}>
+                    <strong className={styles.recipeTitle}>
+                      {recipe.name}
+                    </strong>
+
+                    <div className={styles.recipeNutrition}>
+                      <div className={styles.recipeRating}>
+                        <span>Gusto</span>
+                        <div aria-label={`Valuta il gusto di ${recipe.name}`}>
+                          {[1, 2, 3, 4, 5].map((rating) => (
+                            <button
+                              key={rating}
+                              type="button"
+                              aria-label={`${rating} su 5`}
+                              className={rating <= Number(recipe.taste_rating || 0) ? styles.starActive : styles.star}
+                              onClick={() => void rateRecipe(recipe, "taste_rating", rating)}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className={styles.recipeRating}>
+                        <span>Facilità</span>
+                        <div aria-label={`Valuta la facilità di ${recipe.name}`}>
+                          {[1, 2, 3, 4, 5].map((rating) => (
+                            <button
+                              key={rating}
+                              type="button"
+                              aria-label={`${rating} su 5`}
+                              className={rating <= Number(recipe.ease_rating || 0) ? styles.starActive : styles.star}
+                              onClick={() => void rateRecipe(recipe, "ease_rating", rating)}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <span>
+                        <strong>
+                          {Math.round(
+                            Number(
+                              recipe.calories || 0,
+                            ),
+                          )}
+                        </strong>
+                        kcal totali
+                      </span>
+
+                      {recipe.protein != null ? (
+                        <span>
+                          <strong>
+                            {Math.round(
+                              Number(
+                                recipe.protein || 0,
+                              ),
+                            )}
+                          </strong>
+                          g proteine totali
+                        </span>
+                      ) : null}
+
+                      <span>
+                        <strong>
+                          {Math.max(
+                            1,
+                            Number(
+                              recipe.recipe_servings || 1,
+                            ),
+                          )}
+                        </strong>
+                        {Number(
+                          recipe.recipe_servings || 1,
+                        ) === 1
+                          ? " porzione"
+                          : " porzioni"}
+                      </span>
+
+                      <span className={styles.recipePerServing}>
+                        <strong>
+                          {Math.round(
+                            Number(
+                              recipe.calories || 0,
+                            ) /
+                              Math.max(
+                                1,
+                                Number(
+                                  recipe.recipe_servings || 1,
+                                ),
+                              ),
+                          )}
+                        </strong>{" "}
+                        kcal / porzione
+                      </span>
+
+                      {recipe.protein != null ? (
+                        <span className={styles.recipePerServing}>
+                          <strong>
+                            {Math.round(
+                              Number(
+                                recipe.protein || 0,
+                              ) /
+                                Math.max(
+                                  1,
+                                  Number(
+                                    recipe.recipe_servings || 1,
+                                  ),
+                                ),
+                            )}
+                          </strong>{" "}
+                          g proteine / porzione
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {recipe.notes ? (
+                      <p
+                        className={
+                          styles.recipeDescription
+                        }
+                      >
+                        {recipe.notes}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.recipeActions}>
+                    <RecipeShareButton
+                      name={recipe.name}
+                      imageUrl={recipe.image_url}
+                      calories={Number(recipe.calories || 0)}
+                      protein={
+                        recipe.protein != null
+                          ? Number(recipe.protein)
+                          : null
+                      }
+                      servings={recipe.recipe_servings}
+                      preparation={recipe.preparation}
+                    />
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => {
+                        openCookDialog(recipe);
+                      }}
+                    >
+                      Cucina
+                    </button>
+<button
+                      type="button"
+                      className={
+                        styles.primarySmallButton
+                      }
+                      onClick={() => {
+                        void startMealFromRecipe(
+                          recipe.id,
+                        );
+                      }}
+                    >
+                      Registra
+                    </button>
+
+                    <Link
+                      className={styles.secondaryButton}
+                      href={`/recipes/${encodeURIComponent(recipe.id)}`}
+                    >
+                      Dettaglio
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.recipeEmptyState}>
+            <strong>
+              {recipes.length
+                ? zero
+                  ? "Niente. I filtri hanno lavorato fin troppo bene."
+                  : "Nessuna ricetta trovata"
+                : zero
+                  ? "Libreria vuota. Minimalismo non richiesto."
+                  : "La tua libreria è ancora vuota"}
+            </strong>
+
+            <p>
+              {recipes.length
+                ? zero
+                  ? "Cambia ricerca o filtro. Magari compare qualcosa."
+                  : "Prova a cambiare ricerca o filtro."
+                : zero
+                  ? "Salva una ricetta. Prima o poi servirà anche questa organizzazione."
+                  : "Salva una ricetta e la troverai qui pronta da riutilizzare."}
+            </p>
+
+            {recipes.length ? (
+              <button
+                type="button"
+                className={styles.resetFiltersButton}
+                onClick={() => {
+                  setRecipeSearch("");
+                  setRecipeMealFilter("Tutte");
+                }}
+              >
+                Azzera filtri
+              </button>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+
+<section ref={editorRef} className={styles.editorCard}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
@@ -1043,6 +1642,23 @@ export default function RecipesPage() {
                 );
               }}
             />
+          </label>
+        </div>
+
+        <div className={styles.twoColumns}>
+          <label className={styles.field}>
+            Gusto
+            <select value={tasteRating} onChange={(event) => setTasteRating(event.target.value)}>
+              <option value="">Non valutato</option>
+              {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
+            </select>
+          </label>
+          <label className={styles.field}>
+            Facilità
+            <select value={easeRating} onChange={(event) => setEaseRating(event.target.value)}>
+              <option value="">Non valutata</option>
+              {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
+            </select>
           </label>
         </div>
 
@@ -1279,106 +1895,6 @@ export default function RecipesPage() {
         </button>
       </section>
 
-      <section>
-        <div className={styles.sectionHeader}>
-          <div>
-            <p className={styles.kicker}>
-              Libreria
-            </p>
-            <h2>Le tue ricette</h2>
-          </div>
-
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            disabled={saving}
-            onClick={() => {
-              void migrateLegacyLibrary();
-            }}
-          >
-            Aggiorna ricette legacy
-          </button>
-        </div>
-
-        {loading ? (
-          <p>Caricamento…</p>
-        ) : recipes.length ? (
-          <div className={styles.recipeList}>
-            {recipes.map((recipe) => (
-              <article
-                key={recipe.id}
-                className={styles.recipeCard}
-              >
-                {recipe.image_url ? (
-                  <img
-                    src={recipe.image_url}
-                    alt={recipe.name}
-                    className={styles.recipeThumb}
-                  />
-                ) : null}
-
-                <div>
-                  <strong>
-                    {recipe.name}
-                  </strong>
-                  <p>
-                    {recipe.meal_type ||
-                      "Ricetta"}{" "}
-                    ·{" "}
-                    {Math.round(
-                      Number(
-                        recipe.calories ||
-                          0,
-                      ),
-                    )}{" "}
-                    kcal
-                  </p>
-
-                  {recipe.notes ? (
-                    <p
-                      className={
-                        styles.recipeDescription
-                      }
-                    >
-                      {recipe.notes}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className={styles.smallActions}>
-                  <button
-                    type="button"
-                    className={styles.primarySmallButton}
-                    onClick={() => {
-                      void startMealFromRecipe(
-                        recipe.id,
-                      );
-                    }}
-                  >
-                    Registra
-                  </button>
-
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => {
-                      void editRecipe(
-                        recipe.id,
-                      );
-                    }}
-                  >
-                    Modifica
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p>
-            Nessuna ricetta salvata.
-          </p>
-        )}
-      </section>
       </main>
     </>
   );
