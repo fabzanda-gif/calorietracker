@@ -311,6 +311,16 @@ export interface PlannedActivity {
   intensity: PlannedActivityIntensity;
   notes?: string | null;
   status: PlannedActivityStatus;
+  training_plan_id?: string | null;
+  training_week?: number | null;
+  session_kind?:
+    | "easy"
+    | "recovery"
+    | "tempo"
+    | "interval"
+    | "long"
+    | "race"
+    | null;
 }
 
 export interface PlannedActivityInput {
@@ -441,6 +451,13 @@ export interface RunningTrainingPlanCreateResponse {
   sessions: PlannedActivity[];
 }
 
+export interface RunningTrainingPlanPreviewResponse {
+  preview: true;
+  total_weeks: number;
+  session_count: number;
+  sessions: PlannedActivity[];
+}
+
 export function getTrainingPlans(
   accessToken?: string | null,
 ): Promise<{
@@ -450,6 +467,20 @@ export function getTrainingPlans(
   return apiRequest(
     "/activities/training-plans",
     { accessToken },
+  );
+}
+
+export function previewRunningTrainingPlan(
+  input: RunningTrainingPlanInput,
+  accessToken?: string | null,
+): Promise<RunningTrainingPlanPreviewResponse> {
+  return apiRequest(
+    "/activities/training-plans/running/preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
   );
 }
 

@@ -8,7 +8,10 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   createRunningTrainingPlan,
+  previewRunningTrainingPlan,
   getTrainingPlans,
+  type PlannedActivity,
+  type RunningTrainingPlanInput,
   type TrainingPlan,
 } from "@/lib/api/activities";
 
@@ -103,6 +106,24 @@ export function RunningPlanBuilder({
   const [message, setMessage] =
     useState<string | null>(null);
 
+  const [previewSessions, setPreviewSessions] =
+    useState<PlannedActivity[]>([]);
+
+  const [previewWeeks, setPreviewWeeks] =
+    useState<number | null>(null);
+
+  const [previewInput, setPreviewInput] =
+    useState<RunningTrainingPlanInput | null>(
+      null,
+    );
+
+
+  function clearPreview() {
+    setPreviewSessions([]);
+    setPreviewWeeks(null);
+    setPreviewInput(null);
+  }
+
 
   async function refreshPlans() {
     if (!accessToken) {
@@ -128,11 +149,9 @@ export function RunningPlanBuilder({
   }, [accessToken]);
 
 
-  async function createPlan() {
-    if (!accessToken) {
-      return;
-    }
-
+  function buildPlanInput():
+    | RunningTrainingPlanInput
+    | null {
     const currentPaceSeconds =
       paceToSeconds(currentPace);
 
@@ -155,7 +174,7 @@ export function RunningPlanBuilder({
       setMessage(
         "Controlla distanza, passo e data obiettivo.",
       );
-      return;
+      return null;
     }
 
     const startDate =
@@ -178,6 +197,78 @@ export function RunningPlanBuilder({
       setMessage(
         "Servono almeno 8 settimane tra oggi e l’obiettivo.",
       );
+      return null;
+    }
+
+    return {
+      start_date: startDate,
+      target_date: targetDate,
+      current_distance_meters:
+        currentDistanceKm * 1000,
+      current_pace_seconds_per_km:
+        currentPaceSeconds,
+      target_distance_meters:
+        targetDistanceKm * 1000,
+      target_pace_seconds_per_km:
+        targetPaceSeconds,
+      sessions_per_week:
+        Number(sessionsPerWeek),
+      long_run_weekday:
+        Number(longRunWeekday),
+    };
+  }
+
+
+  async function generatePreview() {
+    if (!accessToken) {
+      return;
+    }
+
+    const input = buildPlanInput();
+
+    if (!input) {
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+    clearPreview();
+
+    try {
+      const response =
+        await previewRunningTrainingPlan(
+          input,
+          accessToken,
+        );
+
+      setPreviewInput(input);
+      setPreviewSessions(
+        response.sessions,
+      );
+      setPreviewWeeks(
+        response.total_weeks,
+      );
+
+      setMessage(
+        "Anteprima pronta. Nulla è stato ancora aggiunto al calendario.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Non riesco a generare l’anteprima.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
+  async function confirmPlan() {
+    if (
+      !accessToken ||
+      !previewInput
+    ) {
       return;
     }
 
@@ -187,28 +278,15 @@ export function RunningPlanBuilder({
     try {
       const response =
         await createRunningTrainingPlan(
-          {
-            start_date: startDate,
-            target_date: targetDate,
-            current_distance_meters:
-              currentDistanceKm * 1000,
-            current_pace_seconds_per_km:
-              currentPaceSeconds,
-            target_distance_meters:
-              targetDistanceKm * 1000,
-            target_pace_seconds_per_km:
-              targetPaceSeconds,
-            sessions_per_week:
-              Number(sessionsPerWeek),
-            long_run_weekday:
-              Number(longRunWeekday),
-          },
+          previewInput,
           accessToken,
         );
 
       setMessage(
-        `Piano creato: ${response.plan.total_weeks} settimane, ${response.session_count} sessioni.`,
+        `Piano confermato: ${response.plan.total_weeks} settimane, ${response.session_count} sessioni aggiunte al calendario.`,
       );
+
+      clearPreview();
 
       await refreshPlans();
 
@@ -217,12 +295,13 @@ export function RunningPlanBuilder({
       setMessage(
         error instanceof Error
           ? error.message
-          : "Non riesco a creare il piano.",
+          : "Non riesco a salvare il piano.",
       );
     } finally {
       setSaving(false);
     }
   }
+
 
 
   const activePlan =
@@ -294,11 +373,12 @@ export function RunningPlanBuilder({
                   min="1"
                   step="0.1"
                   value={currentDistance}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setCurrentDistance(
                       event.target.value,
-                    )
-                  }
+                    );
+                    clearPreview();
+                  }}
                 />
                 <span>km</span>
               </div>
@@ -310,11 +390,12 @@ export function RunningPlanBuilder({
                 <input
                   value={currentPace}
                   placeholder="6:00"
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setCurrentPace(
                       event.target.value,
-                    )
-                  }
+                    );
+                    clearPreview();
+                  }}
                 />
                 <span>min/km</span>
               </div>
@@ -342,11 +423,12 @@ export function RunningPlanBuilder({
                   min="1"
                   step="0.1"
                   value={targetDistance}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setTargetDistance(
                       event.target.value,
-                    )
-                  }
+                    );
+                    clearPreview();
+                  }}
                 />
                 <span>km</span>
               </div>
@@ -358,11 +440,12 @@ export function RunningPlanBuilder({
                 <input
                   value={targetPace}
                   placeholder="5:00"
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setTargetPace(
                       event.target.value,
-                    )
-                  }
+                    );
+                    clearPreview();
+                  }}
                 />
                 <span>min/km</span>
               </div>
@@ -373,11 +456,12 @@ export function RunningPlanBuilder({
               <input
                 type="date"
                 value={targetDate}
-                onChange={(event) =>
+                onChange={(event) => {
                   setTargetDate(
                     event.target.value,
-                  )
-                }
+                  );
+                  clearPreview();
+                }}
               />
             </label>
           </div>
@@ -389,11 +473,12 @@ export function RunningPlanBuilder({
           Corse a settimana
           <select
             value={sessionsPerWeek}
-            onChange={(event) =>
+            onChange={(event) => {
               setSessionsPerWeek(
                 event.target.value,
-              )
-            }
+              );
+              clearPreview();
+            }}
           >
             <option value="2">2</option>
             <option value="3">3</option>
@@ -406,11 +491,12 @@ export function RunningPlanBuilder({
           Giorno del lungo
           <select
             value={longRunWeekday}
-            onChange={(event) =>
+            onChange={(event) => {
               setLongRunWeekday(
                 event.target.value,
-              )
-            }
+              );
+              clearPreview();
+            }}
           >
             <option value="0">Lunedì</option>
             <option value="1">Martedì</option>
@@ -426,14 +512,132 @@ export function RunningPlanBuilder({
           type="button"
           disabled={saving}
           onClick={() => {
-            void createPlan();
+            void generatePreview();
           }}
         >
           {saving
-            ? "Costruisco il piano…"
-            : "Crea piano di corsa"}
+            ? "Genero l’anteprima…"
+            : "Genera anteprima"}
         </button>
       </div>
+
+      {previewSessions.length &&
+      previewWeeks ? (
+        <div className={styles.preview}>
+          <div className={styles.previewHeading}>
+            <div>
+              <small>
+                ANTEPRIMA · NON ANCORA SALVATA
+              </small>
+
+              <h3>
+                {previewWeeks} settimane ·{" "}
+                {previewSessions.length} sessioni
+              </h3>
+
+              <p>
+                Controlla le prime sessioni.
+                Il calendario verrà modificato
+                solo dopo la conferma.
+              </p>
+            </div>
+          </div>
+
+          <div className={styles.previewSessions}>
+            {previewSessions
+              .slice(0, 6)
+              .map((session, index) => (
+                <article
+                  key={`${session.scheduled_date}-${index}`}
+                >
+                  <div>
+                    <small>
+                      Settimana{" "}
+                      {session.training_week ?? "—"}
+                    </small>
+
+                    <strong>
+                      {new Date(
+                        `${session.scheduled_date}T00:00:00`,
+                      ).toLocaleDateString(
+                        "it-IT",
+                        {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        },
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <small>
+                      {session.session_kind ??
+                        "corsa"}
+                    </small>
+
+                    <strong>
+                      {session.title}
+                    </strong>
+
+                    <span>
+                      {session.distance_meters
+                        ? `${(
+                            session.distance_meters /
+                            1000
+                          ).toLocaleString(
+                            "it-IT",
+                            {
+                              maximumFractionDigits:
+                                1,
+                            },
+                          )} km`
+                        : ""}
+
+                      {session.duration_minutes
+                        ? ` · ${session.duration_minutes} min`
+                        : ""}
+                    </span>
+                  </div>
+                </article>
+              ))}
+          </div>
+
+          {previewSessions.length > 6 ? (
+            <p className={styles.previewMore}>
+              + altre{" "}
+              {previewSessions.length - 6} sessioni
+            </p>
+          ) : null}
+
+          <div className={styles.previewActions}>
+            <button
+              type="button"
+              className={styles.confirmButton}
+              disabled={saving}
+              onClick={() => {
+                void confirmPlan();
+              }}
+            >
+              {saving
+                ? "Salvo il piano…"
+                : "Conferma e aggiungi al calendario"}
+            </button>
+
+            <button
+              type="button"
+              className={styles.editButton}
+              disabled={saving}
+              onClick={() => {
+                clearPreview();
+                setMessage(null);
+              }}
+            >
+              Modifica parametri
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {message ? (
         <p className={styles.message}>

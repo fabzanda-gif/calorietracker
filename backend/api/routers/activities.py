@@ -286,6 +286,76 @@ def list_training_plans(
 
 
 @router.post(
+    "/training-plans/running/preview",
+)
+def preview_running_training_plan(
+    request: RunningTrainingPlanCreate,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+):
+    # Authentication is still required, but this
+    # endpoint intentionally performs no persistence.
+    _ = current_user
+
+    total_days = (
+        request.target_date -
+        request.start_date
+    ).days
+
+    if total_days < 56:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Il piano deve durare almeno 8 settimane."
+            ),
+        )
+
+    try:
+        sessions = build_running_plan(
+            RunningPlanInput(
+                start_date=request.start_date,
+                target_date=request.target_date,
+                current_distance_meters=(
+                    request.current_distance_meters
+                ),
+                current_pace_seconds_per_km=(
+                    request.current_pace_seconds_per_km
+                ),
+                target_distance_meters=(
+                    request.target_distance_meters
+                ),
+                target_pace_seconds_per_km=(
+                    request.target_pace_seconds_per_km
+                ),
+                sessions_per_week=(
+                    request.sessions_per_week
+                ),
+                long_run_weekday=(
+                    request.long_run_weekday
+                ),
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    total_weeks = max(
+        item["training_week"]
+        for item in sessions
+    )
+
+    return {
+        "preview": True,
+        "total_weeks": total_weeks,
+        "session_count": len(sessions),
+        "sessions": sessions,
+    }
+
+
+@router.post(
     "/training-plans/running",
     status_code=status.HTTP_201_CREATED,
 )
