@@ -287,6 +287,36 @@ def list_training_plans(
         ) from exc
 
 
+@router.get(
+    "/training-plans/{plan_id}/sessions"
+)
+def list_training_plan_sessions(
+    plan_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+):
+    try:
+        items = repo.list_for_training_plan(
+            current_user.id,
+            plan_id,
+        )
+
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.delete("/training-plans/{plan_id}")
 def delete_training_plan(
     plan_id: str,

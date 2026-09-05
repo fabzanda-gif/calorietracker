@@ -485,6 +485,21 @@ export function previewRunningTrainingPlan(
   );
 }
 
+export function getTrainingPlanSessions(
+  id: string,
+  accessToken?: string | null,
+): Promise<{
+  count: number;
+  items: PlannedActivity[];
+}> {
+  return apiRequest(
+    `/activities/training-plans/${encodeURIComponent(id)}/sessions`,
+    {
+      accessToken,
+    },
+  );
+}
+
 export function deleteTrainingPlan(
   id: string,
   accessToken?: string | null,

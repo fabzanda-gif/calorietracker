@@ -391,3 +391,267 @@
 }
 
 /* REPLACE RUNNING PLAN END */
+
+
+/* FULL RUNNING PLAN START */
+
+.viewPlanButton{
+  width:100%;
+  min-height:36px;
+  margin-top:12px;
+  padding:0 10px;
+  border:0;
+  border-radius:9px;
+  background:#102846;
+  color:#fff;
+  font:inherit;
+  font-size:.72rem;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.fullPlan{
+  margin-top:22px;
+  padding:20px;
+  border:1px solid #dfe3e2;
+  border-radius:20px;
+  background:#f8faf8;
+}
+
+.fullPlanHeading{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:20px;
+}
+
+.fullPlanHeading small{
+  color:#ef5e5c;
+  font-size:.65rem;
+  font-weight:900;
+  letter-spacing:.09em;
+}
+
+.fullPlanHeading h3{
+  margin:4px 0;
+  color:#102846;
+  font-size:1.35rem;
+}
+
+.fullPlanHeading p{
+  margin:0;
+  color:#788594;
+  font-size:.78rem;
+}
+
+.fullPlanGoal{
+  min-width:150px;
+  padding:11px 13px;
+  border-radius:13px;
+  background:#fff;
+}
+
+.fullPlanGoal small,
+.fullPlanGoal span{
+  display:block;
+  color:#85909d;
+}
+
+.fullPlanGoal strong{
+  display:block;
+  margin:3px 0;
+  color:#102846;
+}
+
+.weekList{
+  display:grid;
+  gap:10px;
+  margin-top:18px;
+}
+
+.weekCard{
+  overflow:hidden;
+  border:1px solid #e0e4e1;
+  border-radius:15px;
+  background:#fff;
+}
+
+.weekHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 14px;
+  border-bottom:1px solid #edf0ed;
+  background:#fafbf9;
+}
+
+.weekHeader > div{
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+}
+
+.weekHeader small{
+  color:#8c97a3;
+  font-size:.61rem;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+
+.weekHeader strong{
+  color:#102846;
+  font-size:1.05rem;
+}
+
+.weekHeader > span{
+  color:#8994a0;
+  font-size:.7rem;
+  font-weight:700;
+}
+
+.weekSessions{
+  display:grid;
+}
+
+.weekSession{
+  display:grid;
+  grid-template-columns:
+    110px minmax(170px,1fr) 120px 90px;
+  gap:14px;
+  align-items:center;
+  min-height:58px;
+  padding:8px 14px;
+  border-bottom:1px solid #eff1ef;
+}
+
+.weekSession:last-child{
+  border-bottom:0;
+}
+
+.weekSessionDate{
+  color:#5e6d7d;
+  font-size:.75rem;
+  font-weight:800;
+  text-transform:capitalize;
+}
+
+.weekSessionType{
+  display:grid;
+  justify-items:start;
+  gap:3px;
+}
+
+.weekSessionType > span{
+  display:inline-flex;
+  min-height:21px;
+  align-items:center;
+  padding:0 7px;
+  border-radius:999px;
+  background:#eef2f5;
+  color:#526478;
+  font-size:.6rem;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.weekSessionType strong{
+  color:#102846;
+  font-size:.8rem;
+}
+
+.weekSessionMetrics{
+  display:grid;
+  gap:2px;
+}
+
+.weekSessionMetrics strong{
+  color:#102846;
+  font-size:.8rem;
+}
+
+.weekSessionMetrics span{
+  color:#87929e;
+  font-size:.69rem;
+}
+
+.weekSessionStatus{
+  justify-self:end;
+  color:#82909c;
+  font-size:.66rem;
+  font-weight:800;
+}
+
+.sessionKind_easy{
+  background:#edf6ef !important;
+  color:#487051 !important;
+}
+
+.sessionKind_recovery{
+  background:#eef5f7 !important;
+  color:#4c6f78 !important;
+}
+
+.sessionKind_tempo{
+  background:#fff4df !important;
+  color:#886426 !important;
+}
+
+.sessionKind_interval{
+  background:#fff0ec !important;
+  color:#9a5040 !important;
+}
+
+.sessionKind_long{
+  background:#eaf0f8 !important;
+  color:#284d7b !important;
+}
+
+.sessionKind_race{
+  background:#fcebec !important;
+  color:#9b3740 !important;
+}
+
+.fullPlanLoading{
+  margin-top:16px;
+  padding:18px;
+  border-radius:13px;
+  background:#fff;
+  color:#7d8997;
+  font-size:.8rem;
+  font-weight:750;
+  text-align:center;
+}
+
+@media(max-width:760px){
+  .fullPlanHeading{
+    flex-direction:column;
+  }
+
+  .weekSession{
+    grid-template-columns:90px 1fr 90px;
+  }
+
+  .weekSessionStatus{
+    display:none;
+  }
+}
+
+@media(max-width:540px){
+  .fullPlan{
+    padding:14px;
+  }
+
+  .weekSession{
+    grid-template-columns:1fr;
+    gap:5px;
+    padding:12px;
+  }
+
+  .weekSessionMetrics{
+    display:flex;
+    gap:8px;
+  }
+}
+
+/* FULL RUNNING PLAN END */

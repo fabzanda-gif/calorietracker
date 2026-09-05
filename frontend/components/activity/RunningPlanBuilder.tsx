@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   createRunningTrainingPlan,
   deleteTrainingPlan,
+  getTrainingPlanSessions,
   previewRunningTrainingPlan,
   getTrainingPlans,
   type PlannedActivity,
@@ -47,6 +48,64 @@ function paceToSeconds(
     Number(match[1]) * 60 +
     Number(match[2])
   );
+}
+
+
+const SESSION_KIND_LABELS: Record<
+  string,
+  string
+> = {
+  easy: "Facile",
+  recovery: "Recupero",
+  tempo: "Tempo",
+  interval: "Intervalli",
+  long: "Lungo",
+  race: "Gara",
+};
+
+
+function sessionKindLabel(
+  value?: string | null,
+): string {
+  if (!value) {
+    return "Corsa";
+  }
+
+  return SESSION_KIND_LABELS[value] ?? value;
+}
+
+
+function sessionDateLabel(
+  value: string,
+): string {
+  return new Date(
+    `${value}T00:00:00`,
+  ).toLocaleDateString(
+    "it-IT",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    },
+  );
+}
+
+
+function distanceLabel(
+  meters?: number | null,
+): string {
+  if (meters == null) {
+    return "—";
+  }
+
+  return `${(
+    meters / 1000
+  ).toLocaleString(
+    "it-IT",
+    {
+      maximumFractionDigits: 2,
+    },
+  )} km`;
 }
 
 
@@ -120,6 +179,15 @@ export function RunningPlanBuilder({
     useState<RunningTrainingPlanInput | null>(
       null,
     );
+
+  const [planSessions, setPlanSessions] =
+    useState<PlannedActivity[]>([]);
+
+  const [showFullPlan, setShowFullPlan] =
+    useState(false);
+
+  const [loadingFullPlan, setLoadingFullPlan] =
+    useState(false);
 
 
   function clearPreview() {
@@ -374,6 +442,99 @@ export function RunningPlanBuilder({
     ) ?? null;
 
 
+  useEffect(() => {
+    if (
+      !accessToken ||
+      !activePlan ||
+      !showFullPlan
+    ) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadFullPlan() {
+      setLoadingFullPlan(true);
+
+      try {
+        const response =
+          await getTrainingPlanSessions(
+            activePlan!.id,
+            accessToken,
+          );
+
+        if (!active) {
+          return;
+        }
+
+        setPlanSessions(response.items);
+
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Non riesco a caricare il piano completo.",
+        );
+
+      } finally {
+        if (active) {
+          setLoadingFullPlan(false);
+        }
+      }
+    }
+
+    void loadFullPlan();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    accessToken,
+    activePlan?.id,
+    showFullPlan,
+  ]);
+
+
+  useEffect(() => {
+    setPlanSessions([]);
+    setShowFullPlan(false);
+  }, [activePlan?.id]);
+
+
+  const sessionsByWeek =
+    planSessions.reduce<
+      Record<number, PlannedActivity[]>
+    >(
+      (groups, session) => {
+        const week =
+          session.training_week ?? 0;
+
+        if (!groups[week]) {
+          groups[week] = [];
+        }
+
+        groups[week].push(session);
+        return groups;
+      },
+      {},
+    );
+
+
+  const planWeeks = Object.entries(
+    sessionsByWeek,
+  )
+    .map(([week, sessions]) => ({
+      week: Number(week),
+      sessions,
+    }))
+    .filter((item) => item.week > 0)
+    .sort((a, b) => a.week - b.week);
+
+
   return (
     <section className={styles.wrapper}>
       <div className={styles.heading}>
@@ -415,6 +576,20 @@ export function RunningPlanBuilder({
 
             <button
               type="button"
+              className={styles.viewPlanButton}
+              onClick={() => {
+                setShowFullPlan(
+                  (current) => !current,
+                );
+              }}
+            >
+              {showFullPlan
+                ? "Nascondi piano"
+                : "Vedi piano completo"}
+            </button>
+
+            <button
+              type="button"
               className={styles.deletePlanButton}
               disabled={deletingPlan}
               onClick={() => {
@@ -430,6 +605,166 @@ export function RunningPlanBuilder({
           </div>
         ) : null}
       </div>
+
+      {activePlan && showFullPlan ? (
+        <section className={styles.fullPlan}>
+          <div className={styles.fullPlanHeading}>
+            <div>
+              <small>IL TUO PIANO</small>
+
+              <h3>
+                {activePlan.total_weeks} settimane
+              </h3>
+
+              <p>
+                Da{" "}
+                {new Date(
+                  `${activePlan.start_date}T00:00:00`,
+                ).toLocaleDateString(
+                  "it-IT",
+                  {
+                    day: "numeric",
+                    month: "short",
+                  },
+                )}{" "}
+                a{" "}
+                {new Date(
+                  `${activePlan.target_date}T00:00:00`,
+                ).toLocaleDateString(
+                  "it-IT",
+                  {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  },
+                )}
+              </p>
+            </div>
+
+            <div className={styles.fullPlanGoal}>
+              <small>Obiettivo</small>
+
+              <strong>
+                {distanceLabel(
+                  activePlan.target_distance_meters,
+                )}
+              </strong>
+
+              <span>
+                {paceLabel(
+                  activePlan.target_pace_seconds_per_km,
+                )}
+              </span>
+            </div>
+          </div>
+
+          {loadingFullPlan ? (
+            <div className={styles.fullPlanLoading}>
+              Carico tutte le settimane…
+            </div>
+          ) : planWeeks.length ? (
+            <div className={styles.weekList}>
+              {planWeeks.map(
+                ({ week, sessions }) => (
+                  <article
+                    key={week}
+                    className={styles.weekCard}
+                  >
+                    <div className={styles.weekHeader}>
+                      <div>
+                        <small>SETTIMANA</small>
+                        <strong>{week}</strong>
+                      </div>
+
+                      <span>
+                        {sessions.length}{" "}
+                        {sessions.length === 1
+                          ? "sessione"
+                          : "sessioni"}
+                      </span>
+                    </div>
+
+                    <div className={styles.weekSessions}>
+                      {sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className={styles.weekSession}
+                        >
+                          <div
+                            className={
+                              styles.weekSessionDate
+                            }
+                          >
+                            {sessionDateLabel(
+                              session.scheduled_date,
+                            )}
+                          </div>
+
+                          <div
+                            className={
+                              styles.weekSessionType
+                            }
+                          >
+                            <span
+                              className={
+                                styles[
+                                  `sessionKind_${session.session_kind}`
+                                ] ?? ""
+                              }
+                            >
+                              {sessionKindLabel(
+                                session.session_kind,
+                              )}
+                            </span>
+
+                            <strong>
+                              {session.title}
+                            </strong>
+                          </div>
+
+                          <div
+                            className={
+                              styles.weekSessionMetrics
+                            }
+                          >
+                            <strong>
+                              {distanceLabel(
+                                session.distance_meters,
+                              )}
+                            </strong>
+
+                            <span>
+                              {session.duration_minutes
+                                ? `${session.duration_minutes} min`
+                                : "—"}
+                            </span>
+                          </div>
+
+                          <div
+                            className={
+                              styles.weekSessionStatus
+                            }
+                          >
+                            {session.status === "completed"
+                              ? "Completata"
+                              : session.status === "skipped"
+                                ? "Saltata"
+                                : "Pianificata"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ),
+              )}
+            </div>
+          ) : (
+            <div className={styles.fullPlanLoading}>
+              Nessuna sessione trovata.
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <div className={styles.columns}>
         <div className={styles.stateCard}>

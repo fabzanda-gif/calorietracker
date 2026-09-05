@@ -40,6 +40,32 @@ class PlannedActivitiesRepository(BaseRepository):
                 f"Unable to load planned activities: {exc}"
             ) from exc
 
+    def list_for_training_plan(
+        self,
+        user_id: str,
+        training_plan_id: Any,
+    ) -> list[dict]:
+        try:
+            response = (
+                self.table
+                .select(PLANNED_ACTIVITY_SELECT)
+                .eq("user_id", user_id)
+                .eq(
+                    "training_plan_id",
+                    training_plan_id,
+                )
+                .order("scheduled_date")
+                .order("scheduled_time")
+                .execute()
+            )
+            return self._data(response)
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to load training plan sessions: "
+                f"{exc}"
+            ) from exc
+
     def create(self, payload: dict) -> dict | None:
         try:
             response = self.table.insert(payload).execute()
