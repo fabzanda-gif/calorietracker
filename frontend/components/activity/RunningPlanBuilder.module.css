@@ -1,0 +1,211 @@
+.wrapper{
+  margin:24px 0;
+  padding:26px;
+  border:1px solid #e2e4e0;
+  border-radius:24px;
+  background:#fff;
+}
+
+.heading{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:24px;
+}
+
+.heading p{
+  margin:0 0 6px;
+  color:#ef5e5c;
+  font-size:.7rem;
+  font-weight:900;
+  letter-spacing:.13em;
+}
+
+.heading h2{
+  margin:0;
+  color:#102846;
+  letter-spacing:-.035em;
+}
+
+.heading div > span{
+  display:block;
+  margin-top:6px;
+  color:#718093;
+}
+
+.activePlan{
+  min-width:190px;
+  padding:14px 16px;
+  border-radius:16px;
+  background:#f5f6f4;
+}
+
+.activePlan small,
+.activePlan span{
+  display:block;
+  color:#718093;
+}
+
+.activePlan strong{
+  display:block;
+  margin:4px 0;
+  color:#102846;
+  font-size:1.35rem;
+}
+
+.columns{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-top:22px;
+}
+
+.stateCard,
+.goalCard{
+  padding:18px;
+  border:1px solid #e6e7e4;
+  border-radius:18px;
+  background:#fafbf9;
+}
+
+.cardTitle{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-bottom:16px;
+}
+
+.cardTitle > span{
+  display:grid;
+  place-items:center;
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:#102846;
+  color:#fff;
+  font-size:.68rem;
+  font-weight:900;
+}
+
+.cardTitle strong,
+.cardTitle small{
+  display:block;
+}
+
+.cardTitle strong{
+  color:#102846;
+}
+
+.cardTitle small{
+  margin-top:2px;
+  color:#8993a0;
+}
+
+.fields{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+
+.fields label,
+.preferences label{
+  display:grid;
+  gap:6px;
+  color:#607085;
+  font-size:.75rem;
+  font-weight:800;
+}
+
+.fields input,
+.fields select,
+.preferences select{
+  min-height:44px;
+  box-sizing:border-box;
+  width:100%;
+  padding:0 12px;
+  border:1px solid #dfe1df;
+  border-radius:11px;
+  background:#fff;
+  color:#102846;
+  font:inherit;
+}
+
+.unitInput{
+  position:relative;
+}
+
+.unitInput input{
+  padding-right:66px;
+}
+
+.unitInput span{
+  position:absolute;
+  top:50%;
+  right:11px;
+  transform:translateY(-50%);
+  color:#98a1ad;
+  font-size:.68rem;
+}
+
+.preferences{
+  display:grid;
+  grid-template-columns:180px 210px 1fr;
+  gap:12px;
+  align-items:end;
+  margin-top:14px;
+}
+
+.preferences button{
+  min-height:44px;
+  border:0;
+  border-radius:11px;
+  background:#102846;
+  color:#fff;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.preferences button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+.message{
+  margin:12px 0 0;
+  color:#607085;
+  font-size:.82rem;
+  font-weight:700;
+}
+
+@media(max-width:820px){
+  .heading{
+    flex-direction:column;
+  }
+
+  .columns{
+    grid-template-columns:1fr;
+  }
+
+  .preferences{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .preferences button{
+    grid-column:1/-1;
+  }
+}
+
+@media(max-width:560px){
+  .wrapper{
+    padding:18px;
+  }
+
+  .fields,
+  .preferences{
+    grid-template-columns:1fr;
+  }
+
+  .preferences button{
+    grid-column:auto;
+  }
+}

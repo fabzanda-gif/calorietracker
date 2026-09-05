@@ -31,6 +31,9 @@ from backend.repositories.oura_connections import (
 )
 from backend.repositories.recipe_ingredients import RecipeIngredientsRepository
 from backend.repositories.recipes import RecipesRepository
+from backend.repositories.training_plans import (
+    TrainingPlansRepository,
+)
 from backend.repositories.weight import WeightRepository
 from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 
@@ -239,6 +242,12 @@ def get_planned_activities_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> PlannedActivitiesRepository:
     return PlannedActivitiesRepository(supabase)
+
+
+def get_training_plans_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> TrainingPlansRepository:
+    return TrainingPlansRepository(supabase)
 
 
 def get_weight_repository(

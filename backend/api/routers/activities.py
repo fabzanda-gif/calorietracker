@@ -15,6 +15,7 @@ from backend.api.dependencies import (
     get_daily_logs_repository,
     get_meals_repository,
     get_planned_activities_repository,
+    get_training_plans_repository,
     get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
@@ -23,6 +24,9 @@ from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.planned_activities import (
     PlannedActivitiesRepository,
+)
+from backend.repositories.training_plans import (
+    TrainingPlansRepository,
 )
 from backend.repositories.weight import WeightRepository
 from backend.services.gpx_activity import (
@@ -43,6 +47,10 @@ from backend.services.activity_comment import (
     fallback_activity_comment,
 )
 from backend.services.profile_goal import ProfileGoalService
+from backend.services.running_plan import (
+    RunningPlanInput,
+    build_running_plan,
+)
 
 
 router = APIRouter(prefix="/activities", tags=["activities"])
@@ -203,6 +211,36 @@ class PlannedActivityUpdate(BaseModel):
     )
 
 
+class RunningTrainingPlanCreate(BaseModel):
+    start_date: date
+    target_date: date
+
+    current_distance_meters: float = Field(
+        gt=0,
+    )
+    current_pace_seconds_per_km: int = Field(
+        gt=0,
+    )
+
+    target_distance_meters: float = Field(
+        gt=0,
+    )
+    target_pace_seconds_per_km: int = Field(
+        gt=0,
+    )
+
+    sessions_per_week: int = Field(
+        ge=2,
+        le=5,
+    )
+
+    long_run_weekday: int = Field(
+        default=6,
+        ge=0,
+        le=6,
+    )
+
+
 class GpxPreviewRequest(BaseModel):
     file_name: str = Field(min_length=1, max_length=255)
     content_base64: str = Field(min_length=1)
@@ -221,6 +259,172 @@ class GpxImportRequest(GpxPreviewRequest):
     )
     activity_date: date | None = None
     burned_calories: int | None = Field(default=None, ge=0)
+
+
+@router.get("/training-plans")
+def list_training_plans(
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    repo: TrainingPlansRepository = Depends(
+        get_training_plans_repository
+    ),
+):
+    try:
+        items = repo.list_for_user(
+            current_user.id
+        )
+        return {
+            "count": len(items),
+            "items": items,
+        }
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/training-plans/running",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_running_training_plan(
+    request: RunningTrainingPlanCreate,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    plans_repo: TrainingPlansRepository = Depends(
+        get_training_plans_repository
+    ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+):
+    total_days = (
+        request.target_date -
+        request.start_date
+    ).days
+
+    if total_days < 56:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Il piano deve durare almeno 8 settimane."
+            ),
+        )
+
+    try:
+        sessions = build_running_plan(
+            RunningPlanInput(
+                start_date=request.start_date,
+                target_date=request.target_date,
+                current_distance_meters=(
+                    request.current_distance_meters
+                ),
+                current_pace_seconds_per_km=(
+                    request.current_pace_seconds_per_km
+                ),
+                target_distance_meters=(
+                    request.target_distance_meters
+                ),
+                target_pace_seconds_per_km=(
+                    request.target_pace_seconds_per_km
+                ),
+                sessions_per_week=(
+                    request.sessions_per_week
+                ),
+                long_run_weekday=(
+                    request.long_run_weekday
+                ),
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    total_weeks = max(
+        item["training_week"]
+        for item in sessions
+    )
+
+    plan_payload = {
+        "user_id": current_user.id,
+        "sport": "running",
+        "start_date": str(request.start_date),
+        "target_date": str(request.target_date),
+        "current_distance_meters":
+            request.current_distance_meters,
+        "current_pace_seconds_per_km":
+            request.current_pace_seconds_per_km,
+        "target_distance_meters":
+            request.target_distance_meters,
+        "target_pace_seconds_per_km":
+            request.target_pace_seconds_per_km,
+        "sessions_per_week":
+            request.sessions_per_week,
+        "long_run_weekday":
+            request.long_run_weekday,
+        "total_weeks": total_weeks,
+        "status": "active",
+    }
+
+    plan = None
+
+    try:
+        plan = plans_repo.create(
+            plan_payload
+        )
+
+        if not plan or not plan.get("id"):
+            raise RepositoryError(
+                "Training plan was not persisted"
+            )
+
+        plan_id = plan["id"]
+
+        activity_payloads = []
+
+        for session in sessions:
+            activity_payloads.append(
+                {
+                    **session,
+                    "user_id": current_user.id,
+                    "training_plan_id": plan_id,
+                }
+            )
+
+        created_sessions = (
+            planned_repo.create_many(
+                activity_payloads
+            )
+        )
+
+        return {
+            "created": True,
+            "plan": plan,
+            "session_count":
+                len(created_sessions),
+            "sessions":
+                created_sessions,
+        }
+
+    except RepositoryError as exc:
+        if plan and plan.get("id"):
+            try:
+                plans_repo.delete(
+                    plan["id"],
+                    current_user.id,
+                )
+            except RepositoryError:
+                pass
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/planned")

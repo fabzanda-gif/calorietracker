@@ -400,3 +400,71 @@ export function deletePlannedActivity(
 
 /* PLANNED ACTIVITIES API END */
 
+
+
+/* RUNNING TRAINING PLAN API START */
+
+export interface TrainingPlan {
+  id: string;
+  sport: "running";
+  start_date: string;
+  target_date: string;
+  current_distance_meters: number;
+  current_pace_seconds_per_km: number;
+  target_distance_meters: number;
+  target_pace_seconds_per_km: number;
+  sessions_per_week: number;
+  long_run_weekday: number;
+  total_weeks: number;
+  status:
+    | "active"
+    | "paused"
+    | "completed"
+    | "cancelled";
+}
+
+export interface RunningTrainingPlanInput {
+  start_date: string;
+  target_date: string;
+  current_distance_meters: number;
+  current_pace_seconds_per_km: number;
+  target_distance_meters: number;
+  target_pace_seconds_per_km: number;
+  sessions_per_week: number;
+  long_run_weekday: number;
+}
+
+export interface RunningTrainingPlanCreateResponse {
+  created: boolean;
+  plan: TrainingPlan;
+  session_count: number;
+  sessions: PlannedActivity[];
+}
+
+export function getTrainingPlans(
+  accessToken?: string | null,
+): Promise<{
+  count: number;
+  items: TrainingPlan[];
+}> {
+  return apiRequest(
+    "/activities/training-plans",
+    { accessToken },
+  );
+}
+
+export function createRunningTrainingPlan(
+  input: RunningTrainingPlanInput,
+  accessToken?: string | null,
+): Promise<RunningTrainingPlanCreateResponse> {
+  return apiRequest(
+    "/activities/training-plans/running",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+/* RUNNING TRAINING PLAN API END */

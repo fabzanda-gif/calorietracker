@@ -9,6 +9,7 @@ PLANNED_ACTIVITY_SELECT = (
     "id,user_id,scheduled_date,scheduled_time,"
     "title,activity_type,duration_minutes,"
     "distance_meters,intensity,notes,status,"
+    "training_plan_id,training_week,session_kind,"
     "created_at,updated_at"
 )
 
@@ -47,6 +48,25 @@ class PlannedActivitiesRepository(BaseRepository):
         except Exception as exc:
             raise RepositoryError(
                 f"Unable to create planned activity: {exc}"
+            ) from exc
+
+    def create_many(
+        self,
+        payloads: list[dict],
+    ) -> list[dict]:
+        if not payloads:
+            return []
+
+        try:
+            response = (
+                self.table
+                .insert(payloads)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to create planned activities: {exc}"
             ) from exc
 
     def update(

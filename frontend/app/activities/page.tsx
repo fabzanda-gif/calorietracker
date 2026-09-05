@@ -9,6 +9,7 @@ import {
 
 import { ActivityLogger } from "@/components/activity/ActivityLogger";
 import { ActivityMap } from "@/components/activity/ActivityMap";
+import { RunningPlanBuilder } from "@/components/activity/RunningPlanBuilder";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AppNav } from "@/components/navigation/AppNav";
 import {
@@ -1180,6 +1181,12 @@ export default function ActivitiesPage() {
             <div><span>Energia</span><strong>{rollingSummary.calories.toLocaleString("it-IT")} kcal</strong></div>
           </div>
         </section>
+
+        <RunningPlanBuilder
+          onCreated={() => {
+            void loadMonth();
+          }}
+        />
 
         <section className={styles.plannerSection}>
           <div className={styles.plannerHeading}>
