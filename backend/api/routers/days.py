@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date as Date
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import json
 import time
@@ -16,6 +16,7 @@ from backend.api.dependencies import (
     get_day_briefings_repository,
     get_optional_decision_selections_repository,
     get_meal_prep_repository,
+    get_planned_activities_repository,
     get_meals_repository,
     get_recipes_repository,
     get_weekly_schedule_repository,
@@ -27,6 +28,9 @@ from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.day_briefings import DayBriefingsRepository
 from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.meal_prep import MealPrepRepository
+from backend.repositories.planned_activities import (
+    PlannedActivitiesRepository,
+)
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
@@ -60,6 +64,9 @@ from backend.services.generic_eating_out_candidates import (
 )
 from backend.services.generic_order_candidates import (
     GenericOrderCandidateService,
+)
+from backend.services.future_training_nutrition import (
+    FutureTrainingNutritionService,
 )
 from backend.services.meal_candidates import MealCandidateService
 from backend.services.meal_confirmation import (
@@ -458,6 +465,9 @@ def get_ranked_meal_options(
     meal_prep_repo: MealPrepRepository = Depends(
         get_meal_prep_repository
     ),
+    planned_activities_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
     recipes_repo: RecipesRepository = Depends(
         get_recipes_repository
     ),
@@ -604,6 +614,35 @@ def get_ranked_meal_options(
             mode=mode_result["mode"],
         )
 
+        future_training_context = None
+
+        if meal_slot == "dinner":
+            tomorrow = (
+                day_date
+                + timedelta(days=1)
+            )
+
+            try:
+                tomorrow_sessions = (
+                    planned_activities_repo.list_range(
+                        current_user.id,
+                        tomorrow,
+                        tomorrow,
+                    )
+                )
+            except RepositoryError:
+                # Future training is an optional enhancement.
+                # Meal recommendations must remain usable if
+                # planned-activity storage is unavailable.
+                tomorrow_sessions = []
+
+            future_training_context = (
+                FutureTrainingNutritionService().build(
+                    day_date=day_date,
+                    planned_activities=tomorrow_sessions,
+                )
+            )
+
         ranked = DecisionRankingService().rank(
             candidates=feedback["candidates"],
             available_kcal=available_kcal,
@@ -612,6 +651,9 @@ def get_ranked_meal_options(
             preferred_lens=feedback["preferred_lens"],
             preferred_mode=feedback["preferred_mode"],
             max_main_meal_kcal=max_main_meal_kcal,
+            future_training_context=(
+                future_training_context
+            ),
         )
 
         routine_candidate = None
@@ -696,6 +738,7 @@ def get_ranked_meal_options(
             "candidates": mode_result["candidates"],
             "recommended": recommended,
             "replanning_context": replanning_context,
+            "future_training": future_training_context,
             **ranked,
         }
 
