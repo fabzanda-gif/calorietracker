@@ -2013,3 +2013,107 @@ summary.loggerHeading {
     flex-wrap: wrap;
   }
 }
+
+
+/* TRAINING PROGRAMS COLLAPSIBLE V1 */
+
+.trainingPrograms {
+  margin: 26px 0;
+  border: 1px solid #deded7;
+  border-radius: 24px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.trainingProgramsSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 26px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.trainingProgramsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.trainingProgramsSummary > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trainingProgramsSummary strong {
+  color: #102846;
+  font-size: 1.25rem;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.trainingProgramsSummary span {
+  color: #73736d;
+  font-size: 0.82rem;
+}
+
+.trainingProgramsToggle {
+  flex: 0 0 auto;
+  border: 1px solid #d7d7d0;
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: #f7f7f3;
+  color: #30302d !important;
+  font-size: 0.76rem !important;
+  font-weight: 800;
+}
+
+.trainingPrograms[open]
+.trainingProgramsToggle {
+  background: #102846;
+  color: #ffffff !important;
+}
+
+.trainingProgramsBody {
+  display: grid;
+  gap: 24px;
+  padding: 0 20px 20px;
+  border-top: 1px solid #ecece7;
+}
+
+.trainingProgramsBody > :first-child {
+  margin-top: 20px;
+}
+
+.pageZero .trainingPrograms {
+  border-color: rgba(244, 61, 61, 0.35);
+}
+
+.pageZero .trainingProgramsToggle {
+  border-color: rgba(244, 61, 61, 0.35);
+}
+
+.pageZero .trainingPrograms[open]
+.trainingProgramsToggle {
+  border-color: #f43d3d;
+  background: #f43d3d;
+}
+
+@media (max-width: 760px) {
+  .trainingProgramsSummary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .trainingProgramsToggle {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .trainingProgramsBody {
+    padding: 0 12px 12px;
+  }
+}

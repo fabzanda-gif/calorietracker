@@ -1436,13 +1436,267 @@ export default function ActivitiesPage() {
           </div>
         </section>
 
-        <RunningPlanBuilder
-          onCreated={() => {
-            void loadMonth();
-          }}
-        />
+        <div className={styles.topGrid}>
+          <section className={styles.card}>
+            <div className={styles.cardHeading}>
+              <div>
+                <p className={styles.eyebrow}>
+                  Costanza
+                </p>
+                <h2>Calendario attività</h2>
+              </div>
 
-        <StrengthPlanPanel />
+              <div className={styles.monthControls}>
+                <button
+                  type="button"
+                  aria-label="Mese precedente"
+                  onClick={() =>
+                    setMonth(
+                      new Date(
+                        month.getFullYear(),
+                        month.getMonth() - 1,
+                        1,
+                      ),
+                    )
+                  }
+                >
+                  ←
+                </button>
+
+                <strong>
+                  {month.toLocaleDateString("it-IT", {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </strong>
+
+                <button
+                  type="button"
+                  aria-label="Mese successivo"
+                  onClick={() =>
+                    setMonth(
+                      new Date(
+                        month.getFullYear(),
+                        month.getMonth() + 1,
+                        1,
+                      ),
+                    )
+                  }
+                >
+                  →
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.calendar}>
+              {WEEKDAYS.map((weekday) => (
+                <span
+                  key={weekday}
+                  className={styles.weekday}
+                >
+                  {weekday}
+                </span>
+              ))}
+
+              {days.map((day, index) => {
+                if (!day) {
+                  return (
+                    <span
+                      key={`empty-${index}`}
+                      className={styles.emptyDay}
+                    />
+                  );
+                }
+
+                const date = isoDate(day);
+                const dayActivities =
+                  activitiesByDate.get(date) ?? [];
+                const active =
+                  dayActivities.length > 0;
+                const selected =
+                  selectedDate === date;
+                const today =
+                  date === isoDate(new Date());
+                const energy = energyByDate.get(date);
+
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    className={`${styles.day} ${
+                      active ? styles.activeDay : ""
+                    } ${
+                      selected
+                        ? styles.selectedDay
+                        : ""
+                    } ${
+                      today ? styles.today : ""
+                    }`}
+                    onClick={() => {
+                      if (selectedDate === date) {
+                        setSelectedDate("");
+                        setSelectedActivity(
+                          trainingActivities[0] ?? null,
+                        );
+                        return;
+                      }
+
+                      setSelectedDate(date);
+                      setSelectedActivity(
+                        dayActivities[0] ?? null,
+                      );
+                    }}
+                  >
+                    <span>{day.getDate()}</span>
+
+                    {energy ? (
+                      <span
+                        className={`${styles.energyState} ${
+                          energy.state === "deficit"
+                            ? styles.energyDeficit
+                            : energy.state === "surplus"
+                            ? styles.energySurplus
+                            : styles.energyMaintenance
+                        }`}
+                        title={`${energy.state === "deficit" ? "Deficit" : energy.state === "surplus" ? "Surplus" : "Mantenimento"}: ${Math.abs(energy.balance_kcal)} kcal`}
+                        aria-label={energy.state}
+                      >
+                        {energy.state === "deficit" ? "↓" : energy.state === "surplus" ? "↑" : "="}
+                      </span>
+                    ) : null}
+
+                    {active ? (
+                      <span
+                        className={styles.dayActivityIcon}
+                        aria-label={
+                          dayActivities[0].activity_name
+                        }
+                        title={
+                          dayActivities
+                            .map(
+                              (activity) =>
+                                activity.activity_name,
+                            )
+                            .join(", ")
+                        }
+                      >
+                        {activityIcon(
+                          dayActivities[0],
+                        )}
+                      </span>
+                    ) : null}
+
+                    {dayActivities.length > 1 ? (
+                      <i>
+                        +{dayActivities.length - 1}
+                      </i>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={styles.energyLegend}>
+              <span className={styles.energyDeficit}>↓ <i>Deficit</i></span>
+              <span className={styles.energyMaintenance}>= <i>Mantenimento</i></span>
+              <span className={styles.energySurplus}>↑ <i>Surplus</i></span>
+            </div>
+
+            {loading ? (
+              <p className={styles.loading}>
+                Carico il mese…
+              </p>
+            ) : null}
+          </section>
+
+          <section className={styles.uploadCard}>
+            <div>
+              <p className={styles.eyebrow}>
+                Importa
+              </p>
+              <h2>Carica un GPX</h2>
+              <p>
+                Percorso, durata, cadenza e frequenza
+                cardiaca vengono letti dal file.
+              </p>
+            </div>
+
+            <label className={styles.dropZone}>
+              <input
+                type="file"
+                accept=".gpx,application/gpx+xml"
+                onChange={(event) => {
+                  void chooseGpx(
+                    event.target.files?.[0] ?? null,
+                  );
+                  event.currentTarget.value = "";
+                }}
+              />
+              <span className={styles.uploadIcon}>
+                ↑
+              </span>
+              <strong>
+                {previewing
+                  ? "Analizzo il percorso…"
+                  : "Scegli file GPX"}
+              </strong>
+              <small>Massimo 5 MB</small>
+            </label>
+
+            {gpxFile ? (
+              <p className={styles.fileName}>
+                {gpxFile.name}
+              </p>
+            ) : null}
+          </section>
+        </div>
+
+
+        <details
+          className={styles.trainingPrograms}
+        >
+          <summary
+            className={
+              styles.trainingProgramsSummary
+            }
+          >
+            <div>
+              <p className={styles.eyebrow}>
+                Programmi
+              </p>
+
+              <strong>
+                Programmi di allenamento
+              </strong>
+
+              <span>
+                Corsa e palestra in un unico posto.
+              </span>
+            </div>
+
+            <span
+              className={
+                styles.trainingProgramsToggle
+              }
+            >
+              Apri programmi ＋
+            </span>
+          </summary>
+
+          <div
+            className={
+              styles.trainingProgramsBody
+            }
+          >
+            <RunningPlanBuilder
+              onCreated={() => {
+                void loadMonth();
+              }}
+            />
+
+            <StrengthPlanPanel />
+          </div>
+        </details>
 
         <section className={styles.plannerSection}>
           <div className={styles.plannerHeading}>
@@ -2166,221 +2420,6 @@ export default function ActivitiesPage() {
             {importMessage}
           </div>
         ) : null}
-
-        <div className={styles.topGrid}>
-          <section className={styles.card}>
-            <div className={styles.cardHeading}>
-              <div>
-                <p className={styles.eyebrow}>
-                  Costanza
-                </p>
-                <h2>Calendario attività</h2>
-              </div>
-
-              <div className={styles.monthControls}>
-                <button
-                  type="button"
-                  aria-label="Mese precedente"
-                  onClick={() =>
-                    setMonth(
-                      new Date(
-                        month.getFullYear(),
-                        month.getMonth() - 1,
-                        1,
-                      ),
-                    )
-                  }
-                >
-                  ←
-                </button>
-
-                <strong>
-                  {month.toLocaleDateString("it-IT", {
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </strong>
-
-                <button
-                  type="button"
-                  aria-label="Mese successivo"
-                  onClick={() =>
-                    setMonth(
-                      new Date(
-                        month.getFullYear(),
-                        month.getMonth() + 1,
-                        1,
-                      ),
-                    )
-                  }
-                >
-                  →
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.calendar}>
-              {WEEKDAYS.map((weekday) => (
-                <span
-                  key={weekday}
-                  className={styles.weekday}
-                >
-                  {weekday}
-                </span>
-              ))}
-
-              {days.map((day, index) => {
-                if (!day) {
-                  return (
-                    <span
-                      key={`empty-${index}`}
-                      className={styles.emptyDay}
-                    />
-                  );
-                }
-
-                const date = isoDate(day);
-                const dayActivities =
-                  activitiesByDate.get(date) ?? [];
-                const active =
-                  dayActivities.length > 0;
-                const selected =
-                  selectedDate === date;
-                const today =
-                  date === isoDate(new Date());
-                const energy = energyByDate.get(date);
-
-                return (
-                  <button
-                    key={date}
-                    type="button"
-                    className={`${styles.day} ${
-                      active ? styles.activeDay : ""
-                    } ${
-                      selected
-                        ? styles.selectedDay
-                        : ""
-                    } ${
-                      today ? styles.today : ""
-                    }`}
-                    onClick={() => {
-                      if (selectedDate === date) {
-                        setSelectedDate("");
-                        setSelectedActivity(
-                          trainingActivities[0] ?? null,
-                        );
-                        return;
-                      }
-
-                      setSelectedDate(date);
-                      setSelectedActivity(
-                        dayActivities[0] ?? null,
-                      );
-                    }}
-                  >
-                    <span>{day.getDate()}</span>
-
-                    {energy ? (
-                      <span
-                        className={`${styles.energyState} ${
-                          energy.state === "deficit"
-                            ? styles.energyDeficit
-                            : energy.state === "surplus"
-                            ? styles.energySurplus
-                            : styles.energyMaintenance
-                        }`}
-                        title={`${energy.state === "deficit" ? "Deficit" : energy.state === "surplus" ? "Surplus" : "Mantenimento"}: ${Math.abs(energy.balance_kcal)} kcal`}
-                        aria-label={energy.state}
-                      >
-                        {energy.state === "deficit" ? "↓" : energy.state === "surplus" ? "↑" : "="}
-                      </span>
-                    ) : null}
-
-                    {active ? (
-                      <span
-                        className={styles.dayActivityIcon}
-                        aria-label={
-                          dayActivities[0].activity_name
-                        }
-                        title={
-                          dayActivities
-                            .map(
-                              (activity) =>
-                                activity.activity_name,
-                            )
-                            .join(", ")
-                        }
-                      >
-                        {activityIcon(
-                          dayActivities[0],
-                        )}
-                      </span>
-                    ) : null}
-
-                    {dayActivities.length > 1 ? (
-                      <i>
-                        +{dayActivities.length - 1}
-                      </i>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className={styles.energyLegend}>
-              <span className={styles.energyDeficit}>↓ <i>Deficit</i></span>
-              <span className={styles.energyMaintenance}>= <i>Mantenimento</i></span>
-              <span className={styles.energySurplus}>↑ <i>Surplus</i></span>
-            </div>
-
-            {loading ? (
-              <p className={styles.loading}>
-                Carico il mese…
-              </p>
-            ) : null}
-          </section>
-
-          <section className={styles.uploadCard}>
-            <div>
-              <p className={styles.eyebrow}>
-                Importa
-              </p>
-              <h2>Carica un GPX</h2>
-              <p>
-                Percorso, durata, cadenza e frequenza
-                cardiaca vengono letti dal file.
-              </p>
-            </div>
-
-            <label className={styles.dropZone}>
-              <input
-                type="file"
-                accept=".gpx,application/gpx+xml"
-                onChange={(event) => {
-                  void chooseGpx(
-                    event.target.files?.[0] ?? null,
-                  );
-                  event.currentTarget.value = "";
-                }}
-              />
-              <span className={styles.uploadIcon}>
-                ↑
-              </span>
-              <strong>
-                {previewing
-                  ? "Analizzo il percorso…"
-                  : "Scegli file GPX"}
-              </strong>
-              <small>Massimo 5 MB</small>
-            </label>
-
-            {gpxFile ? (
-              <p className={styles.fileName}>
-                {gpxFile.name}
-              </p>
-            ) : null}
-          </section>
-        </div>
 
         <details className={styles.loggerCard}>
           <summary className={styles.loggerHeading}>
