@@ -269,6 +269,72 @@ function formatDuration(value?: number | null): string {
   return `${seconds}s`;
 }
 
+function plannedActivitySupportsDistance(
+  activityType: string,
+): boolean {
+  return [
+    "corsa",
+    "bici",
+    "nuoto",
+    "camminata",
+  ].includes(
+    activityType
+      .trim()
+      .toLocaleLowerCase("it-IT"),
+  );
+}
+
+const PLANNED_INTENSITY_LABELS: Record<
+  PlannedActivityIntensity,
+  string
+> = {
+  low: "Facile",
+  moderate: "Moderata",
+  hard: "Intensa",
+  race: "Gara / test",
+  unknown: "Da definire",
+};
+
+function plannedDateLabel(
+  value: string,
+): string {
+  const target = new Date(
+    `${value}T00:00:00`,
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(
+    tomorrow.getDate() + 1,
+  );
+
+  if (
+    target.getTime() ===
+    today.getTime()
+  ) {
+    return "Oggi";
+  }
+
+  if (
+    target.getTime() ===
+    tomorrow.getTime()
+  ) {
+    return "Domani";
+  }
+
+  return target.toLocaleDateString(
+    "it-IT",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    },
+  );
+}
+
+
 function formatActivityDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("it-IT", {
     day: "numeric",
@@ -650,6 +716,36 @@ export default function ActivitiesPage() {
     [energyDays],
   );
 
+  const sortedPlannedActivities =
+    useMemo(
+      () =>
+        [...plannedActivities].sort(
+          (left, right) => {
+            const leftTime =
+              `${left.scheduled_date}T${
+                left.scheduled_time ??
+                "23:59:59"
+              }`;
+
+            const rightTime =
+              `${right.scheduled_date}T${
+                right.scheduled_time ??
+                "23:59:59"
+              }`;
+
+            return (
+              new Date(
+                leftTime,
+              ).getTime() -
+              new Date(
+                rightTime,
+              ).getTime()
+            );
+          },
+        ),
+      [plannedActivities],
+    );
+
   const activitiesByDate = useMemo(() => {
     const grouped = new Map<string, Activity[]>();
 
@@ -690,6 +786,9 @@ export default function ActivitiesPage() {
               ? Number(planDuration)
               : null,
           distance_meters:
+            plannedActivitySupportsDistance(
+              planType,
+            ) &&
             planDistanceKm
               ? Number(planDistanceKm) *
                 1000
@@ -1125,11 +1224,22 @@ export default function ActivitiesPage() {
                 Tipo
                 <select
                   value={planType}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const nextType =
+                      event.target.value;
+
                     setPlanType(
-                      event.target.value,
-                    )
-                  }
+                      nextType,
+                    );
+
+                    if (
+                      !plannedActivitySupportsDistance(
+                        nextType,
+                      )
+                    ) {
+                      setPlanDistanceKm("");
+                    }
+                  }}
                 >
                   <option>Corsa</option>
                   <option>Palestra</option>
@@ -1185,24 +1295,48 @@ export default function ActivitiesPage() {
                 </div>
               </label>
 
-              <label>
-                Distanza
-                <div className={styles.planUnitInput}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={planDistanceKm}
-                    placeholder="10"
-                    onChange={(event) =>
-                      setPlanDistanceKm(
-                        event.target.value,
-                      )
+              {plannedActivitySupportsDistance(
+                planType,
+              ) ? (
+                <label>
+                  Distanza
+                  <div
+                    className={
+                      styles.planUnitInput
                     }
-                  />
-                  <span>km</span>
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={planDistanceKm}
+                      placeholder="10"
+                      onChange={(event) =>
+                        setPlanDistanceKm(
+                          event.target.value,
+                        )
+                      }
+                    />
+                    <span>km</span>
+                  </div>
+                </label>
+              ) : (
+                <div
+                  className={
+                    styles.planNoDistance
+                  }
+                >
+                  <span>
+                    Distanza
+                  </span>
+                  <strong>
+                    Non prevista per{" "}
+                    {planType.toLocaleLowerCase(
+                      "it-IT",
+                    )}
+                  </strong>
                 </div>
-              </label>
+              )}
 
               <label>
                 Intensità
@@ -1265,8 +1399,8 @@ export default function ActivitiesPage() {
             </div>
 
             <div className={styles.upcomingList}>
-              {plannedActivities.length ? (
-                plannedActivities.map(
+              {sortedPlannedActivities.length ? (
+                sortedPlannedActivities.map(
                   (item) => (
                     <article
                       key={item.id}
@@ -1280,17 +1414,22 @@ export default function ActivitiesPage() {
                         }
                       >
                         <strong>
+                          {plannedDateLabel(
+                            item.scheduled_date,
+                          )}
+                        </strong>
+
+                        <small>
                           {new Date(
                             `${item.scheduled_date}T00:00:00`,
                           ).toLocaleDateString(
                             "it-IT",
                             {
-                              weekday: "short",
                               day: "numeric",
                               month: "short",
                             },
                           )}
-                        </strong>
+                        </small>
 
                         {item.scheduled_time ? (
                           <span>
@@ -1307,13 +1446,33 @@ export default function ActivitiesPage() {
                           styles.upcomingBody
                         }
                       >
-                        <span
+                        <div
                           className={
-                            styles.upcomingType
+                            styles.upcomingBadges
                           }
                         >
-                          {item.activity_type}
-                        </span>
+                          <span
+                            className={
+                              styles.upcomingType
+                            }
+                          >
+                            {item.activity_type}
+                          </span>
+
+                          <span
+                            className={`${styles.upcomingIntensity} ${
+                              styles[
+                                `upcomingIntensity_${item.intensity}`
+                              ] ?? ""
+                            }`}
+                          >
+                            {
+                              PLANNED_INTENSITY_LABELS[
+                                item.intensity
+                              ]
+                            }
+                          </span>
+                        </div>
 
                         <h3>{item.title}</h3>
 
@@ -1322,7 +1481,10 @@ export default function ActivitiesPage() {
                             ? `${item.duration_minutes} min`
                             : "Durata da definire"}
 
-                          {item.distance_meters
+                          {item.distance_meters &&
+                          plannedActivitySupportsDistance(
+                            item.activity_type,
+                          )
                             ? ` · ${(
                                 item.distance_meters /
                                 1000
@@ -1352,6 +1514,9 @@ export default function ActivitiesPage() {
                             <>
                               <button
                                 type="button"
+                                className={
+                                  styles.completePlanButton
+                                }
                                 disabled={
                                   busyPlanId ===
                                   item.id
@@ -1393,6 +1558,9 @@ export default function ActivitiesPage() {
 
                           <button
                             type="button"
+                            className={
+                              styles.deletePlanButton
+                            }
                             disabled={
                               busyPlanId ===
                               item.id

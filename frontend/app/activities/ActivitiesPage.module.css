@@ -1521,3 +1521,122 @@ summary.loggerHeading {
 }
 
 /* PLANNED ACTIVITIES END */
+
+
+/* PLANNER UI POLISH START */
+
+.planNoDistance{
+  display:grid;
+  align-content:start;
+  gap:6px;
+}
+
+.planNoDistance > span{
+  color:#607085;
+  font-size:.75rem;
+  font-weight:800;
+}
+
+.planNoDistance strong{
+  display:flex;
+  align-items:center;
+  min-height:44px;
+  box-sizing:border-box;
+  padding:0 12px;
+  border:1px dashed #dfe1df;
+  border-radius:11px;
+  background:#fafbf9;
+  color:#98a1ad;
+  font-size:.78rem;
+  font-weight:700;
+}
+
+.upcomingBadges{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:7px;
+}
+
+.upcomingIntensity{
+  display:inline-flex;
+  align-items:center;
+  min-height:22px;
+  padding:0 7px;
+  border-radius:999px;
+  background:#eef1f3;
+  color:#667487;
+  font-size:.62rem;
+  font-weight:850;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+
+.upcomingIntensity_low{
+  background:#eef6f0;
+  color:#3e7051;
+}
+
+.upcomingIntensity_moderate{
+  background:#eef1f5;
+  color:#53657c;
+}
+
+.upcomingIntensity_hard{
+  background:#fff2e9;
+  color:#a45c27;
+}
+
+.upcomingIntensity_race{
+  background:#fff0f0;
+  color:#c33d3d;
+}
+
+.upcomingIntensity_unknown{
+  background:#f2f2f0;
+  color:#7a7d7a;
+}
+
+.upcomingDate small{
+  color:#9aa3ae;
+  font-size:.68rem;
+  font-weight:700;
+  text-transform:capitalize;
+}
+
+.upcomingActions .completePlanButton{
+  border-color:#102846;
+  background:#102846;
+  color:#fff;
+}
+
+.upcomingActions .deletePlanButton{
+  margin-left:auto;
+  border-color:transparent;
+  background:transparent;
+  color:#969da6;
+}
+
+.upcomingActions .deletePlanButton:hover{
+  color:#b63230;
+}
+
+.pageZero .upcomingActions .completePlanButton{
+  border-color:#111;
+  background:#111;
+  color:#fff;
+}
+
+.pageZero .upcomingIntensity_race,
+.pageZero .upcomingIntensity_hard{
+  background:#fff0f0;
+  color:#f43d3d;
+}
+
+@media(max-width:620px){
+  .upcomingActions .deletePlanButton{
+    margin-left:0;
+  }
+}
+
+/* PLANNER UI POLISH END */
