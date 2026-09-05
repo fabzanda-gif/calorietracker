@@ -2057,6 +2057,17 @@ summary.loggerHeading {
   font-size: 0.82rem;
 }
 
+.trainingProgramsToggle::after {
+  content: "＋";
+  margin-left: 6px;
+  font-weight: 900;
+}
+
+.trainingPrograms[open]
+.trainingProgramsToggle::after {
+  content: "−";
+}
+
 .trainingProgramsToggle {
   flex: 0 0 auto;
   border: 1px solid #d7d7d0;

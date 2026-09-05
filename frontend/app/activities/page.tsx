@@ -1679,7 +1679,7 @@ export default function ActivitiesPage() {
                 styles.trainingProgramsToggle
               }
             >
-              Apri programmi ＋
+              Apri programmi
             </span>
           </summary>
 
