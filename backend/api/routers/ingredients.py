@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -52,6 +52,21 @@ class IngredientCreate(BaseModel):
         gt=0,
     )
 
+    kind: Literal[
+        "ingredient",
+        "product",
+        "prepared_food",
+    ] = "ingredient"
+
+    meal_slots: list[
+        Literal[
+            "breakfast",
+            "lunch",
+            "snack",
+            "dinner",
+        ]
+    ] = Field(default_factory=list)
+
 
 class NutritionLabelScanRequest(BaseModel):
     content_base64: str = Field(
@@ -100,6 +115,21 @@ class IngredientUpdate(BaseModel):
         default=None,
         gt=0,
     )
+
+    kind: Literal[
+        "ingredient",
+        "product",
+        "prepared_food",
+    ] | None = None
+
+    meal_slots: list[
+        Literal[
+            "breakfast",
+            "lunch",
+            "snack",
+            "dinner",
+        ]
+    ] | None = None
 
 
 @router.post("/scan-label")

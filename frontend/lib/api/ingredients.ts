@@ -12,6 +12,16 @@ export interface Ingredient {
   default_unit: string;
   grams_per_unit: number | null;
   default_quantity: number | null;
+  kind:
+    | "ingredient"
+    | "product"
+    | "prepared_food";
+  meal_slots: Array<
+    | "breakfast"
+    | "lunch"
+    | "snack"
+    | "dinner"
+  >;
 }
 
 export interface IngredientsResponse {
@@ -28,6 +38,16 @@ export interface IngredientCreateInput {
   default_unit?: string;
   grams_per_unit?: number | null;
   default_quantity?: number | null;
+  kind?:
+    | "ingredient"
+    | "product"
+    | "prepared_food";
+  meal_slots?: Array<
+    | "breakfast"
+    | "lunch"
+    | "snack"
+    | "dinner"
+  >;
 }
 
 export async function getIngredients(

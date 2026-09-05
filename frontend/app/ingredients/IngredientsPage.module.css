@@ -110,3 +110,93 @@
 }
 
 /* NUTRITION LABEL SCANNER END */
+
+
+/* FOOD CLASSIFICATION START */
+
+.editor select{
+  min-height:44px;
+  box-sizing:border-box;
+  padding:0 12px;
+  border:1px solid #dfe1df;
+  border-radius:11px;
+  background:#fafbf9;
+  color:#102846;
+}
+
+.foodKind{
+  min-width:150px;
+}
+
+.mealSlots{
+  grid-column:1/-1;
+  margin:4px 0 0;
+  padding:14px;
+  border:1px solid #e2e4e0;
+  border-radius:14px;
+}
+
+.mealSlots legend{
+  padding:0 6px;
+  color:#607085;
+  font-size:.75rem;
+  font-weight:800;
+}
+
+.mealSlotChoices{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.mealSlot,
+.mealSlotActive{
+  display:inline-flex !important;
+  align-items:center;
+  min-height:38px;
+  padding:0 12px;
+  border:1px solid #dfe1df;
+  border-radius:999px;
+  background:#fff;
+  cursor:pointer;
+}
+
+.mealSlotActive{
+  border-color:#102846;
+  background:#102846;
+  color:#fff !important;
+}
+
+.mealSlot input,
+.mealSlotActive input{
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+
+.mealSlots small{
+  display:block;
+  margin-top:9px;
+  color:#84909e;
+  line-height:1.4;
+}
+
+.foodMeta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin:0 0 9px;
+}
+
+.foodMeta span{
+  padding:4px 7px;
+  border-radius:999px;
+  background:#eef1f3;
+  color:#607085;
+  font-size:.66rem;
+  font-weight:800;
+}
+
+/* FOOD CLASSIFICATION END */
