@@ -49,6 +49,10 @@ import {
   type Recipe,
 } from "@/lib/api/recipes";
 import {
+  getIngredients,
+  type Ingredient,
+} from "@/lib/api/ingredients";
+import {
   getDay,
   getDayBriefing,
   getDayBudget,
@@ -404,11 +408,12 @@ export function HomeShell() {
   const [knownAlternates, setKnownAlternates] = useState<Array<{
     key: string;
     name: string;
-    mealType: string;
+    mealType: string | null;
     calories: number;
     protein: number;
     carbs: number;
     fat: number;
+    source: "recipe" | "history" | "ingredient";
   }>>([]);
   const [savingAlternate, setSavingAlternate] =
     useState(false);
@@ -508,43 +513,185 @@ export function HomeShell() {
     Promise.allSettled([
       getAvailableRecipes(accessToken),
       getMealHistory(accessToken),
-    ]).then(([recipesResult, historyResult]) => {
+      getIngredients(accessToken),
+    ]).then(([
+      recipesResult,
+      historyResult,
+      ingredientsResult,
+    ]) => {
       if (!active) return;
-      const recipes = recipesResult.status === "fulfilled" ? recipesResult.value.items : [];
-      const history = historyResult.status === "fulfilled" ? historyResult.value.items : [];
+
+      const recipes =
+        recipesResult.status === "fulfilled"
+          ? recipesResult.value.items
+          : [];
+
+      const history =
+        historyResult.status === "fulfilled"
+          ? historyResult.value.items
+          : [];
+
+      const ingredients =
+        ingredientsResult.status === "fulfilled"
+          ? ingredientsResult.value.items
+          : [];
+
       const seen = new Set<string>();
+
+      const ingredientPortionGrams = (
+        ingredient: Ingredient,
+      ): number => {
+        const defaultQuantity =
+          Number(ingredient.default_quantity);
+
+        const gramsPerUnit =
+          Number(ingredient.grams_per_unit);
+
+        if (
+          ingredient.default_unit !== "g" &&
+          Number.isFinite(defaultQuantity) &&
+          defaultQuantity > 0 &&
+          Number.isFinite(gramsPerUnit) &&
+          gramsPerUnit > 0
+        ) {
+          return defaultQuantity * gramsPerUnit;
+        }
+
+        if (
+          ingredient.default_unit === "g" &&
+          Number.isFinite(defaultQuantity) &&
+          defaultQuantity > 0
+        ) {
+          return defaultQuantity;
+        }
+
+        if (
+          Number.isFinite(gramsPerUnit) &&
+          gramsPerUnit > 0
+        ) {
+          return gramsPerUnit;
+        }
+
+        return 100;
+      };
+
       const items = [
         ...recipes.map((recipe: Recipe) => {
-          const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
+          const servings = Math.max(
+            1,
+            Number(recipe.recipe_servings) || 1,
+          );
+
           return {
             key: `recipe:${recipe.id}`,
             name: recipe.name,
             mealType: recipe.meal_type || "Pranzo",
-            calories: Number(recipe.calories || 0) / servings,
-            protein: Number(recipe.protein || 0) / servings,
-            carbs: Number(recipe.carbs || 0) / servings,
-            fat: Number(recipe.fat || 0) / servings,
+            calories:
+              Number(recipe.calories || 0) / servings,
+            protein:
+              Number(recipe.protein || 0) / servings,
+            carbs:
+              Number(recipe.carbs || 0) / servings,
+            fat:
+              Number(recipe.fat || 0) / servings,
+            source: "recipe" as const,
           };
         }),
+
         ...history.map((meal) => {
-          const quantity = Math.max(0.01, Number(meal.quantity) || 1);
-          const factor = meal.is_per_100g ? 100 / quantity : 1 / quantity;
+          const quantity = Math.max(
+            0.01,
+            Number(meal.quantity) || 1,
+          );
+
+          const factor = meal.is_per_100g
+            ? 100 / quantity
+            : 1 / quantity;
+
           return {
-            key: `history:${meal.id ?? `${meal.date}:${meal.name}`}`,
+            key:
+              `history:${
+                meal.id ??
+                `${meal.date}:${meal.name}`
+              }`,
             name: meal.base_name || meal.name,
-            mealType: meal.meal_type || "Pranzo",
-            calories: Number(meal.base_calories ?? Number(meal.calories || 0) * factor),
-            protein: Number(meal.base_protein ?? Number(meal.protein || 0) * factor),
-            carbs: Number(meal.base_carbs ?? Number(meal.carbs || 0) * factor),
-            fat: Number(meal.base_fat ?? Number(meal.fat || 0) * factor),
+            mealType:
+              meal.meal_type || "Pranzo",
+            calories: Number(
+              meal.base_calories ??
+                Number(meal.calories || 0) *
+                  factor,
+            ),
+            protein: Number(
+              meal.base_protein ??
+                Number(meal.protein || 0) *
+                  factor,
+            ),
+            carbs: Number(
+              meal.base_carbs ??
+                Number(meal.carbs || 0) *
+                  factor,
+            ),
+            fat: Number(
+              meal.base_fat ??
+                Number(meal.fat || 0) *
+                  factor,
+            ),
+            source: "history" as const,
           };
         }),
+
+        ...ingredients.map(
+          (ingredient: Ingredient) => {
+            const portionGrams =
+              ingredientPortionGrams(
+                ingredient,
+              );
+
+            const factor =
+              portionGrams / 100;
+
+            return {
+              key: `ingredient:${ingredient.id}`,
+              name: ingredient.name,
+              mealType: null,
+              calories:
+                Number(
+                  ingredient.calories_per_100g ||
+                    0,
+                ) * factor,
+              protein:
+                Number(
+                  ingredient.protein_per_100g ||
+                    0,
+                ) * factor,
+              carbs:
+                Number(
+                  ingredient.carbs_per_100g ||
+                    0,
+                ) * factor,
+              fat:
+                Number(
+                  ingredient.fat_per_100g ||
+                    0,
+                ) * factor,
+              source: "ingredient" as const,
+            };
+          },
+        ),
       ].filter((item) => {
-        const key = item.name.trim().toLocaleLowerCase("it");
-        if (!key || seen.has(key)) return false;
+        const key = item.name
+          .trim()
+          .toLocaleLowerCase("it");
+
+        if (!key || seen.has(key)) {
+          return false;
+        }
+
         seen.add(key);
         return true;
       });
+
       setKnownAlternates(items);
     });
 
@@ -2756,7 +2903,15 @@ export function HomeShell() {
                   );
 
                   if (selectedSlot) {
-                    openAlternateMeal(selectedSlot);
+                    if (
+                      alternateSlot === selectedSlot
+                    ) {
+                      closeAlternateMeal();
+                    } else {
+                      openAlternateMeal(
+                        selectedSlot,
+                      );
+                    }
                   }
                 }}
               >
@@ -2784,9 +2939,12 @@ export function HomeShell() {
                         ? styles.mealTabActive
                         : styles.mealTab
                     }
-                    onClick={() =>
-                      setSelectedMealSlot(mealLabel(slot))
-                    }
+                    onClick={() => {
+                      closeAlternateMeal();
+                      setSelectedMealSlot(
+                        mealLabel(slot),
+                      );
+                    }}
                     aria-pressed={
                       selectedMealSlot === mealLabel(slot)
                     }
@@ -3594,12 +3752,96 @@ export function HomeShell() {
                                   setAlternateFat(String(Math.round(selected.fat)));
                                 }}
                               >
-                                <option value="">Scegli da ricette e pasti recenti…</option>
-                                {knownAlternates
-                                  .filter((item) => mealFitsSlot(item.mealType, slot))
-                                  .map((item) => (
-                                    <option key={item.key} value={item.key}>{item.name}</option>
-                                  ))}
+                                <option value="">
+                                  Scegli da ricette, recenti e alimenti…
+                                </option>
+
+                                {knownAlternates.some(
+                                  (item) =>
+                                    item.source === "recipe" &&
+                                    item.mealType &&
+                                    mealFitsSlot(
+                                      item.mealType,
+                                      slot,
+                                    ),
+                                ) ? (
+                                  <optgroup label="Ricette">
+                                    {knownAlternates
+                                      .filter(
+                                        (item) =>
+                                          item.source ===
+                                            "recipe" &&
+                                          item.mealType &&
+                                          mealFitsSlot(
+                                            item.mealType,
+                                            slot,
+                                          ),
+                                      )
+                                      .map((item) => (
+                                        <option
+                                          key={item.key}
+                                          value={item.key}
+                                        >
+                                          {item.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                ) : null}
+
+                                {knownAlternates.some(
+                                  (item) =>
+                                    item.source === "history" &&
+                                    item.mealType &&
+                                    mealFitsSlot(
+                                      item.mealType,
+                                      slot,
+                                    ),
+                                ) ? (
+                                  <optgroup label="Pasti recenti">
+                                    {knownAlternates
+                                      .filter(
+                                        (item) =>
+                                          item.source ===
+                                            "history" &&
+                                          item.mealType &&
+                                          mealFitsSlot(
+                                            item.mealType,
+                                            slot,
+                                          ),
+                                      )
+                                      .map((item) => (
+                                        <option
+                                          key={item.key}
+                                          value={item.key}
+                                        >
+                                          {item.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                ) : null}
+
+                                {knownAlternates.some(
+                                  (item) =>
+                                    item.source ===
+                                    "ingredient",
+                                ) ? (
+                                  <optgroup label="Alimenti">
+                                    {knownAlternates
+                                      .filter(
+                                        (item) =>
+                                          item.source ===
+                                          "ingredient",
+                                      )
+                                      .map((item) => (
+                                        <option
+                                          key={item.key}
+                                          value={item.key}
+                                        >
+                                          {item.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                ) : null}
                               </select>
                               <span className={styles.manualMealLabel}>oppure scrivi manualmente</span>
                               <input
