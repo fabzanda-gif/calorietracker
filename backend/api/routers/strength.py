@@ -38,6 +38,9 @@ from backend.services.strength_plan import (
 from backend.services.strength_outcome import (
     StrengthOutcomeService,
 )
+from backend.services.strength_progression import (
+    StrengthProgressionService,
+)
 
 
 router = APIRouter(
@@ -781,6 +784,254 @@ def get_strength_workout_outcome(
             "workout": workout,
             "workout_log": workout_log,
             "outcome": outcome,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+@router.get(
+    "/workouts/{workout_id}/progression-preview",
+)
+def preview_strength_progression(
+    workout_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    workouts_repo:
+        StrengthWorkoutsRepository = Depends(
+            get_strength_workouts_repository
+        ),
+    exercises_repo:
+        StrengthWorkoutExercisesRepository = Depends(
+            get_strength_workout_exercises_repository
+        ),
+    workout_logs_repo:
+        StrengthWorkoutLogsRepository = Depends(
+            get_strength_workout_logs_repository
+        ),
+    set_logs_repo:
+        StrengthSetLogsRepository = Depends(
+            get_strength_set_logs_repository
+        ),
+):
+    try:
+        workout = workouts_repo.get(
+            current_user.id,
+            workout_id,
+        )
+
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Workout palestra non trovato."
+                ),
+            )
+
+        workout_log = (
+            workout_logs_repo.get_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        if not workout_log:
+            return {
+                "status": "pending",
+                "workout": workout,
+                "proposals": [],
+                "message": (
+                    "Registra prima il workout "
+                    "per calcolare la progressione."
+                ),
+            }
+
+        planned_exercises = (
+            exercises_repo.list_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        set_logs = (
+            set_logs_repo.list_for_workout_log(
+                current_user.id,
+                workout_log["id"],
+            )
+        )
+
+        outcome = (
+            StrengthOutcomeService().evaluate(
+                planned_exercises=
+                    planned_exercises,
+                set_logs=set_logs,
+            )
+        )
+
+        logs_by_exercise = {}
+
+        for item in set_logs:
+            exercise_id = str(
+                item[
+                    "strength_workout_exercise_id"
+                ]
+            )
+
+            logs_by_exercise.setdefault(
+                exercise_id,
+                [],
+            ).append(item)
+
+        outcome_by_exercise = {
+            str(item["exercise_id"]): item
+            for item in outcome["exercises"]
+        }
+
+        plan_workouts = (
+            workouts_repo.list_for_plan(
+                current_user.id,
+                workout["strength_plan_id"],
+            )
+        )
+
+        future_workouts = [
+            item
+            for item in plan_workouts
+            if (
+                str(item["scheduled_date"])
+                > str(workout["scheduled_date"])
+                and item.get("status")
+                == "planned"
+            )
+        ]
+
+        future_workouts.sort(
+            key=lambda item: (
+                str(item["scheduled_date"]),
+                int(
+                    item.get(
+                        "workout_index",
+                        0,
+                    )
+                ),
+            )
+        )
+
+        next_by_key = {}
+
+        for future_workout in future_workouts:
+            future_exercises = (
+                exercises_repo.list_for_workout(
+                    current_user.id,
+                    future_workout["id"],
+                )
+            )
+
+            for future_exercise in (
+                future_exercises
+            ):
+                key = future_exercise.get(
+                    "exercise_key"
+                )
+
+                if (
+                    key
+                    and key not in next_by_key
+                ):
+                    next_by_key[key] = {
+                        "workout":
+                            future_workout,
+                        "exercise":
+                            future_exercise,
+                    }
+
+        service = StrengthProgressionService()
+        proposals = []
+
+        for planned in planned_exercises:
+            exercise_id = str(
+                planned["id"]
+            )
+
+            exercise_outcome = (
+                outcome_by_exercise.get(
+                    exercise_id
+                )
+            )
+
+            if not exercise_outcome:
+                continue
+
+            proposal = service.preview(
+                planned_exercise=planned,
+                exercise_outcome=
+                    exercise_outcome,
+                set_logs=logs_by_exercise.get(
+                    exercise_id,
+                    [],
+                ),
+            )
+
+            next_exposure = next_by_key.get(
+                planned.get("exercise_key")
+            )
+
+            proposal["next_exposure"] = (
+                {
+                    "workout_id":
+                        next_exposure[
+                            "workout"
+                        ]["id"],
+                    "scheduled_date":
+                        next_exposure[
+                            "workout"
+                        ]["scheduled_date"],
+                    "exercise_id":
+                        next_exposure[
+                            "exercise"
+                        ]["id"],
+                    "current_prescribed_load_kg":
+                        next_exposure[
+                            "exercise"
+                        ].get(
+                            "prescribed_load_kg"
+                        ),
+                }
+                if next_exposure
+                else None
+            )
+
+            proposals.append(proposal)
+
+        actionable = [
+            item
+            for item in proposals
+            if (
+                item["action"]
+                != "maintain"
+                and item["next_exposure"]
+                is not None
+            )
+        ]
+
+        return {
+            "status": "preview",
+            "workout": workout,
+            "workout_outcome":
+                outcome["outcome"],
+            "proposal_count":
+                len(proposals),
+            "actionable_count":
+                len(actionable),
+            "proposals": proposals,
         }
 
     except HTTPException:
