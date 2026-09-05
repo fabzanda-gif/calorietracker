@@ -8377,3 +8377,27 @@
 }
 
 /* TRAINING PREP NOTICE END */
+
+
+/* FINAL: selected meal card full width */
+
+.mealsSection .mealList,
+.desktopHomeGrid .mealsSection .mealList {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+
+.mealsSection .mealList > article,
+.desktopHomeGrid .mealsSection .mealList > article {
+  width: 100%;
+  min-width: 0;
+}
+
+.mealsSection .mealCard,
+.desktopHomeGrid .mealsSection .mealCard {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  height: auto;
+  box-sizing: border-box;
+}
