@@ -18,7 +18,12 @@ import {
   type DayHistoryResponse,
 } from "@/lib/api/dayHistory";
 import { RegisteredToday } from "@/components/home/RegisteredToday";
-import { getActivitiesForDate, type Activity } from "@/lib/api/activities";
+import {
+  getActivitiesForDate,
+  getPlannedActivities,
+  type Activity,
+  type PlannedActivity,
+} from "@/lib/api/activities";
 
 import {
   type DragEvent,
@@ -86,8 +91,74 @@ import { useExperienceMode } from "@/components/experience/ExperienceModeProvide
 
 import styles from "./HomeShell.module.css";
 
+function localIsoDate(
+  date: Date,
+): string {
+  const year = date.getFullYear();
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0");
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localIsoDate(new Date());
+}
+
+
+function futureIso(
+  days: number,
+): string {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(
+    date.getDate() + days,
+  );
+
+  return localIsoDate(date);
+}
+
+
+function plannedTrainingDateLabel(
+  value: string,
+): string {
+  if (value === todayIso()) {
+    return "Oggi";
+  }
+
+  if (value === futureIso(1)) {
+    return "Domani";
+  }
+
+  return new Date(
+    `${value}T00:00:00`,
+  ).toLocaleDateString(
+    "it-IT",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "short",
+    },
+  );
+}
+
+
+function plannedTrainingKindLabel(
+  value?: string | null,
+): string {
+  return {
+    easy: "Facile",
+    recovery: "Recupero",
+    tempo: "Tempo",
+    interval: "Intervalli",
+    long: "Lungo",
+    race: "Gara",
+  }[value ?? ""] ?? "Corsa";
 }
 
 function briefingMoment():
@@ -426,6 +497,13 @@ export function HomeShell() {
 
   const [actualActivities, setActualActivities] =
     useState<Activity[]>([]);
+
+  const [
+    nextRunningSession,
+    setNextRunningSession,
+  ] = useState<PlannedActivity | null>(
+    null,
+  );
 
   const [latestWeight, setLatestWeight] =
     useState<number | null>(null);
@@ -1074,6 +1152,7 @@ export function HomeShell() {
           nextMealPayload,
           mealsPayload,
           activitiesPayload,
+          plannedActivitiesPayload,
           latestWeightPayload,
           profilePayload,
         ] = await Promise.all([
@@ -1097,6 +1176,11 @@ export function HomeShell() {
             date,
             accessToken,
           ),
+          getPlannedActivities(
+            date,
+            futureIso(7),
+            accessToken,
+          ),
           getLatestWeight(
             accessToken,
           ),
@@ -1110,6 +1194,33 @@ export function HomeShell() {
           setActualMeals(mealsPayload.items);
           setActualActivities(
             activitiesPayload.items,
+          );
+
+          setNextRunningSession(
+            plannedActivitiesPayload.items
+              .filter(
+                (item) =>
+                  item.status === "planned" &&
+                  Boolean(
+                    item.training_plan_id,
+                  ) &&
+                  item.activity_type
+                    .trim()
+                    .toLocaleLowerCase(
+                      "it-IT",
+                    ) === "corsa",
+              )
+              .sort(
+                (left, right) =>
+                  left.scheduled_date.localeCompare(
+                    right.scheduled_date,
+                  ) ||
+                  (
+                    left.scheduled_time ?? ""
+                  ).localeCompare(
+                    right.scheduled_time ?? "",
+                  ),
+              )[0] ?? null,
           );
 
           setLatestWeight(
@@ -1495,6 +1606,7 @@ export function HomeShell() {
       nextMealPayload,
       mealsPayload,
       activitiesPayload,
+      plannedActivitiesPayload,
     ] = await Promise.all([
       getDay(date, accessToken),
       getDayBudget(date, accessToken),
@@ -1508,6 +1620,11 @@ export function HomeShell() {
       ),
       getActivitiesForDate(
         date,
+        accessToken,
+      ),
+      getPlannedActivities(
+        date,
+        futureIso(7),
         accessToken,
       ),
     ]);
@@ -1535,6 +1652,34 @@ export function HomeShell() {
     setActualActivities(
       activitiesPayload.items,
     );
+
+    setNextRunningSession(
+      plannedActivitiesPayload.items
+        .filter(
+          (item) =>
+            item.status === "planned" &&
+            Boolean(
+              item.training_plan_id,
+            ) &&
+            item.activity_type
+              .trim()
+              .toLocaleLowerCase(
+                "it-IT",
+              ) === "corsa",
+        )
+        .sort(
+          (left, right) =>
+            left.scheduled_date.localeCompare(
+              right.scheduled_date,
+            ) ||
+            (
+              left.scheduled_time ?? ""
+            ).localeCompare(
+              right.scheduled_time ?? "",
+            ),
+        )[0] ?? null,
+    );
+
     setActualDinner(
       mealsPayload.items.find(
         (meal) => meal.meal_type === "Cena",
@@ -2316,6 +2461,129 @@ export function HomeShell() {
                 ? "Salvataggio..."
                 : dayPlannerMessage}
             </p>
+          ) : null}
+
+          {nextRunningSession ? (
+            <section
+              className={
+                styles.nextTrainingCard
+              }
+            >
+              <div
+                className={
+                  styles.nextTrainingTop
+                }
+              >
+                <div>
+                  <span
+                    className={
+                      styles.nextTrainingEyebrow
+                    }
+                  >
+                    PROSSIMO ALLENAMENTO ·{" "}
+                    {plannedTrainingDateLabel(
+                      nextRunningSession
+                        .scheduled_date,
+                    )}
+                  </span>
+
+                  <h2>
+                    {nextRunningSession.title}
+                  </h2>
+                </div>
+
+                <span
+                  className={
+                    styles.nextTrainingKind
+                  }
+                >
+                  {plannedTrainingKindLabel(
+                    nextRunningSession
+                      .session_kind,
+                  )}
+                </span>
+              </div>
+
+              <div
+                className={
+                  styles.nextTrainingMetrics
+                }
+              >
+                {nextRunningSession
+                  .training_week ? (
+                  <span>
+                    Settimana{" "}
+                    {
+                      nextRunningSession
+                        .training_week
+                    }
+                  </span>
+                ) : null}
+
+                {nextRunningSession
+                  .distance_meters ? (
+                  <strong>
+                    {(
+                      nextRunningSession
+                        .distance_meters /
+                      1000
+                    ).toLocaleString(
+                      "it-IT",
+                      {
+                        maximumFractionDigits:
+                          2,
+                      },
+                    )}{" "}
+                    km
+                  </strong>
+                ) : null}
+
+                {nextRunningSession
+                  .duration_minutes ? (
+                  <span>
+                    {
+                      nextRunningSession
+                        .duration_minutes
+                    }{" "}
+                    min
+                  </span>
+                ) : null}
+
+                {nextRunningSession
+                  .scheduled_time ? (
+                  <span>
+                    ore{" "}
+                    {nextRunningSession
+                      .scheduled_time
+                      .slice(0, 5)}
+                  </span>
+                ) : null}
+              </div>
+
+              <p
+                className={
+                  styles.nextTrainingMessage
+                }
+              >
+                {experienceMode === "zero"
+                  ? `${
+                      plannedTrainingDateLabel(
+                        nextRunningSession
+                          .scheduled_date,
+                      )
+                    }: ${
+                      nextRunningSession.title
+                    }. Non si correrà da solo.`
+                  : `${
+                      plannedTrainingDateLabel(
+                        nextRunningSession
+                          .scheduled_date,
+                      )
+                    } hai ${
+                      nextRunningSession.title
+                    }. Tienilo presente mentre organizzi la giornata.`}
+              </p>
+            </section>
           ) : null}
 
           {budget ? (
