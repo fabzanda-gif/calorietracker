@@ -270,9 +270,17 @@ def build_running_plan(
 
             if is_final:
                 kind = "race"
-                distance = _round_distance(
-                    plan.target_distance_meters
+
+                # The goal session must preserve the
+                # user's exact target distance.
+                # Intermediate training sessions remain
+                # rounded to practical 500 m increments.
+                distance = int(
+                    round(
+                        plan.target_distance_meters
+                    )
                 )
+
                 pace = (
                     plan.target_pace_seconds_per_km
                 )

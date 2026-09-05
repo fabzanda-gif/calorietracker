@@ -41,8 +41,21 @@ def test_running_plan_finishes_with_target_race():
     final = sessions[-1]
 
     assert final["session_kind"] == "race"
-    assert final["distance_meters"] == 21000
+    assert final["distance_meters"] == 21100
     assert final["intensity"] == "race"
+
+
+def test_running_plan_preserves_non_round_target_distance():
+    sessions = build_running_plan(
+        sample_plan(
+            target_distance_meters=42195,
+        )
+    )
+
+    final = sessions[-1]
+
+    assert final["session_kind"] == "race"
+    assert final["distance_meters"] == 42195
 
 
 def test_running_plan_contains_long_and_quality_sessions():
