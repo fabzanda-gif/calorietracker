@@ -20,6 +20,7 @@ from backend.api.routers.pantry import router as pantry_router
 from backend.api.routers.recipes import router as recipes_router
 from backend.api.routers.progress import router as progress_router
 from backend.api.routers.profile import router as profile_router
+from backend.api.routers.strength import router as strength_router
 from backend.api.routers.weekly_schedule import router as weekly_schedule_router
 from backend.api.routers.weight import router as weight_router
 
@@ -58,6 +59,7 @@ app.include_router(activities_router)
 app.include_router(weight_router)
 app.include_router(progress_router)
 app.include_router(profile_router)
+app.include_router(strength_router)
 app.include_router(weekly_schedule_router)
 app.include_router(daily_logs_router)
 app.include_router(day_history_router)

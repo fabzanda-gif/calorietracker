@@ -85,3 +85,26 @@ class StrengthPlansRepository(BaseRepository):
                 "Unable to create strength plan: "
                 f"{exc}"
             ) from exc
+
+
+    def delete(
+        self,
+        plan_id: Any,
+        user_id: str,
+    ) -> bool:
+        try:
+            (
+                self.table
+                .delete()
+                .eq("id", plan_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
+
+            return True
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to delete strength plan: "
+                f"{exc}"
+            ) from exc
