@@ -6626,12 +6626,12 @@
   }
 
   .mealsSection .mealCardTwoItems {
-    width: 72%;
+    width: 100%;
     max-width: none;
   }
 
   .mealsSection .mealCardManyItems {
-    width: 52%;
+    width: 100%;
     max-width: none;
   }
 }
@@ -6659,13 +6659,13 @@
   }
 
   .desktopHomeGrid .mealsSection .mealCard.mealCardTwoItems {
-    width: 72%;
+    width: 100%;
     max-width: none;
     justify-self: start;
   }
 
   .desktopHomeGrid .mealsSection .mealCard.mealCardManyItems {
-    width: 52%;
+    width: 100%;
     max-width: none;
     justify-self: start;
   }
@@ -6681,11 +6681,11 @@
   }
 
   .mealsSection .mealCard.mealCardTwoItems {
-    width: 72%;
+    width: 100%;
   }
 
   .mealsSection .mealCard.mealCardManyItems {
-    width: 52%;
+    width: 100%;
   }
 }
 
