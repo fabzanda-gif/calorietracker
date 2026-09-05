@@ -143,7 +143,8 @@ export interface DayDecisionContext {
     | "tight_budget"
     | "protein_focus"
     | "flexible"
-    | "balanced";
+    | "balanced"
+    | "training_prep";
   title: string;
   message: string;
 }

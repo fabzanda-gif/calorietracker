@@ -4004,6 +4004,50 @@ export function HomeShell() {
                       </>
                     ) : null}
 
+                    {slot === "dinner" &&
+                    slot === nextMeal?.next_slot &&
+                    !actualMealForSlot(slot) &&
+                    nextMealOptions?.day_context?.kind ===
+                      "training_prep" ? (
+                      <div
+                        className={
+                          styles.trainingPrepNotice
+                        }
+                      >
+                        <div
+                          className={
+                            styles.trainingPrepIcon
+                          }
+                          aria-hidden="true"
+                        >
+                          ↗
+                        </div>
+
+                        <div>
+                          <span
+                            className={
+                              styles.trainingPrepEyebrow
+                            }
+                          >
+                            ALLENAMENTO DI DOMANI
+                          </span>
+
+                          <strong>
+                            {experienceMode === "zero"
+                              ? "Domani si corre. Sorpresa: serve carburante."
+                              : "Preparazione per domani"}
+                          </strong>
+
+                          <p>
+                            {
+                              nextMealOptions
+                                .day_context.message
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
                         {alternateSlot === slot ? (
                           <div className={styles.alternateMealForm}>
                             <label>
