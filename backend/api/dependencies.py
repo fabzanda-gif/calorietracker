@@ -34,6 +34,13 @@ from backend.repositories.recipes import RecipesRepository
 from backend.repositories.training_plans import (
     TrainingPlansRepository,
 )
+from backend.repositories.strength_plans import (
+    StrengthPlansRepository,
+)
+from backend.repositories.strength_workouts import (
+    StrengthWorkoutsRepository,
+    StrengthWorkoutExercisesRepository,
+)
 from backend.repositories.training_plan_adaptations import (
     TrainingPlanAdaptationsRepository,
 )
@@ -251,6 +258,37 @@ def get_training_plans_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> TrainingPlansRepository:
     return TrainingPlansRepository(supabase)
+
+
+
+def get_strength_plans_repository(
+    supabase: Client = Depends(
+        get_authenticated_supabase
+    ),
+) -> StrengthPlansRepository:
+    return StrengthPlansRepository(
+        supabase
+    )
+
+
+def get_strength_workouts_repository(
+    supabase: Client = Depends(
+        get_authenticated_supabase
+    ),
+) -> StrengthWorkoutsRepository:
+    return StrengthWorkoutsRepository(
+        supabase
+    )
+
+
+def get_strength_workout_exercises_repository(
+    supabase: Client = Depends(
+        get_authenticated_supabase
+    ),
+) -> StrengthWorkoutExercisesRepository:
+    return StrengthWorkoutExercisesRepository(
+        supabase
+    )
 
 
 def get_training_plan_adaptations_repository(
