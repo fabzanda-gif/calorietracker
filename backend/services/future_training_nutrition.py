@@ -6,7 +6,7 @@ from typing import Any
 
 class FutureTrainingNutritionService:
     """
-    Translate tomorrow's planned running session into
+    Translate tomorrow's planned training into
     a small deterministic nutrition context.
 
     Tomorrow's estimated exercise calories are deliberately
@@ -18,11 +18,15 @@ class FutureTrainingNutritionService:
         *,
         day_date: date,
         planned_activities: list[dict[str, Any]],
+        strength_workouts: list[dict[str, Any]] | None = None,
     ) -> dict:
         tomorrow = day_date + timedelta(days=1)
 
-        sessions = [
-            item
+        running_sessions = [
+            {
+                **item,
+                "training_type": "running",
+            }
             for item in planned_activities
             if (
                 str(item.get("scheduled_date") or "")
@@ -34,6 +38,33 @@ class FutureTrainingNutritionService:
                     item.get("training_plan_id")
                 )
             )
+        ]
+
+        strength_sessions = [
+            {
+                **item,
+                "training_type": "strength",
+                "duration_minutes": item.get(
+                    "estimated_duration_minutes"
+                ),
+                "session_kind": "strength",
+            }
+            for item in (strength_workouts or [])
+            if (
+                str(item.get("scheduled_date") or "")
+                == str(tomorrow)
+                and str(
+                    item.get("status") or "planned"
+                ) == "planned"
+                and bool(
+                    item.get("strength_plan_id")
+                )
+            )
+        ]
+
+        sessions = [
+            *running_sessions,
+            *strength_sessions,
         ]
 
         if not sessions:
@@ -82,6 +113,10 @@ class FutureTrainingNutritionService:
                 "training_week": primary.get(
                     "training_week"
                 ),
+                "training_type": primary.get(
+                    "training_type"
+                ),
+                "focus": primary.get("focus"),
             },
         }
 

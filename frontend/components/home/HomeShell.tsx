@@ -26,6 +26,12 @@ import {
 } from "@/lib/api/activities";
 
 import {
+  getStrengthPlanDetail,
+  getStrengthPlans,
+  type StrengthWorkout,
+} from "@/lib/api/strength";
+
+import {
   type DragEvent,
   useEffect,
   useMemo,
@@ -160,6 +166,20 @@ function plannedTrainingKindLabel(
     race: "Gara",
   }[value ?? ""] ?? "Corsa";
 }
+
+function strengthFocusLabel(
+  value?: string | null,
+): string {
+  return {
+    full_body: "Full body",
+    upper: "Upper",
+    lower: "Lower",
+    push: "Push",
+    pull: "Pull",
+    legs: "Gambe",
+  }[value ?? ""] ?? "Palestra";
+}
+
 
 function briefingMoment():
   "morning" | "afternoon" | "evening" {
@@ -502,6 +522,13 @@ export function HomeShell() {
     nextRunningSession,
     setNextRunningSession,
   ] = useState<PlannedActivity | null>(
+    null,
+  );
+
+  const [
+    nextStrengthSession,
+    setNextStrengthSession,
+  ] = useState<StrengthWorkout | null>(
     null,
   );
 
@@ -1060,6 +1087,75 @@ export function HomeShell() {
 
     return "";
   }, [user]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setNextStrengthSession(null);
+      return;
+    }
+
+    let active = true;
+
+    async function loadStrengthTraining() {
+      try {
+        const plans = await getStrengthPlans(
+          accessToken,
+        );
+
+        const activePlan = plans.items.find(
+          (item) =>
+            item.status === "active",
+        );
+
+        if (!activePlan) {
+          if (active) {
+            setNextStrengthSession(null);
+          }
+          return;
+        }
+
+        const detail =
+          await getStrengthPlanDetail(
+            activePlan.id,
+            accessToken,
+          );
+
+        const nextWorkout = [
+          ...detail.workouts,
+        ]
+          .filter(
+            (item) =>
+              item.status === "planned",
+          )
+          .sort(
+            (left, right) =>
+              left.scheduled_date.localeCompare(
+                right.scheduled_date,
+              ) ||
+              left.workout_index -
+                right.workout_index,
+          )[0] ?? null;
+
+        if (active) {
+          setNextStrengthSession(
+            nextWorkout,
+          );
+        }
+      } catch {
+        // Strength is an optional Home enhancement.
+        if (active) {
+          setNextStrengthSession(null);
+        }
+      }
+    }
+
+    void loadStrengthTraining();
+
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
+
 
   const recentWeights = useMemo(() => {
     const sorted = [...weightHistory].sort(
@@ -2582,6 +2678,102 @@ export function HomeShell() {
                     } hai ${
                       nextRunningSession.title
                     }. Tienilo presente mentre organizzi la giornata.`}
+              </p>
+            </section>
+          ) : null}
+
+          {nextStrengthSession ? (
+            <section
+              className={
+                styles.nextTrainingCard
+              }
+            >
+              <div
+                className={
+                  styles.nextTrainingTop
+                }
+              >
+                <div>
+                  <span
+                    className={
+                      styles.nextTrainingEyebrow
+                    }
+                  >
+                    PROSSIMA PALESTRA ·{" "}
+                    {plannedTrainingDateLabel(
+                      nextStrengthSession
+                        .scheduled_date,
+                    )}
+                  </span>
+
+                  <h2>
+                    {nextStrengthSession.title}
+                  </h2>
+                </div>
+
+                <span
+                  className={
+                    styles.nextTrainingKind
+                  }
+                >
+                  {strengthFocusLabel(
+                    nextStrengthSession.focus,
+                  )}
+                </span>
+              </div>
+
+              <div
+                className={
+                  styles.nextTrainingMetrics
+                }
+              >
+                <span>
+                  Settimana{" "}
+                  {
+                    nextStrengthSession
+                      .training_week
+                  }
+                </span>
+
+                <strong>
+                  {
+                    nextStrengthSession
+                      .exercises.length
+                  }{" "}
+                  esercizi
+                </strong>
+
+                {nextStrengthSession
+                  .estimated_duration_minutes !=
+                null ? (
+                  <span>
+                    {
+                      nextStrengthSession
+                        .estimated_duration_minutes
+                    }{" "}
+                    min
+                  </span>
+                ) : null}
+              </div>
+
+              <p
+                className={
+                  styles.nextTrainingMessage
+                }
+              >
+                {experienceMode === "zero"
+                  ? `${plannedTrainingDateLabel(
+                      nextStrengthSession
+                        .scheduled_date,
+                    )}: ${
+                      nextStrengthSession.title
+                    }. I pesi non si alzano da soli.`
+                  : `${plannedTrainingDateLabel(
+                      nextStrengthSession
+                        .scheduled_date,
+                    )} hai ${
+                      nextStrengthSession.title
+                    }. La seduta è già nel tuo programma.`}
               </p>
             </section>
           ) : null}

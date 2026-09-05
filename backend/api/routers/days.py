@@ -17,6 +17,8 @@ from backend.api.dependencies import (
     get_optional_decision_selections_repository,
     get_meal_prep_repository,
     get_planned_activities_repository,
+    get_strength_plans_repository,
+    get_strength_workouts_repository,
     get_meals_repository,
     get_recipes_repository,
     get_weekly_schedule_repository,
@@ -34,6 +36,12 @@ from backend.repositories.planned_activities import (
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
+from backend.repositories.strength_plans import (
+    StrengthPlansRepository,
+)
+from backend.repositories.strength_workouts import (
+    StrengthWorkoutsRepository,
+)
 from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
@@ -468,6 +476,12 @@ def get_ranked_meal_options(
     planned_activities_repo: PlannedActivitiesRepository = Depends(
         get_planned_activities_repository
     ),
+    strength_plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
+    strength_workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
     recipes_repo: RecipesRepository = Depends(
         get_recipes_repository
     ),
@@ -636,10 +650,70 @@ def get_ranked_meal_options(
                 # planned-activity storage is unavailable.
                 tomorrow_sessions = []
 
+            tomorrow_strength_workouts = []
+
+            try:
+                if (
+                    hasattr(
+                        strength_plans_repo,
+                        "list_for_user",
+                    )
+                    and hasattr(
+                        strength_workouts_repo,
+                        "list_for_plan",
+                    )
+                ):
+                    strength_plans = (
+                        strength_plans_repo.list_for_user(
+                            current_user.id
+                        )
+                    )
+
+                    active_strength_plans = [
+                        item
+                        for item in strength_plans
+                        if item.get("status") == "active"
+                        and item.get("id")
+                    ]
+
+                    for strength_plan in (
+                        active_strength_plans
+                    ):
+                        plan_workouts = (
+                            strength_workouts_repo
+                            .list_for_plan(
+                                current_user.id,
+                                strength_plan["id"],
+                            )
+                        )
+
+                        tomorrow_strength_workouts.extend(
+                            item
+                            for item in plan_workouts
+                            if (
+                                str(
+                                    item.get(
+                                        "scheduled_date"
+                                    )
+                                    or ""
+                                )
+                                == str(tomorrow)
+                                and item.get("status")
+                                == "planned"
+                            )
+                        )
+
+            except RepositoryError:
+                # Strength context is optional too.
+                tomorrow_strength_workouts = []
+
             future_training_context = (
                 FutureTrainingNutritionService().build(
                     day_date=day_date,
                     planned_activities=tomorrow_sessions,
+                    strength_workouts=(
+                        tomorrow_strength_workouts
+                    ),
                 )
             )
 
