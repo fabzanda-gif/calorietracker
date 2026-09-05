@@ -10,6 +10,7 @@ import {
 import { ActivityLogger } from "@/components/activity/ActivityLogger";
 import { ActivityMap } from "@/components/activity/ActivityMap";
 import { RunningPlanBuilder } from "@/components/activity/RunningPlanBuilder";
+import { StrengthPlanPanel } from "@/components/activity/StrengthPlanPanel";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AppNav } from "@/components/navigation/AppNav";
 import {
@@ -1447,6 +1448,8 @@ export default function ActivitiesPage() {
             void loadMonth();
           }}
         />
+
+        <StrengthPlanPanel />
 
         <section className={styles.plannerSection}>
           <div className={styles.plannerHeading}>
