@@ -433,3 +433,60 @@
     width: 100%;
   }
 }
+
+
+/* Strength V1 final mobile polish */
+
+@media (max-width: 760px) {
+  .panel,
+  .card {
+    min-width: 0;
+  }
+
+  .header,
+  .planHeader,
+  .workoutHeader {
+    align-items: flex-start;
+  }
+
+  .formGrid,
+  .exerciseGrid,
+  .logMeta {
+    grid-template-columns: 1fr;
+  }
+
+  .exerciseCard,
+  .workoutCard {
+    min-width: 0;
+  }
+
+  .setRow {
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, 1fr)
+      minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .setRow input {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton {
+    min-height: 46px;
+  }
+
+  .setActions button {
+    min-height: 42px;
+    flex: 1;
+  }
+
+  .workoutActions > button,
+  .planActions > button {
+    width: 100%;
+  }
+}

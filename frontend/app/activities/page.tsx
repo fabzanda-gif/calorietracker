@@ -12,6 +12,9 @@ import { ActivityMap } from "@/components/activity/ActivityMap";
 import { RunningPlanBuilder } from "@/components/activity/RunningPlanBuilder";
 import { StrengthPlanPanel } from "@/components/activity/StrengthPlanPanel";
 import { useAuth } from "@/components/auth/AuthProvider";
+import {
+  useExperienceMode,
+} from "@/components/experience/ExperienceModeProvider";
 import { AppNav } from "@/components/navigation/AppNav";
 import {
   getActivitiesForRange,
@@ -38,8 +41,6 @@ import {
 } from "@/lib/api/activities";
 
 import styles from "./ActivitiesPage.module.css";
-
-type ExperienceMode = "standard" | "zero";
 
 const WEEKDAYS = [
   "Lun",
@@ -534,8 +535,10 @@ function MetricChart({
 
 export default function ActivitiesPage() {
   const { accessToken } = useAuth();
-  const [experienceMode, setExperienceMode] =
-    useState<ExperienceMode>("standard");
+  const {
+    experienceMode,
+    setExperienceMode,
+  } = useExperienceMode();
   const [month, setMonth] = useState(
     () => new Date(),
   );
@@ -648,16 +651,6 @@ export default function ActivitiesPage() {
     adaptationFeedback,
     setAdaptationFeedback,
   ] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(
-      "sanosync-experience-mode",
-    );
-
-    if (stored === "zero") {
-      setExperienceMode("zero");
-    }
-  }, []);
 
   const loadMonth = useCallback(async () => {
     if (!accessToken) {

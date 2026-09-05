@@ -184,3 +184,47 @@
     flex-direction: column;
   }
 }
+
+
+/* Strength V1 overview mobile polish */
+
+@media (max-width: 760px) {
+  .block {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .week,
+  .historyCard {
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .weekHeading,
+  .workout {
+    align-items: flex-start;
+  }
+
+  .workout > div,
+  .historyHeader > div {
+    min-width: 0;
+  }
+
+  .workout strong,
+  .historyHeader h4 {
+    overflow-wrap: anywhere;
+  }
+
+  .status {
+    flex: 0 0 auto;
+  }
+
+  .sets {
+    gap: 5px;
+  }
+
+  .sets span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+}
