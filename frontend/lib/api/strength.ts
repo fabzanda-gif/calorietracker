@@ -323,6 +323,34 @@ export function getStrengthPlanHistory(
 }
 
 
+export function skipStrengthWorkout(
+  workoutId: string,
+  accessToken?: string | null,
+): Promise<unknown> {
+  return apiRequest(
+    `/strength/workouts/${workoutId}/skip`,
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
+}
+
+
+export function cancelStrengthPlan(
+  planId: string,
+  accessToken?: string | null,
+): Promise<unknown> {
+  return apiRequest(
+    `/strength/plans/${planId}/cancel`,
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
+}
+
+
 export function logStrengthWorkout(
   workoutId: string,
   input: StrengthWorkoutLogInput,

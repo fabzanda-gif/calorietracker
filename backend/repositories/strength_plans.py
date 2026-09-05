@@ -65,6 +65,32 @@ class StrengthPlansRepository(BaseRepository):
                 f"{exc}"
             ) from exc
 
+    def update_status(
+        self,
+        *,
+        plan_id: Any,
+        user_id: str,
+        status: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update({"status": status})
+                .eq("id", plan_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
+
+            rows = self._data(response)
+
+            return rows[0] if rows else None
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to update strength plan: "
+                f"{exc}"
+            ) from exc
+
     def create(
         self,
         payload: dict[str, Any],

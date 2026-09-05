@@ -174,6 +174,37 @@ def _plan_payload(
     }
 
 
+def _complete_strength_plan_if_finished(
+    *,
+    user_id: str,
+    plan_id: str,
+    plans_repo: StrengthPlansRepository,
+    workouts_repo: StrengthWorkoutsRepository,
+) -> dict | None:
+    workouts = workouts_repo.list_for_plan(
+        user_id,
+        plan_id,
+    )
+
+    if not workouts:
+        return None
+
+    unfinished = [
+        item
+        for item in workouts
+        if item.get("status") == "planned"
+    ]
+
+    if unfinished:
+        return None
+
+    return plans_repo.update_status(
+        plan_id=plan_id,
+        user_id=user_id,
+        status="completed",
+    )
+
+
 def _persist_strength_plan(
     *,
     user_id: str,
@@ -508,6 +539,9 @@ def log_strength_workout(
         StrengthWorkoutsRepository = Depends(
             get_strength_workouts_repository
         ),
+    plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
     exercises_repo:
         StrengthWorkoutExercisesRepository = Depends(
             get_strength_workout_exercises_repository
@@ -666,12 +700,28 @@ def log_strength_workout(
                     "was not updated"
                 )
 
+            plan_id = workout.get(
+                "strength_plan_id"
+            )
+
+            plan_update = (
+                _complete_strength_plan_if_finished(
+                    user_id=current_user.id,
+                    plan_id=str(plan_id),
+                    plans_repo=plans_repo,
+                    workouts_repo=workouts_repo,
+                )
+                if plan_id
+                else None
+            )
+
             return {
                 "logged": True,
                 "workout": updated_workout,
                 "workout_log": workout_log,
                 "set_count": len(created_sets),
                 "sets": created_sets,
+                "plan": plan_update,
             }
 
         except Exception:
@@ -1711,6 +1761,167 @@ def get_strength_plan_history(
             "plan_id": plan_id,
             "count": len(items),
             "items": items,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+@router.post(
+    "/workouts/{workout_id}/skip",
+)
+def skip_strength_workout(
+    workout_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    workouts_repo:
+        StrengthWorkoutsRepository = Depends(
+            get_strength_workouts_repository
+        ),
+    plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
+    workout_logs_repo:
+        StrengthWorkoutLogsRepository = Depends(
+            get_strength_workout_logs_repository
+        ),
+):
+    try:
+        workout = workouts_repo.get(
+            current_user.id,
+            workout_id,
+        )
+
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Workout palestra non trovato."
+                ),
+            )
+
+        if workout.get("status") != "planned":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Puoi saltare solo una seduta "
+                    "ancora pianificata."
+                ),
+            )
+
+        existing_log = (
+            workout_logs_repo.get_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        if existing_log:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "La seduta è già stata "
+                    "registrata."
+                ),
+            )
+
+        updated = workouts_repo.update_status(
+            user_id=current_user.id,
+            workout_id=workout_id,
+            status="skipped",
+        )
+
+        if not updated:
+            raise RepositoryError(
+                "Strength workout was not skipped"
+            )
+
+        plan_update = (
+            _complete_strength_plan_if_finished(
+                user_id=current_user.id,
+                plan_id=str(
+                    workout["strength_plan_id"]
+                ),
+                plans_repo=plans_repo,
+                workouts_repo=workouts_repo,
+            )
+        )
+
+        return {
+            "skipped": True,
+            "workout": updated,
+            "plan": plan_update,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/plans/{plan_id}/cancel",
+)
+def cancel_strength_plan(
+    plan_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
+):
+    try:
+        plan = plans_repo.get(
+            plan_id,
+            current_user.id,
+        )
+
+        if not plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Programma palestra non trovato."
+                ),
+            )
+
+        if plan.get("status") != "active":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Puoi interrompere solo "
+                    "un programma attivo."
+                ),
+            )
+
+        updated = plans_repo.update_status(
+            plan_id=plan_id,
+            user_id=current_user.id,
+            status="cancelled",
+        )
+
+        if not updated:
+            raise RepositoryError(
+                "Strength plan was not cancelled"
+            )
+
+        return {
+            "cancelled": True,
+            "plan": updated,
         }
 
     except HTTPException:

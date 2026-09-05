@@ -373,3 +373,63 @@
     width: 100%;
   }
 }
+
+
+.setActions,
+.workoutActions,
+.planActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.setActions {
+  margin-top: 10px;
+}
+
+.setActions button,
+.secondaryButton,
+.dangerButton {
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: white;
+  color: inherit;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.setActions button:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.workoutActions {
+  margin-top: 4px;
+}
+
+.planActions {
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+
+.dangerButton {
+  border-color: rgba(185, 28, 28, 0.25);
+  color: #991b1b;
+  background: rgba(220, 38, 38, 0.04);
+}
+
+@media (max-width: 760px) {
+  .workoutActions,
+  .planActions {
+    flex-direction: column;
+  }
+
+  .secondaryButton,
+  .dangerButton {
+    width: 100%;
+  }
+}

@@ -13,12 +13,14 @@ import { StrengthProgramOverview } from "@/components/activity/StrengthProgramOv
 
 import {
   applyStrengthProgression,
+  cancelStrengthPlan,
   createStrengthPlan,
   getStrengthPlanDetail,
   getStrengthPlans,
   getStrengthProgressionPreview,
   getStrengthWorkoutOutcome,
   logStrengthWorkout,
+  skipStrengthWorkout,
   previewStrengthPlan,
   type StrengthExperience,
   type StrengthGoal,
@@ -242,6 +244,11 @@ export function StrengthPlanPanel() {
   >({});
 
   const [
+    performedDate,
+    setPerformedDate,
+  ] = useState(todayIso());
+
+  const [
     duration,
     setDuration,
   ] = useState("");
@@ -254,6 +261,17 @@ export function StrengthPlanPanel() {
   const [
     logging,
     setLogging,
+  ] = useState(false);
+
+
+  const [
+    skipping,
+    setSkipping,
+  ] = useState(false);
+
+  const [
+    cancellingPlan,
+    setCancellingPlan,
   ] = useState(false);
 
   const [
@@ -390,6 +408,7 @@ export function StrengthPlanPanel() {
     );
 
     setNotes("");
+    setPerformedDate(todayIso());
   }, [nextWorkout]);
 
 
@@ -502,6 +521,156 @@ export function StrengthPlanPanel() {
   }
 
 
+  function addSet(
+    exerciseId: string,
+  ) {
+    setSetDrafts(
+      (current) => {
+        const existing =
+          current[exerciseId] ?? [];
+
+        if (existing.length >= 10) {
+          return current;
+        }
+
+        const last =
+          existing[
+            existing.length - 1
+          ];
+
+        return {
+          ...current,
+          [exerciseId]: [
+            ...existing,
+            last
+              ? { ...last }
+              : {
+                  reps: "",
+                  loadKg: "",
+                  rir: "",
+                },
+          ],
+        };
+      },
+    );
+  }
+
+
+  function removeSet(
+    exerciseId: string,
+  ) {
+    setSetDrafts(
+      (current) => {
+        const existing =
+          current[exerciseId] ?? [];
+
+        if (existing.length <= 1) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [exerciseId]:
+            existing.slice(0, -1),
+        };
+      },
+    );
+  }
+
+
+  async function skipWorkout() {
+    if (
+      !accessToken ||
+      !nextWorkout
+    ) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Saltare "${nextWorkout.title}"?`,
+      )
+    ) {
+      return;
+    }
+
+    setSkipping(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await skipStrengthWorkout(
+        nextWorkout.id,
+        accessToken,
+      );
+
+      setMessage(
+        "Seduta segnata come saltata.",
+      );
+
+      await loadPlan();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : (
+              "Non riesco a saltare " +
+              "la seduta."
+            ),
+      );
+    } finally {
+      setSkipping(false);
+    }
+  }
+
+
+  async function cancelPlan() {
+    if (
+      !accessToken ||
+      !detail
+    ) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Interrompere il programma palestra attivo?",
+      )
+    ) {
+      return;
+    }
+
+    setCancellingPlan(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await cancelStrengthPlan(
+        detail.plan.id,
+        accessToken,
+      );
+
+      setDetail(null);
+      setPlanPreview(null);
+
+      setMessage(
+        "Programma palestra interrotto.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : (
+              "Non riesco a interrompere " +
+              "il programma."
+            ),
+      );
+    } finally {
+      setCancellingPlan(false);
+    }
+  }
+
+
   async function submitWorkout() {
     if (
       !accessToken ||
@@ -604,7 +773,7 @@ export function StrengthPlanPanel() {
       await logStrengthWorkout(
         nextWorkout.id,
         {
-          performed_date: todayIso(),
+          performed_date: performedDate,
           duration_minutes:
             duration.trim()
               ? Number(duration)
@@ -997,6 +1166,27 @@ export function StrengthPlanPanel() {
           </div>
 
 
+          <div
+            className={
+              styles.planActions
+            }
+          >
+            <button
+              type="button"
+              className={
+                styles.dangerButton
+              }
+              disabled={cancellingPlan}
+              onClick={() => {
+                void cancelPlan();
+              }}
+            >
+              {cancellingPlan
+                ? "Interrompo…"
+                : "Interrompi programma"}
+            </button>
+          </div>
+
           <StrengthProgramOverview
             detail={detail}
             refreshKey={
@@ -1238,6 +1428,48 @@ export function StrengthPlanPanel() {
                           ),
                         )}
                       </div>
+
+                      <div
+                        className={
+                          styles.setActions
+                        }
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeSet(
+                              exercise.id,
+                            )
+                          }
+                          disabled={
+                            (
+                              setDrafts[
+                                exercise.id
+                              ] ?? []
+                            ).length <= 1
+                          }
+                        >
+                          − Serie
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            addSet(
+                              exercise.id,
+                            )
+                          }
+                          disabled={
+                            (
+                              setDrafts[
+                                exercise.id
+                              ] ?? []
+                            ).length >= 10
+                          }
+                        >
+                          + Serie
+                        </button>
+                      </div>
                     </article>
                   ),
                 )}
@@ -1245,6 +1477,19 @@ export function StrengthPlanPanel() {
 
 
               <div className={styles.logMeta}>
+                <label>
+                  Data reale
+                  <input
+                    type="date"
+                    value={performedDate}
+                    onChange={(event) =>
+                      setPerformedDate(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </label>
+
                 <label>
                   Durata reale
                   <div
@@ -1280,20 +1525,45 @@ export function StrengthPlanPanel() {
                 </label>
               </div>
 
-              <button
-                type="button"
+              <div
                 className={
-                  styles.primaryButton
+                  styles.workoutActions
                 }
-                disabled={logging}
-                onClick={() => {
-                  void submitWorkout();
-                }}
               >
-                {logging
-                  ? "Registro seduta…"
-                  : "Completa seduta"}
-              </button>
+                <button
+                  type="button"
+                  className={
+                    styles.primaryButton
+                  }
+                  disabled={
+                    logging || skipping
+                  }
+                  onClick={() => {
+                    void submitWorkout();
+                  }}
+                >
+                  {logging
+                    ? "Registro seduta…"
+                    : "Completa seduta"}
+                </button>
+
+                <button
+                  type="button"
+                  className={
+                    styles.secondaryButton
+                  }
+                  disabled={
+                    logging || skipping
+                  }
+                  onClick={() => {
+                    void skipWorkout();
+                  }}
+                >
+                  {skipping
+                    ? "Salto…"
+                    : "Salta seduta"}
+                </button>
+              </div>
             </div>
           ) : (
             <div className={styles.empty}>
