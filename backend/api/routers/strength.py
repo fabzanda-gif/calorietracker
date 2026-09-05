@@ -17,6 +17,7 @@ from backend.api.dependencies import (
     get_strength_workout_exercises_repository,
     get_strength_workout_logs_repository,
     get_strength_set_logs_repository,
+    get_strength_progression_history_repository,
     get_strength_workouts_repository,
 )
 from backend.repositories.base import RepositoryError
@@ -30,6 +31,9 @@ from backend.repositories.strength_workouts import (
 from backend.repositories.strength_logs import (
     StrengthSetLogsRepository,
     StrengthWorkoutLogsRepository,
+)
+from backend.repositories.strength_progression_history import (
+    StrengthProgressionHistoryRepository,
 )
 from backend.services.strength_plan import (
     StrengthPlanInput,
@@ -1036,6 +1040,383 @@ def preview_strength_progression(
 
     except HTTPException:
         raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+@router.post(
+    "/workouts/{workout_id}/progression/"
+    "{exercise_id}/apply",
+)
+def apply_strength_progression(
+    workout_id: str,
+    exercise_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    workouts_repo:
+        StrengthWorkoutsRepository = Depends(
+            get_strength_workouts_repository
+        ),
+    exercises_repo:
+        StrengthWorkoutExercisesRepository = Depends(
+            get_strength_workout_exercises_repository
+        ),
+    workout_logs_repo:
+        StrengthWorkoutLogsRepository = Depends(
+            get_strength_workout_logs_repository
+        ),
+    set_logs_repo:
+        StrengthSetLogsRepository = Depends(
+            get_strength_set_logs_repository
+        ),
+    history_repo:
+        StrengthProgressionHistoryRepository = Depends(
+            get_strength_progression_history_repository
+        ),
+):
+    try:
+        workout = workouts_repo.get(
+            current_user.id,
+            workout_id,
+        )
+
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Workout palestra non trovato."
+                ),
+            )
+
+        existing = (
+            history_repo.get_for_source_exercise(
+                current_user.id,
+                exercise_id,
+            )
+        )
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "La progressione di questo "
+                    "esercizio è già stata gestita."
+                ),
+            )
+
+        planned_exercises = (
+            exercises_repo.list_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        source_exercise = next(
+            (
+                item
+                for item in planned_exercises
+                if str(item.get("id"))
+                == str(exercise_id)
+            ),
+            None,
+        )
+
+        if not source_exercise:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Esercizio non trovato "
+                    "nel workout sorgente."
+                ),
+            )
+
+        workout_log = (
+            workout_logs_repo.get_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        if not workout_log:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Registra prima il workout "
+                    "per applicare la progressione."
+                ),
+            )
+
+        set_logs = (
+            set_logs_repo.list_for_workout_log(
+                current_user.id,
+                workout_log["id"],
+            )
+        )
+
+        outcome = (
+            StrengthOutcomeService().evaluate(
+                planned_exercises=
+                    planned_exercises,
+                set_logs=set_logs,
+            )
+        )
+
+        exercise_outcome = next(
+            (
+                item
+                for item in outcome["exercises"]
+                if str(item["exercise_id"])
+                == str(exercise_id)
+            ),
+            None,
+        )
+
+        if not exercise_outcome:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Outcome esercizio "
+                    "non disponibile."
+                ),
+            )
+
+        source_set_logs = [
+            item
+            for item in set_logs
+            if str(
+                item.get(
+                    "strength_workout_exercise_id"
+                )
+            )
+            == str(exercise_id)
+        ]
+
+        proposal = (
+            StrengthProgressionService().preview(
+                planned_exercise=
+                    source_exercise,
+                exercise_outcome=
+                    exercise_outcome,
+                set_logs=source_set_logs,
+            )
+        )
+
+        if proposal["current_load_kg"] <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Non esiste un carico esterno "
+                    "valido da applicare."
+                ),
+            )
+
+        plan_workouts = (
+            workouts_repo.list_for_plan(
+                current_user.id,
+                workout["strength_plan_id"],
+            )
+        )
+
+        future_workouts = [
+            item
+            for item in plan_workouts
+            if (
+                str(item["scheduled_date"])
+                > str(workout["scheduled_date"])
+                and item.get("status")
+                == "planned"
+            )
+        ]
+
+        future_workouts.sort(
+            key=lambda item: (
+                str(item["scheduled_date"]),
+                int(
+                    item.get(
+                        "workout_index",
+                        0,
+                    )
+                ),
+            )
+        )
+
+        target_workout = None
+        target_exercise = None
+
+        source_key = source_exercise.get(
+            "exercise_key"
+        )
+
+        for future_workout in future_workouts:
+            future_exercises = (
+                exercises_repo.list_for_workout(
+                    current_user.id,
+                    future_workout["id"],
+                )
+            )
+
+            match = next(
+                (
+                    item
+                    for item in future_exercises
+                    if item.get("exercise_key")
+                    == source_key
+                ),
+                None,
+            )
+
+            if match:
+                target_workout = future_workout
+                target_exercise = match
+                break
+
+        if not target_exercise:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Non esiste una prossima "
+                    "esposizione a questo esercizio."
+                ),
+            )
+
+        target_guard = (
+            history_repo.get_for_target_exercise(
+                current_user.id,
+                target_exercise["id"],
+            )
+        )
+
+        if target_guard:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "La prossima esposizione è già "
+                    "stata modificata da una "
+                    "progressione precedente."
+                ),
+            )
+
+        before_load = target_exercise.get(
+            "prescribed_load_kg"
+        )
+
+        after_load = proposal[
+            "proposed_load_kg"
+        ]
+
+        history = history_repo.create(
+            {
+                "user_id": current_user.id,
+                "strength_plan_id":
+                    workout["strength_plan_id"],
+                "source_workout_id":
+                    workout_id,
+                "source_exercise_id":
+                    source_exercise["id"],
+                "target_workout_id":
+                    target_workout["id"],
+                "target_exercise_id":
+                    target_exercise["id"],
+                "exercise_key":
+                    source_key,
+                "outcome":
+                    exercise_outcome["outcome"],
+                "action":
+                    proposal["action"],
+                "observed_load_kg":
+                    proposal["current_load_kg"],
+                "before_load_kg":
+                    before_load,
+                "after_load_kg":
+                    after_load,
+            }
+        )
+
+        if not history or not history.get("id"):
+            raise RepositoryError(
+                "Strength progression history "
+                "was not persisted"
+            )
+
+        try:
+            updated_exercise = (
+                exercises_repo.update_prescribed_load(
+                    user_id=current_user.id,
+                    exercise_id=
+                        target_exercise["id"],
+                    prescribed_load_kg=
+                        after_load,
+                )
+            )
+
+            if not updated_exercise:
+                raise RepositoryError(
+                    "Strength progression target "
+                    "was not updated"
+                )
+
+        except Exception:
+            try:
+                history_repo.delete(
+                    history["id"],
+                    current_user.id,
+                )
+            except RepositoryError:
+                pass
+
+            raise
+
+        return {
+            "applied": True,
+            "proposal": proposal,
+            "history": history,
+            "target_workout":
+                target_workout,
+            "target_exercise":
+                updated_exercise,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/plans/{plan_id}/progression-history",
+)
+def list_strength_progression_history(
+    plan_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    history_repo:
+        StrengthProgressionHistoryRepository = Depends(
+            get_strength_progression_history_repository
+        ),
+):
+    try:
+        items = history_repo.list_for_plan(
+            current_user.id,
+            plan_id,
+        )
+
+        return {
+            "count": len(items),
+            "items": items,
+        }
 
     except RepositoryError as exc:
         raise HTTPException(

@@ -157,6 +157,37 @@ class StrengthWorkoutExercisesRepository(
                 f"{exc}"
             ) from exc
 
+    def update_prescribed_load(
+        self,
+        *,
+        user_id: str,
+        exercise_id: Any,
+        prescribed_load_kg: float,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update(
+                    {
+                        "prescribed_load_kg":
+                            prescribed_load_kg,
+                    }
+                )
+                .eq("user_id", user_id)
+                .eq("id", exercise_id)
+                .execute()
+            )
+
+            rows = self._data(response)
+
+            return rows[0] if rows else None
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to update prescribed "
+                f"strength load: {exc}"
+            ) from exc
+
     def list_for_workout(
         self,
         user_id: str,

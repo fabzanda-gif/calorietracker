@@ -45,6 +45,9 @@ from backend.repositories.strength_logs import (
     StrengthSetLogsRepository,
     StrengthWorkoutLogsRepository,
 )
+from backend.repositories.strength_progression_history import (
+    StrengthProgressionHistoryRepository,
+)
 from backend.repositories.training_plan_adaptations import (
     TrainingPlanAdaptationsRepository,
 )
@@ -312,6 +315,17 @@ def get_strength_set_logs_repository(
     ),
 ) -> StrengthSetLogsRepository:
     return StrengthSetLogsRepository(
+        supabase
+    )
+
+
+
+def get_strength_progression_history_repository(
+    supabase: Client = Depends(
+        get_authenticated_supabase
+    ),
+) -> StrengthProgressionHistoryRepository:
+    return StrengthProgressionHistoryRepository(
         supabase
     )
 
