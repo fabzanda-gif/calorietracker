@@ -679,6 +679,7 @@ def _build_planned_activity_adaptation(
     user_id: str,
     planned_repo: PlannedActivitiesRepository,
     activities_repo: ActivitiesRepository,
+    adaptation_repo: TrainingPlanAdaptationsRepository,
 ) -> dict:
     source = planned_repo.get(
         planned_id,
@@ -725,11 +726,19 @@ def _build_planned_activity_adaptation(
         )
     )
 
+    adaptation_history = (
+        adaptation_repo.list_for_plan(
+            user_id,
+            plan_id,
+        )
+    )
+
     proposal = (
         RunningPlanAdaptationService().build(
             source_session=source,
             outcome=outcome,
             plan_sessions=plan_sessions,
+            adaptation_history=adaptation_history,
         )
     )
 
@@ -800,6 +809,9 @@ def preview_planned_activity_adaptation(
     activities_repo: ActivitiesRepository = Depends(
         get_activities_repository
     ),
+    adaptation_repo: TrainingPlanAdaptationsRepository = Depends(
+        get_training_plan_adaptations_repository
+    ),
 ):
     try:
         result = _build_planned_activity_adaptation(
@@ -807,6 +819,7 @@ def preview_planned_activity_adaptation(
             user_id=current_user.id,
             planned_repo=planned_repo,
             activities_repo=activities_repo,
+            adaptation_repo=adaptation_repo,
         )
 
         return {
@@ -849,6 +862,7 @@ def apply_planned_activity_adaptation(
             user_id=current_user.id,
             planned_repo=planned_repo,
             activities_repo=activities_repo,
+            adaptation_repo=adaptation_repo,
         )
 
         proposal = result["proposal"]
@@ -956,6 +970,7 @@ def keep_planned_activity_adaptation(
             user_id=current_user.id,
             planned_repo=planned_repo,
             activities_repo=activities_repo,
+            adaptation_repo=adaptation_repo,
         )
 
         history = adaptation_repo.create(

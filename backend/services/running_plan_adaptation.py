@@ -24,7 +24,27 @@ class RunningPlanAdaptationService:
         source_session: dict[str, Any],
         outcome: dict[str, Any],
         plan_sessions: list[dict[str, Any]],
+        adaptation_history: list[dict[str, Any]] | None = None,
     ) -> dict:
+        history = adaptation_history or []
+        source_id = str(
+            source_session.get("id") or ""
+        )
+
+        if self._source_already_decided(
+            source_id=source_id,
+            history=history,
+        ):
+            return self._none(
+                source_session=source_session,
+                outcome=outcome,
+                reason=(
+                    "Hai già deciso come gestire questa "
+                    "sessione. Non propongo lo stesso "
+                    "adattamento una seconda volta."
+                ),
+            )
+
         action = str(
             outcome.get("recommended_action") or ""
         ).strip().lower()
@@ -55,6 +75,51 @@ class RunningPlanAdaptationService:
                 reason=(
                     "Non ci sono sessioni di qualità future "
                     "adatte da modificare."
+                ),
+            )
+
+        target_id = str(
+            target.get("id") or ""
+        )
+
+        if self._target_already_adapted(
+            target_id=target_id,
+            history=history,
+        ):
+            return self._none(
+                source_session=source_session,
+                outcome=outcome,
+                reason=(
+                    "La prossima sessione è già stata "
+                    "adattata. Evito di correggerla due volte."
+                ),
+            )
+
+        if self._too_many_consecutive_applied(
+            history
+        ):
+            return self._none(
+                source_session=source_session,
+                outcome=outcome,
+                reason=(
+                    "Il piano è già stato adattato due volte "
+                    "di seguito. Prima di ridurre ancora il "
+                    "carico, serve osservare una nuova "
+                    "sessione."
+                ),
+            )
+
+        if self._target_is_in_race_lock(
+            target=target,
+            plan_sessions=plan_sessions,
+        ):
+            return self._none(
+                source_session=source_session,
+                outcome=outcome,
+                reason=(
+                    "Sei nella settimana finale prima della "
+                    "gara. Il taper resta protetto e non viene "
+                    "riscritto automaticamente."
                 ),
             )
 
@@ -123,6 +188,130 @@ class RunningPlanAdaptationService:
                 changes,
             ),
         }
+
+    @staticmethod
+    def _source_already_decided(
+        *,
+        source_id: str,
+        history: list[dict[str, Any]],
+    ) -> bool:
+        if not source_id:
+            return False
+
+        return any(
+            str(
+                item.get(
+                    "source_planned_activity_id"
+                )
+                or ""
+            )
+            == source_id
+            and str(
+                item.get("decision") or ""
+            )
+            in {"applied", "kept"}
+            for item in history
+        )
+
+    @staticmethod
+    def _target_already_adapted(
+        *,
+        target_id: str,
+        history: list[dict[str, Any]],
+    ) -> bool:
+        if not target_id:
+            return False
+
+        return any(
+            str(
+                item.get(
+                    "target_planned_activity_id"
+                )
+                or ""
+            )
+            == target_id
+            and str(
+                item.get("decision") or ""
+            )
+            == "applied"
+            for item in history
+        )
+
+    @staticmethod
+    def _too_many_consecutive_applied(
+        history: list[dict[str, Any]],
+    ) -> bool:
+        consecutive = 0
+
+        for item in history:
+            decision = str(
+                item.get("decision") or ""
+            )
+
+            if decision != "applied":
+                break
+
+            consecutive += 1
+
+            if consecutive >= 2:
+                return True
+
+        return False
+
+    @staticmethod
+    def _target_is_in_race_lock(
+        *,
+        target: dict[str, Any],
+        plan_sessions: list[dict[str, Any]],
+    ) -> bool:
+        from datetime import date
+
+        target_value = str(
+            target.get("scheduled_date") or ""
+        )
+
+        try:
+            target_date = date.fromisoformat(
+                target_value
+            )
+        except ValueError:
+            return False
+
+        race_dates = []
+
+        for item in plan_sessions:
+            if (
+                str(
+                    item.get("session_kind") or ""
+                ).strip().lower()
+                != "race"
+            ):
+                continue
+
+            try:
+                race_date = date.fromisoformat(
+                    str(
+                        item.get(
+                            "scheduled_date"
+                        )
+                        or ""
+                    )
+                )
+            except ValueError:
+                continue
+
+            if race_date >= target_date:
+                race_dates.append(race_date)
+
+        if not race_dates:
+            return False
+
+        next_race = min(race_dates)
+        days_to_race = (
+            next_race - target_date
+        ).days
+
+        return 0 <= days_to_race <= 7
 
     def _next_quality_session(
         self,
