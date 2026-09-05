@@ -269,6 +269,7 @@ def build_running_plan(
             )
 
             if is_final:
+                session_date = plan.target_date
                 kind = "race"
 
                 # The goal session must preserve the
