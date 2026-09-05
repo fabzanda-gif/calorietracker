@@ -568,34 +568,7 @@
 }
 
 
-/* QUICK ADD — Focus Energia */
-.action:first-child {
-  border-color: #ff6b65;
-  background:
-    linear-gradient(
-      135deg,
-      #ff6b65,
-      #f45853
-    );
-  color: #ffffff;
-  box-shadow:
-    0 8px 18px rgba(244, 88, 83, 0.16);
-}
-
-.action:first-child .actionIcon {
-  color: #ffffff;
-}
-
-.action:first-child:hover {
-  border-color: #e94e49;
-  background:
-    linear-gradient(
-      135deg,
-      #ff756f,
-      #ef504b
-    );
-}
-
+/* QUICK ADD — active state only */
 @media (max-width: 700px) {
   .actions {
     grid-template-columns:

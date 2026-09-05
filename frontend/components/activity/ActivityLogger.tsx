@@ -24,6 +24,7 @@ type ActivityLoggerProps = {
 };
 
 const ACTIVITY_OPTIONS = [
+  // Preferite / frequenti
   {
     value: "Padel",
     label: "🎾 Padel",
@@ -41,6 +42,100 @@ const ACTIVITY_OPTIONS = [
     label: "⚡ E-bike",
     kcalPerHour: 250,
     defaultMinutes: 45,
+  },
+
+  // Cardio
+  {
+    value: "Corsa",
+    label: "🏃 Corsa",
+    kcalPerHour: 650,
+    defaultMinutes: 45,
+  },
+  {
+    value: "Camminata",
+    label: "🚶 Camminata",
+    kcalPerHour: 280,
+    defaultMinutes: 60,
+  },
+  {
+    value: "Nuoto",
+    label: "🏊 Nuoto",
+    kcalPerHour: 520,
+    defaultMinutes: 45,
+  },
+  {
+    value: "Ellittica",
+    label: "🏃 Ellittica",
+    kcalPerHour: 430,
+    defaultMinutes: 45,
+  },
+  {
+    value: "Canottaggio",
+    label: "🚣 Canottaggio",
+    kcalPerHour: 500,
+    defaultMinutes: 45,
+  },
+
+  // Forza
+  {
+    value: "Palestra",
+    label: "🏋️ Palestra / pesi",
+    kcalPerHour: 350,
+    defaultMinutes: 60,
+  },
+  {
+    value: "Circuit training",
+    label: "💪 Circuit training",
+    kcalPerHour: 500,
+    defaultMinutes: 45,
+  },
+
+  // Sport
+  {
+    value: "Tennis",
+    label: "🎾 Tennis",
+    kcalPerHour: 480,
+    defaultMinutes: 60,
+  },
+  {
+    value: "Calcio",
+    label: "⚽ Calcio",
+    kcalPerHour: 600,
+    defaultMinutes: 60,
+  },
+  {
+    value: "Basket",
+    label: "🏀 Basket",
+    kcalPerHour: 550,
+    defaultMinutes: 60,
+  },
+
+  // Outdoor / mobilità
+  {
+    value: "Escursionismo",
+    label: "🥾 Escursionismo",
+    kcalPerHour: 450,
+    defaultMinutes: 90,
+  },
+  {
+    value: "Yoga",
+    label: "🧘 Yoga",
+    kcalPerHour: 200,
+    defaultMinutes: 60,
+  },
+  {
+    value: "Pilates",
+    label: "🧘 Pilates",
+    kcalPerHour: 220,
+    defaultMinutes: 60,
+  },
+
+  // Fallback
+  {
+    value: "Altro",
+    label: "➕ Altra attività",
+    kcalPerHour: 300,
+    defaultMinutes: 60,
   },
 ];
 
