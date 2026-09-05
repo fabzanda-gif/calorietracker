@@ -366,13 +366,26 @@
     padding: 34px 28px 72px;
   }
 
-  .mealList,
+  .mealList {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    width: 100%;
+  }
+
   .optionList {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: stretch;
   }
 
-  .mealCard,
+  .mealCard {
+    width: 100%;
+    min-width: 0;
+    min-height: 180px;
+    height: auto;
+    box-sizing: border-box;
+    align-content: start;
+  }
+
   .optionCard {
     min-height: 180px;
     height: 100%;
