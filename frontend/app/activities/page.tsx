@@ -14,6 +14,10 @@ import { AppNav } from "@/components/navigation/AppNav";
 import {
   getActivitiesForRange,
   getActivityOverview,
+  getPlannedActivities,
+  createPlannedActivity,
+  updatePlannedActivity,
+  deletePlannedActivity,
   getActivityComment,
   deleteActivity,
   importGpxActivity,
@@ -23,6 +27,8 @@ import {
   type ActivitySeriesPoint,
   type GpxActivityPreview,
   type ActivityEnergyDay,
+  type PlannedActivity,
+  type PlannedActivityIntensity,
 } from "@/lib/api/activities";
 
 import styles from "./ActivitiesPage.module.css";
@@ -476,6 +482,46 @@ export default function ActivitiesPage() {
     setActivityCommentLoading,
   ] = useState(false);
 
+  const [
+    plannedActivities,
+    setPlannedActivities,
+  ] = useState<PlannedActivity[]>([]);
+
+  const [planTitle, setPlanTitle] =
+    useState("");
+  const [planType, setPlanType] =
+    useState("Corsa");
+
+  const [planDate, setPlanDate] =
+    useState(() => {
+      const tomorrow = new Date();
+      tomorrow.setDate(
+        tomorrow.getDate() + 1,
+      );
+      return isoDate(tomorrow);
+    });
+
+  const [planTime, setPlanTime] =
+    useState("");
+  const [planDuration, setPlanDuration] =
+    useState("");
+  const [planDistanceKm, setPlanDistanceKm] =
+    useState("");
+
+  const [
+    planIntensity,
+    setPlanIntensity,
+  ] = useState<PlannedActivityIntensity>(
+    "moderate",
+  );
+
+  const [planNotes, setPlanNotes] =
+    useState("");
+  const [savingPlan, setSavingPlan] =
+    useState(false);
+  const [busyPlanId, setBusyPlanId] =
+    useState<string | null>(null);
+
   useEffect(() => {
     const stored = window.localStorage.getItem(
       "sanosync-experience-mode",
@@ -499,9 +545,31 @@ export default function ActivitiesPage() {
       const today = new Date();
       const rollingStart = new Date(today);
       rollingStart.setDate(today.getDate() - 29);
-      const [response, recentResponse] = await Promise.all([
-        getActivityOverview(bounds.start, bounds.end, accessToken),
-        getActivitiesForRange(isoDate(rollingStart), isoDate(today), accessToken),
+      const plannedEnd = new Date(today);
+      plannedEnd.setDate(
+        today.getDate() + 30,
+      );
+
+      const [
+        response,
+        recentResponse,
+        plannedResponse,
+      ] = await Promise.all([
+        getActivityOverview(
+          bounds.start,
+          bounds.end,
+          accessToken,
+        ),
+        getActivitiesForRange(
+          isoDate(rollingStart),
+          isoDate(today),
+          accessToken,
+        ),
+        getPlannedActivities(
+          isoDate(today),
+          isoDate(plannedEnd),
+          accessToken,
+        ),
       ]);
 
       const sortedItems = [...response.items].sort(
@@ -514,6 +582,9 @@ export default function ActivitiesPage() {
         ),
       );
       setEnergyDays(response.energy_days);
+      setPlannedActivities(
+        plannedResponse.items,
+      );
 
       setSelectedActivity((current) => {
         const visibleItems = sortedItems.filter(
@@ -592,6 +663,123 @@ export default function ActivitiesPage() {
 
     return grouped;
   }, [trainingActivities]);
+
+  async function savePlannedActivity() {
+    if (
+      !accessToken ||
+      !planTitle.trim() ||
+      !planDate
+    ) {
+      return;
+    }
+
+    setSavingPlan(true);
+    setError(null);
+
+    try {
+      await createPlannedActivity(
+        {
+          scheduled_date: planDate,
+          scheduled_time:
+            planTime || null,
+          title: planTitle.trim(),
+          activity_type:
+            planType.trim() || "Attività",
+          duration_minutes:
+            planDuration
+              ? Number(planDuration)
+              : null,
+          distance_meters:
+            planDistanceKm
+              ? Number(planDistanceKm) *
+                1000
+              : null,
+          intensity: planIntensity,
+          notes:
+            planNotes.trim() || null,
+        },
+        accessToken,
+      );
+
+      setPlanTitle("");
+      setPlanTime("");
+      setPlanDuration("");
+      setPlanDistanceKm("");
+      setPlanNotes("");
+      setPlanIntensity("moderate");
+
+      await loadMonth();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a pianificare l’attività.",
+      );
+    } finally {
+      setSavingPlan(false);
+    }
+  }
+
+  async function setPlannedStatus(
+    item: PlannedActivity,
+    status:
+      | "completed"
+      | "skipped",
+  ) {
+    if (!accessToken) return;
+
+    setBusyPlanId(item.id);
+    setError(null);
+
+    try {
+      await updatePlannedActivity(
+        item.id,
+        { status },
+        accessToken,
+      );
+      await loadMonth();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad aggiornare il piano.",
+      );
+    } finally {
+      setBusyPlanId(null);
+    }
+  }
+
+  async function removePlannedActivity(
+    item: PlannedActivity,
+  ) {
+    if (
+      !accessToken ||
+      !window.confirm(
+        `Eliminare “${item.title}” dal piano?`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyPlanId(item.id);
+    setError(null);
+
+    try {
+      await deletePlannedActivity(
+        item.id,
+        accessToken,
+      );
+      await loadMonth();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a eliminare l’attività pianificata.",
+      );
+    } finally {
+      setBusyPlanId(null);
+    }
+  }
 
   async function chooseGpx(file: File | null) {
     setGpxFile(file);
@@ -891,6 +1079,349 @@ export default function ActivitiesPage() {
             <div><span>Tempo totale</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
             <div><span>Distanza</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
             <div><span>Energia</span><strong>{rollingSummary.calories.toLocaleString("it-IT")} kcal</strong></div>
+          </div>
+        </section>
+
+        <section className={styles.plannerSection}>
+          <div className={styles.plannerHeading}>
+            <div>
+              <p className={styles.eyebrow}>
+                Pianifica
+              </p>
+              <h2>Prossime attività</h2>
+              <p>
+                Quello che hai intenzione di fare,
+                non quello che è già successo.
+              </p>
+            </div>
+
+            <span className={styles.plannerCount}>
+              {
+                plannedActivities.filter(
+                  (item) =>
+                    item.status === "planned",
+                ).length
+              }{" "}
+              in programma
+            </span>
+          </div>
+
+          <div className={styles.plannerGrid}>
+            <div className={styles.plannerForm}>
+              <label>
+                Attività
+                <input
+                  value={planTitle}
+                  placeholder="Es. Lungo 12 km"
+                  onChange={(event) =>
+                    setPlanTitle(
+                      event.target.value,
+                    )
+                  }
+                />
+              </label>
+
+              <label>
+                Tipo
+                <select
+                  value={planType}
+                  onChange={(event) =>
+                    setPlanType(
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option>Corsa</option>
+                  <option>Palestra</option>
+                  <option>Padel</option>
+                  <option>Bici</option>
+                  <option>Nuoto</option>
+                  <option>Camminata</option>
+                  <option>Altro</option>
+                </select>
+              </label>
+
+              <label>
+                Data
+                <input
+                  type="date"
+                  value={planDate}
+                  onChange={(event) =>
+                    setPlanDate(
+                      event.target.value,
+                    )
+                  }
+                />
+              </label>
+
+              <label>
+                Ora
+                <input
+                  type="time"
+                  value={planTime}
+                  onChange={(event) =>
+                    setPlanTime(
+                      event.target.value,
+                    )
+                  }
+                />
+              </label>
+
+              <label>
+                Durata prevista
+                <div className={styles.planUnitInput}>
+                  <input
+                    type="number"
+                    min="1"
+                    value={planDuration}
+                    placeholder="60"
+                    onChange={(event) =>
+                      setPlanDuration(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <span>min</span>
+                </div>
+              </label>
+
+              <label>
+                Distanza
+                <div className={styles.planUnitInput}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={planDistanceKm}
+                    placeholder="10"
+                    onChange={(event) =>
+                      setPlanDistanceKm(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <span>km</span>
+                </div>
+              </label>
+
+              <label>
+                Intensità
+                <select
+                  value={planIntensity}
+                  onChange={(event) =>
+                    setPlanIntensity(
+                      event.target
+                        .value as PlannedActivityIntensity,
+                    )
+                  }
+                >
+                  <option value="low">
+                    Facile
+                  </option>
+                  <option value="moderate">
+                    Moderata
+                  </option>
+                  <option value="hard">
+                    Intensa
+                  </option>
+                  <option value="race">
+                    Gara / test
+                  </option>
+                  <option value="unknown">
+                    Da definire
+                  </option>
+                </select>
+              </label>
+
+              <label className={styles.planNotes}>
+                Note
+                <input
+                  value={planNotes}
+                  placeholder="Opzionale"
+                  onChange={(event) =>
+                    setPlanNotes(
+                      event.target.value,
+                    )
+                  }
+                />
+              </label>
+
+              <button
+                type="button"
+                className={styles.savePlanButton}
+                disabled={
+                  savingPlan ||
+                  !planTitle.trim() ||
+                  !planDate
+                }
+                onClick={() => {
+                  void savePlannedActivity();
+                }}
+              >
+                {savingPlan
+                  ? "Pianifico…"
+                  : "Aggiungi al piano"}
+              </button>
+            </div>
+
+            <div className={styles.upcomingList}>
+              {plannedActivities.length ? (
+                plannedActivities.map(
+                  (item) => (
+                    <article
+                      key={item.id}
+                      className={
+                        styles.upcomingCard
+                      }
+                    >
+                      <div
+                        className={
+                          styles.upcomingDate
+                        }
+                      >
+                        <strong>
+                          {new Date(
+                            `${item.scheduled_date}T00:00:00`,
+                          ).toLocaleDateString(
+                            "it-IT",
+                            {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            },
+                          )}
+                        </strong>
+
+                        {item.scheduled_time ? (
+                          <span>
+                            {item.scheduled_time.slice(
+                              0,
+                              5,
+                            )}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div
+                        className={
+                          styles.upcomingBody
+                        }
+                      >
+                        <span
+                          className={
+                            styles.upcomingType
+                          }
+                        >
+                          {item.activity_type}
+                        </span>
+
+                        <h3>{item.title}</h3>
+
+                        <p>
+                          {item.duration_minutes
+                            ? `${item.duration_minutes} min`
+                            : "Durata da definire"}
+
+                          {item.distance_meters
+                            ? ` · ${(
+                                item.distance_meters /
+                                1000
+                              ).toLocaleString(
+                                "it-IT",
+                                {
+                                  maximumFractionDigits:
+                                    1,
+                                },
+                              )} km`
+                            : ""}
+                        </p>
+
+                        {item.notes ? (
+                          <small>
+                            {item.notes}
+                          </small>
+                        ) : null}
+
+                        <div
+                          className={
+                            styles.upcomingActions
+                          }
+                        >
+                          {item.status ===
+                          "planned" ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={
+                                  busyPlanId ===
+                                  item.id
+                                }
+                                onClick={() => {
+                                  void setPlannedStatus(
+                                    item,
+                                    "completed",
+                                  );
+                                }}
+                              >
+                                Completata
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  busyPlanId ===
+                                  item.id
+                                }
+                                onClick={() => {
+                                  void setPlannedStatus(
+                                    item,
+                                    "skipped",
+                                  );
+                                }}
+                              >
+                                Saltata
+                              </button>
+                            </>
+                          ) : (
+                            <span>
+                              {item.status ===
+                              "completed"
+                                ? "Completata"
+                                : "Saltata"}
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            disabled={
+                              busyPlanId ===
+                              item.id
+                            }
+                            onClick={() => {
+                              void removePlannedActivity(
+                                item,
+                              );
+                            }}
+                          >
+                            Elimina
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ),
+                )
+              ) : (
+                <div className={styles.emptyPlan}>
+                  <strong>
+                    Nessuna attività pianificata.
+                  </strong>
+                  <p>
+                    Per ora il futuro è sorprendentemente
+                    libero.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </section>
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -14,12 +14,16 @@ from backend.api.dependencies import (
     get_current_user,
     get_daily_logs_repository,
     get_meals_repository,
+    get_planned_activities_repository,
     get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.meals import MealsRepository
+from backend.repositories.planned_activities import (
+    PlannedActivitiesRepository,
+)
 from backend.repositories.weight import WeightRepository
 from backend.services.gpx_activity import (
     GpxActivityError,
@@ -126,6 +130,79 @@ class ActivityCommentRequest(BaseModel):
     )
 
 
+class PlannedActivityCreate(BaseModel):
+    scheduled_date: date
+    scheduled_time: time | None = None
+
+    title: str = Field(
+        min_length=1,
+        max_length=160,
+    )
+    activity_type: str = Field(
+        min_length=1,
+        max_length=80,
+    )
+
+    duration_minutes: int | None = Field(
+        default=None,
+        gt=0,
+    )
+    distance_meters: float | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    intensity: str = Field(
+        default="moderate",
+        pattern="^(low|moderate|hard|race|unknown)$",
+    )
+
+    notes: str | None = Field(
+        default=None,
+        max_length=2000,
+    )
+
+
+class PlannedActivityUpdate(BaseModel):
+    scheduled_date: date | None = None
+    scheduled_time: time | None = None
+
+    title: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=160,
+    )
+    activity_type: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=80,
+    )
+
+    duration_minutes: int | None = Field(
+        default=None,
+        gt=0,
+    )
+    distance_meters: float | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    intensity: str | None = Field(
+        default=None,
+        pattern="^(low|moderate|hard|race|unknown)$",
+    )
+
+    notes: str | None = Field(
+        default=None,
+        max_length=2000,
+    )
+
+    status: str | None = Field(
+        default=None,
+        pattern="^(planned|completed|skipped)$",
+    )
+
+
 class GpxPreviewRequest(BaseModel):
     file_name: str = Field(min_length=1, max_length=255)
     content_base64: str = Field(min_length=1)
@@ -144,6 +221,173 @@ class GpxImportRequest(GpxPreviewRequest):
     )
     activity_date: date | None = None
     burned_calories: int | None = Field(default=None, ge=0)
+
+
+@router.get("/planned")
+def list_planned_activities(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+):
+    if end_date < start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid planned activity date range",
+        )
+
+    if (end_date - start_date).days > 366:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Planned activity range is too large",
+        )
+
+    try:
+        items = repo.list_range(
+            current_user.id,
+            start_date,
+            end_date,
+        )
+        return {
+            "count": len(items),
+            "items": items,
+        }
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/planned",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_planned_activity(
+    request: PlannedActivityCreate,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+):
+    payload = request.model_dump(
+        mode="json"
+    )
+    payload["user_id"] = current_user.id
+    payload["title"] = payload["title"].strip()
+    payload["activity_type"] = (
+        payload["activity_type"].strip()
+    )
+
+    if payload.get("notes"):
+        payload["notes"] = (
+            payload["notes"].strip() or None
+        )
+
+    try:
+        item = repo.create(payload)
+        return {
+            "created": True,
+            "item": item or payload,
+        }
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch("/planned/{planned_id}")
+def update_planned_activity(
+    planned_id: str,
+    request: PlannedActivityUpdate,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+):
+    payload = request.model_dump(
+        exclude_unset=True,
+        mode="json",
+    )
+
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields supplied",
+        )
+
+    if "title" in payload:
+        payload["title"] = payload["title"].strip()
+
+    if "activity_type" in payload:
+        payload["activity_type"] = (
+            payload["activity_type"].strip()
+        )
+
+    if "notes" in payload and payload["notes"]:
+        payload["notes"] = (
+            payload["notes"].strip() or None
+        )
+
+    try:
+        item = repo.update(
+            planned_id,
+            current_user.id,
+            payload,
+        )
+
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Planned activity not found",
+            )
+
+        return {
+            "updated": True,
+            "item": item,
+        }
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete("/planned/{planned_id}")
+def delete_planned_activity(
+    planned_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+):
+    try:
+        repo.delete(
+            planned_id,
+            current_user.id,
+        )
+        return {
+            "deleted": True,
+            "id": planned_id,
+        }
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/overview")

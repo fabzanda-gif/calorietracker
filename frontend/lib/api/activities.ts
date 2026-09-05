@@ -284,3 +284,119 @@ export function getActivityComment(
 }
 
 /* ACTIVITY AI COMMENT API END */
+
+/* PLANNED ACTIVITIES API START */
+
+export type PlannedActivityStatus =
+  | "planned"
+  | "completed"
+  | "skipped";
+
+export type PlannedActivityIntensity =
+  | "low"
+  | "moderate"
+  | "hard"
+  | "race"
+  | "unknown";
+
+export interface PlannedActivity {
+  id: string;
+  user_id?: string;
+  scheduled_date: string;
+  scheduled_time?: string | null;
+  title: string;
+  activity_type: string;
+  duration_minutes?: number | null;
+  distance_meters?: number | null;
+  intensity: PlannedActivityIntensity;
+  notes?: string | null;
+  status: PlannedActivityStatus;
+}
+
+export interface PlannedActivityInput {
+  scheduled_date: string;
+  scheduled_time?: string | null;
+  title: string;
+  activity_type: string;
+  duration_minutes?: number | null;
+  distance_meters?: number | null;
+  intensity?: PlannedActivityIntensity;
+  notes?: string | null;
+}
+
+export function getPlannedActivities(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<{
+  count: number;
+  items: PlannedActivity[];
+}> {
+  const query = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+  });
+
+  return apiRequest(
+    `/activities/planned?${query.toString()}`,
+    { accessToken },
+  );
+}
+
+export function createPlannedActivity(
+  input: PlannedActivityInput,
+  accessToken?: string | null,
+): Promise<{
+  created: boolean;
+  item: PlannedActivity;
+}> {
+  return apiRequest(
+    "/activities/planned",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function updatePlannedActivity(
+  id: string,
+  input: Partial<
+    PlannedActivityInput & {
+      status: PlannedActivityStatus;
+    }
+  >,
+  accessToken?: string | null,
+): Promise<{
+  updated: boolean;
+  item: PlannedActivity;
+}> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deletePlannedActivity(
+  id: string,
+  accessToken?: string | null,
+): Promise<{
+  deleted: boolean;
+  id: string;
+}> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      accessToken,
+    },
+  );
+}
+
+/* PLANNED ACTIVITIES API END */
+

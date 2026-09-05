@@ -1279,3 +1279,245 @@ summary.loggerHeading {
 }
 
 /* ACTIVITY AI COMMENT V1 END */
+
+
+/* PLANNED ACTIVITIES START */
+
+.plannerSection{
+  margin-top:24px;
+  padding:24px;
+  border:1px solid #e2e4e0;
+  border-radius:24px;
+  background:#fff;
+}
+
+.plannerHeading{
+  display:flex;
+  justify-content:space-between;
+  gap:24px;
+  align-items:flex-start;
+}
+
+.plannerHeading h2{
+  margin:5px 0 6px;
+}
+
+.plannerHeading p:last-child{
+  margin:0;
+  color:#718093;
+}
+
+.plannerCount{
+  padding:7px 11px;
+  border-radius:999px;
+  background:#eef1f3;
+  color:#526174;
+  font-size:.75rem;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.plannerGrid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(320px,.85fr);
+  gap:20px;
+  margin-top:22px;
+}
+
+.plannerForm{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  align-content:start;
+}
+
+.plannerForm label{
+  display:grid;
+  gap:6px;
+  color:#607085;
+  font-size:.75rem;
+  font-weight:800;
+}
+
+.plannerForm input,
+.plannerForm select{
+  min-height:44px;
+  box-sizing:border-box;
+  width:100%;
+  padding:0 12px;
+  border:1px solid #dfe1df;
+  border-radius:11px;
+  background:#fafbf9;
+  color:#102846;
+}
+
+.planUnitInput{
+  position:relative;
+}
+
+.planUnitInput input{
+  padding-right:45px;
+}
+
+.planUnitInput span{
+  position:absolute;
+  top:50%;
+  right:12px;
+  transform:translateY(-50%);
+  color:#84909e;
+  font-size:.72rem;
+}
+
+.planNotes{
+  grid-column:1/-1;
+}
+
+.savePlanButton{
+  grid-column:1/-1;
+  min-height:46px;
+  border:0;
+  border-radius:12px;
+  background:#102846;
+  color:#fff;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.savePlanButton:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.upcomingList{
+  display:grid;
+  gap:10px;
+  align-content:start;
+}
+
+.upcomingCard{
+  display:grid;
+  grid-template-columns:90px 1fr;
+  gap:14px;
+  padding:15px;
+  border:1px solid #e5e6e3;
+  border-radius:16px;
+  background:#fafbf9;
+}
+
+.upcomingDate{
+  display:grid;
+  align-content:start;
+  gap:3px;
+}
+
+.upcomingDate strong{
+  text-transform:capitalize;
+}
+
+.upcomingDate span{
+  color:#718093;
+  font-size:.8rem;
+}
+
+.upcomingBody h3{
+  margin:5px 0;
+}
+
+.upcomingBody p{
+  margin:0;
+  color:#607085;
+  font-size:.82rem;
+}
+
+.upcomingBody small{
+  display:block;
+  margin-top:7px;
+  color:#84909e;
+}
+
+.upcomingType{
+  color:#ef5e5c;
+  font-size:.67rem;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.upcomingActions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:12px;
+}
+
+.upcomingActions button{
+  padding:7px 10px;
+  border:1px solid #dfe1df;
+  border-radius:9px;
+  background:#fff;
+  color:#102846;
+  font-weight:750;
+  cursor:pointer;
+}
+
+.upcomingActions span{
+  align-self:center;
+  color:#607085;
+  font-size:.75rem;
+  font-weight:800;
+}
+
+.emptyPlan{
+  padding:20px;
+  border:1px dashed #d7dad6;
+  border-radius:16px;
+  color:#607085;
+}
+
+.emptyPlan p{
+  margin:5px 0 0;
+}
+
+.pageZero .plannerSection{
+  border-color:#2a2a2a;
+}
+
+.pageZero .upcomingType{
+  color:#f43d3d;
+}
+
+.pageZero .savePlanButton{
+  background:#111;
+}
+
+@media(max-width:900px){
+  .plannerGrid{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(max-width:620px){
+  .plannerSection{
+    padding:18px;
+  }
+
+  .plannerHeading{
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .plannerForm{
+    grid-template-columns:1fr;
+  }
+
+  .planNotes,
+  .savePlanButton{
+    grid-column:auto;
+  }
+
+  .upcomingCard{
+    grid-template-columns:1fr;
+  }
+}
+
+/* PLANNED ACTIVITIES END */
