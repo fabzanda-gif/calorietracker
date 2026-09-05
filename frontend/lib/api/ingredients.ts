@@ -76,3 +76,45 @@ export async function deleteIngredient(
     accessToken,
   });
 }
+
+/* NUTRITION LABEL SCAN API START */
+
+export interface NutritionLabelScanResult {
+  name: string | null;
+  basis:
+    | "per_100g"
+    | "per_serving"
+    | "unknown";
+  serving_size_g: number | null;
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  confidence:
+    | "high"
+    | "medium"
+    | "low";
+  notes: string | null;
+  ready_for_form: boolean;
+}
+
+export async function scanNutritionLabel(
+  input: {
+    content_base64: string;
+    mime_type: string;
+  },
+  accessToken?: string | null,
+): Promise<{
+  result: NutritionLabelScanResult;
+}> {
+  return apiRequest(
+    "/ingredients/scan-label",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+/* NUTRITION LABEL SCAN API END */
