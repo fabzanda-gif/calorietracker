@@ -1453,3 +1453,80 @@ def list_strength_progression_history(
             detail=str(exc),
         ) from exc
 
+@router.get(
+    "/plans/{plan_id}",
+)
+def get_strength_plan_detail(
+    plan_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
+    workouts_repo:
+        StrengthWorkoutsRepository = Depends(
+            get_strength_workouts_repository
+        ),
+    exercises_repo:
+        StrengthWorkoutExercisesRepository = Depends(
+            get_strength_workout_exercises_repository
+        ),
+):
+    try:
+        plan = plans_repo.get(
+            plan_id,
+            current_user.id,
+        )
+
+        if not plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Programma palestra non trovato."
+                ),
+            )
+
+        workouts = workouts_repo.list_for_plan(
+            current_user.id,
+            plan_id,
+        )
+
+        items = []
+
+        for workout in workouts:
+            workout_id = workout.get("id")
+
+            exercises = (
+                exercises_repo.list_for_workout(
+                    current_user.id,
+                    workout_id,
+                )
+                if workout_id
+                else []
+            )
+
+            items.append(
+                {
+                    **workout,
+                    "exercises": exercises,
+                }
+            )
+
+        return {
+            "plan": plan,
+            "workout_count": len(items),
+            "workouts": items,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
