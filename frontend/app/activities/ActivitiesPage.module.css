@@ -1640,3 +1640,112 @@ summary.loggerHeading {
 }
 
 /* PLANNER UI POLISH END */
+
+
+/* RUNNING SESSION CARDS START */
+
+.upcomingTrainingCard{
+  position:relative;
+  overflow:hidden;
+}
+
+.upcomingTrainingCard::before{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:0;
+  width:4px;
+  background:#102846;
+}
+
+.trainingSessionMeta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  align-items:center;
+  margin-bottom:8px;
+}
+
+.trainingWeekBadge,
+.trainingKindBadge,
+.trainingPlanBadge{
+  display:inline-flex;
+  align-items:center;
+  min-height:23px;
+  padding:0 8px;
+  border-radius:999px;
+  font-size:.63rem;
+  font-weight:900;
+  letter-spacing:.035em;
+  line-height:1;
+  text-transform:uppercase;
+}
+
+.trainingWeekBadge{
+  background:#102846;
+  color:#fff;
+}
+
+.trainingPlanBadge{
+  border:1px solid #dfe3e8;
+  background:#f7f8f9;
+  color:#768394;
+}
+
+.trainingKindBadge{
+  border:1px solid transparent;
+  background:#edf1f5;
+  color:#42556d;
+}
+
+.trainingKind_easy{
+  background:#edf6ef;
+  color:#487051;
+}
+
+.trainingKind_recovery{
+  background:#eef5f7;
+  color:#4c6f78;
+}
+
+.trainingKind_tempo{
+  background:#fff4df;
+  color:#886426;
+}
+
+.trainingKind_interval{
+  background:#fff0ec;
+  color:#9a5040;
+}
+
+.trainingKind_long{
+  background:#eaf0f8;
+  color:#284d7b;
+}
+
+.trainingKind_race{
+  background:#fcebec;
+  color:#9b3740;
+}
+
+.upcomingTypeTraining{
+  opacity:.62;
+}
+
+.pageZero .upcomingTrainingCard::before{
+  background:#f43d3d;
+}
+
+.pageZero .trainingWeekBadge{
+  background:#f43d3d;
+  color:#fff;
+}
+
+.pageZero .trainingPlanBadge{
+  border-color:rgba(244,61,61,.28);
+  background:rgba(244,61,61,.07);
+  color:#c94646;
+}
+
+/* RUNNING SESSION CARDS END */

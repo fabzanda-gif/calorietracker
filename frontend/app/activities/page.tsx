@@ -296,6 +296,31 @@ const PLANNED_INTENSITY_LABELS: Record<
   unknown: "Da definire",
 };
 
+const RUNNING_SESSION_LABELS: Record<
+  string,
+  string
+> = {
+  easy: "Facile",
+  recovery: "Recupero",
+  tempo: "Tempo",
+  interval: "Intervalli",
+  long: "Lungo",
+  race: "Gara",
+};
+
+function runningSessionLabel(
+  value?: string | null,
+): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return (
+    RUNNING_SESSION_LABELS[value] ??
+    value
+  );
+}
+
 function plannedDateLabel(
   value: string,
 ): string {
@@ -1411,9 +1436,11 @@ export default function ActivitiesPage() {
                   (item) => (
                     <article
                       key={item.id}
-                      className={
-                        styles.upcomingCard
-                      }
+                      className={`${styles.upcomingCard} ${
+                        item.training_plan_id
+                          ? styles.upcomingTrainingCard
+                          : ""
+                      }`}
                     >
                       <div
                         className={
@@ -1453,15 +1480,60 @@ export default function ActivitiesPage() {
                           styles.upcomingBody
                         }
                       >
+                        {item.training_plan_id ? (
+                          <div
+                            className={
+                              styles.trainingSessionMeta
+                            }
+                          >
+                            {item.training_week ? (
+                              <span
+                                className={
+                                  styles.trainingWeekBadge
+                                }
+                              >
+                                Settimana{" "}
+                                {item.training_week}
+                              </span>
+                            ) : null}
+
+                            {runningSessionLabel(
+                              item.session_kind,
+                            ) ? (
+                              <span
+                                className={`${styles.trainingKindBadge} ${
+                                  styles[
+                                    `trainingKind_${item.session_kind}`
+                                  ] ?? ""
+                                }`}
+                              >
+                                {runningSessionLabel(
+                                  item.session_kind,
+                                )}
+                              </span>
+                            ) : null}
+
+                            <span
+                              className={
+                                styles.trainingPlanBadge
+                              }
+                            >
+                              Running plan
+                            </span>
+                          </div>
+                        ) : null}
+
                         <div
                           className={
                             styles.upcomingBadges
                           }
                         >
                           <span
-                            className={
-                              styles.upcomingType
-                            }
+                            className={`${styles.upcomingType} ${
+                              item.training_plan_id
+                                ? styles.upcomingTypeTraining
+                                : ""
+                            }`}
                           >
                             {item.activity_type}
                           </span>
