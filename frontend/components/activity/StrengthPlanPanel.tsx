@@ -9,6 +9,8 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider";
 
+import { StrengthProgramOverview } from "@/components/activity/StrengthProgramOverview";
+
 import {
   applyStrengthProgression,
   createStrengthPlan,
@@ -994,6 +996,15 @@ export function StrengthPlanPanel() {
             </div>
           </div>
 
+
+          <StrengthProgramOverview
+            detail={detail}
+            refreshKey={
+              loggedWorkout
+                ? 1
+                : 0
+            }
+          />
 
           {nextWorkout ? (
             <div className={styles.workoutCard}>

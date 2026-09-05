@@ -1,0 +1,186 @@
+.wrapper {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.block {
+  padding: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 18px;
+}
+
+.heading,
+.weekHeading,
+.workout,
+.historyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.heading {
+  margin-bottom: 16px;
+}
+
+.heading span,
+.historyHeader span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.58);
+}
+
+.heading h3,
+.historyHeader h4 {
+  margin: 0;
+}
+
+.weeks,
+.history {
+  display: grid;
+  gap: 12px;
+}
+
+.week,
+.historyCard {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.035);
+}
+
+.weekHeading {
+  margin-bottom: 10px;
+}
+
+.weekHeading span {
+  color: rgba(15, 23, 42, 0.58);
+  font-size: 0.78rem;
+}
+
+.workoutList {
+  display: grid;
+  gap: 7px;
+}
+
+.workout {
+  padding: 10px 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.07);
+}
+
+.workout:first-child {
+  border-top: 0;
+}
+
+.workout > div {
+  display: grid;
+  gap: 2px;
+}
+
+.workout small,
+.historyHeader small {
+  color: rgba(15, 23, 42, 0.58);
+}
+
+.status {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.07);
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.historyHeader {
+  align-items: center;
+}
+
+.historyHeader > strong {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.07);
+  font-size: 0.78rem;
+}
+
+.notes {
+  margin: 12px 0 0;
+  color: rgba(15, 23, 42, 0.68);
+}
+
+.exerciseHistory {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.exercise {
+  display: grid;
+  gap: 5px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(15, 23, 42, 0.07);
+}
+
+.sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sets span {
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: white;
+  font-size: 0.78rem;
+}
+
+.progressions {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.progressions > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progressions span {
+  color: rgba(15, 23, 42, 0.62);
+}
+
+.empty,
+.error {
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.empty {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.error {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+
+@media (max-width: 760px) {
+  .heading,
+  .historyHeader {
+    flex-direction: column;
+  }
+
+  .workout {
+    gap: 10px;
+  }
+
+  .progressions > div {
+    flex-direction: column;
+  }
+}

@@ -1530,3 +1530,197 @@ def get_strength_plan_detail(
             detail=str(exc),
         ) from exc
 
+@router.get(
+    "/plans/{plan_id}/history",
+)
+def get_strength_plan_history(
+    plan_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
+    workouts_repo:
+        StrengthWorkoutsRepository = Depends(
+            get_strength_workouts_repository
+        ),
+    exercises_repo:
+        StrengthWorkoutExercisesRepository = Depends(
+            get_strength_workout_exercises_repository
+        ),
+    workout_logs_repo:
+        StrengthWorkoutLogsRepository = Depends(
+            get_strength_workout_logs_repository
+        ),
+    set_logs_repo:
+        StrengthSetLogsRepository = Depends(
+            get_strength_set_logs_repository
+        ),
+    history_repo:
+        StrengthProgressionHistoryRepository = Depends(
+            get_strength_progression_history_repository
+        ),
+):
+    try:
+        plan = plans_repo.get(
+            plan_id,
+            current_user.id,
+        )
+
+        if not plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Programma palestra non trovato."
+                ),
+            )
+
+        workouts = workouts_repo.list_for_plan(
+            current_user.id,
+            plan_id,
+        )
+
+        progression_rows = (
+            history_repo.list_for_plan(
+                current_user.id,
+                plan_id,
+            )
+        )
+
+        progressions_by_workout = {}
+
+        for item in progression_rows:
+            source_id = str(
+                item.get(
+                    "source_workout_id",
+                    "",
+                )
+            )
+
+            progressions_by_workout.setdefault(
+                source_id,
+                [],
+            ).append(item)
+
+        items = []
+
+        for workout in workouts:
+            if workout.get("status") != "completed":
+                continue
+
+            workout_id = str(workout["id"])
+
+            workout_log = (
+                workout_logs_repo.get_for_workout(
+                    current_user.id,
+                    workout_id,
+                )
+            )
+
+            if not workout_log:
+                continue
+
+            planned_exercises = (
+                exercises_repo.list_for_workout(
+                    current_user.id,
+                    workout_id,
+                )
+            )
+
+            set_logs = (
+                set_logs_repo.list_for_workout_log(
+                    current_user.id,
+                    workout_log["id"],
+                )
+            )
+
+            outcome = (
+                StrengthOutcomeService().evaluate(
+                    planned_exercises=
+                        planned_exercises,
+                    set_logs=set_logs,
+                )
+            )
+
+            sets_by_exercise = {}
+
+            for set_item in set_logs:
+                exercise_id = str(
+                    set_item[
+                        "strength_workout_exercise_id"
+                    ]
+                )
+
+                sets_by_exercise.setdefault(
+                    exercise_id,
+                    [],
+                ).append(set_item)
+
+            exercise_items = []
+
+            for exercise in planned_exercises:
+                exercise_id = str(
+                    exercise["id"]
+                )
+
+                exercise_items.append(
+                    {
+                        **exercise,
+                        "sets":
+                            sets_by_exercise.get(
+                                exercise_id,
+                                [],
+                            ),
+                    }
+                )
+
+            items.append(
+                {
+                    "workout": workout,
+                    "workout_log": workout_log,
+                    "exercises": exercise_items,
+                    "outcome": outcome,
+                    "progressions":
+                        progressions_by_workout.get(
+                            workout_id,
+                            [],
+                        ),
+                }
+            )
+
+        items.sort(
+            key=lambda item: (
+                str(
+                    item["workout_log"].get(
+                        "performed_date",
+                        "",
+                    )
+                ),
+                str(
+                    item["workout"].get(
+                        "scheduled_date",
+                        "",
+                    )
+                ),
+            ),
+            reverse=True,
+        )
+
+        return {
+            "plan_id": plan_id,
+            "count": len(items),
+            "items": items,
+        }
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+

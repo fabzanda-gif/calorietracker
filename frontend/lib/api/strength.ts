@@ -189,6 +189,61 @@ export interface StrengthProgressionProposal {
   } | null;
 }
 
+export interface StrengthHistorySet {
+  set_index: number;
+  reps: number;
+  load_kg: number;
+  rir: number | null;
+}
+
+export interface StrengthHistoryExercise
+  extends StrengthWorkoutExercise {
+  sets: StrengthHistorySet[];
+}
+
+export interface StrengthProgressionHistoryItem {
+  id: string;
+  source_workout_id: string;
+  source_exercise_id: string;
+  target_workout_id?: string;
+  target_exercise_id: string;
+  exercise_key: string;
+  outcome:
+    | "under_target"
+    | "on_target"
+    | "over_target";
+  action:
+    | "increase_load"
+    | "maintain"
+    | "reduce_load";
+  observed_load_kg: number | null;
+  before_load_kg: number | null;
+  after_load_kg: number | null;
+  created_at?: string;
+}
+
+export interface StrengthPlanHistoryItem {
+  workout: StrengthWorkout;
+  workout_log: {
+    id: string;
+    strength_workout_id: string;
+    performed_date: string;
+    duration_minutes: number | null;
+    notes: string | null;
+  };
+  exercises: StrengthHistoryExercise[];
+  outcome: StrengthWorkoutOutcome;
+  progressions:
+    StrengthProgressionHistoryItem[];
+}
+
+export interface StrengthPlanHistoryResponse {
+  plan_id: string;
+  count: number;
+  items: StrengthPlanHistoryItem[];
+}
+
+
 export interface StrengthProgressionPreviewResponse {
   status: "pending" | "preview";
   workout: StrengthWorkout;
@@ -248,6 +303,19 @@ export function getStrengthPlanDetail(
 ): Promise<StrengthPlanDetailResponse> {
   return apiRequest<StrengthPlanDetailResponse>(
     `/strength/plans/${planId}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+
+export function getStrengthPlanHistory(
+  planId: string,
+  accessToken?: string | null,
+): Promise<StrengthPlanHistoryResponse> {
+  return apiRequest<StrengthPlanHistoryResponse>(
+    `/strength/plans/${planId}/history`,
     {
       accessToken,
     },
