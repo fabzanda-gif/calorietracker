@@ -285,6 +285,34 @@ def list_training_plans(
         ) from exc
 
 
+@router.delete("/training-plans/{plan_id}")
+def delete_training_plan(
+    plan_id: str,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    repo: TrainingPlansRepository = Depends(
+        get_training_plans_repository
+    ),
+):
+    try:
+        repo.delete(
+            plan_id,
+            current_user.id,
+        )
+
+        return {
+            "deleted": True,
+            "id": plan_id,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post(
     "/training-plans/running/preview",
 )

@@ -8,6 +8,7 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   createRunningTrainingPlan,
+  deleteTrainingPlan,
   previewRunningTrainingPlan,
   getTrainingPlans,
   type PlannedActivity,
@@ -101,6 +102,9 @@ export function RunningPlanBuilder({
     });
 
   const [saving, setSaving] =
+    useState(false);
+
+  const [deletingPlan, setDeletingPlan] =
     useState(false);
 
   const [message, setMessage] =
@@ -264,6 +268,53 @@ export function RunningPlanBuilder({
   }
 
 
+  async function removeActivePlan(
+    plan: TrainingPlan,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Eliminare questo piano e tutte le sessioni collegate dal calendario?",
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingPlan(true);
+    setMessage(null);
+
+    try {
+      await deleteTrainingPlan(
+        plan.id,
+        accessToken,
+      );
+
+      clearPreview();
+
+      await refreshPlans();
+
+      setMessage(
+        "Piano eliminato insieme alle sessioni collegate.",
+      );
+
+      onCreated?.();
+
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Non riesco a eliminare il piano.",
+      );
+    } finally {
+      setDeletingPlan(false);
+    }
+  }
+
+
   async function confirmPlan() {
     if (
       !accessToken ||
@@ -330,6 +381,7 @@ export function RunningPlanBuilder({
         {activePlan ? (
           <div className={styles.activePlan}>
             <small>Piano attivo</small>
+
             <strong>
               {(
                 activePlan.target_distance_meters /
@@ -342,12 +394,28 @@ export function RunningPlanBuilder({
               )}{" "}
               km
             </strong>
+
             <span>
               {paceLabel(
                 activePlan.target_pace_seconds_per_km,
               )}{" "}
               · {activePlan.total_weeks} settimane
             </span>
+
+            <button
+              type="button"
+              className={styles.deletePlanButton}
+              disabled={deletingPlan}
+              onClick={() => {
+                void removeActivePlan(
+                  activePlan,
+                );
+              }}
+            >
+              {deletingPlan
+                ? "Elimino…"
+                : "Elimina piano"}
+            </button>
           </div>
         ) : null}
       </div>

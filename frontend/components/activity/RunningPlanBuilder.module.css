@@ -335,3 +335,33 @@
 }
 
 /* RUNNING PLAN PREVIEW END */
+
+
+/* DELETE RUNNING PLAN START */
+
+.deletePlanButton{
+  width:100%;
+  min-height:34px;
+  margin-top:12px;
+  padding:0 10px;
+  border:1px solid #e2caca;
+  border-radius:9px;
+  background:#fff;
+  color:#a94848;
+  font:inherit;
+  font-size:.72rem;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.deletePlanButton:hover{
+  border-color:#cf8e8e;
+  color:#8f3030;
+}
+
+.deletePlanButton:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+/* DELETE RUNNING PLAN END */

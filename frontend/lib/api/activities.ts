@@ -484,6 +484,22 @@ export function previewRunningTrainingPlan(
   );
 }
 
+export function deleteTrainingPlan(
+  id: string,
+  accessToken?: string | null,
+): Promise<{
+  deleted: boolean;
+  id: string;
+}> {
+  return apiRequest(
+    `/activities/training-plans/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      accessToken,
+    },
+  );
+}
+
 export function createRunningTrainingPlan(
   input: RunningTrainingPlanInput,
   accessToken?: string | null,
