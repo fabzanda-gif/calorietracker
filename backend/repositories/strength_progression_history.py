@@ -111,6 +111,80 @@ class StrengthProgressionHistoryRepository(
                 f"progression history: {exc}"
             ) from exc
 
+    def apply_atomic(
+        self,
+        *,
+        user_id: str,
+        strength_plan_id: Any,
+        source_workout_id: Any,
+        source_exercise_id: Any,
+        target_workout_id: Any,
+        target_exercise_id: Any,
+        exercise_key: str,
+        outcome: str,
+        action: str,
+        observed_load_kg: float,
+        expected_before_load_kg: float | None,
+        after_load_kg: float,
+    ) -> dict:
+        try:
+            response = self.supabase.rpc(
+                "apply_strength_progression_atomic",
+                {
+                    "p_user_id": user_id,
+                    "p_strength_plan_id":
+                        strength_plan_id,
+                    "p_source_workout_id":
+                        source_workout_id,
+                    "p_source_exercise_id":
+                        source_exercise_id,
+                    "p_target_workout_id":
+                        target_workout_id,
+                    "p_target_exercise_id":
+                        target_exercise_id,
+                    "p_exercise_key":
+                        exercise_key,
+                    "p_outcome": outcome,
+                    "p_action": action,
+                    "p_observed_load_kg":
+                        observed_load_kg,
+                    "p_expected_before_load_kg":
+                        expected_before_load_kg,
+                    "p_after_load_kg":
+                        after_load_kg,
+                },
+            ).execute()
+
+            data = getattr(
+                response,
+                "data",
+                None,
+            )
+
+            if isinstance(data, dict):
+                return data
+
+            if (
+                isinstance(data, list)
+                and data
+                and isinstance(data[0], dict)
+            ):
+                return data[0]
+
+            raise RepositoryError(
+                "Atomic strength progression "
+                "returned no result"
+            )
+
+        except RepositoryError:
+            raise
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to apply atomic strength "
+                f"progression: {exc}"
+            ) from exc
+
     def create(
         self,
         payload: dict[str, Any],

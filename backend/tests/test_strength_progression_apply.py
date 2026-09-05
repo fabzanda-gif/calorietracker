@@ -160,9 +160,14 @@ class FakeSetLogsRepo:
 
 
 class FakeHistoryRepo:
-    def __init__(self):
+    def __init__(
+        self,
+        atomic_result=None,
+    ):
         self.rows = []
         self.deleted = []
+        self.atomic_calls = []
+        self.atomic_result = atomic_result
 
     def get_for_source_exercise(
         self,
@@ -193,6 +198,33 @@ class FakeHistoryRepo:
             ),
             None,
         )
+
+    def apply_atomic(self, **payload):
+        self.atomic_calls.append(payload)
+
+        if self.atomic_result is not None:
+            return self.atomic_result
+
+        item = {
+            **payload,
+            "id": "history-1",
+            "before_load_kg":
+                payload[
+                    "expected_before_load_kg"
+                ],
+        }
+
+        self.rows.append(item)
+
+        return {
+            "applied": True,
+            "history": item,
+            "target_exercise": {
+                **target_exercise(),
+                "prescribed_load_kg":
+                    payload["after_load_kg"],
+            },
+        }
 
     def create(self, payload):
         item = {
@@ -236,15 +268,17 @@ def test_over_target_applies_next_load():
         "increase_load"
     )
 
-    assert exercises.updated == [
-        (
-            "target-exercise",
-            82.5,
-        )
-    ]
+    assert exercises.updated == []
 
     assert history.rows[0]["after_load_kg"] == (
         82.5
+    )
+
+    assert (
+        history.atomic_calls[0][
+            "expected_before_load_kg"
+        ]
+        is None
     )
 
 
@@ -271,12 +305,9 @@ def test_on_target_initializes_next_load():
         "maintain"
     )
 
-    assert exercises.updated == [
-        (
-            "target-exercise",
-            80,
-        )
-    ]
+    assert exercises.updated == []
+
+    assert history.rows[0]["after_load_kg"] == 80
 
 
 def test_replay_is_blocked():
@@ -350,6 +381,63 @@ def test_zero_load_is_not_applied():
                 load=0
             ),
             history_repo=FakeHistoryRepo(),
+        )
+
+    assert exc.value.status_code == 409
+
+
+
+def test_atomic_stale_target_is_409():
+    history = FakeHistoryRepo(
+        atomic_result={
+            "applied": False,
+            "reason": "stale_target",
+            "current_load_kg": 82.5,
+        }
+    )
+
+    with pytest.raises(
+        HTTPException
+    ) as exc:
+        apply_strength_progression(
+            workout_id="source-workout",
+            exercise_id="source-exercise",
+            current_user=user(),
+            workouts_repo=FakeWorkoutsRepo(),
+            exercises_repo=FakeExercisesRepo(),
+            workout_logs_repo=(
+                FakeWorkoutLogsRepo()
+            ),
+            set_logs_repo=FakeSetLogsRepo(),
+            history_repo=history,
+        )
+
+    assert exc.value.status_code == 409
+    assert "preview" in exc.value.detail.lower()
+
+
+def test_atomic_concurrent_conflict_is_409():
+    history = FakeHistoryRepo(
+        atomic_result={
+            "applied": False,
+            "reason": "concurrent_conflict",
+        }
+    )
+
+    with pytest.raises(
+        HTTPException
+    ) as exc:
+        apply_strength_progression(
+            workout_id="source-workout",
+            exercise_id="source-exercise",
+            current_user=user(),
+            workouts_repo=FakeWorkoutsRepo(),
+            exercises_repo=FakeExercisesRepo(),
+            workout_logs_repo=(
+                FakeWorkoutLogsRepo()
+            ),
+            set_logs_repo=FakeSetLogsRepo(),
+            history_repo=history,
         )
 
     assert exc.value.status_code == 409

@@ -1310,67 +1310,94 @@ def apply_strength_progression(
             "proposed_load_kg"
         ]
 
-        history = history_repo.create(
-            {
-                "user_id": current_user.id,
-                "strength_plan_id":
-                    workout["strength_plan_id"],
-                "source_workout_id":
-                    workout_id,
-                "source_exercise_id":
-                    source_exercise["id"],
-                "target_workout_id":
-                    target_workout["id"],
-                "target_exercise_id":
-                    target_exercise["id"],
-                "exercise_key":
-                    source_key,
-                "outcome":
-                    exercise_outcome["outcome"],
-                "action":
-                    proposal["action"],
-                "observed_load_kg":
-                    proposal["current_load_kg"],
-                "before_load_kg":
-                    before_load,
-                "after_load_kg":
-                    after_load,
-            }
+        atomic_result = history_repo.apply_atomic(
+            user_id=current_user.id,
+            strength_plan_id=
+                workout["strength_plan_id"],
+            source_workout_id=workout_id,
+            source_exercise_id=
+                source_exercise["id"],
+            target_workout_id=
+                target_workout["id"],
+            target_exercise_id=
+                target_exercise["id"],
+            exercise_key=source_key,
+            outcome=
+                exercise_outcome["outcome"],
+            action=proposal["action"],
+            observed_load_kg=
+                proposal["current_load_kg"],
+            expected_before_load_kg=
+                before_load,
+            after_load_kg=after_load,
         )
 
-        if not history or not history.get("id"):
+        if not atomic_result.get("applied"):
+            reason = atomic_result.get(
+                "reason"
+            )
+
+            messages = {
+                "stale_target": (
+                    "Il carico della prossima "
+                    "esposizione è cambiato dopo "
+                    "la preview. Ricalcola la "
+                    "progressione."
+                ),
+                "source_already_handled": (
+                    "La progressione di questo "
+                    "esercizio è già stata gestita."
+                ),
+                "target_already_handled": (
+                    "La prossima esposizione è già "
+                    "stata modificata."
+                ),
+                "concurrent_conflict": (
+                    "Un'altra progressione è stata "
+                    "applicata nello stesso momento. "
+                    "Ricalcola la preview."
+                ),
+                "target_not_available": (
+                    "La prossima esposizione non è "
+                    "più disponibile."
+                ),
+                "exercise_key_mismatch": (
+                    "L'esercizio target non "
+                    "corrisponde più alla preview."
+                ),
+            }
+
+            raise HTTPException(
+                status_code=
+                    status.HTTP_409_CONFLICT,
+                detail=messages.get(
+                    reason,
+                    (
+                        "La progressione non può "
+                        "essere applicata allo "
+                        "stato corrente."
+                    ),
+                ),
+            )
+
+        history = atomic_result.get(
+            "history"
+        )
+
+        updated_exercise = (
+            atomic_result.get(
+                "target_exercise"
+            )
+        )
+
+        if (
+            not history
+            or not updated_exercise
+        ):
             raise RepositoryError(
-                "Strength progression history "
-                "was not persisted"
+                "Atomic strength progression "
+                "returned incomplete data"
             )
-
-        try:
-            updated_exercise = (
-                exercises_repo.update_prescribed_load(
-                    user_id=current_user.id,
-                    exercise_id=
-                        target_exercise["id"],
-                    prescribed_load_kg=
-                        after_load,
-                )
-            )
-
-            if not updated_exercise:
-                raise RepositoryError(
-                    "Strength progression target "
-                    "was not updated"
-                )
-
-        except Exception:
-            try:
-                history_repo.delete(
-                    history["id"],
-                    current_user.id,
-                )
-            except RepositoryError:
-                pass
-
-            raise
 
         return {
             "applied": True,
