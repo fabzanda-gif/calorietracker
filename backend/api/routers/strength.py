@@ -15,6 +15,8 @@ from backend.api.dependencies import (
     get_current_user,
     get_strength_plans_repository,
     get_strength_workout_exercises_repository,
+    get_strength_workout_logs_repository,
+    get_strength_set_logs_repository,
     get_strength_workouts_repository,
 )
 from backend.repositories.base import RepositoryError
@@ -24,6 +26,10 @@ from backend.repositories.strength_plans import (
 from backend.repositories.strength_workouts import (
     StrengthWorkoutExercisesRepository,
     StrengthWorkoutsRepository,
+)
+from backend.repositories.strength_logs import (
+    StrengthSetLogsRepository,
+    StrengthWorkoutLogsRepository,
 )
 from backend.services.strength_plan import (
     StrengthPlanInput,
@@ -35,6 +41,42 @@ router = APIRouter(
     prefix="/strength",
     tags=["strength"],
 )
+
+
+class StrengthSetLogRequest(BaseModel):
+    reps: int = Field(gt=0)
+    load_kg: float = Field(default=0, ge=0)
+    rir: float | None = Field(
+        default=None,
+        ge=0,
+        le=6,
+    )
+
+
+class StrengthExerciseLogRequest(BaseModel):
+    exercise_id: str = Field(min_length=1)
+    sets: list[StrengthSetLogRequest] = Field(
+        min_length=1,
+        max_length=10,
+    )
+
+
+class StrengthWorkoutLogRequest(BaseModel):
+    performed_date: date
+
+    duration_minutes: int | None = Field(
+        default=None,
+        gt=0,
+    )
+
+    notes: str | None = Field(
+        default=None,
+        max_length=2000,
+    )
+
+    exercises: list[
+        StrengthExerciseLogRequest
+    ] = Field(min_length=1)
 
 
 class StrengthPlanRequest(BaseModel):
@@ -441,3 +483,204 @@ def list_strength_plans(
             ),
             detail=str(exc),
         ) from exc
+
+@router.post(
+    "/workouts/{workout_id}/log",
+    status_code=status.HTTP_201_CREATED,
+)
+def log_strength_workout(
+    workout_id: str,
+    request: StrengthWorkoutLogRequest,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    workouts_repo:
+        StrengthWorkoutsRepository = Depends(
+            get_strength_workouts_repository
+        ),
+    exercises_repo:
+        StrengthWorkoutExercisesRepository = Depends(
+            get_strength_workout_exercises_repository
+        ),
+    workout_logs_repo:
+        StrengthWorkoutLogsRepository = Depends(
+            get_strength_workout_logs_repository
+        ),
+    set_logs_repo:
+        StrengthSetLogsRepository = Depends(
+            get_strength_set_logs_repository
+        ),
+):
+    try:
+        workout = workouts_repo.get(
+            current_user.id,
+            workout_id,
+        )
+
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workout palestra non trovato.",
+            )
+
+        existing_log = (
+            workout_logs_repo.get_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        if existing_log:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Questo workout è già stato "
+                    "registrato."
+                ),
+            )
+
+        planned_exercises = (
+            exercises_repo.list_for_workout(
+                current_user.id,
+                workout_id,
+            )
+        )
+
+        allowed_ids = {
+            str(item["id"])
+            for item in planned_exercises
+            if item.get("id")
+        }
+
+        submitted_ids = [
+            item.exercise_id
+            for item in request.exercises
+        ]
+
+        if len(submitted_ids) != len(
+            set(submitted_ids)
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Lo stesso esercizio non può "
+                    "comparire due volte."
+                ),
+            )
+
+        if any(
+            item not in allowed_ids
+            for item in submitted_ids
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Uno o più esercizi non "
+                    "appartengono a questo workout."
+                ),
+            )
+
+        workout_log = workout_logs_repo.create(
+            {
+                "user_id": current_user.id,
+                "strength_workout_id": workout_id,
+                "performed_date": str(
+                    request.performed_date
+                ),
+                "duration_minutes":
+                    request.duration_minutes,
+                "notes": request.notes,
+            }
+        )
+
+        if (
+            not workout_log
+            or not workout_log.get("id")
+        ):
+            raise RepositoryError(
+                "Strength workout log "
+                "was not persisted"
+            )
+
+        log_id = workout_log["id"]
+
+        try:
+            payloads = []
+
+            for exercise in request.exercises:
+                for set_index, set_item in enumerate(
+                    exercise.sets,
+                    start=1,
+                ):
+                    payloads.append(
+                        {
+                            "user_id":
+                                current_user.id,
+                            "strength_workout_log_id":
+                                log_id,
+                            "strength_workout_exercise_id":
+                                exercise.exercise_id,
+                            "set_index": set_index,
+                            "reps": set_item.reps,
+                            "load_kg":
+                                set_item.load_kg,
+                            "rir": set_item.rir,
+                        }
+                    )
+
+            created_sets = (
+                set_logs_repo.create_many(
+                    payloads
+                )
+            )
+
+            if len(created_sets) != len(
+                payloads
+            ):
+                raise RepositoryError(
+                    "Not all strength sets "
+                    "were persisted"
+                )
+
+            updated_workout = (
+                workouts_repo.update_status(
+                    user_id=current_user.id,
+                    workout_id=workout_id,
+                    status="completed",
+                )
+            )
+
+            if not updated_workout:
+                raise RepositoryError(
+                    "Strength workout status "
+                    "was not updated"
+                )
+
+            return {
+                "logged": True,
+                "workout": updated_workout,
+                "workout_log": workout_log,
+                "set_count": len(created_sets),
+                "sets": created_sets,
+            }
+
+        except Exception:
+            try:
+                workout_logs_repo.delete(
+                    log_id,
+                    current_user.id,
+                )
+            except RepositoryError:
+                pass
+
+            raise
+
+    except HTTPException:
+        raise
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+

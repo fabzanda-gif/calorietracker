@@ -53,6 +53,57 @@ class StrengthWorkoutsRepository(BaseRepository):
                 f"{exc}"
             ) from exc
 
+    def get(
+        self,
+        user_id: str,
+        workout_id: Any,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_SELECT)
+                .eq("user_id", user_id)
+                .eq("id", workout_id)
+                .limit(1)
+                .execute()
+            )
+
+            rows = self._data(response)
+
+            return rows[0] if rows else None
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to load strength workout: "
+                f"{exc}"
+            ) from exc
+
+    def update_status(
+        self,
+        *,
+        user_id: str,
+        workout_id: Any,
+        status: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update({"status": status})
+                .eq("user_id", user_id)
+                .eq("id", workout_id)
+                .execute()
+            )
+
+            rows = self._data(response)
+
+            return rows[0] if rows else None
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to update strength workout: "
+                f"{exc}"
+            ) from exc
+
     def create_many(
         self,
         payloads: list[dict[str, Any]],
@@ -80,6 +131,31 @@ class StrengthWorkoutExercisesRepository(
     BaseRepository
 ):
     table_name = "strength_workout_exercises"
+
+    def get(
+        self,
+        user_id: str,
+        exercise_id: Any,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_EXERCISE_SELECT)
+                .eq("user_id", user_id)
+                .eq("id", exercise_id)
+                .limit(1)
+                .execute()
+            )
+
+            rows = self._data(response)
+
+            return rows[0] if rows else None
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to load strength exercise: "
+                f"{exc}"
+            ) from exc
 
     def list_for_workout(
         self,
