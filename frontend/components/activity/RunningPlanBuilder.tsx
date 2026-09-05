@@ -109,6 +109,58 @@ function distanceLabel(
 }
 
 
+type TrainingPhase =
+  | "base"
+  | "build"
+  | "specific"
+  | "taper";
+
+
+const TRAINING_PHASE_LABELS: Record<
+  TrainingPhase,
+  string
+> = {
+  base: "Base",
+  build: "Build",
+  specific: "Specific",
+  taper: "Taper",
+};
+
+
+const TRAINING_PHASE_DESCRIPTIONS: Record<
+  TrainingPhase,
+  string
+> = {
+  base: "Costruzione della base aerobica.",
+  build: "Volume e qualità iniziano a salire.",
+  specific: "Il lavoro si avvicina all’obiettivo.",
+  taper: "Si riduce il carico. Finalmente.",
+};
+
+
+function trainingPhaseForWeek(
+  week: number,
+  totalWeeks: number,
+): TrainingPhase {
+  const ratio =
+    week / Math.max(1, totalWeeks);
+
+  if (ratio < 0.35) {
+    return "base";
+  }
+
+  if (ratio < 0.70) {
+    return "build";
+  }
+
+  if (ratio < 0.90) {
+    return "specific";
+  }
+
+  return "taper";
+}
+
+
 function paceLabel(
   seconds: number,
 ): string {
@@ -535,6 +587,33 @@ export function RunningPlanBuilder({
     .sort((a, b) => a.week - b.week);
 
 
+  const phaseSummary = (
+    [
+      "base",
+      "build",
+      "specific",
+      "taper",
+    ] as TrainingPhase[]
+  ).map((phase) => {
+    const weeks = planWeeks.filter(
+      (item) =>
+        trainingPhaseForWeek(
+          item.week,
+          activePlan?.total_weeks ?? 1,
+        ) === phase,
+    );
+
+    return {
+      phase,
+      firstWeek:
+        weeks[0]?.week ?? null,
+      lastWeek:
+        weeks[weeks.length - 1]?.week ?? null,
+      count: weeks.length,
+    };
+  });
+
+
   return (
     <section className={styles.wrapper}>
       <div className={styles.heading}>
@@ -658,6 +737,53 @@ export function RunningPlanBuilder({
             </div>
           </div>
 
+          {!loadingFullPlan &&
+          planWeeks.length ? (
+            <div className={styles.phaseTimeline}>
+              {phaseSummary.map((item) => (
+                <div
+                  key={item.phase}
+                  className={`${styles.phaseTimelineItem} ${
+                    styles[
+                      `phaseTimeline_${item.phase}`
+                    ] ?? ""
+                  }`}
+                >
+                  <div
+                    className={
+                      styles.phaseTimelineTop
+                    }
+                  >
+                    <strong>
+                      {
+                        TRAINING_PHASE_LABELS[
+                          item.phase
+                        ]
+                      }
+                    </strong>
+
+                    <span>
+                      {item.count
+                        ? item.firstWeek ===
+                          item.lastWeek
+                          ? `Settimana ${item.firstWeek}`
+                          : `Settimane ${item.firstWeek}–${item.lastWeek}`
+                        : "—"}
+                    </span>
+                  </div>
+
+                  <p>
+                    {
+                      TRAINING_PHASE_DESCRIPTIONS[
+                        item.phase
+                      ]
+                    }
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {loadingFullPlan ? (
             <div className={styles.fullPlanLoading}>
               Carico tutte le settimane…
@@ -674,6 +800,26 @@ export function RunningPlanBuilder({
                       <div>
                         <small>SETTIMANA</small>
                         <strong>{week}</strong>
+
+                        <span
+                          className={`${styles.weekPhaseBadge} ${
+                            styles[
+                              `weekPhase_${trainingPhaseForWeek(
+                                week,
+                                activePlan.total_weeks,
+                              )}`
+                            ] ?? ""
+                          }`}
+                        >
+                          {
+                            TRAINING_PHASE_LABELS[
+                              trainingPhaseForWeek(
+                                week,
+                                activePlan.total_weeks,
+                              )
+                            ]
+                          }
+                        </span>
                       </div>
 
                       <span>

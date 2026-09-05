@@ -655,3 +655,123 @@
 }
 
 /* FULL RUNNING PLAN END */
+
+
+/* RUNNING PLAN PHASES START */
+
+.phaseTimeline{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-top:18px;
+}
+
+.phaseTimelineItem{
+  position:relative;
+  overflow:hidden;
+  min-height:92px;
+  padding:12px;
+  border:1px solid #e2e6e3;
+  border-radius:13px;
+  background:#fff;
+}
+
+.phaseTimelineItem::before{
+  content:"";
+  position:absolute;
+  top:0;
+  right:0;
+  left:0;
+  height:4px;
+  background:#cfd7df;
+}
+
+.phaseTimelineTop{
+  display:grid;
+  gap:3px;
+}
+
+.phaseTimelineTop strong{
+  color:#102846;
+  font-size:.78rem;
+}
+
+.phaseTimelineTop span{
+  color:#84909d;
+  font-size:.65rem;
+  font-weight:750;
+}
+
+.phaseTimelineItem p{
+  margin:8px 0 0;
+  color:#748291;
+  font-size:.68rem;
+  line-height:1.4;
+}
+
+.phaseTimeline_base::before{
+  background:#688a72;
+}
+
+.phaseTimeline_build::before{
+  background:#bf8831;
+}
+
+.phaseTimeline_specific::before{
+  background:#b65e4f;
+}
+
+.phaseTimeline_taper::before{
+  background:#536f94;
+}
+
+.weekPhaseBadge{
+  display:inline-flex;
+  align-items:center;
+  min-height:21px;
+  margin-left:5px;
+  padding:0 7px;
+  border-radius:999px;
+  font-size:.58rem;
+  font-weight:900;
+  letter-spacing:.035em;
+  text-transform:uppercase;
+}
+
+.weekPhase_base{
+  background:#edf6ef;
+  color:#487051;
+}
+
+.weekPhase_build{
+  background:#fff4df;
+  color:#886426;
+}
+
+.weekPhase_specific{
+  background:#fff0ec;
+  color:#9a5040;
+}
+
+.weekPhase_taper{
+  background:#eaf0f8;
+  color:#284d7b;
+}
+
+@media(max-width:760px){
+  .phaseTimeline{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:480px){
+  .phaseTimeline{
+    grid-template-columns:1fr;
+  }
+
+  .phaseTimelineItem{
+    min-height:auto;
+  }
+}
+
+/* RUNNING PLAN PHASES END */
