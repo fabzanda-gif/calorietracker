@@ -14,6 +14,7 @@ import { AppNav } from "@/components/navigation/AppNav";
 import {
   getActivitiesForRange,
   getActivityOverview,
+  getActivityComment,
   deleteActivity,
   importGpxActivity,
   previewGpxActivity,
@@ -465,6 +466,16 @@ export default function ActivitiesPage() {
   const [importMessage, setImportMessage] =
     useState<string | null>(null);
 
+  const [
+    activityComments,
+    setActivityComments,
+  ] = useState<Record<string, string>>({});
+
+  const [
+    activityCommentLoading,
+    setActivityCommentLoading,
+  ] = useState(false);
+
   useEffect(() => {
     const stored = window.localStorage.getItem(
       "sanosync-experience-mode",
@@ -757,6 +768,80 @@ export default function ActivitiesPage() {
     null;
 
   const zero = experienceMode === "zero";
+
+  const detailCommentKey = detail
+    ? `${String(
+        detail.id ??
+          `${detail.date}-${detail.activity_name}`,
+      )}:${experienceMode}`
+    : "";
+
+  const activityComment =
+    detailCommentKey
+      ? activityComments[
+          detailCommentKey
+        ] ?? null
+      : null;
+
+  useEffect(() => {
+    if (
+      !detail ||
+      !accessToken ||
+      !detailCommentKey ||
+      activityComments[
+        detailCommentKey
+      ]
+    ) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadActivityComment() {
+      setActivityCommentLoading(true);
+
+      try {
+        const response =
+          await getActivityComment(
+            detail!,
+            experienceMode,
+            accessToken,
+          );
+
+        if (!active) {
+          return;
+        }
+
+        setActivityComments(
+          (current) => ({
+            ...current,
+            [detailCommentKey]:
+              response.comment,
+          }),
+        );
+      } catch {
+        // The backend already has a deterministic
+        // fallback. If the request itself fails,
+        // keep the activity detail usable.
+      } finally {
+        if (active) {
+          setActivityCommentLoading(false);
+        }
+      }
+    }
+
+    void loadActivityComment();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    accessToken,
+    activityComments,
+    detail,
+    detailCommentKey,
+    experienceMode,
+  ]);
 
   return (
     <>
@@ -1265,7 +1350,7 @@ export default function ActivitiesPage() {
                 <div className={styles.emptyList}>
                   {selectedDate
                     ? "Nessuna attività registrata in questo giorno."
-                    : "Nessun allenamento registrato in questo mese."}
+                    : "Nessuna attività registrata in questo mese."}
                 </div>
               )}
             </div>
@@ -1322,6 +1407,49 @@ export default function ActivitiesPage() {
                       {detail.burned_calories} kcal
                     </strong>
                   </div>
+                </div>
+
+                <div
+                  className={
+                    styles.activityAiComment
+                  }
+                >
+                  <div
+                    className={
+                      styles.activityAiCommentHeader
+                    }
+                  >
+                    <span
+                      className={
+                        styles.activityAiMark
+                      }
+                      aria-hidden="true"
+                    >
+                      AI
+                    </span>
+                    <div>
+                      <span>
+                        SanoSync AI
+                      </span>
+                      <strong>
+                        {zero
+                          ? "Il verdetto"
+                          : "Commento attività"}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <p>
+                    {activityCommentLoading &&
+                    !activityComment
+                      ? zero
+                        ? "Sto cercando qualcosa da dire. Non abituarti."
+                        : "Analizzo questa attività…"
+                      : activityComment ??
+                        (zero
+                          ? "Attività registrata. Le prove esistono."
+                          : "Attività registrata. La continuità parte anche da qui.")}
+                  </p>
                 </div>
 
                 <ActivityMap

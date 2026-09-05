@@ -239,3 +239,48 @@ export function getActivityMovement(
     },
   );
 }
+
+/* ACTIVITY AI COMMENT API START */
+
+export interface ActivityCommentResponse {
+  comment: string;
+  source: "groq" | "fallback";
+  mode: "standard" | "zero";
+}
+
+export function getActivityComment(
+  activity: Activity,
+  mode: "standard" | "zero",
+  accessToken?: string | null,
+): Promise<ActivityCommentResponse> {
+  return apiRequest<ActivityCommentResponse>(
+    "/activities/comment",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        activity_name:
+          activity.activity_name,
+        activity_type:
+          activity.activity_type ?? null,
+        burned_calories:
+          Number(
+            activity.burned_calories ?? 0,
+          ),
+        duration_seconds:
+          activity.duration_seconds ?? null,
+        distance_meters:
+          activity.distance_meters ?? null,
+        average_cadence:
+          activity.average_cadence ?? null,
+        average_heart_rate:
+          activity.average_heart_rate ?? null,
+        source:
+          activity.source ?? null,
+        mode,
+      }),
+    },
+  );
+}
+
+/* ACTIVITY AI COMMENT API END */

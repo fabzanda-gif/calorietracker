@@ -33,6 +33,11 @@ from backend.services.activity_movement import (
 from backend.services.activity_movement_sync import (
     ActivityMovementSyncService,
 )
+from backend.services.activity_comment import (
+    ActivityCommentError,
+    ActivityCommentService,
+    fallback_activity_comment,
+)
 from backend.services.profile_goal import ProfileGoalService
 
 
@@ -80,6 +85,45 @@ class ActivityCreate(BaseModel):
 class ActivityUpdate(BaseModel):
     activity_name: str | None = None
     burned_calories: int | None = Field(default=None, ge=0)
+
+
+class ActivityCommentRequest(BaseModel):
+    activity_name: str = Field(
+        min_length=1,
+        max_length=160,
+    )
+    activity_type: str | None = Field(
+        default=None,
+        max_length=80,
+    )
+    burned_calories: int = Field(
+        default=0,
+        ge=0,
+    )
+    duration_seconds: int | None = Field(
+        default=None,
+        ge=0,
+    )
+    distance_meters: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    average_cadence: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    average_heart_rate: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    source: str | None = Field(
+        default=None,
+        max_length=40,
+    )
+    mode: str = Field(
+        default="standard",
+        pattern="^(standard|zero)$",
+    )
 
 
 class GpxPreviewRequest(BaseModel):
@@ -396,6 +440,54 @@ def import_gpx_activity(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
+
+
+@router.post("/comment")
+def get_activity_comment(
+    request: ActivityCommentRequest,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+):
+    # current_user is intentionally resolved here:
+    # generating AI text remains an authenticated
+    # SanoSync capability.
+    _ = current_user
+
+    payload = request.model_dump(
+        exclude={"mode"}
+    )
+
+    mode = (
+        "zero"
+        if request.mode == "zero"
+        else "standard"
+    )
+
+    try:
+        comment = (
+            ActivityCommentService()
+            .generate(
+                payload,
+                mode=mode,
+            )
+        )
+
+        return {
+            "comment": comment,
+            "source": "groq",
+            "mode": mode,
+        }
+
+    except ActivityCommentError:
+        return {
+            "comment": fallback_activity_comment(
+                payload,
+                mode=mode,
+            ),
+            "source": "fallback",
+            "mode": mode,
+        }
 
 
 @router.get("/movement/{activity_date}")

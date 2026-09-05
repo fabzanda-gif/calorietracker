@@ -1184,3 +1184,98 @@ summary.loggerHeading {
 }
 
 /* ACTIVITY CALENDAR FULL WIDTH V1 END */
+
+/* ACTIVITY AI COMMENT V1 START */
+
+.activityAiComment {
+  display: grid;
+  gap: 12px;
+
+  margin: 0 0 16px;
+  padding: 16px 18px;
+
+  border: 1px solid #e4e5e1;
+  border-radius: 17px;
+
+  background: #f7f8f6;
+}
+
+.activityAiCommentHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.activityAiMark {
+  display: grid;
+  place-items: center;
+
+  width: 34px;
+  height: 34px;
+
+  border-radius: 11px;
+
+  background: #102744;
+  color: #ffffff;
+
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.activityAiCommentHeader > div {
+  display: grid;
+  gap: 1px;
+}
+
+.activityAiCommentHeader span {
+  color: #747b84;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.activityAiCommentHeader strong {
+  color: #102744;
+  font-size: 0.86rem;
+}
+
+.activityAiComment p {
+  margin: 0;
+
+  color: #3f4b59;
+
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+:global(html[data-experience-mode="zero"])
+  .activityAiComment {
+  border-color:
+    rgba(244, 61, 61, 0.26);
+
+  background: #f7f7f5;
+}
+
+:global(html[data-experience-mode="zero"])
+  .activityAiMark {
+  background: #f43d3d;
+}
+
+:global(html[data-experience-mode="zero"])
+  .activityAiCommentHeader span {
+  color: #f43d3d;
+}
+
+:global(html[data-experience-mode="zero"])
+  .activityAiCommentHeader strong {
+  color: #111111;
+}
+
+:global(html[data-experience-mode="zero"])
+  .activityAiComment p {
+  color: #3d3d3b;
+}
+
+/* ACTIVITY AI COMMENT V1 END */
