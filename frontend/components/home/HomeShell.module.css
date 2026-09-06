@@ -12541,3 +12541,229 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* HOME FINAL FIDELITY PASS */
+
+/* ==========================================================
+   RESOCONTO
+   ========================================================== */
+
+.mealsSection {
+  padding: 14px 16px !important;
+}
+
+.dailySummaryHeader {
+  margin-bottom: 5px !important;
+}
+
+.dailySummaryHeaderCopy h2 {
+  font-size: 1.12rem !important;
+}
+
+.dailyActivityEntry > summary,
+.dailyMealSummary {
+  min-height: 47px !important;
+}
+
+.mealList {
+  border-radius: 12px !important;
+}
+
+.dailyEntryMain > strong {
+  font-size: .78rem !important;
+}
+
+.dailyEntryMain > span {
+  max-width: 100%;
+  font-size: .62rem !important;
+}
+
+.dailyMealCalories,
+.dailyActivityCalories {
+  font-size: .69rem !important;
+}
+
+.dailyEntryDone {
+  box-shadow: 0 3px 9px rgba(32, 189, 117, .18);
+}
+
+/* ==========================================================
+   AI
+   ========================================================== */
+
+.conversationCard {
+  justify-content: flex-start !important;
+  padding: 14px 16px !important;
+}
+
+.conversationHeader {
+  min-height: auto !important;
+}
+
+.aiHelperPanel {
+  margin-top: 2px !important;
+  margin-bottom: 3px !important;
+}
+
+.conversationModeSwitch {
+  margin: 1px auto 3px !important;
+}
+
+.conversationControls {
+  margin-top: 1px !important;
+}
+
+/*
+  Remove any legacy generated arrow so only the real button
+  content remains.
+*/
+.conversationControls > button::before,
+.conversationControls > button::after {
+  content: none !important;
+  display: none !important;
+}
+
+.conversationControls > button {
+  position: relative;
+  overflow: hidden;
+}
+
+.conversationControls > button > span:not(.srOnly) {
+  display: block;
+  transform: translateY(-1px);
+}
+
+.aiSuggestionChips {
+  margin-top: 0 !important;
+}
+
+.aiSuggestionChips button {
+  line-height: 1.1 !important;
+}
+
+/* ==========================================================
+   FOCUS
+   ========================================================== */
+
+.dailyFocusCard {
+  display: flex;
+  flex-direction: column;
+}
+
+.dailyFocusRings {
+  flex: 1;
+  align-items: center !important;
+  margin-top: 12px !important;
+}
+
+.dailyFocusRing,
+.dailyFocusStat {
+  width: 78px !important;
+  height: 78px !important;
+}
+
+.dailyFocusRing {
+  padding: 8px !important;
+}
+
+.dailyFocusMetricIcon {
+  font-size: .84rem !important;
+}
+
+.dailyFocusRingInner strong,
+.dailyFocusStat strong {
+  font-size: 1.02rem !important;
+}
+
+.dailyFocusLabel {
+  margin-top: 4px !important;
+  font-size: .71rem !important;
+}
+
+.dailyFocusNumbers {
+  margin-top: 3px !important;
+  font-size: .56rem !important;
+}
+
+/* ==========================================================
+   WEEK
+   ========================================================== */
+
+.weekOverviewCard {
+  display: flex;
+  flex-direction: column;
+}
+
+.weekKpis {
+  margin-top: 11px !important;
+}
+
+.weekKpi {
+  min-height: 58px !important;
+}
+
+.weekKpiIcon {
+  width: 27px !important;
+  height: 27px !important;
+}
+
+.weekKpi > div > strong {
+  font-size: .8rem !important;
+}
+
+.weekDays {
+  margin-top: 8px !important;
+}
+
+.weekDay > strong {
+  font-size: .74rem !important;
+}
+
+.weekTodaySummary {
+  margin-top: auto !important;
+  padding-top: 10px !important;
+}
+
+.weekTodayProgress {
+  height: 7px !important;
+}
+
+/* ==========================================================
+   MATCH CARD HEIGHT / MOCKUP RHYTHM
+   ========================================================== */
+
+@media (min-width: 900px) {
+  .mealsSection,
+  .conversationCard {
+    min-height: 448px !important;
+    max-height: 448px !important;
+  }
+
+  .dailyFocusCard,
+  .weekOverviewCard {
+    min-height: 285px !important;
+    max-height: 285px !important;
+  }
+
+  .homeBottomOverview {
+    margin-top: 14px !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .mealsSection,
+  .conversationCard,
+  .dailyFocusCard,
+  .weekOverviewCard {
+    min-height: auto !important;
+    max-height: none !important;
+  }
+
+  .dailyFocusRing,
+  .dailyFocusStat {
+    width: 70px !important;
+    height: 70px !important;
+  }
+}
+
