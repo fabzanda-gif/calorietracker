@@ -12767,3 +12767,178 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+/* HOME WEEK REGRESSION FIX V1 */
+
+/* ----------------------------------------------------------
+   Remove forced empty vertical space from final fidelity pass
+   ---------------------------------------------------------- */
+
+@media (min-width: 900px) {
+  .mealsSection,
+  .conversationCard,
+  .dailyFocusCard,
+  .weekOverviewCard {
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  .homeBottomOverview {
+    align-items: stretch !important;
+  }
+
+  .dailyFocusCard,
+  .weekOverviewCard {
+    height: auto !important;
+  }
+}
+
+/* ----------------------------------------------------------
+   Restore visible weekly KPI dashboard
+   ---------------------------------------------------------- */
+
+.weekKpis {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+
+  width: 100% !important;
+  min-height: 58px !important;
+
+  margin: 10px 0 8px !important;
+  padding: 0 !important;
+
+  overflow: hidden;
+
+  border: 1px solid #e5e9ed !important;
+  border-radius: 11px !important;
+
+  background: #ffffff !important;
+}
+
+.weekKpi {
+  display: grid !important;
+  grid-template-columns: 27px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 7px !important;
+
+  min-width: 0 !important;
+  min-height: 58px !important;
+
+  margin: 0 !important;
+  padding: 8px 9px !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: #ffffff !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.weekKpi + .weekKpi {
+  border-left: 1px solid #e5e9ed !important;
+}
+
+.weekKpiIcon {
+  display: grid !important;
+  place-items: center !important;
+
+  width: 27px !important;
+  height: 27px !important;
+
+  border-radius: 7px !important;
+
+  background: #fff1ef !important;
+  color: #ff6868 !important;
+
+  font-size: .7rem !important;
+  line-height: 1 !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.weekKpi > div {
+  display: block !important;
+  min-width: 0 !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.weekKpi > div > span {
+  display: block !important;
+
+  margin: 0 0 3px !important;
+
+  color: #728297 !important;
+
+  font-size: .52rem !important;
+  font-weight: 650 !important;
+  line-height: 1.05 !important;
+
+  white-space: normal !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.weekKpi > div > strong {
+  display: block !important;
+
+  margin: 0 !important;
+
+  color: #102846 !important;
+
+  font-size: .8rem !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* ----------------------------------------------------------
+   Denser bottom strip, closer to reference
+   ---------------------------------------------------------- */
+
+.dailyFocusCard,
+.weekOverviewCard {
+  padding: 14px 18px 12px !important;
+}
+
+.dailyFocusRings {
+  margin-top: 10px !important;
+}
+
+.weekDays {
+  margin-top: 5px !important;
+}
+
+.weekTodaySummary {
+  margin-top: 7px !important;
+  padding-top: 8px !important;
+}
+
+.weekOverviewNote {
+  margin-top: 5px !important;
+}
+
+/* Tablet/mobile */
+
+@media (max-width: 1100px) {
+  .weekKpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .weekKpi:nth-child(3) {
+    border-left: 0 !important;
+    border-top: 1px solid #e5e9ed !important;
+  }
+
+  .weekKpi:nth-child(4) {
+    border-top: 1px solid #e5e9ed !important;
+  }
+}
+
