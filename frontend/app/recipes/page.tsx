@@ -174,6 +174,8 @@ export default function RecipesPage() {
   const [mealDraft, setMealDraft] =
     useState<{
       recipeId: string;
+
+
       name: string;
       mealType: string;
       recipeServings: number;
@@ -181,6 +183,10 @@ export default function RecipesPage() {
       baseIngredients: DraftIngredient[];
       ingredients: DraftIngredient[];
     } | null>(null);
+
+  const [mealDraftPortions, setMealDraftPortions] =
+    useState(1);
+
 
   const [loggingMeal, setLoggingMeal] =
     useState(false);
@@ -721,21 +727,28 @@ export default function RecipesPage() {
 
           structured_ingredients:
             mealDraft.ingredients.map(
-              (item) => ({
-                ingredient_id:
-                  item.ingredientId,
-                quantity:
-                  item.quantityG,
-                unit: "g",
-                quantity_g:
-                  item.quantityG,
-              }),
+              (item) => {
+                const quantityG =
+                  item.quantityG *
+                  mealDraftPortions;
+
+                return {
+                  ingredient_id:
+                    item.ingredientId,
+                  quantity:
+                    quantityG,
+                  unit: "g",
+                  quantity_g:
+                    quantityG,
+                };
+              },
             ),
         },
         accessToken,
       );
 
       setMealDraft(null);
+      setMealDraftPortions(1);
 
       setMessage(
         `${mealDraft.name} registrato come ${mealDraft.mealType.toLowerCase()}.`,
