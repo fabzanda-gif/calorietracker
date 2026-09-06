@@ -8404,65 +8404,45 @@
 
 
 /* ==========================================================
-   Home meals collapse
+   Home meals — clear add meal action
    ========================================================== */
 
-.mealsHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
+.mealsSection .addMealFab {
+  width: auto;
+  min-width: 0;
+  height: 46px;
 
-.mealsCollapseToggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 9px;
 
-  width: 48px;
-  height: 48px;
-  padding: 0;
+  padding: 0 17px;
 
-  border: 0;
-  border-radius: 999px;
+  border-radius: 15px;
 
-  background: var(--ss-navy-950);
-  color: #ffffff;
-
-  font: inherit;
-  font-size: 1.7rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 800;
   line-height: 1;
-
-  cursor: pointer;
+  white-space: nowrap;
 }
 
-.mealsCollapseToggle:hover {
-  background: var(--ss-navy-800);
+.mealsSection .addMealFab > span:first-child {
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
 }
 
-.mealsCollapseToggle:focus-visible {
-  outline: 3px solid rgba(16, 40, 70, 0.18);
-  outline-offset: 3px;
-}
+@media (max-width: 600px) {
+  .mealsSection .addMealFab {
+    height: 42px;
+    padding: 0 14px;
+    gap: 7px;
 
-.mealsSectionCollapsed {
-  gap: 0;
-}
-
-.mealsSectionCollapsed .mealTabs,
-.mealsSectionCollapsed .mealList {
-  display: none;
-}
-
-@media (max-width: 767px) {
-  .mealsHeaderActions {
-    gap: 8px;
+    font-size: 0.76rem;
   }
 
-  .mealsCollapseToggle {
-    width: 44px;
-    height: 44px;
-    font-size: 1.55rem;
+  .mealsSection .addMealFab > span:first-child {
+    font-size: 1.2rem;
   }
 }

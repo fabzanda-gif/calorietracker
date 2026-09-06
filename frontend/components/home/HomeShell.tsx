@@ -555,8 +555,6 @@ export function HomeShell() {
   // Pannello "I tuoi pasti": mostra una sola fascia alla volta.
   const [selectedMealSlot, setSelectedMealSlot] =
     useState<string>("Colazione");
-  const [mealsExpanded, setMealsExpanded] =
-    useState(true);
   const [mealEditType, setMealEditType] =
     useState("Colazione");
   const [
@@ -3406,11 +3404,7 @@ export function HomeShell() {
 
           <section
             {...dashboardWidgetProps("meals")}
-            className={`${styles.section} ${styles.mealsSection} ${
-              mealsExpanded
-                ? ""
-                : styles.mealsSectionCollapsed
-            } ${styles.dashboardWidget}`}
+            className={`${styles.section} ${styles.mealsSection} ${styles.dashboardWidget}`}
           >
             {dashboardWidgetControls(
               "meals",
@@ -3424,93 +3418,73 @@ export function HomeShell() {
                 <h2>I tuoi pasti</h2>
               </div>
 
-              <div
-                className={styles.mealsHeaderActions}
-              >
-                {mealsExpanded ? (
-                  <button
-                    type="button"
-                    className={styles.addMealFab}
-                    aria-label={
-                      alternateSlot ===
-                      Object.keys(day.meals).find(
-                        (slot) =>
-                          mealLabel(slot) ===
-                          selectedMealSlot,
-                      )
-                        ? `Chiudi aggiunta ${selectedMealSlot}`
-                        : `Aggiungi ${selectedMealSlot}`
-                    }
-                    title={
-                      alternateSlot ===
-                      Object.keys(day.meals).find(
-                        (slot) =>
-                          mealLabel(slot) ===
-                          selectedMealSlot,
-                      )
-                        ? "Chiudi"
-                        : `Aggiungi ${selectedMealSlot}`
-                    }
-                    onClick={() => {
-                      const selectedSlot = Object.keys(
-                        day.meals,
-                      ).find(
-                        (slot) =>
-                          mealLabel(slot) ===
-                          selectedMealSlot,
-                      );
+              <button
+                type="button"
+                className={styles.addMealFab}
+                aria-expanded={
+                  alternateSlot ===
+                  Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  )
+                }
+                aria-label={
+                  alternateSlot ===
+                  Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  )
+                    ? `Chiudi aggiunta ${selectedMealSlot}`
+                    : `Aggiungi pasto ${selectedMealSlot}`
+                }
+                title={
+                  alternateSlot ===
+                  Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  )
+                    ? "Chiudi"
+                    : "Aggiungi pasto"
+                }
+                onClick={() => {
+                  const selectedSlot = Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  );
 
-                      if (selectedSlot) {
-                        if (
-                          alternateSlot === selectedSlot
-                        ) {
-                          closeAlternateMeal();
-                        } else {
-                          openAlternateMeal(
-                            selectedSlot,
-                          );
-                        }
-                      }
-                    }}
-                  >
-                    {alternateSlot ===
-                    Object.keys(day.meals).find(
-                      (slot) =>
-                        mealLabel(slot) ===
-                        selectedMealSlot,
-                    )
-                      ? "−"
-                      : "+"}
-                  </button>
-                ) : null}
-
-                <button
-                  type="button"
-                  className={styles.mealsCollapseToggle}
-                  aria-label={
-                    mealsExpanded
-                      ? "Chiudi I tuoi pasti"
-                      : "Apri I tuoi pasti"
-                  }
-                  aria-expanded={mealsExpanded}
-                  title={
-                    mealsExpanded
-                      ? "Compatta sezione"
-                      : "Espandi sezione"
-                  }
-                  onClick={() => {
-                    setMealsExpanded(
-                      (current) => !current,
-                    );
-
-                    if (mealsExpanded) {
+                  if (selectedSlot) {
+                    if (
+                      alternateSlot === selectedSlot
+                    ) {
                       closeAlternateMeal();
+                    } else {
+                      openAlternateMeal(
+                        selectedSlot,
+                      );
                     }
-                  }}
-                >
-                  {mealsExpanded ? "⌃" : "⌄"}
-                </button>
-              </div>
+                  }
+                }}
+              >
+                <span aria-hidden="true">
+                  {alternateSlot ===
+                  Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  )
+                    ? "−"
+                    : "+"}
+                </span>
+
+                <span>
+                  {alternateSlot ===
+                  Object.keys(day.meals).find(
+                    (slot) =>
+                      mealLabel(slot) === selectedMealSlot,
+                  )
+                    ? "Chiudi"
+                    : "Aggiungi pasto"}
+                </span>
+              </button>
             </div>
 
             <div className={styles.mealTabs}>
