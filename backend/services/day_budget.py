@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from typing import Any, Mapping
 
@@ -129,10 +130,31 @@ class DayBudgetService:
         metadata: Mapping[str, Any],
         current_weight: float | None,
     ) -> dict:
-        metrics = self.metrics_service.for_day(
-            user_id=user_id,
-            day_date=day_date,
-        )
+        # These reads are independent and I/O-bound.
+        # Execute them concurrently so Supabase round-trips overlap.
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            metrics_future = executor.submit(
+                self.metrics_service.for_day,
+                user_id=user_id,
+                day_date=day_date,
+            )
+
+            activity_history_future = executor.submit(
+                self.history_service.average_activity_kcal,
+                user_id=user_id,
+                end_date=day_date - timedelta(days=1),
+                lookback_days=7,
+            )
+
+            activity_level_future = executor.submit(
+                self._activity_level,
+                user_id=user_id,
+                day_date=day_date,
+            )
+
+            metrics = metrics_future.result()
+            activity_history = activity_history_future.result()
+            activity_level = activity_level_future.result()
 
         profile = self.profile_goal_service.build(
             metadata,
@@ -149,19 +171,8 @@ class DayBudgetService:
                 "profile": profile,
             }
 
-        activity_history = self.history_service.average_activity_kcal(
-            user_id=user_id,
-            end_date=day_date - timedelta(days=1),
-            lookback_days=7,
-        )
-
         average_activity_kcal = float(
             activity_history["average_burned_calories"]
-        )
-
-        activity_level = self._activity_level(
-            user_id=user_id,
-            day_date=day_date,
         )
 
         activity_buffer_kcal = self._activity_buffer_kcal(
