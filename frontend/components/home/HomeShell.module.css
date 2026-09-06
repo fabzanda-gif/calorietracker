@@ -9898,3 +9898,90 @@
     min-height: 42px !important;
   }
 }
+
+
+/* ==========================================================
+   HOME POST-HERO V2 — LEGACY WIDGET DETACH
+   AI + Meals stay in the same JSX wrapper but no longer use
+   legacy dashboard sizing/drag controls.
+   Hero intentionally untouched.
+   ========================================================== */
+
+@media (min-width: 900px) {
+  .desktopHomeGrid {
+    width: 100% !important;
+    max-width: none !important;
+
+    display: grid !important;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, 1fr) !important;
+
+    gap: 16px !important;
+
+    align-items: stretch !important;
+
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .desktopHomeGrid > .mealsSection,
+  .desktopHomeGrid > .homeAssistantSection {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+
+    height: 100% !important;
+    min-height: 390px !important;
+
+    margin: 0 !important;
+
+    align-self: stretch !important;
+    justify-self: stretch !important;
+  }
+
+  .desktopHomeGrid > .mealsSection {
+    grid-column: 1 / 2 !important;
+    grid-row: 1 !important;
+  }
+
+  .desktopHomeGrid > .homeAssistantSection {
+    grid-column: 2 / 3 !important;
+    grid-row: 1 !important;
+  }
+}
+
+/*
+  Le due card principali non hanno più sizing inline
+  derivato da dashboardWidgetProps.
+*/
+
+.desktopHomeGrid > .mealsSection,
+.desktopHomeGrid > .homeAssistantSection {
+  box-sizing: border-box !important;
+}
+
+/*
+  Elimina qualsiasi residuo visuale dei controlli legacy
+  eventualmente lasciato nel CSS precedente.
+*/
+
+.mealsSection .dashboardWidgetControls,
+.homeAssistantSection .dashboardWidgetControls {
+  display: none !important;
+}
+
+@media (max-width: 899px) {
+  .desktopHomeGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .desktopHomeGrid > .mealsSection,
+  .desktopHomeGrid > .homeAssistantSection {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+
+    min-height: 0 !important;
+  }
+}

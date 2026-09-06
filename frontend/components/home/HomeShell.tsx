@@ -3034,13 +3034,10 @@ export function HomeShell() {
 
           <div className={styles.desktopHomeGrid}>
             <section
-              {...dashboardWidgetProps("ai")}
-              className={`${styles.homeAssistantSection} ${styles.conversationCard} ${styles.dashboardWidget}`}
+
+              className={`${styles.homeAssistantSection} ${styles.conversationCard}`}
             >
-            {dashboardWidgetControls(
-              "ai",
-              "SanoSync AI",
-            )}
+
             <div className={styles.conversationHeader}>
               <div>
                 <span className={styles.conversationEyebrow}>
@@ -3399,13 +3396,10 @@ export function HomeShell() {
           </section>
 
           <section
-            {...dashboardWidgetProps("meals")}
-            className={`${styles.section} ${styles.mealsSection} ${styles.dashboardWidget}`}
+
+            className={`${styles.section} ${styles.mealsSection}`}
           >
-            {dashboardWidgetControls(
-              "meals",
-              "Resoconto giornaliero",
-            )}
+
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
