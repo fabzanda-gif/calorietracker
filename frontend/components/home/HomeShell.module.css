@@ -11237,3 +11237,45 @@
   }
 }
 
+
+/* HOME DAILY STATUS COMPACT V1 */
+
+.dailyMealCalories,
+.dailyActivityCalories {
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.dailyEntryDone {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  margin-left: 4px;
+  margin-right: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.dailyEntryChevron {
+  margin-left: 0;
+  min-width: 14px;
+}
+
+.dailyMealSummary,
+.dailyActivityEntry > summary {
+  column-gap: 8px;
+}
+
+@media (max-width: 759px) {
+  .dailyEntryDone {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+  }
+
+  .dailyMealCalories,
+  .dailyActivityCalories {
+    padding-left: 4px;
+  }
+}
+
