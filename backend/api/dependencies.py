@@ -110,6 +110,10 @@ def get_current_user(
 
     cached = _AUTH_CACHE.get(token_key)
     if cached and cached[0] > now:
+        print(
+            "[SUPA perf] auth cache hit",
+            flush=True,
+        )
         return CurrentUser(
             id=cached[1],
             access_token=token,
@@ -130,8 +134,18 @@ def get_current_user(
             )
 
         try:
+            auth_started_at = time.perf_counter()
             auth_response = get_supabase_client().auth.get_user(
                 token
+            )
+            auth_elapsed_ms = (
+                time.perf_counter() - auth_started_at
+            ) * 1000
+
+            print(
+                f"[SUPA perf] auth remote: "
+                f"{auth_elapsed_ms:.0f} ms",
+                flush=True,
             )
         except Exception as exc:
             _AUTH_CACHE.pop(token_key, None)
@@ -222,8 +236,27 @@ def get_authenticated_supabase(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Client:
     url, key = _supabase_settings()
+
+    create_started_at = time.perf_counter()
     client = create_client(url, key)
+    create_elapsed_ms = (
+        time.perf_counter() - create_started_at
+    ) * 1000
+
+    auth_started_at = time.perf_counter()
     client.postgrest.auth(current_user.access_token)
+    postgrest_auth_elapsed_ms = (
+        time.perf_counter() - auth_started_at
+    ) * 1000
+
+    print(
+        f"[SUPA perf] client create: "
+        f"{create_elapsed_ms:.0f} ms "
+        f"postgrest-auth: "
+        f"{postgrest_auth_elapsed_ms:.0f} ms",
+        flush=True,
+    )
+
     return client
 
 
