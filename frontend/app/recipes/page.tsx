@@ -51,6 +51,10 @@ interface IngredientDraft {
   protein: string;
   carbs: string;
   fat: string;
+
+  // RECIPE INLINE INGREDIENT PORTION V1
+  // Optional weight of one normal serving.
+  portionGrams: string;
 }
 
 const EMPTY_INGREDIENT: IngredientDraft = {
@@ -59,6 +63,7 @@ const EMPTY_INGREDIENT: IngredientDraft = {
   protein: "",
   carbs: "",
   fat: "",
+  portionGrams: "",
 };
 
 
@@ -876,6 +881,24 @@ export default function RecipesPage() {
     const ingredientName =
       ingredientDraft.name.trim();
 
+    const portionGrams =
+      ingredientDraft.portionGrams.trim()
+        ? Number(ingredientDraft.portionGrams)
+        : null;
+
+    if (
+      portionGrams !== null &&
+      (
+        !Number.isFinite(portionGrams) ||
+        portionGrams <= 0
+      )
+    ) {
+      setMessage(
+        "La porzione deve essere espressa in grammi ed essere maggiore di zero.",
+      );
+      return;
+    }
+
     if (!ingredientName) {
       setMessage(
         "Inserisci il nome dell'ingrediente.",
@@ -903,7 +926,19 @@ export default function RecipesPage() {
             Number(
               ingredientDraft.fat,
             ) || 0,
-          default_unit: "g",
+
+          default_unit:
+            portionGrams !== null
+              ? "porzione"
+              : "g",
+
+          default_quantity:
+            portionGrams !== null
+              ? 1
+              : null,
+
+          grams_per_unit:
+            portionGrams,
         },
         accessToken,
       );
@@ -917,7 +952,18 @@ export default function RecipesPage() {
         ...current,
         {
           ingredientId: result.item.id,
-          quantityG: 100,
+
+          quantityG:
+            result.item.default_unit !== "g" &&
+            Number(result.item.grams_per_unit) > 0
+              ? Number(result.item.grams_per_unit) *
+                Math.max(
+                  1,
+                  Number(
+                    result.item.default_quantity,
+                  ) || 1,
+                )
+              : 100,
         },
       ]);
 
@@ -1794,6 +1840,31 @@ export default function RecipesPage() {
                   );
                 }}
               />
+            </label>
+
+            <label className={styles.field}>
+              Porzione predefinita (g)
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={
+                  ingredientDraft.portionGrams
+                }
+                placeholder="Es. 70"
+                onChange={(event) => {
+                  setIngredientDraft(
+                    (current) => ({
+                      ...current,
+                      portionGrams:
+                        event.target.value,
+                    }),
+                  );
+                }}
+              />
+              <small>
+                Opzionale. Esempio: 1 porzione di riso = 70 g.
+              </small>
             </label>
 
             <div className={styles.macroInputs}>
