@@ -8446,3 +8446,485 @@
     font-size: 1.2rem;
   }
 }
+
+
+/* ==========================================================
+   HOME — Daily summary V1
+   Foundation for the new post-hero layout
+   ========================================================== */
+
+.dailySummarySubtitle {
+  margin: 4px 0 0;
+  color: var(--ss-text-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.dailyAddMenu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.dailyAddMenu > summary {
+  list-style: none;
+}
+
+.dailyAddMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dailyAddChevron {
+  margin-left: 2px;
+  font-size: 0.72rem !important;
+}
+
+.dailyAddMenuPanel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+
+  min-width: 190px;
+  padding: 7px;
+
+  display: grid;
+  gap: 3px;
+
+  border: 1px solid var(--ss-border);
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 14px 35px rgba(16, 40, 70, 0.14);
+}
+
+.dailyAddMenuPanel button,
+.dailyAddMenuPanel a {
+  width: 100%;
+  min-height: 40px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 8px 11px;
+
+  border: 0;
+  border-radius: 9px;
+
+  background: transparent;
+  color: var(--ss-navy-950);
+
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-align: left;
+  text-decoration: none;
+
+  cursor: pointer;
+}
+
+.dailyAddMenuPanel button:hover,
+.dailyAddMenuPanel a:hover {
+  background: var(--ss-surface-soft);
+}
+
+.mealsSection .mealList {
+  grid-template-columns: 1fr !important;
+  gap: 8px;
+}
+
+.dailyActivityEntry {
+  margin: 14px 0 8px;
+
+  border: 1px solid var(--ss-border);
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  overflow: hidden;
+}
+
+.dailyActivityEntry > summary {
+  min-height: 58px;
+
+  display: grid;
+  grid-template-columns:
+    42px
+    minmax(0, 1fr)
+    auto
+    20px;
+  gap: 10px;
+  align-items: center;
+
+  padding: 9px 13px;
+
+  list-style: none;
+
+  cursor: pointer;
+}
+
+.dailyActivityEntry > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dailyEntryIcon {
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: #eaf4ff;
+
+  font-size: 1.22rem;
+}
+
+.dailyEntryMain {
+  min-width: 0;
+
+  display: grid;
+  gap: 2px;
+}
+
+.dailyEntryMain strong {
+  overflow: hidden;
+  color: var(--ss-navy-950);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dailyEntryMain span {
+  overflow: hidden;
+  color: var(--ss-text-soft);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dailyActivityCalories {
+  color: var(--ss-navy-950);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.dailyEntryChevron {
+  color: var(--ss-navy-950);
+  font-size: 0.75rem;
+
+  transition: transform 150ms ease;
+}
+
+.dailyActivityEntry[open] .dailyEntryChevron {
+  transform: rotate(180deg);
+}
+
+.dailyActivityDetails {
+  display: grid;
+  gap: 1px;
+
+  padding: 0 13px 10px 65px;
+}
+
+.dailyActivityDetailRow {
+  min-height: 42px;
+
+  display: grid;
+  grid-template-columns:
+    24px
+    minmax(0, 1fr)
+    auto;
+  gap: 9px;
+  align-items: center;
+
+  padding: 7px 0;
+
+  border-top: 1px solid var(--ss-border);
+}
+
+.dailyActivityDetailRow > div {
+  min-width: 0;
+
+  display: grid;
+  gap: 2px;
+}
+
+.dailyActivityDetailRow strong {
+  color: var(--ss-navy-950);
+  font-size: 0.74rem;
+}
+
+.dailyActivityDetailRow span {
+  color: var(--ss-text-soft);
+  font-size: 0.67rem;
+}
+
+@media (max-width: 600px) {
+  .dailyAddMenuPanel {
+    right: 0;
+    min-width: 180px;
+  }
+
+  .dailyActivityEntry > summary {
+    grid-template-columns:
+      38px
+      minmax(0, 1fr)
+      auto
+      16px;
+
+    padding-inline: 10px;
+  }
+
+  .dailyActivityDetails {
+    padding-left: 58px;
+  }
+}
+
+
+/* ==========================================================
+   HOME — Daily summary V2
+   Compact expandable meal rows
+   ========================================================== */
+
+.mealsSection .dailyMealEntry {
+  display: block;
+
+  min-height: 0;
+  height: auto;
+
+  padding: 0;
+
+  border: 1px solid var(--ss-border);
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  overflow: hidden;
+}
+
+.mealsSection .dailyMealEntry[open] {
+  box-shadow:
+    0 8px 24px rgba(16, 40, 70, 0.06);
+}
+
+/*
+  Il vecchio header della meal card rimane disponibile
+  nel dettaglio, ma non serve nel formato compatto:
+  le stesse informazioni sono già nel summary.
+*/
+.mealsSection .dailyMealEntry > .mealCardTop {
+  display: none;
+}
+
+.dailyMealSummary {
+  min-height: 58px;
+
+  display: grid;
+  grid-template-columns:
+    42px
+    minmax(0, 1fr)
+    auto
+    20px;
+
+  gap: 10px;
+  align-items: center;
+
+  padding: 9px 13px;
+
+  list-style: none;
+
+  cursor: pointer;
+}
+
+.dailyMealSummary::-webkit-details-marker {
+  display: none;
+}
+
+.dailyMealSummary:hover {
+  background: #fbfbf8;
+}
+
+.dailyMealCalories {
+  color: var(--ss-navy-950);
+
+  font-size: 0.8rem;
+  font-weight: 800;
+
+  white-space: nowrap;
+}
+
+.dailyMealEntry[open]
+  .dailyEntryChevron {
+  transform: rotate(180deg);
+}
+
+/* ----------------------------------------------------------
+   Contenuto espanso
+   ---------------------------------------------------------- */
+
+.mealsSection .dailyMealEntry[open] {
+  padding-bottom: 11px;
+}
+
+.mealsSection
+  .dailyMealEntry
+  > .registeredMealList,
+.mealsSection
+  .dailyMealEntry
+  > .registeredMealNutrition,
+.mealsSection
+  .dailyMealEntry
+  > .registeredMealInsights,
+.mealsSection
+  .dailyMealEntry
+  > .registeredMealEditor,
+.mealsSection
+  .dailyMealEntry
+  > .mealName,
+.mealsSection
+  .dailyMealEntry
+  > .mealMeta,
+.mealsSection
+  .dailyMealEntry
+  > .mealActions,
+.mealsSection
+  .dailyMealEntry
+  > .replanningPreview,
+.mealsSection
+  .dailyMealEntry
+  > .replanningCompact {
+  margin-left: 64px;
+  margin-right: 13px;
+}
+
+/* Macro nello stile del mockup */
+.mealsSection
+  .dailyMealEntry
+  > .registeredMealNutrition {
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 8px;
+
+  margin-top: 10px;
+  padding: 11px 12px;
+
+  border: 1px solid var(--ss-border);
+  border-radius: 11px;
+
+  background: var(--ss-surface-soft);
+}
+
+.mealsSection
+  .dailyMealEntry
+  .nutritionItem {
+  min-width: 0;
+
+  display: grid;
+  gap: 3px;
+}
+
+.mealsSection
+  .dailyMealEntry
+  .nutritionItem strong {
+  color: var(--ss-navy-950);
+
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mealsSection
+  .dailyMealEntry
+  .nutritionItem span {
+  color: var(--ss-text-soft);
+
+  font-size: 0.62rem;
+}
+
+/*
+  Righe pasti registrati più leggere:
+  diventano contenuto secondario dell'espanso.
+*/
+.mealsSection
+  .dailyMealEntry
+  .registeredMealRow {
+  padding: 9px 0;
+}
+
+.mealsSection
+  .dailyMealEntry
+  .registeredMealRow:first-child {
+  border-top: 1px solid var(--ss-border);
+}
+
+/* ----------------------------------------------------------
+   Coerenza con la riga attività
+   ---------------------------------------------------------- */
+
+.dailyActivityEntry,
+.mealsSection .dailyMealEntry {
+  width: 100%;
+}
+
+.dailyActivityEntry > summary,
+.dailyMealSummary {
+  min-height: 58px;
+}
+
+/* ----------------------------------------------------------
+   Mobile
+   ---------------------------------------------------------- */
+
+@media (max-width: 600px) {
+  .dailyMealSummary {
+    grid-template-columns:
+      38px
+      minmax(0, 1fr)
+      auto
+      16px;
+
+    padding-inline: 10px;
+  }
+
+  .mealsSection
+    .dailyMealEntry
+    > .registeredMealList,
+  .mealsSection
+    .dailyMealEntry
+    > .registeredMealNutrition,
+  .mealsSection
+    .dailyMealEntry
+    > .registeredMealInsights,
+  .mealsSection
+    .dailyMealEntry
+    > .registeredMealEditor,
+  .mealsSection
+    .dailyMealEntry
+    > .mealName,
+  .mealsSection
+    .dailyMealEntry
+    > .mealMeta,
+  .mealsSection
+    .dailyMealEntry
+    > .mealActions,
+  .mealsSection
+    .dailyMealEntry
+    > .replanningPreview,
+  .mealsSection
+    .dailyMealEntry
+    > .replanningCompact {
+    margin-left: 58px;
+    margin-right: 10px;
+  }
+
+  .mealsSection
+    .dailyMealEntry
+    > .registeredMealNutrition {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}

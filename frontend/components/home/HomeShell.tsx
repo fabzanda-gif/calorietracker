@@ -3408,86 +3408,145 @@ export function HomeShell() {
           >
             {dashboardWidgetControls(
               "meals",
-              "I tuoi pasti",
+              "Resoconto giornaliero",
             )}
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
-                  Routine prevista
+                  Oggi
                 </p>
-                <h2>I tuoi pasti</h2>
+                <h2>Resoconto giornaliero</h2>
+                <p className={styles.dailySummarySubtitle}>
+                  Pasti e attività, tutto in un unico elenco.
+                </p>
               </div>
 
-              <button
-                type="button"
-                className={styles.addMealFab}
-                aria-expanded={
-                  alternateSlot ===
-                  Object.keys(day.meals).find(
-                    (slot) =>
-                      mealLabel(slot) === selectedMealSlot,
-                  )
-                }
-                aria-label={
-                  alternateSlot ===
-                  Object.keys(day.meals).find(
-                    (slot) =>
-                      mealLabel(slot) === selectedMealSlot,
-                  )
-                    ? `Chiudi aggiunta ${selectedMealSlot}`
-                    : `Aggiungi pasto ${selectedMealSlot}`
-                }
-                title={
-                  alternateSlot ===
-                  Object.keys(day.meals).find(
-                    (slot) =>
-                      mealLabel(slot) === selectedMealSlot,
-                  )
-                    ? "Chiudi"
-                    : "Aggiungi pasto"
-                }
-                onClick={() => {
-                  const selectedSlot = Object.keys(day.meals).find(
-                    (slot) =>
-                      mealLabel(slot) === selectedMealSlot,
-                  );
+              <details className={styles.dailyAddMenu}>
+                <summary className={styles.addMealFab}>
+                  <span aria-hidden="true">+</span>
+                  <span>Aggiungi</span>
+                  <span
+                    className={styles.dailyAddChevron}
+                    aria-hidden="true"
+                  >
+                    ▾
+                  </span>
+                </summary>
 
-                  if (selectedSlot) {
-                    if (
-                      alternateSlot === selectedSlot
-                    ) {
-                      closeAlternateMeal();
-                    } else {
-                      openAlternateMeal(
-                        selectedSlot,
-                      );
-                    }
-                  }
-                }}
-              >
-                <span aria-hidden="true">
-                  {alternateSlot ===
-                  Object.keys(day.meals).find(
-                    (slot) =>
-                      mealLabel(slot) === selectedMealSlot,
-                  )
-                    ? "−"
-                    : "+"}
-                </span>
+                <div className={styles.dailyAddMenuPanel}>
+                  {Object.keys(day.meals)
+                    .sort(
+                      (slotA, slotB) =>
+                        ["Colazione", "Pranzo", "Snack", "Cena"].indexOf(
+                          mealLabel(slotA),
+                        ) -
+                        ["Colazione", "Pranzo", "Snack", "Cena"].indexOf(
+                          mealLabel(slotB),
+                        ),
+                    )
+                    .map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={(event) => {
+                          openAlternateMeal(slot);
 
-                <span>
-                  {alternateSlot ===
-                  Object.keys(day.meals).find(
-                    (slot) =>
-                      mealLabel(slot) === selectedMealSlot,
-                  )
-                    ? "Chiudi"
-                    : "Aggiungi pasto"}
-                </span>
-              </button>
+                          const details =
+                            event.currentTarget.closest("details");
+
+                          if (details) {
+                            details.open = false;
+                          }
+                        }}
+                      >
+                        <span aria-hidden="true">
+                          {mealIcon(slot)}
+                        </span>
+                        {mealLabel(slot)}
+                      </button>
+                    ))}
+
+                  <a href="/activities">
+                    <span aria-hidden="true">🏃</span>
+                    Attività
+                  </a>
+                </div>
+              </details>
             </div>
 
-            <div className={styles.mealTabs}>
+            {actualActivities.length > 0 ? (
+              <details className={styles.dailyActivityEntry}>
+                <summary>
+                  <span
+                    className={styles.dailyEntryIcon}
+                    aria-hidden="true"
+                  >
+                    🏃
+                  </span>
+
+                  <span className={styles.dailyEntryMain}>
+                    <strong>Attività di oggi</strong>
+                    <span>
+                      {actualActivities.length === 1
+                        ? actualActivities[0].activity_name
+                        : `${actualActivities.length} attività registrate`}
+                    </span>
+                  </span>
+
+                  <strong className={styles.dailyActivityCalories}>
+                    −{roundNumber(burnedCalories)} kcal
+                  </strong>
+
+                  <span
+                    className={styles.dailyEntryChevron}
+                    aria-hidden="true"
+                  >
+                    ▾
+                  </span>
+                </summary>
+
+                <div className={styles.dailyActivityDetails}>
+                  {actualActivities.map((activity) => (
+                    <div
+                      key={String(
+                        activity.id ??
+                          `${activity.activity_name}-${activity.date}`,
+                      )}
+                      className={styles.dailyActivityDetailRow}
+                    >
+                      <span aria-hidden="true">🏃</span>
+
+                      <div>
+                        <strong>{activity.activity_name}</strong>
+
+                        <span>
+                          {activity.duration_seconds
+                            ? `${Math.round(
+                                activity.duration_seconds / 60,
+                              )} min`
+                            : "Attività registrata"}
+                          {activity.distance_meters
+                            ? ` · ${(
+                                activity.distance_meters / 1000
+                              ).toLocaleString("it-IT", {
+                                maximumFractionDigits: 2,
+                              })} km`
+                            : ""}
+                        </span>
+                      </div>
+
+                      <strong>
+                        −{roundNumber(
+                          Number(activity.burned_calories || 0),
+                        )} kcal
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
+            <div className={styles.mealList}>
               {Object.entries(day.meals)
                 .sort(
                   ([slotA], [slotB]) =>
@@ -3498,41 +3557,11 @@ export function HomeShell() {
                       mealLabel(slotB),
                     ),
                 )
-                .map(([slot]) => (
-                  <button
-                    key={slot}
-                    type="button"
-                    className={
-                      selectedMealSlot === mealLabel(slot)
-                        ? styles.mealTabActive
-                        : styles.mealTab
-                    }
-                    onClick={() => {
-                      closeAlternateMeal();
-                      setSelectedMealSlot(
-                        mealLabel(slot),
-                      );
-                    }}
-                    aria-pressed={
-                      selectedMealSlot === mealLabel(slot)
-                    }
-                  >
-                    {mealLabel(slot)}
-                  </button>
-                ))}
-            </div>
-
-            <div className={styles.mealList}>
-              {Object.entries(day.meals)
-                .filter(
-                  ([slot]) =>
-                    mealLabel(slot) === selectedMealSlot,
-                )
                 .map(
                 ([slot, meal]) => (
-                  <article
+                  <details
                     key={slot}
-                    className={`${styles.mealCard} ${
+                    className={`${styles.mealCard} ${styles.dailyMealEntry} ${
                       actualMealForSlot(slot)
                         ? actualMealsForSlot(slot).length <= 1
                           ? styles.mealCardOneItem
@@ -3542,6 +3571,79 @@ export function HomeShell() {
                         : ""
                     }`}
                   >
+                    <summary
+                      className={styles.dailyMealSummary}
+                    >
+                      <span
+                        className={styles.dailyEntryIcon}
+                        aria-hidden="true"
+                      >
+                        {mealIcon(slot)}
+                      </span>
+
+                      <span
+                        className={styles.dailyEntryMain}
+                      >
+                        <strong>
+                          {mealLabel(slot)}
+                        </strong>
+
+                        <span>
+                          {actualMealForSlot(slot)
+                            ? actualMealsForSlot(slot)
+                                .map((registeredMeal) =>
+                                  registeredMeal.name.replace(
+                                    /\\s*\\([^)]*porz\\.\\)\\s*$/i,
+                                    "",
+                                  ),
+                                )
+                                .join(" · ")
+                            : meal.value ??
+                              "Da decidere"}
+                        </span>
+                      </span>
+
+                      <strong
+                        className={
+                          styles.dailyMealCalories
+                        }
+                      >
+                        {actualMealForSlot(slot)
+                          ? `${roundNumber(
+                              actualMealsForSlot(
+                                slot,
+                              ).reduce(
+                                (
+                                  total,
+                                  registeredMeal,
+                                ) =>
+                                  total +
+                                  Number(
+                                    registeredMeal.calories ||
+                                      0,
+                                  ),
+                                0,
+                              ),
+                            )} kcal`
+                          : meal.estimated_calories != null
+                            ? `~${roundNumber(
+                                Number(
+                                  meal.estimated_calories,
+                                ),
+                              )} kcal`
+                            : "—"}
+                      </strong>
+
+                      <span
+                        className={
+                          styles.dailyEntryChevron
+                        }
+                        aria-hidden="true"
+                      >
+                        ▾
+                      </span>
+                    </summary>
+
                     <div
                       className={
                         styles.mealCardTop
@@ -4560,7 +4662,7 @@ export function HomeShell() {
                             </div>
                           </div>
                         ) : null}
-                  </article>
+                  </details>
                 ),
               )}
 
