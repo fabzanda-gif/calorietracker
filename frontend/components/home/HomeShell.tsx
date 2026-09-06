@@ -3431,8 +3431,26 @@ export function HomeShell() {
                   <button
                     type="button"
                     className={styles.addMealFab}
-                    aria-label={`Aggiungi ${selectedMealSlot}`}
-                    title={`Aggiungi ${selectedMealSlot}`}
+                    aria-label={
+                      alternateSlot ===
+                      Object.keys(day.meals).find(
+                        (slot) =>
+                          mealLabel(slot) ===
+                          selectedMealSlot,
+                      )
+                        ? `Chiudi aggiunta ${selectedMealSlot}`
+                        : `Aggiungi ${selectedMealSlot}`
+                    }
+                    title={
+                      alternateSlot ===
+                      Object.keys(day.meals).find(
+                        (slot) =>
+                          mealLabel(slot) ===
+                          selectedMealSlot,
+                      )
+                        ? "Chiudi"
+                        : `Aggiungi ${selectedMealSlot}`
+                    }
                     onClick={() => {
                       const selectedSlot = Object.keys(
                         day.meals,
@@ -3455,7 +3473,14 @@ export function HomeShell() {
                       }
                     }}
                   >
-                    +
+                    {alternateSlot ===
+                    Object.keys(day.meals).find(
+                      (slot) =>
+                        mealLabel(slot) ===
+                        selectedMealSlot,
+                    )
+                      ? "−"
+                      : "+"}
                   </button>
                 ) : null}
 
@@ -3470,8 +3495,8 @@ export function HomeShell() {
                   aria-expanded={mealsExpanded}
                   title={
                     mealsExpanded
-                      ? "Chiudi"
-                      : "Apri"
+                      ? "Compatta sezione"
+                      : "Espandi sezione"
                   }
                   onClick={() => {
                     setMealsExpanded(
@@ -3483,7 +3508,7 @@ export function HomeShell() {
                     }
                   }}
                 >
-                  {mealsExpanded ? "−" : "+"}
+                  {mealsExpanded ? "⌃" : "⌄"}
                 </button>
               </div>
             </div>
