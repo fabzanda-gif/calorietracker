@@ -3058,11 +3058,7 @@ export function HomeShell() {
                     className={styles.conversationAiLogo}
                   />
                 </span>
-                <h2>
-                  {conversationMode === "text"
-                    ? "Raccontami cosa hai mangiato"
-                    : "Fammi vedere cosa hai mangiato"}
-                </h2>
+                <h2>SanoSync AI</h2>
                 <p>
                   {conversationMode === "text"
                     ? "Scrivilo come lo diresti normalmente. "
