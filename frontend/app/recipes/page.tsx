@@ -43,6 +43,10 @@ import styles from "./RecipesPage.module.css";
 interface DraftIngredient {
   ingredientId: string;
   quantityG: number;
+
+  // RECIPE INGREDIENT UNIT SWITCH V1
+  // quantityG remains canonical; this only controls the editor UI.
+  inputUnit?: "g" | "portion";
 }
 
 interface IngredientDraft {
@@ -66,6 +70,36 @@ const EMPTY_INGREDIENT: IngredientDraft = {
   portionGrams: "",
 };
 
+
+function ingredientPortionGrams(
+  ingredient: Ingredient | undefined,
+): number | null {
+  const grams = Number(
+    ingredient?.grams_per_unit,
+  );
+
+  return Number.isFinite(grams) &&
+    grams > 0
+    ? grams
+    : null;
+}
+
+function ingredientDisplayQuantity(
+  row: DraftIngredient,
+  ingredient: Ingredient | undefined,
+): number {
+  const portionGrams =
+    ingredientPortionGrams(ingredient);
+
+  if (
+    row.inputUnit === "portion" &&
+    portionGrams
+  ) {
+    return row.quantityG / portionGrams;
+  }
+
+  return row.quantityG;
+}
 
 function todayLocalIso(): string {
   const now = new Date();
@@ -303,11 +337,19 @@ export default function RecipesPage() {
       return;
     }
 
+    const portionGrams =
+      ingredientPortionGrams(first);
+
     setDraftIngredients((current) => [
       ...current,
       {
         ingredientId: first.id,
-        quantityG: 100,
+        quantityG:
+          portionGrams ?? 100,
+        inputUnit:
+          portionGrams
+            ? "portion"
+            : "g",
       },
     ]);
   }
@@ -964,6 +1006,11 @@ export default function RecipesPage() {
                   ) || 1,
                 )
               : 100,
+
+          inputUnit:
+            Number(result.item.grams_per_unit) > 0
+              ? "portion"
+              : "g",
         },
       ]);
 
@@ -1756,11 +1803,31 @@ export default function RecipesPage() {
               <select
                 value={row.ingredientId}
                 onChange={(event) => {
+                  const nextIngredient =
+                    ingredients.find(
+                      (ingredient) =>
+                        ingredient.id ===
+                        event.target.value,
+                    );
+
+                  const portionGrams =
+                    ingredientPortionGrams(
+                      nextIngredient,
+                    );
+
                   updateDraftIngredient(
                     index,
                     {
                       ingredientId:
                         event.target.value,
+
+                      quantityG:
+                        portionGrams ?? 100,
+
+                      inputUnit:
+                        portionGrams
+                          ? "portion"
+                          : "g",
                     },
                   );
                 }}
@@ -1777,29 +1844,106 @@ export default function RecipesPage() {
                 )}
               </select>
 
-              <div
-                className={
-                  styles.quantityField
-                }
-              >
-                <input
-                  type="number"
-                  min="1"
-                  value={row.quantityG}
-                  onChange={(event) => {
-                    updateDraftIngredient(
-                      index,
-                      {
-                        quantityG:
+              {(() => {
+                const ingredient =
+                  ingredients.find(
+                    (item) =>
+                      item.id ===
+                      row.ingredientId,
+                  );
+
+                const portionGrams =
+                  ingredientPortionGrams(
+                    ingredient,
+                  );
+
+                const usingPortion =
+                  row.inputUnit ===
+                    "portion" &&
+                  portionGrams !== null;
+
+                return (
+                  <div
+                    className={
+                      styles.quantityField
+                    }
+                  >
+                    <input
+                      type="number"
+                      min={
+                        usingPortion
+                          ? "0.1"
+                          : "1"
+                      }
+                      step={
+                        usingPortion
+                          ? "0.5"
+                          : "1"
+                      }
+                      value={
+                        ingredientDisplayQuantity(
+                          row,
+                          ingredient,
+                        )
+                      }
+                      onChange={(event) => {
+                        const next =
                           Number(
                             event.target.value,
-                          ) || 0,
-                      },
-                    );
-                  }}
-                />
-                <span>g</span>
-              </div>
+                          ) || 0;
+
+                        updateDraftIngredient(
+                          index,
+                          {
+                            quantityG:
+                              usingPortion &&
+                              portionGrams
+                                ? next *
+                                  portionGrams
+                                : next,
+                          },
+                        );
+                      }}
+                    />
+
+                    {portionGrams ? (
+                      <select
+                        className={
+                          styles.quantityUnitSelect
+                        }
+                        value={
+                          usingPortion
+                            ? "portion"
+                            : "g"
+                        }
+                        onChange={(event) => {
+                          updateDraftIngredient(
+                            index,
+                            {
+                              inputUnit:
+                                event.target
+                                  .value ===
+                                "portion"
+                                  ? "portion"
+                                  : "g",
+                            },
+                          );
+                        }}
+                        aria-label="Unità quantità"
+                      >
+                        <option value="g">
+                          g
+                        </option>
+                        <option value="portion">
+                          porzioni
+                        </option>
+                      </select>
+                    ) : (
+                      <span>g</span>
+                    )}
+                  </div>
+                );
+              })()}
 
               <button
                 type="button"

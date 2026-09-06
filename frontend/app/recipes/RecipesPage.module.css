@@ -1437,3 +1437,52 @@
 
 
 /* ZERO RECIPES PALETTE V2 END */
+
+
+/* RECIPE INGREDIENT UNIT SWITCH V1 */
+
+.quantityField:has(.quantityUnitSelect) {
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(82px, auto);
+}
+
+.quantityUnitSelect {
+  width: auto;
+  min-width: 82px;
+  min-height: 42px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid #d7d7d0;
+
+  border-radius: 11px;
+
+  padding:
+    8px 9px;
+
+  background: #fff;
+  color: inherit;
+
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .quantityField:has(.quantityUnitSelect) {
+    grid-template-columns:
+      minmax(0, 1fr)
+      78px;
+  }
+
+  .quantityUnitSelect {
+    min-width: 78px;
+
+    padding-left: 6px;
+    padding-right: 6px;
+
+    font-size: 0.7rem;
+  }
+}
