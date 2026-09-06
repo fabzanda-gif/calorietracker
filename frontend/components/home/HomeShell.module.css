@@ -9984,3 +9984,282 @@
     min-height: 0 !important;
   }
 }
+
+
+/* ==========================================================
+   HOME AI CARD — MOCKUP POLISH V1
+   Visual refinement only. Existing AI functionality unchanged.
+   ========================================================== */
+
+.homeAssistantSection {
+  position: relative !important;
+  padding: 20px 22px 18px !important;
+  overflow: hidden !important;
+}
+
+/* Header */
+
+.homeAssistantSection .conversationHeader {
+  padding-left: 42px !important;
+  margin-bottom: 4px !important;
+}
+
+.homeAssistantSection .conversationHeader::before {
+  top: -1px !important;
+  font-size: 2.05rem !important;
+}
+
+.homeAssistantSection .conversationHeader h2 {
+  margin: 0 !important;
+
+  color:
+    var(--ss-coral-500, #ff6868) !important;
+
+  font-size:
+    clamp(1.35rem, 1.7vw, 1.65rem) !important;
+
+  line-height: 1.02 !important;
+  letter-spacing: -0.045em !important;
+  font-weight: 900 !important;
+}
+
+.homeAssistantSection .conversationHeader p {
+  max-width: 39rem !important;
+
+  margin: 8px 0 0 !important;
+
+  color:
+    var(--ss-text-soft, #607087) !important;
+
+  font-size: 0.78rem !important;
+  line-height: 1.45 !important;
+}
+
+/* Testo / Foto */
+
+.homeAssistantSection .conversationModeSwitch {
+  width: min(100%, 300px) !important;
+  max-width: 300px !important;
+
+  display: grid !important;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr)) !important;
+
+  gap: 3px !important;
+
+  margin: 7px 0 5px !important;
+  padding: 3px !important;
+
+  border: 1px solid #e7e6e2 !important;
+  border-radius: 12px !important;
+
+  background: #f2f1ee !important;
+}
+
+.homeAssistantSection
+  .conversationModeSwitch button {
+  min-height: 34px !important;
+
+  padding: 6px 12px !important;
+
+  border: 0 !important;
+  border-radius: 9px !important;
+
+  background: transparent !important;
+  color: #979790 !important;
+
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+
+  box-shadow: none !important;
+}
+
+.homeAssistantSection
+  .conversationModeSwitch
+  .conversationModeActive {
+  background: #ffffff !important;
+
+  color:
+    var(--ss-navy-950, #0c2c4a) !important;
+
+  box-shadow:
+    0 2px 7px rgba(13, 38, 65, 0.08) !important;
+}
+
+/*
+  Il tipo pasto resta nel DOM perché il backend AI corrente
+  è ancora meal-only, ma non deve occupare spazio nella UI
+  principale.
+*/
+.homeAssistantSection
+  .conversationControls
+  > select {
+  display: none !important;
+}
+
+/* Input */
+
+.homeAssistantSection .conversationControls {
+  width: 100% !important;
+
+  display: grid !important;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    50px !important;
+
+  gap: 10px !important;
+  align-items: center !important;
+
+  margin-top: 7px !important;
+}
+
+.homeAssistantSection
+  .conversationControls textarea {
+  width: 100% !important;
+
+  min-width: 0 !important;
+  min-height: 74px !important;
+  height: 74px !important;
+
+  resize: none !important;
+
+  padding: 14px 15px !important;
+
+  border:
+    1px solid #deddd8 !important;
+
+  border-radius: 13px !important;
+
+  background: #ffffff !important;
+
+  color:
+    var(--ss-navy-950, #0c2c4a) !important;
+
+  font-size: 0.8rem !important;
+  line-height: 1.45 !important;
+
+  outline: none !important;
+
+  box-shadow:
+    inset 0 1px 2px rgba(13, 38, 65, 0.025) !important;
+}
+
+.homeAssistantSection
+  .conversationControls textarea::placeholder {
+  color: #aaa9a4 !important;
+  opacity: 1 !important;
+}
+
+.homeAssistantSection
+  .conversationControls textarea:focus {
+  border-color:
+    rgba(255, 104, 104, 0.62) !important;
+
+  box-shadow:
+    0 0 0 3px rgba(255, 104, 104, 0.10) !important;
+}
+
+/* CTA */
+
+.homeAssistantSection
+  .conversationControls
+  > button {
+  width: 50px !important;
+  height: 50px !important;
+
+  min-width: 50px !important;
+  min-height: 50px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  border-radius: 50% !important;
+
+  background:
+    var(--ss-coral-500, #ff6868) !important;
+
+  color: #ffffff !important;
+
+  box-shadow:
+    0 8px 20px rgba(255, 104, 104, 0.22) !important;
+}
+
+.homeAssistantSection
+  .conversationControls
+  > button:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+
+  box-shadow:
+    0 10px 24px rgba(255, 104, 104, 0.28) !important;
+}
+
+.homeAssistantSection
+  .conversationControls
+  > button:disabled {
+  background: #f0f0ee !important;
+  color: #c4c4c0 !important;
+
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* Result / photo containers */
+
+.homeAssistantSection .conversationPhotoPicker,
+.homeAssistantSection .conversationPhotoPreview,
+.homeAssistantSection .conversationPreview,
+.homeAssistantSection .conversationError,
+.homeAssistantSection .conversationSuccess {
+  width: 100% !important;
+  max-width: none !important;
+
+  box-sizing: border-box !important;
+}
+
+/* Mantiene la simmetria approvata */
+
+@media (min-width: 760px) {
+  .desktopHomeGrid > .mealsSection,
+  .desktopHomeGrid > .homeAssistantSection {
+    min-height: 390px !important;
+  }
+}
+
+@media (max-width: 759px) {
+  .homeAssistantSection {
+    padding: 17px !important;
+  }
+
+  .homeAssistantSection .conversationHeader {
+    padding-left: 34px !important;
+  }
+
+  .homeAssistantSection .conversationHeader::before {
+    font-size: 1.65rem !important;
+  }
+
+  .homeAssistantSection .conversationModeSwitch {
+    max-width: none !important;
+  }
+
+  .homeAssistantSection .conversationControls {
+    grid-template-columns:
+      minmax(0, 1fr)
+      44px !important;
+  }
+
+  .homeAssistantSection
+    .conversationControls
+    > button {
+    width: 44px !important;
+    height: 44px !important;
+
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+}

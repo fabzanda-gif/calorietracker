@@ -3058,10 +3058,8 @@ export function HomeShell() {
                 <h2>SanoSync AI</h2>
                 <p>
                   {conversationMode === "text"
-                    ? "Scrivilo come lo diresti normalmente. "
-                    : "Scatta una foto o scegline una dalla galleria. "}
-                  Prima di registrare qualcosa ti mostro
-                  sempre una preview.
+                    ? "Racconta la tua giornata, penso io al resto."
+                    : "Scatta una foto o scegline una dalla galleria."}
                 </p>
               </div>
             </div>
@@ -3081,7 +3079,7 @@ export function HomeShell() {
                   setConversationSuccess(null);
                 }}
               >
-                Testo
+                Scrivi
               </button>
 
               <button
@@ -3135,7 +3133,7 @@ export function HomeShell() {
                         event.target.value,
                       )
                     }
-                    placeholder="Es. Ho mangiato una carbonara e una mela"
+                    placeholder="Es. Ho mangiato una piadina con pollo..."
                     rows={3}
                   />
 
