@@ -12138,3 +12138,406 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* HOME FIDELITY V4 */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================
+   RESOCONTO — compact dashboard table
+   ========================================================== */
+
+.mealsSection {
+  padding: 15px 17px !important;
+}
+
+.dailySummaryHeader {
+  grid-template-columns: 40px minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+}
+
+.dailySummaryHeaderIcon {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.dailySummaryHeaderCopy h2 {
+  font-size: 1.08rem !important;
+}
+
+.dailySummarySubtitle {
+  font-size: .66rem !important;
+}
+
+.addMealFab {
+  min-height: 39px !important;
+  padding: 8px 13px !important;
+  font-size: .72rem !important;
+}
+
+.dailyActivityEntry {
+  margin: 2px 0 6px !important;
+}
+
+.dailyActivityEntry > summary,
+.dailyMealSummary {
+  grid-template-columns:
+    31px
+    minmax(0, 1fr)
+    max-content
+    25px
+    13px !important;
+
+  min-height: 49px !important;
+  padding: 6px 9px !important;
+  column-gap: 8px !important;
+}
+
+.dailyEntryIcon {
+  width: 29px !important;
+  height: 29px !important;
+  font-size: .8rem !important;
+}
+
+.dailyEntryMain > strong {
+  margin-bottom: 1px !important;
+  font-size: .76rem !important;
+}
+
+.dailyEntryMain > span {
+  font-size: .61rem !important;
+}
+
+.dailyMealCalories,
+.dailyActivityCalories {
+  font-size: .68rem !important;
+}
+
+.dailyEntryDone {
+  width: 23px !important;
+  height: 23px !important;
+  min-width: 23px !important;
+  font-size: .7rem !important;
+}
+
+.dailyEntryChevron {
+  width: 13px !important;
+  min-width: 13px !important;
+  font-size: .58rem !important;
+}
+
+/* ==========================================================
+   AI — much closer to mockup density
+   ========================================================== */
+
+.conversationCard {
+  padding: 15px 17px !important;
+  gap: 9px !important;
+}
+
+.conversationHeader > div {
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  column-gap: 10px !important;
+}
+
+.conversationEyebrow,
+.conversationAiLogo {
+  width: 38px !important;
+  height: 38px !important;
+}
+
+.conversationHeader h2 {
+  font-size: 1.13rem !important;
+}
+
+.conversationHeader p {
+  font-size: .67rem !important;
+}
+
+.aiCapabilityPill {
+  padding: 5px 9px !important;
+  font-size: .59rem !important;
+}
+
+.aiHelperPanel {
+  min-height: 38px !important;
+  padding: 7px 10px !important;
+}
+
+.aiHelperPanel p {
+  font-size: .65rem !important;
+}
+
+.conversationModeSwitch {
+  width: 230px !important;
+  padding: 3px !important;
+}
+
+.conversationModeSwitch button {
+  min-height: 29px !important;
+  font-size: .64rem !important;
+}
+
+.conversationControls {
+  grid-template-columns: minmax(0, 1fr) 44px !important;
+  gap: 7px !important;
+}
+
+.conversationControls select {
+  display: none !important;
+}
+
+.conversationControls textarea {
+  grid-column: 1 !important;
+  min-height: 43px !important;
+  height: 43px !important;
+  padding: 10px 12px !important;
+  font-size: .68rem !important;
+  border-radius: 11px !important;
+}
+
+.conversationControls > button {
+  grid-column: 2 !important;
+
+  width: 43px !important;
+  min-width: 43px !important;
+  height: 43px !important;
+  min-height: 43px !important;
+
+  display: grid !important;
+  place-items: center;
+
+  padding: 0 !important;
+  border-radius: 50% !important;
+
+  font-size: 1.18rem !important;
+  line-height: 1 !important;
+}
+
+.aiSuggestionChips {
+  gap: 5px !important;
+}
+
+.aiSuggestionChips button {
+  min-height: 25px !important;
+  padding: 4px 9px !important;
+  font-size: .59rem !important;
+}
+
+/* Photo mode still uses full space */
+
+.conversationPhotoActions {
+  grid-column: 1 !important;
+}
+
+.conversationPhotoSelected,
+.conversationPhotoPreview {
+  grid-column: 1 / -1 !important;
+}
+
+/* ==========================================================
+   FOCUS — four distinct macro identities
+   ========================================================== */
+
+.dailyFocusCard {
+  padding: 14px 18px !important;
+}
+
+.dailyFocusRings {
+  margin-top: 9px !important;
+}
+
+.dailyFocusRing,
+.dailyFocusStat {
+  width: 68px !important;
+  height: 68px !important;
+}
+
+.dailyFocusItem[data-focus="Calorie"] .dailyFocusStat {
+  border-color: #ff6868 !important;
+}
+
+.dailyFocusItem[data-focus="Proteine"] .dailyFocusStat {
+  border-color: #63cf91 !important;
+}
+
+.dailyFocusItem[data-focus="Carboidrati"] .dailyFocusStat {
+  border-color: #69a9ff !important;
+}
+
+.dailyFocusItem[data-focus="Grassi"] .dailyFocusStat {
+  border-color: #f4bb42 !important;
+}
+
+.dailyFocusMetricIcon {
+  font-size: .78rem !important;
+}
+
+.dailyFocusRingInner strong,
+.dailyFocusStat strong {
+  font-size: .95rem !important;
+}
+
+.dailyFocusLabel {
+  font-size: .67rem !important;
+}
+
+.dailyFocusNumbers {
+  max-width: 100px;
+  font-size: .54rem !important;
+}
+
+/* ==========================================================
+   WEEK — 4 dashboard KPI cells
+   ========================================================== */
+
+.weekOverviewCard {
+  padding: 14px 18px !important;
+}
+
+.weekKpis {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+
+  margin: 9px 0 !important;
+
+  border: 1px solid #e7eaed;
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.weekKpi {
+  min-width: 0;
+  min-height: 54px !important;
+
+  display: grid !important;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+
+  padding: 7px 8px !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: #fff !important;
+}
+
+.weekKpi + .weekKpi {
+  border-left: 1px solid #e7eaed !important;
+}
+
+.weekKpiIcon {
+  width: 24px;
+  height: 24px;
+
+  display: grid !important;
+  place-items: center;
+
+  border-radius: 7px;
+
+  background: #fff0ef;
+  color: #ff6868;
+
+  font-size: .68rem !important;
+  font-weight: 900;
+}
+
+.weekKpi > div {
+  min-width: 0;
+}
+
+.weekKpi > div > span {
+  display: block;
+  margin: 0 !important;
+
+  color: #738398;
+  font-size: .51rem !important;
+  line-height: 1.05;
+}
+
+.weekKpi > div > strong {
+  display: block;
+  margin-top: 2px;
+
+  color: #102846;
+  font-size: .76rem !important;
+  line-height: 1;
+}
+
+.weekDays {
+  margin-top: 6px !important;
+}
+
+.weekDay {
+  padding: 3px 1px !important;
+}
+
+.weekDayDot {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.weekTodaySummary {
+  display: grid !important;
+  grid-template-columns: minmax(110px, 1fr) minmax(0, .9fr);
+  align-items: center;
+  gap: 12px !important;
+}
+
+.weekOverviewNote {
+  font-size: .55rem !important;
+}
+
+/* ==========================================================
+   Bottom cards should feel like one strip
+   ========================================================== */
+
+@media (min-width: 900px) {
+  .homeBottomOverview {
+    align-items: stretch !important;
+  }
+
+  .dailyFocusCard,
+  .weekOverviewCard {
+    min-height: 226px !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .weekKpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .weekKpi:nth-child(3) {
+    border-left: 0 !important;
+    border-top: 1px solid #e7eaed !important;
+  }
+
+  .weekKpi:nth-child(4) {
+    border-top: 1px solid #e7eaed !important;
+  }
+}
+
+@media (max-width: 759px) {
+  .conversationControls {
+    grid-template-columns: minmax(0, 1fr) 43px !important;
+  }
+
+  .weekTodaySummary {
+    grid-template-columns: 1fr !important;
+  }
+}
+

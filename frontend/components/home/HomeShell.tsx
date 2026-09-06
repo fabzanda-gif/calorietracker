@@ -3252,8 +3252,8 @@ export function HomeShell() {
             <div className={styles.aiHelperPanel}>
               <span aria-hidden="true">✦</span>
               <p>
-                Registra un pasto scrivendo come parleresti
-                normalmente oppure usando una foto.
+                Puoi registrare pasti con testo o foto,
+                anche tutto in una sola frase.
               </p>
             </div>
 
@@ -3342,9 +3342,14 @@ export function HomeShell() {
                       !conversationText.trim()
                     }
                   >
-                    {conversationLoading
-                      ? "Analizzo..."
-                      : "Analizza"}
+                    <span aria-hidden="true">
+                      {conversationLoading ? "…" : "→"}
+                    </span>
+                    <span className={styles.srOnly}>
+                      {conversationLoading
+                        ? "Analizzo"
+                        : "Analizza"}
+                    </span>
                   </button>
                 </>
               ) : (
@@ -5193,6 +5198,7 @@ export function HomeShell() {
                 {dailyFocusItems.map((item) => (
                   <div
                     key={item.label}
+                    data-focus={item.label}
                     className={
                       item.target > 0
                         ? styles.dailyFocusItem
@@ -5203,8 +5209,15 @@ export function HomeShell() {
                       <div
                         className={styles.dailyFocusRing}
                         style={{
-                          background:
-                            `conic-gradient(#ff6868 ${item.progress}%, #edf0f2 ${item.progress}% 100%)`,
+                          background: `conic-gradient(${
+                            item.label === "Calorie"
+                              ? "#ff6868"
+                              : item.label === "Proteine"
+                                ? "#63cf91"
+                                : item.label === "Carboidrati"
+                                  ? "#69a9ff"
+                                  : "#f4bb42"
+                          } ${item.progress}%, #edf0f2 ${item.progress}% 100%)`,
                         }}
                         role="img"
                         aria-label={`${item.label}: ${Math.round(item.progress)}%`}
@@ -5307,31 +5320,58 @@ export function HomeShell() {
 
               <div className={styles.weekKpis}>
                 <div className={styles.weekKpi}>
-                  <span>Pasti settimana</span>
-                  <strong>
-                    {weeklyMealCount}
-                  </strong>
+                  <span className={styles.weekKpiIcon} aria-hidden="true">
+                    ✓
+                  </span>
+                  <div>
+                    <span>Giorni registrati</span>
+                    <strong>
+                      {weeklyMealDays} / 7
+                    </strong>
+                  </div>
                 </div>
 
                 <div className={styles.weekKpi}>
-                  <span>Attività oggi</span>
-                  <strong>
-                    {actualActivities.length}
-                  </strong>
+                  <span className={styles.weekKpiIcon} aria-hidden="true">
+                    🍴
+                  </span>
+                  <div>
+                    <span>Pasti settimana</span>
+                    <strong>
+                      {weeklyMealCount}
+                    </strong>
+                  </div>
                 </div>
 
                 <div className={styles.weekKpi}>
-                  <span>Ultimo peso</span>
-                  <strong>
-                    {latestWeight != null
-                      ? `${latestWeight.toLocaleString(
-                          "it-IT",
-                          {
-                            maximumFractionDigits: 1,
-                          },
-                        )} kg`
-                      : "—"}
-                  </strong>
+                  <span className={styles.weekKpiIcon} aria-hidden="true">
+                    🏃
+                  </span>
+                  <div>
+                    <span>Attività oggi</span>
+                    <strong>
+                      {actualActivities.length}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className={styles.weekKpi}>
+                  <span className={styles.weekKpiIcon} aria-hidden="true">
+                    ⚖
+                  </span>
+                  <div>
+                    <span>Ultimo peso</span>
+                    <strong>
+                      {latestWeight != null
+                        ? `${latestWeight.toLocaleString(
+                            "it-IT",
+                            {
+                              maximumFractionDigits: 1,
+                            },
+                          )} kg`
+                        : "—"}
+                    </strong>
+                  </div>
                 </div>
               </div>
 
