@@ -2,7 +2,6 @@
 
 import { AppNav } from "@/components/navigation/AppNav";
 import { WelcomeJourney } from "@/components/onboarding/WelcomeJourney";
-import { QuickAdd } from "@/components/home/QuickAdd";
 import {
   DayPlanner,
   type DayType,
@@ -17,7 +16,6 @@ import {
   getDayHistory,
   type DayHistoryResponse,
 } from "@/lib/api/dayHistory";
-import { RegisteredToday } from "@/components/home/RegisteredToday";
 import {
   getActivitiesForDate,
   getPlannedActivities,
@@ -85,7 +83,6 @@ import {
 
 import {
   getLatestWeight,
-  getWeightHistory,
   type WeightEntry,
 } from "@/lib/api/weight";
 import {
@@ -1438,12 +1435,6 @@ export function HomeShell() {
               );
             }).catch(() => undefined);
           }
-
-          void getWeightHistory(accessToken)
-            .then((payload) => {
-              if (active) setWeightHistory(payload.items);
-            })
-            .catch(() => undefined);
 
           void getDayHistory(accessToken)
             .then((payload) => {
@@ -5108,238 +5099,11 @@ export function HomeShell() {
             </div>
           </section>
 
-          <div
-            {...dashboardWidgetProps("quick-add")}
-            className={`${styles.quickAddWidget} ${styles.dashboardWidget}`}
-          >
-            {dashboardWidgetControls(
-              "quick-add",
-              "Aggiunta rapida",
-            )}
 
-            <QuickAdd
-              date={todayIso()}
-              accessToken={accessToken}
-              latestWeight={latestWeight}
-              defaultMealType={recommendedMealType}
-              onSaved={refreshHome}
-            />
-          </div>
 
-          <section
-            {...dashboardWidgetProps("weight")}
-            className={`${styles.insightWidget} ${styles.weightWidget} ${styles.dashboardWidget}`}
-          >
-            {dashboardWidgetControls(
-              "weight",
-              "Trend peso",
-            )}
-
-            <div className={styles.insightWidgetHeader}>
-              <div>
-                <p className={styles.kicker}>
-                  Andamento
-                </p>
-                <h2>Trend peso</h2>
-              </div>
-
-              <select
-                className={styles.periodBadge}
-                value={weightRange}
-                aria-label="Intervallo del grafico peso"
-                onChange={(event) => {
-                  setWeightRange(
-                    event.target.value as
-                      | "14"
-                      | "30"
-                      | "90"
-                      | "180"
-                      | "365"
-                      | "all",
-                  );
-                }}
-              >
-                <option value="14">
-                  14 giorni
-                </option>
-                <option value="30">
-                  30 giorni
-                </option>
-                <option value="90">
-                  3 mesi
-                </option>
-                <option value="180">
-                  6 mesi
-                </option>
-                <option value="365">
-                  1 anno
-                </option>
-                <option value="all">
-                  Tutto
-                </option>
-              </select>
-            </div>
-
-            {recentWeights.length ? (
-              <>
-                <div className={styles.weightSummary}>
-                  <strong>
-                    {Number(
-                      recentWeights[
-                        recentWeights.length - 1
-                      ].weight,
-                    ).toFixed(1)}{" "}
-                    kg
-                  </strong>
-
-                  {weightChange !== null ? (
-                    <span
-                      className={
-                        weightChange <= 0
-                          ? styles.weightChangePositive
-                          : styles.weightChangeNeutral
-                      }
-                    >
-                      {weightChange > 0 ? "+" : ""}
-                      {weightChange.toFixed(1)} kg
-                    </span>
-                  ) : null}
-                </div>
-
-                <svg
-                  className={styles.weightChart}
-                  viewBox="0 0 300 110"
-                  role="img"
-                  aria-label={`Andamento del peso: ${
-                    weightRange === "all"
-                      ? "tutto il periodo"
-                      : `ultimi ${weightRange} giorni`
-                  }`}
-                >
-                  <line x1="12" y1="92" x2="288" y2="92" />
-                  <line x1="12" y1="56" x2="288" y2="56" />
-                  <line x1="12" y1="20" x2="288" y2="20" />
-
-                  <polyline
-                    points={weightChartPoints}
-                    fill="none"
-                    vectorEffect="non-scaling-stroke"
-                  />
-
-                  {recentWeights.map((entry, index) => {
-                    const [x, y] =
-                      weightChartPoints
-                        .split(" ")[index]
-                        .split(",");
-
-                    return (
-                      <circle
-                        key={`${entry.date}-${entry.id}`}
-                        cx={x}
-                        cy={y}
-                        r="3.5"
-                      />
-                    );
-                  })}
-                </svg>
-
-                <div className={styles.weightDates}>
-                  <span>
-                    {new Date(
-                      recentWeights[0].date,
-                    ).toLocaleDateString("it-IT", {
-                      day: "2-digit",
-                      month: "2-digit",
-                    })}
-                  </span>
-                  <span>
-                    {new Date(
-                      recentWeights[
-                        recentWeights.length - 1
-                      ].date,
-                    ).toLocaleDateString("it-IT", {
-                      day: "2-digit",
-                      month: "2-digit",
-                    })}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div className={styles.insightEmpty}>
-                <strong>Nessun peso registrato</strong>
-                <p>
-                  Aggiungi il primo peso dal tuo profilo.
-                </p>
-              </div>
-            )}
-          </section>
-
-          <section
-            {...dashboardWidgetProps("goal")}
-            className={`${styles.insightWidget} ${styles.goalWidget} ${styles.dashboardWidget}`}
-          >
-            {dashboardWidgetControls(
-              "goal",
-              "Obiettivo calorico",
-            )}
-
-            <div className={styles.insightWidgetHeader}>
-              <div>
-                <p className={styles.kicker}>
-                  Obiettivo
-                </p>
-                <h2>Obiettivo calorico</h2>
-              </div>
-
-              <span
-                className={styles.goalIcon}
-                aria-hidden="true"
-              >
-                ◎
-              </span>
-            </div>
-
-            <div className={styles.goalValue}>
-              <span>Deficit giornaliero</span>
-              <strong>
-                {budget
-                  ? roundNumber(
-                      budget.goal_adjustment_kcal,
-                    )
-                  : "—"}{" "}
-                kcal
-              </strong>
-            </div>
-
-            <p className={styles.goalDescription}>
-              Il target viene calcolato dal tuo
-              mantenimento e dal piano scelto.
-            </p>
-
-            <a
-              href="/profile"
-              className={styles.goalEditLink}
-            >
-              Modifica nel profilo →
-            </a>
-          </section>
-
-          <div
-            {...dashboardWidgetProps("summary")}
-            className={`${styles.summaryWidget} ${styles.dashboardWidget}`}
-          >
-            {dashboardWidgetControls(
-              "summary",
-              "Resoconto della giornata",
-            )}
-
-            <RegisteredToday
-              meals={actualMeals}
-              activities={actualActivities}
-              accessToken={accessToken}
-              onChanged={refreshHome}
-            />
-          </div>
+          {/* HOME LEGACY SECOND HALF REMOVED V1
+              QuickAdd / weight / goal / RegisteredToday
+              are intentionally no longer rendered here. */}
 
           </div>
 
