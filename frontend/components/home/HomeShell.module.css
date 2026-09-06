@@ -9907,7 +9907,7 @@
    Hero intentionally untouched.
    ========================================================== */
 
-@media (min-width: 900px) {
+@media (min-width: 760px) {
   .desktopHomeGrid {
     width: 100% !important;
     max-width: none !important;
