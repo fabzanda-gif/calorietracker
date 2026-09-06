@@ -1,4 +1,5 @@
 import os
+import time
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
@@ -29,6 +30,30 @@ app = FastAPI(
     title="SanoSync API",
     version="0.3.0",
 )
+
+
+@app.middleware("http")
+async def performance_timing_middleware(
+    request,
+    call_next,
+):
+    started_at = time.perf_counter()
+
+    response = await call_next(request)
+
+    elapsed_ms = (
+        time.perf_counter() - started_at
+    ) * 1000
+
+    print(
+        f"[API perf] {request.method} "
+        f"{request.url.path}: "
+        f"{elapsed_ms:.0f} ms "
+        f"status={response.status_code}",
+        flush=True,
+    )
+
+    return response
 
 default_origins = [
     "http://localhost:3000",
