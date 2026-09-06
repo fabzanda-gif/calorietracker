@@ -1,6 +1,9 @@
 import os
 import time
+from contextvars import ContextVar
+from urllib.parse import urlparse
 
+import httpx
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 
@@ -32,6 +35,96 @@ app = FastAPI(
 )
 
 
+_CURRENT_API_PATH: ContextVar[str] = ContextVar(
+    "sanosync_current_api_path",
+    default="-",
+)
+
+_ORIGINAL_HTTPX_SEND = httpx.Client.send
+
+
+def _timed_httpx_send(
+    self,
+    request,
+    *args,
+    **kwargs,
+):
+    supabase_url = os.getenv(
+        "SUPABASE_URL",
+        "",
+    ).strip()
+
+    supabase_host = (
+        urlparse(supabase_url).netloc
+        if supabase_url
+        else ""
+    )
+
+    request_url = str(request.url)
+    parsed = urlparse(request_url)
+
+    is_supabase = bool(
+        supabase_host
+        and parsed.netloc == supabase_host
+    )
+
+    if not is_supabase:
+        return _ORIGINAL_HTTPX_SEND(
+            self,
+            request,
+            *args,
+            **kwargs,
+        )
+
+    started_at = time.perf_counter()
+    response = None
+
+    try:
+        response = _ORIGINAL_HTTPX_SEND(
+            self,
+            request,
+            *args,
+            **kwargs,
+        )
+        return response
+    finally:
+        elapsed_ms = (
+            time.perf_counter() - started_at
+        ) * 1000
+
+        status_code = (
+            response.status_code
+            if response is not None
+            else "ERR"
+        )
+
+        outbound_path = parsed.path
+
+        if parsed.query:
+            # Non logghiamo la query string:
+            # può contenere filtri o dati utente.
+            outbound_path += "?…"
+
+        print(
+            f"[DB perf] "
+            f"api={_CURRENT_API_PATH.get()} "
+            f"{request.method} "
+            f"{outbound_path}: "
+            f"{elapsed_ms:.0f} ms "
+            f"status={status_code}",
+            flush=True,
+        )
+
+
+if not getattr(
+    httpx.Client.send,
+    "_sanosync_perf_wrapped",
+    False,
+):
+    _timed_httpx_send._sanosync_perf_wrapped = True
+    httpx.Client.send = _timed_httpx_send
+
+
 @app.middleware("http")
 async def performance_timing_middleware(
     request,
@@ -39,7 +132,14 @@ async def performance_timing_middleware(
 ):
     started_at = time.perf_counter()
 
-    response = await call_next(request)
+    token = _CURRENT_API_PATH.set(
+        request.url.path,
+    )
+
+    try:
+        response = await call_next(request)
+    finally:
+        _CURRENT_API_PATH.reset(token)
 
     elapsed_ms = (
         time.perf_counter() - started_at
