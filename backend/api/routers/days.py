@@ -536,10 +536,31 @@ def get_ranked_meal_options(
 
         normalized_mode = str(mode or "auto").strip().lower()
 
-        history = _history(
-            user_id=current_user.id,
-            meals_repo=meals_repo,
-        )
+        # These candidate-source reads are independent.
+        # Overlap their Supabase I/O before candidate construction.
+        with ThreadPoolExecutor(
+            max_workers=3,
+            thread_name_prefix="meal_options_read_executor",
+        ) as executor:
+            history_future = executor.submit(
+                _history,
+                user_id=current_user.id,
+                meals_repo=meals_repo,
+            )
+
+            meal_prep_future = executor.submit(
+                meal_prep_repo.list_available,
+                current_user.id,
+            )
+
+            recipes_future = executor.submit(
+                recipes_repo.list_available,
+                current_user.id,
+            )
+
+            history = history_future.result()
+            meal_prep_items = meal_prep_future.result()
+            available_recipes = recipes_future.result()
 
         known_orders = _build_known_order_candidates(
             history=history,
@@ -574,13 +595,9 @@ def get_ranked_meal_options(
         all_candidates = MealCandidateService().build(
             day_date=day_date,
             meal_type=meal_type,
-            meal_prep_items=meal_prep_repo.list_available(
-                current_user.id
-            ),
+            meal_prep_items=meal_prep_items,
             routine_prediction=day["meals"][meal_slot],
-            recipes=recipes_repo.list_available(
-                current_user.id
-            ),
+            recipes=available_recipes,
             order_candidates=[
                 *known_orders,
                 *generic_orders,
