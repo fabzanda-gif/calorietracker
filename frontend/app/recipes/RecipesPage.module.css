@@ -1486,3 +1486,57 @@
     font-size: 0.7rem;
   }
 }
+
+/* RECIPE SAVE CTA V1 */
+
+.recipeSaveBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid #e3e8ec;
+  border-radius: 16px;
+  background: #f8fafb;
+}
+
+.recipeSaveCopy {
+  min-width: 0;
+}
+
+.recipeSaveCopy strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #173a5e;
+  font-size: 0.9rem;
+}
+
+.recipeSaveCopy span {
+  display: block;
+  color: #718293;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.recipeSaveBar .saveButton {
+  flex: 0 0 auto;
+  min-width: 178px;
+  min-height: 44px;
+  padding: 10px 16px;
+  font-weight: 800;
+}
+
+@media (max-width: 759px) {
+  .recipeSaveBar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .recipeSaveBar .saveButton {
+    width: 100%;
+    min-width: 0;
+  }
+}
+

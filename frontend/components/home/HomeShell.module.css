@@ -11100,3 +11100,140 @@
     flex: 0 0 auto;
   }
 }
+
+/* HOME DAILY CONTROLS SPACING V1 */
+
+.dailyMealSummary,
+.dailyActivityEntry > summary {
+  column-gap: 12px;
+}
+
+.dailyMealCalories,
+.dailyActivityCalories {
+  margin-left: auto;
+  padding-left: 12px;
+}
+
+.dailyEntryDone {
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
+.dailyEntryChevron {
+  margin-left: 2px;
+  min-width: 18px;
+  text-align: center;
+}
+
+@media (max-width: 759px) {
+  .dailyMealSummary,
+  .dailyActivityEntry > summary {
+    column-gap: 8px;
+  }
+
+  .dailyMealCalories,
+  .dailyActivityCalories {
+    padding-left: 6px;
+  }
+}
+
+
+/* HOME WEEK KPI V1 */
+
+.weekKpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 16px;
+}
+
+.weekKpi {
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid #edf0f2;
+  border-radius: 14px;
+  background: #fafbfc;
+}
+
+.weekKpi span {
+  display: block;
+  margin-bottom: 5px;
+  color: #7a8998;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.weekKpi strong {
+  display: block;
+  color: #173a5e;
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.weekOverviewCard .weekDays {
+  margin-top: 6px;
+}
+
+.weekOverviewCard .weekDay {
+  min-width: 0;
+}
+
+.weekOverviewCard .weekDay strong {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 759px) {
+  .weekKpis {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .weekKpi {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .weekKpi span {
+    margin-bottom: 0;
+  }
+}
+
+
+/* HOME FAST RECIPE PORTIONS V1 */
+
+.alternatePortionField {
+  display: grid;
+  grid-template-columns: auto 88px;
+  align-items: center;
+  justify-content: start;
+  gap: 10px;
+  margin-top: 10px;
+  color: #5f7184;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.alternatePortionField input {
+  width: 88px;
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid #dfe4e8;
+  border-radius: 10px;
+  padding: 7px 9px;
+  background: #fff;
+  color: #173a5e;
+  font: inherit;
+  font-weight: 800;
+}
+
+@media (max-width: 759px) {
+  .alternatePortionField {
+    grid-template-columns: 1fr 82px;
+  }
+
+  .alternatePortionField input {
+    width: 82px;
+  }
+}
+

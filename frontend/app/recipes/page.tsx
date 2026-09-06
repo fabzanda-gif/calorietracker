@@ -2094,20 +2094,35 @@ export default function RecipesPage() {
           </span>
         </div>
 
-        <button
-          type="button"
-          className={styles.saveButton}
-          disabled={saving}
-          onClick={() => {
-            void saveRecipe();
-          }}
-        >
-          {saving
-            ? "Salvo…"
-            : editingId
-              ? "Salva modifiche"
-              : "Salva ricetta"}
-        </button>
+        <div className={styles.recipeSaveBar}>
+          <div className={styles.recipeSaveCopy}>
+            <strong>
+              {editingId
+                ? "Hai modificato questa ricetta"
+                : "Ricetta pronta"}
+            </strong>
+            <span>
+              {editingId
+                ? "Salva per applicare ingredienti, porzioni e valori aggiornati."
+                : "Salva per aggiungerla alla tua libreria personale."}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className={styles.saveButton}
+            disabled={saving}
+            onClick={() => {
+              void saveRecipe();
+            }}
+          >
+            {saving
+              ? "Salvataggio…"
+              : editingId
+                ? "✓ Salva modifiche"
+                : "✓ Salva ricetta"}
+          </button>
+        </div>
       </section>
 
       </main>

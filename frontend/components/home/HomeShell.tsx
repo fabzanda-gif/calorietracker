@@ -493,6 +493,13 @@ export function HomeShell() {
     useState("");
   const [alternateFat, setAlternateFat] =
     useState("");
+
+  const [alternateSelectedKey, setAlternateSelectedKey] =
+    useState<string | null>(null);
+
+  const [alternateQuantity, setAlternateQuantity] =
+    useState(1);
+
   const [knownAlternates, setKnownAlternates] = useState<Array<{
     key: string;
     name: string;
@@ -3627,12 +3634,30 @@ export function HomeShell() {
                         onClick={(event) => {
                           openAlternateMeal(slot);
 
-                          const details =
+                          const menuDetails =
                             event.currentTarget.closest("details");
 
-                          if (details) {
-                            details.open = false;
+                          if (menuDetails) {
+                            menuDetails.open = false;
                           }
+
+                          window.requestAnimationFrame(() => {
+                            const mealDetails =
+                              document.querySelector<HTMLDetailsElement>(
+                                `[data-meal-slot="${slot}"]`,
+                              );
+
+                            if (!mealDetails) {
+                              return;
+                            }
+
+                            mealDetails.open = true;
+
+                            mealDetails.scrollIntoView({
+                              behavior: "smooth",
+                              block: "center",
+                            });
+                          });
                         }}
                       >
                         <span aria-hidden="true">
@@ -3744,6 +3769,7 @@ export function HomeShell() {
                 ([slot, meal]) => (
                   <details
                     key={slot}
+                    data-meal-slot={slot}
                     className={`${styles.mealCard} ${styles.dailyMealEntry} ${
                       actualMealForSlot(slot)
                         ? actualMealsForSlot(slot).length <= 1
@@ -4649,13 +4675,55 @@ export function HomeShell() {
                               <select
                                 value=""
                                 onChange={(event) => {
-                                  const selected = knownAlternates.find((item) => item.key === event.target.value);
-                                  if (!selected) return;
-                                  setAlternateName(selected.name);
-                                  setAlternateCalories(String(Math.round(selected.calories)));
-                                  setAlternateProtein(String(Math.round(selected.protein)));
-                                  setAlternateCarbs(String(Math.round(selected.carbs)));
-                                  setAlternateFat(String(Math.round(selected.fat)));
+                                  const selected =
+                                    knownAlternates.find(
+                                      (item) =>
+                                        item.key ===
+                                        event.target.value,
+                                    );
+
+                                  if (!selected) {
+                                    setAlternateSelectedKey(null);
+                                    setAlternateQuantity(1);
+                                    return;
+                                  }
+
+                                  setAlternateSelectedKey(
+                                    selected.key,
+                                  );
+                                  setAlternateQuantity(1);
+
+                                  setAlternateName(
+                                    selected.name,
+                                  );
+                                  setAlternateCalories(
+                                    String(
+                                      Math.round(
+                                        selected.calories,
+                                      ),
+                                    ),
+                                  );
+                                  setAlternateProtein(
+                                    String(
+                                      Math.round(
+                                        selected.protein,
+                                      ),
+                                    ),
+                                  );
+                                  setAlternateCarbs(
+                                    String(
+                                      Math.round(
+                                        selected.carbs,
+                                      ),
+                                    ),
+                                  );
+                                  setAlternateFat(
+                                    String(
+                                      Math.round(
+                                        selected.fat,
+                                      ),
+                                    ),
+                                  );
                                 }}
                               >
                                 <option value="">
@@ -4749,6 +4817,88 @@ export function HomeShell() {
                                   </optgroup>
                                 ) : null}
                               </select>
+
+                              {alternateSelectedKey?.startsWith(
+                                "recipe:",
+                              ) ? (
+                                <label
+                                  className={
+                                    styles.alternatePortionField
+                                  }
+                                >
+                                  Porzioni
+                                  <input
+                                    type="number"
+                                    min="0.5"
+                                    step="0.5"
+                                    value={
+                                      alternateQuantity
+                                    }
+                                    onChange={(event) => {
+                                      const nextQuantity =
+                                        Math.max(
+                                          0.5,
+                                          Number(
+                                            event.target
+                                              .value,
+                                          ) || 0.5,
+                                        );
+
+                                      setAlternateQuantity(
+                                        nextQuantity,
+                                      );
+
+                                      const selected =
+                                        knownAlternates.find(
+                                          (item) =>
+                                            item.key ===
+                                            alternateSelectedKey,
+                                        );
+
+                                      if (!selected) {
+                                        return;
+                                      }
+
+                                      setAlternateCalories(
+                                        String(
+                                          Math.round(
+                                            selected.calories *
+                                              nextQuantity,
+                                          ),
+                                        ),
+                                      );
+
+                                      setAlternateProtein(
+                                        String(
+                                          Math.round(
+                                            selected.protein *
+                                              nextQuantity,
+                                          ),
+                                        ),
+                                      );
+
+                                      setAlternateCarbs(
+                                        String(
+                                          Math.round(
+                                            selected.carbs *
+                                              nextQuantity,
+                                          ),
+                                        ),
+                                      );
+
+                                      setAlternateFat(
+                                        String(
+                                          Math.round(
+                                            selected.fat *
+                                              nextQuantity,
+                                          ),
+                                        ),
+                                      );
+                                    }}
+                                  />
+                                </label>
+                              ) : null}
+
                               <span className={styles.manualMealLabel}>oppure scrivi manualmente</span>
                               <input
                                 type="text"
@@ -5097,6 +5247,49 @@ export function HomeShell() {
                 Una vista semplice per mantenere il filo,
                 senza inseguire la perfezione.
               </p>
+
+              <div className={styles.weekKpis}>
+                <div className={styles.weekKpi}>
+                  <span>Pasti oggi</span>
+                  <strong>
+                    {
+                      new Set(
+                        actualMeals
+                          .map((meal) =>
+                            normalizedMealSlot(
+                              meal.meal_type,
+                            ),
+                          )
+                          .filter(
+                            (slot) =>
+                              slot !== "unknown",
+                          ),
+                      ).size
+                    } / 4
+                  </strong>
+                </div>
+
+                <div className={styles.weekKpi}>
+                  <span>Attività oggi</span>
+                  <strong>
+                    {actualActivities.length}
+                  </strong>
+                </div>
+
+                <div className={styles.weekKpi}>
+                  <span>Ultimo peso</span>
+                  <strong>
+                    {latestWeight != null
+                      ? `${latestWeight.toLocaleString(
+                          "it-IT",
+                          {
+                            maximumFractionDigits: 1,
+                          },
+                        )} kg`
+                      : "—"}
+                  </strong>
+                </div>
+              </div>
 
               <div className={styles.weekDays}>
                 {weekOverviewDays.map((item) => (
