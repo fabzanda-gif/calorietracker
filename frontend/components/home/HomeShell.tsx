@@ -3192,13 +3192,27 @@ export function HomeShell() {
                     className={styles.conversationAiLogo}
                   />
                 </span>
+
                 <h2>SanoSync AI</h2>
+
                 <p>
                   {conversationMode === "text"
                     ? "Racconta la tua giornata, penso io al resto."
                     : "Scatta una foto o scegline una dalla galleria."}
                 </p>
               </div>
+
+              <span className={styles.aiCapabilityPill}>
+                ✦ Testo o foto
+              </span>
+            </div>
+
+            <div className={styles.aiHelperPanel}>
+              <span aria-hidden="true">✦</span>
+              <p>
+                Registra un pasto scrivendo come parleresti
+                normalmente oppure usando una foto.
+              </p>
             </div>
 
             <div className={styles.conversationModeSwitch}>
@@ -3216,6 +3230,7 @@ export function HomeShell() {
                   setConversationSuccess(null);
                 }}
               >
+                <span aria-hidden="true">⌨</span>
                 Scrivi
               </button>
 
@@ -3233,6 +3248,7 @@ export function HomeShell() {
                   setConversationSuccess(null);
                 }}
               >
+                <span aria-hidden="true">▣</span>
                 Foto
               </button>
             </div>
@@ -3424,6 +3440,32 @@ export function HomeShell() {
               )}
             </div>
 
+            {conversationMode === "text" &&
+            !conversationPreview ? (
+              <div
+                className={styles.aiSuggestionChips}
+                aria-label="Esempi da provare"
+              >
+                {[
+                  "Ho mangiato una piadina con pollo",
+                  "A pranzo pasta al pomodoro e una mela",
+                  "Ho fatto colazione con yogurt e avena",
+                ].map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => {
+                      setConversationText(example);
+                      setConversationError(null);
+                      setConversationSuccess(null);
+                    }}
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
             {conversationError ? (
               <p className={styles.conversationError}>
                 {conversationError}
@@ -3535,8 +3577,17 @@ export function HomeShell() {
             className={`${styles.section} ${styles.mealsSection}`}
           >
 
-            <div className={styles.sectionHeader}>
-              <div>
+            <div
+              className={`${styles.sectionHeader} ${styles.dailySummaryHeader}`}
+            >
+              <span
+                className={styles.dailySummaryHeaderIcon}
+                aria-hidden="true"
+              >
+                🍴
+              </span>
+
+              <div className={styles.dailySummaryHeaderCopy}>
                 <p className={styles.kicker}>
                   Oggi
                 </p>
@@ -3621,6 +3672,13 @@ export function HomeShell() {
                   <strong className={styles.dailyActivityCalories}>
                     −{roundNumber(burnedCalories)} kcal
                   </strong>
+
+                  <span
+                    className={styles.dailyEntryDone}
+                    aria-label="Registrata"
+                  >
+                    ✓
+                  </span>
 
                   <span
                     className={styles.dailyEntryChevron}
@@ -3758,6 +3816,15 @@ export function HomeShell() {
                               )} kcal`
                             : "—"}
                       </strong>
+
+                      {actualMealForSlot(slot) ? (
+                        <span
+                          className={styles.dailyEntryDone}
+                          aria-label="Registrato"
+                        >
+                          ✓
+                        </span>
+                      ) : null}
 
                       <span
                         className={

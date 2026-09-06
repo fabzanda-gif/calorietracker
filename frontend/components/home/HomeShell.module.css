@@ -10714,3 +10714,389 @@
     border-radius: 20px;
   }
 }
+
+
+/* ==========================================================
+   HOME PRIMARY CARDS — MOCKUP FIDELITY V1
+   Visual/product fidelity only. Existing capabilities remain.
+   ========================================================== */
+
+/* ----------------------------------------------------------
+   Resoconto header
+   ---------------------------------------------------------- */
+
+.mealsSection .dailySummaryHeader {
+  display: grid !important;
+
+  grid-template-columns:
+    42px
+    minmax(0, 1fr)
+    auto !important;
+
+  align-items: start !important;
+  gap: 12px !important;
+}
+
+.dailySummaryHeaderIcon {
+  width: 40px;
+  height: 40px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 11px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ff6b6b,
+      #ff585f
+    );
+
+  color: #ffffff;
+
+  font-size: 1.15rem;
+
+  box-shadow:
+    0 8px 18px rgba(255, 95, 99, 0.20);
+}
+
+.dailySummaryHeaderCopy {
+  min-width: 0;
+}
+
+.dailySummaryHeaderCopy .kicker {
+  display: none;
+}
+
+.dailySummaryHeaderCopy h2 {
+  margin-top: 1px !important;
+}
+
+.mealsSection .dailySummarySubtitle {
+  margin-top: 3px !important;
+}
+
+/* ----------------------------------------------------------
+   Registered status
+   ---------------------------------------------------------- */
+
+.dailyEntryDone {
+  width: 25px;
+  height: 25px;
+
+  flex: 0 0 25px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: #17ba71;
+  color: #ffffff;
+
+  font-size: 0.72rem;
+  font-weight: 900;
+
+  box-shadow:
+    0 4px 10px rgba(23, 186, 113, 0.16);
+}
+
+.dailyMealSummary {
+  min-height: 59px !important;
+}
+
+.dailyMealSummary:hover,
+.dailyActivityEntry > summary:hover {
+  background:
+    rgba(255, 104, 104, 0.025) !important;
+}
+
+.dailyMealEntry[open]
+  > .dailyMealSummary,
+.dailyActivityEntry[open]
+  > summary {
+  background:
+    rgba(255, 104, 104, 0.035) !important;
+}
+
+/* ----------------------------------------------------------
+   AI header
+   ---------------------------------------------------------- */
+
+.homeAssistantSection .conversationHeader {
+  display: flex !important;
+
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+
+  gap: 16px !important;
+
+  padding-left: 42px !important;
+}
+
+.aiCapabilityPill {
+  flex: 0 0 auto;
+
+  display: inline-flex;
+  align-items: center;
+
+  gap: 5px;
+
+  padding: 7px 10px;
+
+  border:
+    1px solid rgba(255, 104, 104, 0.14);
+
+  border-radius: 999px;
+
+  background:
+    rgba(255, 104, 104, 0.075);
+
+  color: #ef6264;
+
+  font-size: 0.67rem;
+  line-height: 1;
+
+  font-weight: 850;
+
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------
+   Helper panel
+   ---------------------------------------------------------- */
+
+.aiHelperPanel {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin: 14px 0 12px;
+  padding: 11px 13px;
+
+  border:
+    1px solid rgba(255, 104, 104, 0.10);
+
+  border-radius: 12px;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 104, 104, 0.07),
+      rgba(255, 104, 104, 0.025)
+    );
+}
+
+.aiHelperPanel > span {
+  flex: 0 0 auto;
+
+  color: #ff6868;
+
+  font-size: 1rem;
+}
+
+.aiHelperPanel p {
+  margin: 0;
+
+  color: #63758a;
+
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+/* ----------------------------------------------------------
+   Mode selector
+   ---------------------------------------------------------- */
+
+.homeAssistantSection
+  .conversationModeSwitch {
+  width: 100% !important;
+  max-width: none !important;
+
+  margin:
+    0 0 11px !important;
+}
+
+.homeAssistantSection
+  .conversationModeSwitch button {
+  display: inline-flex !important;
+
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 6px !important;
+
+  min-height: 38px !important;
+}
+
+.homeAssistantSection
+  .conversationModeSwitch button span {
+  font-size: 0.9rem;
+}
+
+/* ----------------------------------------------------------
+   Composer
+   ---------------------------------------------------------- */
+
+.homeAssistantSection
+  .conversationControls {
+  grid-template-columns:
+    minmax(0, 1fr)
+    48px !important;
+
+  gap: 9px !important;
+}
+
+.homeAssistantSection
+  .conversationControls textarea {
+  min-height: 66px !important;
+  height: 66px !important;
+
+  padding:
+    15px 16px !important;
+
+  border-radius: 14px !important;
+
+  font-size: 0.79rem !important;
+}
+
+.homeAssistantSection
+  .conversationControls
+  > button {
+  width: 48px !important;
+  height: 48px !important;
+
+  min-width: 48px !important;
+  min-height: 48px !important;
+}
+
+/* ----------------------------------------------------------
+   Safe meal examples
+   ---------------------------------------------------------- */
+
+.aiSuggestionChips {
+  width: 100%;
+
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 6px;
+
+  margin-top: 10px;
+}
+
+.aiSuggestionChips button {
+  max-width: 100%;
+
+  overflow: hidden;
+
+  padding: 7px 10px;
+
+  border:
+    1px solid rgba(18, 48, 77, 0.06);
+
+  border-radius: 999px;
+
+  background: #f6f7f8;
+
+  color: #5d7289;
+
+  font-size: 0.66rem;
+  line-height: 1.2;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.aiSuggestionChips button:hover {
+  border-color:
+    rgba(255, 104, 104, 0.18);
+
+  background:
+    rgba(255, 104, 104, 0.065);
+
+  color: #d9575a;
+}
+
+/* ----------------------------------------------------------
+   Desktop density
+   ---------------------------------------------------------- */
+
+@media (min-width: 900px) {
+  .desktopHomeGrid
+    > .mealsSection,
+  .desktopHomeGrid
+    > .homeAssistantSection {
+    min-height: 420px !important;
+  }
+
+  .homeAssistantSection {
+    padding:
+      22px 24px 20px !important;
+  }
+}
+
+/* ----------------------------------------------------------
+   Narrow layouts
+   ---------------------------------------------------------- */
+
+@media (max-width: 759px) {
+  .mealsSection .dailySummaryHeader {
+    grid-template-columns:
+      36px
+      minmax(0, 1fr)
+      auto !important;
+
+    gap: 9px !important;
+  }
+
+  .dailySummaryHeaderIcon {
+    width: 34px;
+    height: 34px;
+
+    border-radius: 10px;
+
+    font-size: 1rem;
+  }
+
+  .homeAssistantSection
+    .conversationHeader {
+    padding-left: 34px !important;
+
+    gap: 8px !important;
+  }
+
+  .aiCapabilityPill {
+    display: none;
+  }
+
+  .aiHelperPanel {
+    margin-top: 11px;
+
+    padding: 10px 11px;
+  }
+
+  .aiSuggestionChips {
+    flex-wrap: nowrap;
+
+    overflow-x: auto;
+
+    padding-bottom: 2px;
+  }
+
+  .aiSuggestionChips button {
+    flex: 0 0 auto;
+  }
+}
