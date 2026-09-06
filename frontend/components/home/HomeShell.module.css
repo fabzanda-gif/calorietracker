@@ -11907,3 +11907,234 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* HOME FOCUS + DENSITY V3 */
+
+/* ----------------------------------------------------------
+   Resoconto — ancora più vicino al mockup
+   ---------------------------------------------------------- */
+
+.mealsSection {
+  padding: 16px 18px !important;
+}
+
+.dailySummaryHeader {
+  margin-bottom: 2px !important;
+}
+
+.dailyActivityEntry > summary,
+.dailyMealSummary {
+  min-height: 54px !important;
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+}
+
+.dailyEntryIcon {
+  width: 31px !important;
+  height: 31px !important;
+  font-size: .88rem !important;
+}
+
+.dailyEntryMain > strong {
+  font-size: .82rem !important;
+}
+
+.dailyEntryMain > span {
+  font-size: .66rem !important;
+}
+
+.dailyMealCalories,
+.dailyActivityCalories {
+  font-size: .73rem !important;
+}
+
+.dailyEntryDone {
+  width: 25px !important;
+  height: 25px !important;
+  min-width: 25px !important;
+}
+
+/* ----------------------------------------------------------
+   AI — remove empty air
+   ---------------------------------------------------------- */
+
+.conversationCard {
+  padding: 16px 18px !important;
+  gap: 11px !important;
+}
+
+.conversationHeader h2 {
+  font-size: 1.2rem !important;
+}
+
+.aiHelperPanel {
+  min-height: 42px !important;
+  padding: 8px 12px !important;
+}
+
+.conversationModeSwitch {
+  width: 250px !important;
+}
+
+.conversationModeSwitch button {
+  min-height: 32px !important;
+}
+
+.conversationControls select,
+.conversationControls textarea,
+.conversationControls > button {
+  min-height: 44px !important;
+}
+
+.conversationControls textarea {
+  height: 44px !important;
+}
+
+.aiSuggestionChips {
+  margin-top: -4px !important;
+}
+
+/* ----------------------------------------------------------
+   Focus — mockup-style metrics
+   ---------------------------------------------------------- */
+
+.dailyFocusCard {
+  padding: 16px 20px 14px !important;
+}
+
+.dailyFocusRings {
+  margin-top: 10px !important;
+  gap: 6px !important;
+}
+
+.dailyFocusItem {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.dailyFocusRing,
+.dailyFocusStat {
+  width: 66px !important;
+  height: 66px !important;
+  margin-bottom: 5px !important;
+}
+
+.dailyFocusRing {
+  padding: 7px;
+  box-sizing: border-box;
+}
+
+.dailyFocusRingInner {
+  width: 100%;
+  height: 100%;
+
+  display: grid !important;
+  grid-template-rows: auto auto auto;
+  place-items: center;
+  align-content: center;
+  gap: 0;
+
+  border-radius: 50%;
+  background: #fff;
+}
+
+.dailyFocusMetricIcon {
+  display: block;
+  margin-bottom: 1px;
+
+  font-size: .72rem;
+  line-height: 1;
+}
+
+.dailyFocusRingInner strong,
+.dailyFocusStat strong {
+  color: #102846 !important;
+  font-size: .92rem !important;
+  line-height: 1 !important;
+  letter-spacing: -.03em;
+}
+
+.dailyFocusRingInner small,
+.dailyFocusStat > span:not(.dailyFocusMetricIcon) {
+  color: #748398 !important;
+  font-size: .52rem !important;
+  line-height: 1;
+}
+
+.dailyFocusStat {
+  border-width: 7px !important;
+  align-content: center;
+  gap: 1px;
+}
+
+.dailyFocusLabel {
+  margin-top: 1px !important;
+
+  color: #102846 !important;
+  font-size: .69rem !important;
+  line-height: 1.05 !important;
+}
+
+.dailyFocusNumbers {
+  margin-top: 2px !important;
+
+  color: #66788d !important;
+  font-size: .57rem !important;
+  line-height: 1.15 !important;
+  text-align: center;
+}
+
+/* ----------------------------------------------------------
+   Week — denser dashboard card
+   ---------------------------------------------------------- */
+
+.weekOverviewCard {
+  padding: 16px 20px 14px !important;
+}
+
+.weekKpis {
+  margin: 10px 0 !important;
+}
+
+.weekKpi {
+  min-height: 46px;
+  padding: 8px 9px !important;
+}
+
+.weekDays {
+  margin-top: 1px !important;
+}
+
+.weekDay {
+  padding: 4px 1px !important;
+}
+
+.weekDayDot {
+  width: 18px !important;
+  height: 18px !important;
+  margin-top: 4px !important;
+}
+
+.weekTodaySummary {
+  margin-top: 8px !important;
+  padding-top: 9px !important;
+}
+
+.weekOverviewNote {
+  margin-top: 6px !important;
+}
+
+/* ----------------------------------------------------------
+   Match bottom row vertical density
+   ---------------------------------------------------------- */
+
+@media (min-width: 900px) {
+  .dailyFocusCard,
+  .weekOverviewCard {
+    min-height: 250px !important;
+  }
+}
+

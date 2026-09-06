@@ -1570,7 +1570,11 @@ export function HomeShell() {
   const carbsConsumed = Number(
     macroBudget?.carbs_consumed_g ??
       macroBudget?.carbohydrates_consumed_g ??
-      0,
+      actualMeals.reduce(
+        (total, meal) =>
+          total + Number(meal.carbs || 0),
+        0,
+      ),
   );
 
   const carbsTarget = Number(
@@ -1580,7 +1584,12 @@ export function HomeShell() {
   );
 
   const fatConsumed = Number(
-    macroBudget?.fat_consumed_g ?? 0,
+    macroBudget?.fat_consumed_g ??
+      actualMeals.reduce(
+        (total, meal) =>
+          total + Number(meal.fat || 0),
+        0,
+      ),
   );
 
   const fatTarget = Number(
@@ -1607,6 +1616,7 @@ export function HomeShell() {
   const dailyFocusItems = [
     {
       label: "Calorie",
+      icon: "🔥",
       consumed: Number(
         budget?.consumed_kcal ?? 0,
       ),
@@ -1618,6 +1628,7 @@ export function HomeShell() {
     },
     {
       label: "Proteine",
+      icon: "💪",
       consumed: Number(
         budget?.protein_consumed_g ?? 0,
       ),
@@ -1629,6 +1640,7 @@ export function HomeShell() {
     },
     {
       label: "Carboidrati",
+      icon: "🌾",
       consumed: carbsConsumed,
       target: carbsTarget,
       unit: "g",
@@ -1639,6 +1651,7 @@ export function HomeShell() {
     },
     {
       label: "Grassi",
+      icon: "🥑",
       consumed: fatConsumed,
       target: fatTarget,
       unit: "g",
@@ -5199,11 +5212,22 @@ export function HomeShell() {
                         <div
                           className={styles.dailyFocusRingInner}
                         >
+                          <span
+                            className={styles.dailyFocusMetricIcon}
+                            aria-hidden="true"
+                          >
+                            {item.icon}
+                          </span>
+
                           <strong>
                             {Math.round(
-                              item.progress,
-                            )}%
+                              item.consumed,
+                            )}
                           </strong>
+
+                          <small>
+                            {item.unit}
+                          </small>
                         </div>
                       </div>
                     ) : (
@@ -5212,6 +5236,13 @@ export function HomeShell() {
                         role="img"
                         aria-label={`${item.label}: ${Math.round(item.consumed)} ${item.unit} registrati`}
                       >
+                        <span
+                          className={styles.dailyFocusMetricIcon}
+                          aria-hidden="true"
+                        >
+                          {item.icon}
+                        </span>
+
                         <strong>
                           {Math.round(
                             item.consumed,
@@ -5235,11 +5266,15 @@ export function HomeShell() {
                     >
                       {item.target > 0
                         ? `${Math.round(
+                            item.progress,
+                          )}% · ${Math.round(
                             item.consumed,
-                          )} ${item.unit} / ${Math.round(
+                          )} / ${Math.round(
                             item.target,
-                          )}`
-                        : "Registrati oggi"}
+                          )} ${item.unit}`
+                        : `${Math.round(
+                            item.consumed,
+                          )} ${item.unit} registrati`}
                     </span>
                   </div>
                 ))}
