@@ -519,6 +519,12 @@ export function HomeShell() {
   const [actualMeals, setActualMeals] =
     useState<LoggedMeal[]>([]);
 
+  // HOME WEEK HISTORY V1
+  // Reuse meal history already loaded for quick-add suggestions.
+  // No additional Home request.
+  const [weeklyMealHistory, setWeeklyMealHistory] =
+    useState<LoggedMeal[]>([]);
+
   const [actualActivities, setActualActivities] =
     useState<Activity[]>([]);
 
@@ -639,6 +645,8 @@ export function HomeShell() {
         historyResult.status === "fulfilled"
           ? historyResult.value.items
           : [];
+
+      setWeeklyMealHistory(history);
 
       const ingredients =
         ingredientsResult.status === "fulfilled"
@@ -1686,9 +1694,23 @@ export function HomeShell() {
             .slice(0, 2),
         dayNumber: date.getDate(),
         isToday: iso === todayIso(),
+        mealCount: weeklyMealHistory.filter(
+          (meal) => meal.date === iso,
+        ).length,
       };
     },
   );
+
+  const weeklyMealCount =
+    weekOverviewDays.reduce(
+      (total, item) => total + item.mealCount,
+      0,
+    );
+
+  const weeklyMealDays =
+    weekOverviewDays.filter(
+      (item) => item.mealCount > 0,
+    ).length;
 
   async function analyzeConversationMeal() {
     if (!accessToken || !conversationText.trim()) {
@@ -5239,33 +5261,20 @@ export function HomeShell() {
                   className={styles.weekCalendarIcon}
                   aria-hidden="true"
                 >
-                  ◫
+                  7g
                 </span>
               </div>
 
               <p className={styles.bottomOverviewIntro}>
-                Una vista semplice per mantenere il filo,
-                senza inseguire la perfezione.
+                I segnali reali dei giorni che hai registrato,
+                senza trasformare la settimana in una pagella.
               </p>
 
               <div className={styles.weekKpis}>
                 <div className={styles.weekKpi}>
-                  <span>Pasti oggi</span>
+                  <span>Pasti settimana</span>
                   <strong>
-                    {
-                      new Set(
-                        actualMeals
-                          .map((meal) =>
-                            normalizedMealSlot(
-                              meal.meal_type,
-                            ),
-                          )
-                          .filter(
-                            (slot) =>
-                              slot !== "unknown",
-                          ),
-                      ).size
-                    } / 4
+                    {weeklyMealCount}
                   </strong>
                 </div>
 
@@ -5312,13 +5321,28 @@ export function HomeShell() {
                     </strong>
 
                     <span
-                      className={
+                      className={`${styles.weekDayDot} ${
+                        item.mealCount > 0
+                          ? styles.weekDayDotRecorded
+                          : ""
+                      } ${
                         item.isToday
-                          ? `${styles.weekDayDot} ${styles.weekDayDotActive}`
-                          : styles.weekDayDot
+                          ? styles.weekDayDotActive
+                          : ""
+                      }`}
+                      aria-label={
+                        item.mealCount > 0
+                          ? `${item.mealCount} pasti registrati`
+                          : "Nessun pasto registrato"
                       }
-                      aria-hidden="true"
-                    />
+                      title={
+                        item.mealCount > 0
+                          ? `${item.mealCount} pasti registrati`
+                          : "Nessun pasto registrato"
+                      }
+                    >
+                      {item.mealCount > 0 ? "✓" : ""}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -5337,7 +5361,7 @@ export function HomeShell() {
 
                 <div>
                   <strong>
-                    Oggi
+                    Budget di oggi
                   </strong>
                   <span>
                     {budget
@@ -5352,9 +5376,9 @@ export function HomeShell() {
               </div>
 
               <p className={styles.weekOverviewNote}>
-                Oggi è il tuo punto di riferimento.
-                Il quadro della settimana si costruisce
-                con i giorni che registri.
+                {weeklyMealDays > 0
+                  ? `${weeklyMealDays} giorni su 7 hanno almeno un pasto registrato.`
+                  : "La settimana inizierà a prendere forma quando registrerai i pasti."}
               </p>
             </div>
           </section>

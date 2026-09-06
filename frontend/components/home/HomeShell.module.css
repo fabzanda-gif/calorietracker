@@ -11279,3 +11279,631 @@
   }
 }
 
+
+
+/* HOME FIDELITY V2 */
+
+/* ==========================================================
+   PRIMARY GRID
+   ========================================================== */
+
+.desktopHomeGrid {
+  gap: 16px;
+}
+
+.mealsSection,
+.conversationCard {
+  min-width: 0;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(16, 40, 70, 0.045);
+}
+
+/* ==========================================================
+   RESOCONTO GIORNALIERO
+   ========================================================== */
+
+.mealsSection {
+  gap: 10px;
+  padding: 20px;
+}
+
+.dailySummaryHeader {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.dailySummaryHeader .kicker {
+  display: none;
+}
+
+.dailySummaryHeaderIcon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #ff6868;
+  color: #fff;
+  font-size: 1.15rem;
+}
+
+.dailySummaryHeaderCopy h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.dailySummarySubtitle {
+  margin: 3px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.addMealFab {
+  min-height: 42px;
+  padding: 9px 14px;
+  border-radius: 11px;
+}
+
+.dailyActivityEntry {
+  margin: 4px 0 8px;
+  border-radius: 13px;
+  box-shadow: none;
+}
+
+.mealList {
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid #e4e8eb;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.mealList .dailyMealEntry {
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid #e4e8eb !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.mealList .dailyMealEntry:last-child {
+  border-bottom: 0 !important;
+}
+
+/* Force every summary onto ONE ROW */
+.dailyActivityEntry > summary,
+.dailyMealSummary {
+  display: grid !important;
+  grid-template-columns:
+    36px
+    minmax(0, 1fr)
+    max-content
+    28px
+    16px !important;
+  grid-template-rows: auto !important;
+  align-items: center !important;
+  gap: 0 10px !important;
+
+  min-height: 62px !important;
+  padding: 9px 12px !important;
+}
+
+.dailyEntryIcon {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+
+  width: 34px !important;
+  height: 34px !important;
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+  background: #f5f7f9;
+}
+
+.dailyEntryMain {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: 0;
+}
+
+.dailyEntryMain > strong {
+  display: block;
+  margin: 0 0 2px;
+  color: #102846;
+  font-size: 0.9rem;
+  line-height: 1.1;
+}
+
+.dailyEntryMain > span {
+  display: block;
+  overflow: hidden;
+  color: #68788c;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dailyMealCalories,
+.dailyActivityCalories {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #102846;
+  font-size: 0.79rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.dailyEntryDone {
+  grid-column: 4 !important;
+  grid-row: 1 !important;
+
+  width: 27px !important;
+  height: 27px !important;
+  min-width: 27px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  border-radius: 50%;
+  font-size: 0.82rem !important;
+  line-height: 1 !important;
+}
+
+.dailyEntryChevron {
+  position: static !important;
+
+  grid-column: 5 !important;
+  grid-row: 1 !important;
+
+  width: 16px !important;
+  min-width: 16px !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #173a5e;
+  font-size: 0.72rem;
+  text-align: center;
+
+  transition: transform 140ms ease;
+}
+
+details[open] > summary .dailyEntryChevron {
+  transform: rotate(180deg);
+}
+
+/* ==========================================================
+   SANOSYNC AI
+   ========================================================== */
+
+.conversationCard {
+  display: flex !important;
+  flex-direction: column;
+  gap: 14px !important;
+
+  margin: 0 !important;
+  padding: 20px 22px !important;
+}
+
+.conversationHeader {
+  display: flex !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.conversationHeader > div {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  min-width: 0;
+}
+
+.conversationEyebrow {
+  grid-column: 1;
+  grid-row: 1 / 3;
+
+  width: 42px !important;
+  height: 42px;
+  display: grid;
+  place-items: center;
+}
+
+.conversationAiLogo {
+  width: 40px !important;
+  height: 40px !important;
+  object-fit: contain;
+}
+
+.conversationHeader h2 {
+  grid-column: 2;
+  grid-row: 1;
+
+  align-self: end;
+
+  margin: 0 !important;
+  color: #ff6868 !important;
+  font-size: 1.3rem !important;
+}
+
+.conversationHeader p {
+  grid-column: 2;
+  grid-row: 2;
+
+  margin: 1px 0 0 !important;
+  font-size: 0.75rem !important;
+}
+
+.aiCapabilityPill {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.aiHelperPanel {
+  min-height: 50px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 11px 14px !important;
+
+  border-radius: 11px !important;
+
+  text-align: center;
+}
+
+.aiHelperPanel p {
+  max-width: 48ch;
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.conversationModeSwitch {
+  width: min(100%, 290px);
+  margin: 0 auto !important;
+}
+
+.conversationModeSwitch button {
+  min-height: 36px !important;
+  font-weight: 750;
+}
+
+.conversationControls {
+  display: grid !important;
+  grid-template-columns: 105px minmax(0, 1fr) 92px;
+  gap: 8px !important;
+  align-items: stretch;
+}
+
+.conversationControls select {
+  grid-column: 1;
+  min-height: 48px !important;
+}
+
+.conversationControls textarea {
+  grid-column: 2;
+  min-height: 48px !important;
+  height: 48px;
+  resize: none !important;
+}
+
+.conversationControls > button {
+  grid-column: 3;
+
+  min-height: 48px !important;
+
+  border-radius: 12px !important;
+  background: #ff6868 !important;
+  color: #fff !important;
+
+  font-weight: 800;
+}
+
+.conversationControls > button:disabled {
+  background: #eef0f2 !important;
+  color: #a7adb4 !important;
+}
+
+.conversationPhotoActions {
+  grid-column: 2;
+}
+
+.conversationPhotoSelected,
+.conversationPhotoPreview {
+  grid-column: 2 / 4;
+}
+
+.aiSuggestionChips {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px !important;
+  margin-top: -2px;
+}
+
+.aiSuggestionChips button {
+  min-height: 28px;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  font-size: 0.66rem !important;
+}
+
+/* ==========================================================
+   BOTTOM OVERVIEW
+   ========================================================== */
+
+.homeBottomOverview {
+  gap: 16px !important;
+  margin-top: 16px !important;
+}
+
+.dailyFocusCard,
+.weekOverviewCard {
+  padding: 20px 22px !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 30px rgba(16, 40, 70, 0.045);
+}
+
+.bottomOverviewHeader {
+  align-items: flex-start !important;
+}
+
+.bottomOverviewKicker {
+  margin-bottom: 3px !important;
+}
+
+.bottomOverviewHeader h2 {
+  font-size: 1.12rem !important;
+  line-height: 1.05;
+}
+
+.bottomOverviewIntro {
+  margin-top: 5px !important;
+  font-size: 0.72rem !important;
+}
+
+/* Focus */
+
+.dailyFocusRings {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+
+  margin-top: 16px !important;
+}
+
+.dailyFocusItem {
+  min-width: 0;
+}
+
+.dailyFocusRing,
+.dailyFocusStat {
+  width: 72px !important;
+  height: 72px !important;
+  margin: 0 auto 8px !important;
+}
+
+.dailyFocusStat {
+  box-sizing: border-box;
+
+  display: grid !important;
+  place-content: center;
+
+  border: 8px solid #eef1f4 !important;
+  border-radius: 50% !important;
+
+  background: #fff !important;
+}
+
+.dailyFocusLabel {
+  font-size: 0.75rem !important;
+}
+
+.dailyFocusNumbers {
+  margin-top: 2px;
+  font-size: 0.64rem !important;
+}
+
+/* Week */
+
+.weekCalendarIcon {
+  width: 36px !important;
+  height: 36px !important;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 10px !important;
+
+  color: #ff6868;
+  font-size: 0.68rem !important;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.weekKpis {
+  gap: 8px !important;
+  margin: 13px 0 14px !important;
+}
+
+.weekKpi {
+  padding: 10px 11px !important;
+  border-radius: 11px !important;
+}
+
+.weekKpi span {
+  margin-bottom: 3px !important;
+  font-size: 0.62rem !important;
+}
+
+.weekKpi strong {
+  font-size: 0.9rem !important;
+}
+
+.weekDays {
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px !important;
+
+  margin-top: 4px !important;
+}
+
+.weekDay {
+  min-width: 0;
+  padding: 7px 2px !important;
+  border-radius: 11px !important;
+}
+
+.weekDayName {
+  font-size: 0.57rem !important;
+  text-transform: uppercase;
+}
+
+.weekDay > strong {
+  margin-top: 2px;
+  font-size: 0.78rem !important;
+}
+
+.weekDayDot {
+  width: 19px !important;
+  height: 19px !important;
+
+  display: grid !important;
+  place-items: center;
+
+  margin: 5px auto 0 !important;
+
+  border: 1px solid #dce2e8;
+  border-radius: 50%;
+
+  background: #fff !important;
+  color: transparent;
+
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.weekDayDotRecorded {
+  border-color: #20bd75 !important;
+  background: #20bd75 !important;
+  color: #fff !important;
+}
+
+.weekDayDotActive {
+  box-shadow: 0 0 0 3px rgba(255, 104, 104, 0.10);
+}
+
+.weekTodaySummary {
+  margin-top: 12px !important;
+  padding-top: 12px !important;
+}
+
+.weekTodayProgress {
+  height: 6px !important;
+}
+
+.weekTodaySummary strong {
+  font-size: 0.76rem !important;
+}
+
+.weekTodaySummary span {
+  font-size: 0.66rem !important;
+}
+
+.weekOverviewNote {
+  margin-top: 9px !important;
+  font-size: 0.63rem !important;
+  line-height: 1.35;
+}
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 1050px) {
+  .conversationControls {
+    grid-template-columns: 95px minmax(0, 1fr);
+  }
+
+  .conversationControls > button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 759px) {
+  .mealsSection,
+  .conversationCard,
+  .dailyFocusCard,
+  .weekOverviewCard {
+    padding: 16px !important;
+  }
+
+  .dailySummaryHeader {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .dailySummaryHeaderIcon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .dailyActivityEntry > summary,
+  .dailyMealSummary {
+    grid-template-columns:
+      32px
+      minmax(0, 1fr)
+      max-content
+      26px
+      14px !important;
+
+    gap: 0 7px !important;
+    min-height: 58px !important;
+    padding: 8px 9px !important;
+  }
+
+  .dailyEntryIcon {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .dailyMealCalories,
+  .dailyActivityCalories {
+    font-size: 0.7rem;
+  }
+
+  .conversationControls {
+    grid-template-columns: 1fr;
+  }
+
+  .conversationControls select,
+  .conversationControls textarea,
+  .conversationControls > button,
+  .conversationPhotoActions,
+  .conversationPhotoSelected,
+  .conversationPhotoPreview {
+    grid-column: 1;
+  }
+
+  .dailyFocusRings {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    row-gap: 16px !important;
+  }
+}
+
