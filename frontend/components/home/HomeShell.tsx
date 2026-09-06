@@ -555,6 +555,8 @@ export function HomeShell() {
   // Pannello "I tuoi pasti": mostra una sola fascia alla volta.
   const [selectedMealSlot, setSelectedMealSlot] =
     useState<string>("Colazione");
+  const [mealsExpanded, setMealsExpanded] =
+    useState(true);
   const [mealEditType, setMealEditType] =
     useState("Colazione");
   const [
@@ -3404,7 +3406,11 @@ export function HomeShell() {
 
           <section
             {...dashboardWidgetProps("meals")}
-            className={`${styles.section} ${styles.mealsSection} ${styles.dashboardWidget}`}
+            className={`${styles.section} ${styles.mealsSection} ${
+              mealsExpanded
+                ? ""
+                : styles.mealsSectionCollapsed
+            } ${styles.dashboardWidget}`}
           >
             {dashboardWidgetControls(
               "meals",
@@ -3418,32 +3424,68 @@ export function HomeShell() {
                 <h2>I tuoi pasti</h2>
               </div>
 
-              <button
-                type="button"
-                className={styles.addMealFab}
-                aria-label={`Aggiungi ${selectedMealSlot}`}
-                title={`Aggiungi ${selectedMealSlot}`}
-                onClick={() => {
-                  const selectedSlot = Object.keys(day.meals).find(
-                    (slot) =>
-                      mealLabel(slot) === selectedMealSlot,
-                  );
-
-                  if (selectedSlot) {
-                    if (
-                      alternateSlot === selectedSlot
-                    ) {
-                      closeAlternateMeal();
-                    } else {
-                      openAlternateMeal(
-                        selectedSlot,
-                      );
-                    }
-                  }
-                }}
+              <div
+                className={styles.mealsHeaderActions}
               >
-                +
-              </button>
+                {mealsExpanded ? (
+                  <button
+                    type="button"
+                    className={styles.addMealFab}
+                    aria-label={`Aggiungi ${selectedMealSlot}`}
+                    title={`Aggiungi ${selectedMealSlot}`}
+                    onClick={() => {
+                      const selectedSlot = Object.keys(
+                        day.meals,
+                      ).find(
+                        (slot) =>
+                          mealLabel(slot) ===
+                          selectedMealSlot,
+                      );
+
+                      if (selectedSlot) {
+                        if (
+                          alternateSlot === selectedSlot
+                        ) {
+                          closeAlternateMeal();
+                        } else {
+                          openAlternateMeal(
+                            selectedSlot,
+                          );
+                        }
+                      }
+                    }}
+                  >
+                    +
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  className={styles.mealsCollapseToggle}
+                  aria-label={
+                    mealsExpanded
+                      ? "Chiudi I tuoi pasti"
+                      : "Apri I tuoi pasti"
+                  }
+                  aria-expanded={mealsExpanded}
+                  title={
+                    mealsExpanded
+                      ? "Chiudi"
+                      : "Apri"
+                  }
+                  onClick={() => {
+                    setMealsExpanded(
+                      (current) => !current,
+                    );
+
+                    if (mealsExpanded) {
+                      closeAlternateMeal();
+                    }
+                  }}
+                >
+                  {mealsExpanded ? "−" : "+"}
+                </button>
+              </div>
             </div>
 
             <div className={styles.mealTabs}>

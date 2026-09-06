@@ -8401,3 +8401,68 @@
   height: auto;
   box-sizing: border-box;
 }
+
+
+/* ==========================================================
+   Home meals collapse
+   ========================================================== */
+
+.mealsHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.mealsCollapseToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 48px;
+  height: 48px;
+  padding: 0;
+
+  border: 0;
+  border-radius: 999px;
+
+  background: var(--ss-navy-950);
+  color: #ffffff;
+
+  font: inherit;
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.mealsCollapseToggle:hover {
+  background: var(--ss-navy-800);
+}
+
+.mealsCollapseToggle:focus-visible {
+  outline: 3px solid rgba(16, 40, 70, 0.18);
+  outline-offset: 3px;
+}
+
+.mealsSectionCollapsed {
+  gap: 0;
+}
+
+.mealsSectionCollapsed .mealTabs,
+.mealsSectionCollapsed .mealList {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mealsHeaderActions {
+    gap: 8px;
+  }
+
+  .mealsCollapseToggle {
+    width: 44px;
+    height: 44px;
+    font-size: 1.55rem;
+  }
+}
