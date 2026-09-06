@@ -10263,3 +10263,379 @@
     min-height: 44px !important;
   }
 }
+
+
+/* ==========================================================
+   HOME BOTTOM OVERVIEW — FOCUS + WEEK V1
+   Uses existing Home data only.
+   ========================================================== */
+
+.homeBottomOverview {
+  grid-column: 1 / -1 !important;
+
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: grid !important;
+
+  grid-template-columns:
+    minmax(0, 1.08fr)
+    minmax(0, 0.92fr) !important;
+
+  gap: 16px !important;
+
+  margin: 0 !important;
+}
+
+.dailyFocusCard,
+.weekOverviewCard {
+  min-width: 0;
+
+  padding: 22px;
+
+  border:
+    1px solid rgba(18, 48, 77, 0.10);
+
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 10px 28px rgba(18, 48, 77, 0.055);
+}
+
+.bottomOverviewHeader {
+  display: flex;
+
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 16px;
+}
+
+.bottomOverviewHeader h2 {
+  margin: 2px 0 0;
+
+  color: #102f4e;
+
+  font-size: 1.22rem;
+  line-height: 1.1;
+
+  letter-spacing: -0.035em;
+}
+
+.bottomOverviewKicker {
+  margin: 0;
+
+  color: #ff6868;
+
+  font-size: 0.68rem;
+  font-weight: 900;
+
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bottomOverviewBadge {
+  flex: 0 0 auto;
+
+  padding: 6px 9px;
+
+  border-radius: 999px;
+
+  background: #fff2f1;
+
+  color: #e95e61;
+
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.bottomOverviewIntro {
+  margin: 7px 0 18px;
+
+  color: #65768a;
+
+  font-size: 0.77rem;
+  line-height: 1.45;
+}
+
+/* ----------------------------------------------------------
+   Daily focus
+   ---------------------------------------------------------- */
+
+.dailyFocusRings {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 14px;
+
+  align-items: start;
+}
+
+.dailyFocusItem {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+  align-items: center;
+
+  text-align: center;
+}
+
+.dailyFocusRing {
+  width: 78px;
+  height: 78px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+}
+
+.dailyFocusRingInner {
+  width: 62px;
+  height: 62px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: #ffffff;
+
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(18, 48, 77, 0.04);
+}
+
+.dailyFocusRingInner strong {
+  color: #102f4e;
+
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.dailyFocusLabel {
+  margin-top: 9px;
+
+  color: #102f4e;
+
+  font-size: 0.77rem;
+  line-height: 1.2;
+}
+
+.dailyFocusNumbers {
+  margin-top: 3px;
+
+  color: #778596;
+
+  font-size: 0.66rem;
+  line-height: 1.25;
+}
+
+/* ----------------------------------------------------------
+   Week overview
+   ---------------------------------------------------------- */
+
+.weekCalendarIcon {
+  width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 10px;
+
+  background: #fff2f1;
+
+  color: #ff6868;
+
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.weekDays {
+  display: grid;
+
+  grid-template-columns:
+    repeat(7, minmax(0, 1fr));
+
+  gap: 6px;
+
+  margin-top: 2px;
+}
+
+.weekDay {
+  min-width: 0;
+
+  padding: 8px 2px;
+
+  display: flex;
+
+  flex-direction: column;
+  align-items: center;
+
+  gap: 4px;
+
+  border-radius: 12px;
+
+  color: #8090a1;
+}
+
+.weekDay strong {
+  color: #193b5b;
+
+  font-size: 0.82rem;
+}
+
+.weekDayToday {
+  background: #fff2f1;
+}
+
+.weekDayToday strong {
+  color: #ef6264;
+}
+
+.weekDayName {
+  font-size: 0.62rem;
+  font-weight: 800;
+
+  text-transform: uppercase;
+}
+
+.weekDayDot {
+  width: 5px;
+  height: 5px;
+
+  display: block;
+
+  border-radius: 50%;
+
+  background: #dde2e7;
+}
+
+.weekDayDotActive {
+  background: #ff6868;
+}
+
+.weekTodaySummary {
+  display: grid;
+
+  grid-template-columns:
+    minmax(100px, 0.7fr)
+    minmax(0, 1fr);
+
+  gap: 13px;
+
+  align-items: center;
+
+  margin-top: 17px;
+  padding-top: 15px;
+
+  border-top:
+    1px solid rgba(18, 48, 77, 0.08);
+}
+
+.weekTodayProgress {
+  height: 7px;
+
+  display: block;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background: #edf0f2;
+}
+
+.weekTodayProgress > span {
+  height: 100%;
+
+  display: block;
+
+  border-radius: inherit;
+
+  background: #ff6868;
+}
+
+.weekTodaySummary > div {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.weekTodaySummary strong {
+  color: #102f4e;
+
+  font-size: 0.75rem;
+}
+
+.weekTodaySummary div span {
+  color: #718194;
+
+  font-size: 0.68rem;
+}
+
+.weekOverviewNote {
+  margin: 12px 0 0;
+
+  color: #8a97a5;
+
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+/* ----------------------------------------------------------
+   Responsive
+   ---------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .homeBottomOverview {
+    grid-template-columns:
+      1fr !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .dailyFocusCard,
+  .weekOverviewCard {
+    padding: 18px;
+  }
+
+  .dailyFocusRings {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    row-gap: 20px;
+  }
+
+  .dailyFocusRing {
+    width: 72px;
+    height: 72px;
+  }
+
+  .dailyFocusRingInner {
+    width: 57px;
+    height: 57px;
+  }
+
+  .weekDays {
+    gap: 2px;
+  }
+
+  .weekTodaySummary {
+    grid-template-columns:
+      1fr;
+  }
+
+  .bottomOverviewBadge {
+    display: none;
+  }
+}

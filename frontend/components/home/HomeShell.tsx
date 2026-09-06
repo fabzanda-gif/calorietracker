@@ -1546,6 +1546,152 @@ export function HomeShell() {
         )
       : 0;
 
+  /*
+   * HOME BOTTOM OVERVIEW — derived only from data Home
+   * already has. No additional blocking request.
+   */
+  const macroBudget = budget as
+    | (typeof budget & {
+        carbs_target_g?: number | null;
+        carbs_consumed_g?: number | null;
+        carbohydrates_target_g?: number | null;
+        carbohydrates_consumed_g?: number | null;
+        fat_target_g?: number | null;
+        fat_consumed_g?: number | null;
+      })
+    | null;
+
+  const carbsConsumed = Number(
+    macroBudget?.carbs_consumed_g ??
+      macroBudget?.carbohydrates_consumed_g ??
+      0,
+  );
+
+  const carbsTarget = Number(
+    macroBudget?.carbs_target_g ??
+      macroBudget?.carbohydrates_target_g ??
+      0,
+  );
+
+  const fatConsumed = Number(
+    macroBudget?.fat_consumed_g ?? 0,
+  );
+
+  const fatTarget = Number(
+    macroBudget?.fat_target_g ?? 0,
+  );
+
+  function focusProgress(
+    consumed: number,
+    target: number,
+  ) {
+    if (!target || target <= 0) {
+      return 0;
+    }
+
+    return Math.min(
+      100,
+      Math.max(
+        0,
+        (consumed / target) * 100,
+      ),
+    );
+  }
+
+  const dailyFocusItems = [
+    {
+      label: "Calorie",
+      consumed: Number(
+        budget?.consumed_kcal ?? 0,
+      ),
+      target: Number(
+        budget?.daily_budget_kcal ?? 0,
+      ),
+      unit: "kcal",
+      progress: budgetProgress,
+    },
+    {
+      label: "Proteine",
+      consumed: Number(
+        budget?.protein_consumed_g ?? 0,
+      ),
+      target: Number(
+        budget?.protein_target_g ?? 0,
+      ),
+      unit: "g",
+      progress: proteinProgress,
+    },
+    {
+      label: "Carboidrati",
+      consumed: carbsConsumed,
+      target: carbsTarget,
+      unit: "g",
+      progress: focusProgress(
+        carbsConsumed,
+        carbsTarget,
+      ),
+    },
+    {
+      label: "Grassi",
+      consumed: fatConsumed,
+      target: fatTarget,
+      unit: "g",
+      progress: focusProgress(
+        fatConsumed,
+        fatTarget,
+      ),
+    },
+  ];
+
+  const todayForWeek = new Date(
+    `${todayIso()}T12:00:00`,
+  );
+
+  const mondayForWeek = new Date(
+    todayForWeek,
+  );
+
+  mondayForWeek.setDate(
+    todayForWeek.getDate() -
+      ((todayForWeek.getDay() + 6) % 7),
+  );
+
+  const weekOverviewDays = Array.from(
+    { length: 7 },
+    (_, index) => {
+      const date = new Date(mondayForWeek);
+
+      date.setDate(
+        mondayForWeek.getDate() + index,
+      );
+
+      const iso = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(
+          2,
+          "0",
+        ),
+        String(date.getDate()).padStart(
+          2,
+          "0",
+        ),
+      ].join("-");
+
+      return {
+        iso,
+        shortLabel:
+          date
+            .toLocaleDateString("it-IT", {
+              weekday: "short",
+            })
+            .replace(".", "")
+            .slice(0, 2),
+        dayNumber: date.getDate(),
+        isToday: iso === todayIso(),
+      };
+    },
+  );
+
   async function analyzeConversationMeal() {
     if (!accessToken || !conversationText.trim()) {
       return;
@@ -4773,6 +4919,179 @@ export function HomeShell() {
             )}
           </section>
           ) : null}
+
+          <section
+            className={styles.homeBottomOverview}
+            aria-label="Focus della giornata e settimana"
+          >
+            <div className={styles.dailyFocusCard}>
+              <div className={styles.bottomOverviewHeader}>
+                <div>
+                  <p className={styles.bottomOverviewKicker}>
+                    Oggi
+                  </p>
+                  <h2>
+                    Focus della giornata
+                  </h2>
+                </div>
+
+                <span
+                  className={styles.bottomOverviewBadge}
+                >
+                  In tempo reale
+                </span>
+              </div>
+
+              <p className={styles.bottomOverviewIntro}>
+                Dove sei rispetto ai riferimenti di oggi.
+              </p>
+
+              <div className={styles.dailyFocusRings}>
+                {dailyFocusItems.map((item) => (
+                  <div
+                    key={item.label}
+                    className={styles.dailyFocusItem}
+                  >
+                    <div
+                      className={styles.dailyFocusRing}
+                      style={{
+                        background:
+                          item.target > 0
+                            ? `conic-gradient(#ff6868 ${item.progress}%, #edf0f2 ${item.progress}% 100%)`
+                            : "#edf0f2",
+                      }}
+                      role="img"
+                      aria-label={
+                        item.target > 0
+                          ? `${item.label}: ${Math.round(item.progress)}%`
+                          : `${item.label}: ${Math.round(item.consumed)} ${item.unit} registrati`
+                      }
+                    >
+                      <div
+                        className={styles.dailyFocusRingInner}
+                      >
+                        <strong>
+                          {item.target > 0
+                            ? `${Math.round(
+                                item.progress,
+                              )}%`
+                            : "—"}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <strong
+                      className={styles.dailyFocusLabel}
+                    >
+                      {item.label}
+                    </strong>
+
+                    <span
+                      className={styles.dailyFocusNumbers}
+                    >
+                      {Math.round(item.consumed)}{" "}
+                      {item.unit}
+                      {item.target > 0
+                        ? ` / ${Math.round(
+                            item.target,
+                          )}`
+                        : " registrati"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.weekOverviewCard}>
+              <div className={styles.bottomOverviewHeader}>
+                <div>
+                  <p className={styles.bottomOverviewKicker}>
+                    Ritmo
+                  </p>
+                  <h2>
+                    La tua settimana
+                  </h2>
+                </div>
+
+                <span
+                  className={styles.weekCalendarIcon}
+                  aria-hidden="true"
+                >
+                  ◫
+                </span>
+              </div>
+
+              <p className={styles.bottomOverviewIntro}>
+                Una vista semplice per mantenere il filo,
+                senza inseguire la perfezione.
+              </p>
+
+              <div className={styles.weekDays}>
+                {weekOverviewDays.map((item) => (
+                  <div
+                    key={item.iso}
+                    className={
+                      item.isToday
+                        ? `${styles.weekDay} ${styles.weekDayToday}`
+                        : styles.weekDay
+                    }
+                  >
+                    <span
+                      className={styles.weekDayName}
+                    >
+                      {item.shortLabel}
+                    </span>
+
+                    <strong>
+                      {item.dayNumber}
+                    </strong>
+
+                    <span
+                      className={
+                        item.isToday
+                          ? `${styles.weekDayDot} ${styles.weekDayDotActive}`
+                          : styles.weekDayDot
+                      }
+                      aria-hidden="true"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className={styles.weekTodaySummary}>
+                <span
+                  className={styles.weekTodayProgress}
+                  aria-hidden="true"
+                >
+                  <span
+                    style={{
+                      width: `${budgetProgress}%`,
+                    }}
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    Oggi
+                  </strong>
+                  <span>
+                    {budget
+                      ? `${Math.round(
+                          budget.consumed_kcal,
+                        )} di ${Math.round(
+                          budget.daily_budget_kcal,
+                        )} kcal`
+                      : "Budget non disponibile"}
+                  </span>
+                </div>
+              </div>
+
+              <p className={styles.weekOverviewNote}>
+                Lo storico settimanale completo arriverà
+                qui usando dati reali, non stime.
+              </p>
+            </div>
+          </section>
 
           <div
             {...dashboardWidgetProps("quick-add")}
