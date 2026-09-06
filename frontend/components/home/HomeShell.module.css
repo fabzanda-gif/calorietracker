@@ -9915,8 +9915,7 @@
     display: grid !important;
 
     grid-template-columns:
-      minmax(0, 1fr)
-      minmax(0, 1fr) !important;
+      repeat(12, minmax(0, 1fr)) !important;
 
     gap: 16px !important;
 
@@ -9942,12 +9941,12 @@
   }
 
   .desktopHomeGrid > .mealsSection {
-    grid-column: 1 / 2 !important;
+    grid-column: 1 / 7 !important;
     grid-row: 1 !important;
   }
 
   .desktopHomeGrid > .homeAssistantSection {
-    grid-column: 2 / 3 !important;
+    grid-column: 7 / 13 !important;
     grid-row: 1 !important;
   }
 }
