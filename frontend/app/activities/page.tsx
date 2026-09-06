@@ -675,58 +675,101 @@ export default function ActivitiesPage() {
         today.getDate() + 30,
       );
 
-      const [
-        response,
-        recentResponse,
-        plannedResponse,
-      ] = await Promise.all([
-        getActivityOverview(
-          bounds.start,
-          bounds.end,
-          accessToken,
-        ),
-        getActivitiesForRange(
-          isoDate(rollingStart),
-          isoDate(today),
-          accessToken,
-        ),
-        getPlannedActivities(
-          isoDate(plannedStart),
-          isoDate(plannedEnd),
-          accessToken,
-        ),
-      ]);
+      const loadStartedAt = performance.now();
 
-      const sortedItems = [...response.items].sort(
-        (left, right) => activityTimestamp(right) - activityTimestamp(left),
-      );
-      setActivities(sortedItems);
-      setRecentActivities(
-        [...recentResponse.items].sort(
-          (left, right) => activityTimestamp(right) - activityTimestamp(left),
-        ),
-      );
-      setEnergyDays(response.energy_days);
-      setPlannedActivities(
-        plannedResponse.items,
-      );
-
-      setSelectedActivity((current) => {
-        const visibleItems = sortedItems.filter(
-          (item) => !isDailyMovement(item),
+      const overviewPromise = getActivityOverview(
+        bounds.start,
+        bounds.end,
+        accessToken,
+      ).then((response) => {
+        const sortedItems = [...response.items].sort(
+          (left, right) =>
+            activityTimestamp(right) -
+            activityTimestamp(left),
         );
 
-        if (
-          current &&
-          visibleItems.some(
-            (item) => item.id === current.id,
-          )
-        ) {
-          return current;
-        }
+        setActivities(sortedItems);
+        setEnergyDays(response.energy_days);
 
-        return visibleItems[0] ?? null;
+        setSelectedActivity((current) => {
+          const visibleItems = sortedItems.filter(
+            (item) => !isDailyMovement(item),
+          );
+
+          if (
+            current &&
+            visibleItems.some(
+              (item) => item.id === current.id,
+            )
+          ) {
+            return current;
+          }
+
+          return visibleItems[0] ?? null;
+        });
+
+        console.info(
+          `[Activities perf] overview ready: ${Math.round(
+            performance.now() - loadStartedAt,
+          )} ms`,
+        );
       });
+
+      const recentPromise = getActivitiesForRange(
+        isoDate(rollingStart),
+        isoDate(today),
+        accessToken,
+      ).then((recentResponse) => {
+        setRecentActivities(
+          [...recentResponse.items].sort(
+            (left, right) =>
+              activityTimestamp(right) -
+              activityTimestamp(left),
+          ),
+        );
+
+        console.info(
+          `[Activities perf] recent ready: ${Math.round(
+            performance.now() - loadStartedAt,
+          )} ms`,
+        );
+      });
+
+      const plannedPromise = getPlannedActivities(
+        isoDate(plannedStart),
+        isoDate(plannedEnd),
+        accessToken,
+      ).then((plannedResponse) => {
+        setPlannedActivities(
+          plannedResponse.items,
+        );
+
+        console.info(
+          `[Activities perf] planned ready: ${Math.round(
+            performance.now() - loadStartedAt,
+          )} ms`,
+        );
+      });
+
+      const results = await Promise.allSettled([
+        overviewPromise,
+        recentPromise,
+        plannedPromise,
+      ]);
+
+      const failed = results.find(
+        (result) => result.status === "rejected",
+      );
+
+      if (failed?.status === "rejected") {
+        throw failed.reason;
+      }
+
+      console.info(
+        `[Activities perf] ALL READY: ${Math.round(
+          performance.now() - loadStartedAt,
+        )} ms`,
+      );
     } catch (err) {
       setError(
         err instanceof Error
