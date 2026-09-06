@@ -6,6 +6,7 @@ import threading
 import time
 
 import requests
+import httpx
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
@@ -13,6 +14,7 @@ from typing import Any
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from supabase import Client, create_client
+from supabase.client import ClientOptions
 
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.daily_logs import DailyLogsRepository
@@ -68,6 +70,22 @@ class CurrentUser:
 _AUTH_CACHE: dict[str, tuple[float, str, dict]] = {}
 _AUTH_CACHE_LOCK = threading.Lock()
 _AUTH_CACHE_TTL_SECONDS = 60.0
+
+
+# Shared transport only:
+# every authenticated Supabase client remains request-scoped,
+# but TCP/TLS connections can be reused across requests.
+_SHARED_SUPABASE_HTTP = httpx.Client(
+    timeout=httpx.Timeout(
+        20.0,
+        connect=10.0,
+    ),
+    limits=httpx.Limits(
+        max_connections=40,
+        max_keepalive_connections=20,
+        keepalive_expiry=30.0,
+    ),
+)
 
 
 def _supabase_settings() -> tuple[str, str]:
@@ -238,7 +256,17 @@ def get_authenticated_supabase(
     url, key = _supabase_settings()
 
     create_started_at = time.perf_counter()
-    client = create_client(url, key)
+
+    client = create_client(
+        url,
+        key,
+        options=ClientOptions(
+            httpx_client=_SHARED_SUPABASE_HTTP,
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
+    )
+
     create_elapsed_ms = (
         time.perf_counter() - create_started_at
     ) * 1000
