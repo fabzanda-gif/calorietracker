@@ -1242,6 +1242,36 @@ export function HomeShell() {
       try {
         const date = todayIso();
 
+        const homeLoadStartedAt =
+          performance.now();
+
+        async function timedHomeRequest<T>(
+          label: string,
+          request: Promise<T>,
+        ): Promise<T> {
+          const startedAt = performance.now();
+
+          try {
+            const result = await request;
+
+            console.info(
+              `[Home perf] ${label}: ${(
+                performance.now() - startedAt
+              ).toFixed(0)} ms`,
+            );
+
+            return result;
+          } catch (error) {
+            console.info(
+              `[Home perf] ${label}: FAILED after ${(
+                performance.now() - startedAt
+              ).toFixed(0)} ms`,
+            );
+
+            throw error;
+          }
+        }
+
         const [
           dayPayload,
           budgetPayload,
@@ -1252,36 +1282,67 @@ export function HomeShell() {
           latestWeightPayload,
           profilePayload,
         ] = await Promise.all([
-          getDay(
-            date,
-            accessToken,
+          timedHomeRequest(
+            "day",
+            getDay(
+              date,
+              accessToken,
+            ),
           ),
-          getDayBudget(
-            date,
-            accessToken,
+          timedHomeRequest(
+            "budget",
+            getDayBudget(
+              date,
+              accessToken,
+            ),
           ),
-          getNextMeal(
-            date,
-            accessToken,
+          timedHomeRequest(
+            "next-meal",
+            getNextMeal(
+              date,
+              accessToken,
+            ),
           ),
-          getMealsForDate(
-            date,
-            accessToken,
+          timedHomeRequest(
+            "meals",
+            getMealsForDate(
+              date,
+              accessToken,
+            ),
           ),
-          getActivitiesForDate(
-            date,
-            accessToken,
+          timedHomeRequest(
+            "activities",
+            getActivitiesForDate(
+              date,
+              accessToken,
+            ),
           ),
-          getPlannedActivities(
-            date,
-            futureIso(7),
-            accessToken,
+          timedHomeRequest(
+            "planned-activities",
+            getPlannedActivities(
+              date,
+              futureIso(7),
+              accessToken,
+            ),
           ),
-          getLatestWeight(
-            accessToken,
+          timedHomeRequest(
+            "latest-weight",
+            getLatestWeight(
+              accessToken,
+            ),
           ),
-          getProfile(accessToken),
+          timedHomeRequest(
+            "profile",
+            getProfile(accessToken),
+          ),
         ]);
+
+        console.info(
+          `[Home perf] CORE READY: ${(
+            performance.now() -
+            homeLoadStartedAt
+          ).toFixed(0)} ms`,
+        );
 
         if (active) {
           setDay(dayPayload);
@@ -1345,22 +1406,28 @@ export function HomeShell() {
           // history are enhancements and must never hold up first paint.
           setLoading(false);
 
-          void getDayBriefing(
-            date,
-            briefingMoment(),
-            experienceMode,
-            briefingHour,
-            accessToken,
+          void timedHomeRequest(
+            "AI day-briefing",
+            getDayBriefing(
+              date,
+              briefingMoment(),
+              experienceMode,
+              briefingHour,
+              accessToken,
+            ),
           ).then((payload) => {
             if (active) setDayBriefing(payload.message);
           }).catch(() => undefined);
 
           if (nextMealPayload.next_slot) {
-            void getMealOptions(
-              date,
-              nextMealPayload.next_slot,
-              "auto",
-              accessToken,
+            void timedHomeRequest(
+              "meal-options",
+              getMealOptions(
+                date,
+                nextMealPayload.next_slot,
+                "auto",
+                accessToken,
+              ),
             ).then((payload) => {
               if (!active) return;
               setNextMealOptions(payload);
