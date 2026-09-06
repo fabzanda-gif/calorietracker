@@ -4950,35 +4950,49 @@ export function HomeShell() {
                 {dailyFocusItems.map((item) => (
                   <div
                     key={item.label}
-                    className={styles.dailyFocusItem}
+                    className={
+                      item.target > 0
+                        ? styles.dailyFocusItem
+                        : `${styles.dailyFocusItem} ${styles.dailyFocusItemUntargeted}`
+                    }
                   >
-                    <div
-                      className={styles.dailyFocusRing}
-                      style={{
-                        background:
-                          item.target > 0
-                            ? `conic-gradient(#ff6868 ${item.progress}%, #edf0f2 ${item.progress}% 100%)`
-                            : "#edf0f2",
-                      }}
-                      role="img"
-                      aria-label={
-                        item.target > 0
-                          ? `${item.label}: ${Math.round(item.progress)}%`
-                          : `${item.label}: ${Math.round(item.consumed)} ${item.unit} registrati`
-                      }
-                    >
+                    {item.target > 0 ? (
                       <div
-                        className={styles.dailyFocusRingInner}
+                        className={styles.dailyFocusRing}
+                        style={{
+                          background:
+                            `conic-gradient(#ff6868 ${item.progress}%, #edf0f2 ${item.progress}% 100%)`,
+                        }}
+                        role="img"
+                        aria-label={`${item.label}: ${Math.round(item.progress)}%`}
+                      >
+                        <div
+                          className={styles.dailyFocusRingInner}
+                        >
+                          <strong>
+                            {Math.round(
+                              item.progress,
+                            )}%
+                          </strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={styles.dailyFocusStat}
+                        role="img"
+                        aria-label={`${item.label}: ${Math.round(item.consumed)} ${item.unit} registrati`}
                       >
                         <strong>
-                          {item.target > 0
-                            ? `${Math.round(
-                                item.progress,
-                              )}%`
-                            : "—"}
+                          {Math.round(
+                            item.consumed,
+                          )}
                         </strong>
+
+                        <span>
+                          {item.unit}
+                        </span>
                       </div>
-                    </div>
+                    )}
 
                     <strong
                       className={styles.dailyFocusLabel}
@@ -4989,13 +5003,13 @@ export function HomeShell() {
                     <span
                       className={styles.dailyFocusNumbers}
                     >
-                      {Math.round(item.consumed)}{" "}
-                      {item.unit}
                       {item.target > 0
-                        ? ` / ${Math.round(
+                        ? `${Math.round(
+                            item.consumed,
+                          )} ${item.unit} / ${Math.round(
                             item.target,
                           )}`
-                        : " registrati"}
+                        : "Registrati oggi"}
                     </span>
                   </div>
                 ))}
@@ -5087,8 +5101,9 @@ export function HomeShell() {
               </div>
 
               <p className={styles.weekOverviewNote}>
-                Lo storico settimanale completo arriverà
-                qui usando dati reali, non stime.
+                Oggi è il tuo punto di riferimento.
+                Il quadro della settimana si costruisce
+                con i giorni che registri.
               </p>
             </div>
           </section>

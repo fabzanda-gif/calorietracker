@@ -10639,3 +10639,78 @@
     display: none;
   }
 }
+
+
+/* ==========================================================
+   HOME BOTTOM OVERVIEW — MISSING TARGET POLISH V1
+   Untargeted macros render as compact stats, not empty rings.
+   ========================================================== */
+
+.dailyFocusItemUntargeted {
+  justify-content: flex-start;
+}
+
+.dailyFocusStat {
+  width: 78px;
+  height: 78px;
+
+  display: flex;
+
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 1px;
+
+  border:
+    1px solid rgba(18, 48, 77, 0.08);
+
+  border-radius: 22px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fafbfb 0%,
+      #f5f7f8 100%
+    );
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.dailyFocusStat strong {
+  color: #102f4e;
+
+  font-size: 1.12rem;
+  line-height: 1;
+
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.dailyFocusStat span {
+  color: #8090a1;
+
+  font-size: 0.62rem;
+  line-height: 1;
+
+  font-weight: 800;
+}
+
+.dailyFocusItemUntargeted
+  .dailyFocusNumbers {
+  color: #8a97a5;
+}
+
+.weekOverviewNote {
+  max-width: 31rem;
+}
+
+@media (max-width: 620px) {
+  .dailyFocusStat {
+    width: 72px;
+    height: 72px;
+
+    border-radius: 20px;
+  }
+}
