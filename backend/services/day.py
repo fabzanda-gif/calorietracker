@@ -137,6 +137,49 @@ class DayService:
         )
         row = row or {}
 
+        preloaded_daily_logs = None
+
+        # Production repositories support date-range reads. Some lightweight
+        # test doubles intentionally expose only get_for_date_compatible().
+        # Keep the optimization optional so the historical service contract
+        # remains backward-compatible.
+        if hasattr(
+            self.daily_logs_repo,
+            "list_date_range",
+        ):
+            memory_lookback_weeks = int(
+                getattr(
+                    self.memory_service,
+                    "lookback_weeks",
+                    16,
+                )
+            )
+
+            if self.meal_memory_service is not None:
+                memory_lookback_weeks = max(
+                    memory_lookback_weeks,
+                    int(
+                        getattr(
+                            self.meal_memory_service,
+                            "lookback_weeks",
+                            12,
+                        )
+                    ),
+                )
+
+            history_start = day_date - timedelta(
+                weeks=memory_lookback_weeks
+            )
+            history_end = day_date - timedelta(days=1)
+
+            preloaded_daily_logs = (
+                self.daily_logs_repo.list_date_range(
+                    user_id=user_id,
+                    start_date=history_start,
+                    end_date=history_end,
+                )
+            )
+
         # Explicit daily choice remains authoritative.
         context = _known_value(row.get("day_type"))
 
@@ -153,19 +196,33 @@ class DayService:
         # Fall back to historical memory only when the weekly schedule
         # cannot provide a usable value.
         if context["state"] == "unknown":
-            prediction = self.memory_service.predict_context(
-                user_id=user_id,
-                day_date=day_date,
-            )
+            if preloaded_daily_logs is None:
+                prediction = self.memory_service.predict_context(
+                    user_id=user_id,
+                    day_date=day_date,
+                )
+            else:
+                prediction = self.memory_service.predict_context(
+                    user_id=user_id,
+                    day_date=day_date,
+                    preloaded_daily_logs=preloaded_daily_logs,
+                )
             if prediction["state"] == "predicted":
                 context = prediction
 
         activity_plan = _known_value(row.get("activity_plan"))
         if activity_plan["state"] == "unknown":
-            prediction = self.memory_service.predict_activity_plan(
-                user_id=user_id,
-                day_date=day_date,
-            )
+            if preloaded_daily_logs is None:
+                prediction = self.memory_service.predict_activity_plan(
+                    user_id=user_id,
+                    day_date=day_date,
+                )
+            else:
+                prediction = self.memory_service.predict_activity_plan(
+                    user_id=user_id,
+                    day_date=day_date,
+                    preloaded_daily_logs=preloaded_daily_logs,
+                )
             if prediction["state"] == "predicted":
                 activity_plan = prediction
 
@@ -176,12 +233,21 @@ class DayService:
 
         if self.meal_memory_service is not None:
             for slot, meal_type in MEAL_SLOTS.items():
-                meals[slot] = self.meal_memory_service.predict_meal(
-                    user_id=user_id,
-                    day_date=day_date,
-                    meal_type=meal_type,
-                    day_context=context.get("value"),
-                )
+                if preloaded_daily_logs is None:
+                    meals[slot] = self.meal_memory_service.predict_meal(
+                        user_id=user_id,
+                        day_date=day_date,
+                        meal_type=meal_type,
+                        day_context=context.get("value"),
+                    )
+                else:
+                    meals[slot] = self.meal_memory_service.predict_meal(
+                        user_id=user_id,
+                        day_date=day_date,
+                        meal_type=meal_type,
+                        day_context=context.get("value"),
+                        preloaded_daily_logs=preloaded_daily_logs,
+                    )
 
         return {
             "date": str(day_date),

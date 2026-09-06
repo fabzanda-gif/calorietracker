@@ -48,6 +48,7 @@ class MealMemoryService:
         day_date: date,
         meal_type: str,
         day_context: str | None = None,
+        preloaded_daily_logs: list[dict] | None = None,
     ) -> dict:
         start_date = day_date - timedelta(weeks=self.lookback_weeks)
         end_date = day_date - timedelta(days=1)
@@ -58,11 +59,21 @@ class MealMemoryService:
             end_date=end_date,
         )
 
-        day_logs = self.daily_logs_repo.list_date_range(
-            user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        if preloaded_daily_logs is None:
+            day_logs = self.daily_logs_repo.list_date_range(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            day_logs = [
+                row
+                for row in preloaded_daily_logs
+                if row.get("date")
+                and start_date
+                <= date.fromisoformat(str(row["date"]))
+                <= end_date
+            ]
 
         context_by_date = {
             str(row.get("date")): row.get("day_type")
