@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date as Date
 from datetime import datetime, timedelta
 import hashlib
@@ -496,22 +497,34 @@ def get_ranked_meal_options(
     meal_type = _validate_slot(meal_slot)
 
     try:
-        day = _build_day(
-            user_id=current_user.id,
-            day_date=day_date,
-            daily_logs_repo=daily_logs_repo,
-            meals_repo=meals_repo,
-            weekly_schedule_repo=weekly_schedule_repo,
-        )
+        # Day prediction and budget calculation are independent
+        # read-only branches. Overlap their Supabase I/O instead of
+        # paying both latency chains sequentially.
+        with ThreadPoolExecutor(
+            max_workers=2,
+            thread_name_prefix="meal_options_executor",
+        ) as executor:
+            day_future = executor.submit(
+                _build_day,
+                user_id=current_user.id,
+                day_date=day_date,
+                daily_logs_repo=daily_logs_repo,
+                meals_repo=meals_repo,
+                weekly_schedule_repo=weekly_schedule_repo,
+            )
 
-        budget_result = _build_budget(
-            current_user=current_user,
-            day_date=day_date,
-            meals_repo=meals_repo,
-            activities_repo=activities_repo,
-            daily_logs_repo=daily_logs_repo,
-            weight_repo=weight_repo,
-        )
+            budget_future = executor.submit(
+                _build_budget,
+                current_user=current_user,
+                day_date=day_date,
+                meals_repo=meals_repo,
+                activities_repo=activities_repo,
+                daily_logs_repo=daily_logs_repo,
+                weight_repo=weight_repo,
+            )
+
+            day = day_future.result()
+            budget_result = budget_future.result()
 
         budget = budget_result.get("budget") or {}
         available_kcal = budget.get("available_kcal")
