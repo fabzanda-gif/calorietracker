@@ -89,11 +89,23 @@ class MealPrepLoggingService:
             "fat": self._number(
                 batch.get("fat_per_portion")
             ),
-            "notes": "Logged from meal prep inventory",
+            "notes": (
+                f"Logged from meal prep inventory; "
+                f"Meal prep batch: {batch_id}"
+            ),
             "category": "meal_prep",
         }
 
-        meal = self.meals_repo.create(payload)
+        create_compatible = getattr(
+            self.meals_repo,
+            "create_compatible",
+            None,
+        )
+
+        if create_compatible is not None:
+            meal = create_compatible(payload)
+        else:
+            meal = self.meals_repo.create(payload)
         if meal is None:
             meal = payload
 

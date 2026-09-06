@@ -24,6 +24,11 @@ interface AuthContextValue {
     email: string,
     password: string,
   ) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signUpWithPassword: (
+    email: string,
+    password: string,
+  ) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -101,6 +106,40 @@ export function AuthProvider({
         if (error) {
           throw error;
         }
+      },
+
+      async signInWithGoogle() {
+        const { error } =
+          await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+              redirectTo: window.location.origin,
+            },
+          });
+
+        if (error) {
+          throw error;
+        }
+      },
+
+      async signUpWithPassword(
+        email: string,
+        password: string,
+      ) {
+        const { data, error } =
+          await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: window.location.origin,
+            },
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        return data.session == null;
       },
 
       async signOut() {

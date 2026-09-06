@@ -12,6 +12,9 @@ export interface ConfirmMealRecommendation {
   protein_g?: number;
   carbs_g?: number;
   fat_g?: number;
+  strategy?: string;
+  components?: unknown;
+  removed_components?: Array<Record<string, unknown>>;
 }
 
 export function confirmMealPrediction(

@@ -29,6 +29,7 @@ export interface LoggedMeal {
   is_reusable?: boolean | null;
   notes?: string | null;
   quantity?: number | null;
+  recipe_servings?: number | null;
   is_per_100g?: boolean | null;
   base_calories?: number | null;
   base_protein?: number | null;
@@ -44,12 +45,28 @@ export interface MealsForDateResponse {
   items: LoggedMeal[];
 }
 
+export interface MealHistoryResponse {
+  count: number;
+  items: LoggedMeal[];
+}
+
 export function getMealsForDate(
   dayDate: string,
   accessToken?: string | null,
 ): Promise<MealsForDateResponse> {
   return apiRequest<MealsForDateResponse>(
     `/meals/${encodeURIComponent(dayDate)}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function getMealHistory(
+  accessToken?: string | null,
+): Promise<MealHistoryResponse> {
+  return apiRequest<MealHistoryResponse>(
+    "/meals/history",
     {
       accessToken,
     },
@@ -98,6 +115,7 @@ export interface MealUpdateInput {
   is_reusable?: boolean;
   base_name?: string | null;
   quantity?: number | null;
+  recipe_servings?: number | null;
   is_per_100g?: boolean | null;
   base_calories?: number | null;
   base_protein?: number | null;
@@ -239,6 +257,27 @@ export function previewConversationalMeal(
       accessToken,
       body: JSON.stringify({
         text,
+        meal_type: mealType,
+      }),
+    },
+  );
+}
+
+
+export function previewPhotoMeal(
+  imageBase64: string,
+  mimeType: string,
+  mealType: string,
+  accessToken?: string | null,
+): Promise<ConversationalMealPreview> {
+  return apiRequest<ConversationalMealPreview>(
+    "/meals/photo/preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        image_base64: imageBase64,
+        mime_type: mimeType,
         meal_type: mealType,
       }),
     },

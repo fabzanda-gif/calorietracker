@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+import base64
+import binascii
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -14,6 +16,10 @@ from backend.repositories.base import RepositoryError
 from backend.repositories.ingredients import IngredientsRepository
 from backend.services.ingredient_names import (
     normalize_ingredient_name,
+)
+from backend.services.nutrition_label_vision import (
+    NutritionLabelVisionError,
+    NutritionLabelVisionService,
 )
 
 
@@ -44,6 +50,31 @@ class IngredientCreate(BaseModel):
     default_quantity: float | None = Field(
         default=None,
         gt=0,
+    )
+
+    kind: Literal[
+        "ingredient",
+        "product",
+        "prepared_food",
+    ] = "ingredient"
+
+    meal_slots: list[
+        Literal[
+            "breakfast",
+            "lunch",
+            "snack",
+            "dinner",
+        ]
+    ] = Field(default_factory=list)
+
+
+class NutritionLabelScanRequest(BaseModel):
+    content_base64: str = Field(
+        min_length=1,
+    )
+    mime_type: str = Field(
+        min_length=1,
+        max_length=80,
     )
 
 
@@ -84,6 +115,84 @@ class IngredientUpdate(BaseModel):
         default=None,
         gt=0,
     )
+
+    kind: Literal[
+        "ingredient",
+        "product",
+        "prepared_food",
+    ] | None = None
+
+    meal_slots: list[
+        Literal[
+            "breakfast",
+            "lunch",
+            "snack",
+            "dinner",
+        ]
+    ] | None = None
+
+
+@router.post("/scan-label")
+def scan_nutrition_label(
+    request: NutritionLabelScanRequest,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+):
+    _ = current_user
+
+    if request.mime_type not in {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=(
+                "Formato immagine non supportato."
+            ),
+        )
+
+    try:
+        image_bytes = base64.b64decode(
+            request.content_base64,
+            validate=True,
+        )
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Immagine non valida.",
+        ) from exc
+
+    if len(image_bytes) > 8 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                "L'immagine supera il limite "
+                "di 8 MB."
+            ),
+        )
+
+    try:
+        result = (
+            NutritionLabelVisionService()
+            .analyze(
+                image_bytes=image_bytes,
+                mime_type=request.mime_type,
+            )
+        )
+    except NutritionLabelVisionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Non riesco a leggere "
+                "l'etichetta nutrizionale."
+            ),
+        ) from exc
+
+    return {
+        "result": result,
+    }
 
 
 @router.get("")

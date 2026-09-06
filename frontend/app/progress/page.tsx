@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
 import {
   createWeight,
   getWeightHistory,
@@ -434,6 +435,50 @@ function WeightChart({
   );
 }
 
+function HeroWeightChart({ items }: { items: WeightEntry[] }) {
+  if (items.length < 2) {
+    return (
+      <div className={styles.heroChartEmpty}>
+        Registra almeno due pesate per vedere la direzione.
+      </div>
+    );
+  }
+
+  const width = 560;
+  const height = 170;
+  const padding = 18;
+  const values = items.map((item) => Number(item.weight));
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const spread = Math.max(1, maximum - minimum);
+  const xFor = (index: number) =>
+    padding + (index / (items.length - 1)) * (width - padding * 2);
+  const yFor = (value: number) =>
+    padding + (1 - (value - minimum) / spread) * (height - padding * 2);
+  const points = values
+    .map((value, index) => `${xFor(index)},${yFor(value)}`)
+    .join(" ");
+
+  return (
+    <div className={styles.heroChartWrap}>
+      <div className={styles.heroChartTitle}>
+        <span>Andamento peso · ultimi 90 giorni</span>
+        <strong>{formatWeight(values[0])} → {formatWeight(values[values.length - 1])} kg</strong>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Trend del peso negli ultimi 90 giorni">
+        {[0.25, 0.5, 0.75].map((ratio) => (
+          <line key={ratio} x1={padding} x2={width - padding} y1={height * ratio} y2={height * ratio} className={styles.heroGridLine} />
+        ))}
+        <polyline points={points} fill="none" className={styles.heroTrendLine} />
+        {items.map((item, index) => (
+          <circle key={`${item.id}-hero`} cx={xFor(index)} cy={yFor(Number(item.weight))} r="3.5" className={styles.heroTrendPoint} />
+        ))}
+      </svg>
+      <div className={styles.heroChartDates}><span>90 giorni fa</span><span>Oggi</span></div>
+    </div>
+  );
+}
+
 function DailyMetricsChart({
   items,
   metric,
@@ -660,6 +705,26 @@ function DailyMetricsChart({
             <span>
               <i className={styles.legendOtherMeal} />
               Altro
+            </span>
+          </>
+        ) : metric === "activity" ? (
+          <>
+            <span>
+              <i
+                className={
+                  styles.legendActivityLow
+                }
+              />
+              Meno di 500 kcal
+            </span>
+
+            <span>
+              <i
+                className={
+                  styles.legendActivityHigh
+                }
+              />
+              500 kcal o più
             </span>
           </>
         ) : (
@@ -997,9 +1062,13 @@ function DailyMetricsChart({
                   )}
                   rx="5"
                   className={
-                    overBudget
-                      ? styles.calorieBarOver
-                      : styles.calorieBar
+                    metric === "activity"
+                      ? value < 500
+                        ? styles.activityBarLow
+                        : styles.activityBarHigh
+                      : overBudget
+                        ? styles.calorieBarOver
+                        : styles.calorieBar
                   }
                 >
                   <title>
@@ -1010,6 +1079,11 @@ function DailyMetricsChart({
                     {Math.round(value)}
                     {" "}
                     {metricUnit(metric)}
+                    {metric === "activity"
+                      ? value < 500
+                        ? " · fascia < 500"
+                        : " · fascia ≥ 500"
+                      : ""}
                   </title>
                 </rect>
               );
@@ -1060,6 +1134,8 @@ function DailyMetricsChart({
 
 export default function ProgressPage() {
   const { accessToken } = useAuth();
+  const { experienceMode } = useExperienceMode();
+  const zero = experienceMode === "zero";
 
   const [items, setItems] =
     useState<WeightEntry[]>([]);
@@ -1134,6 +1210,7 @@ export default function ProgressPage() {
         );
 
       setNutrition(response);
+      setError(null);
     } catch (err) {
       setError(
         err instanceof Error
@@ -1162,6 +1239,7 @@ export default function ProgressPage() {
           a.date.localeCompare(b.date),
         ),
       );
+      setError(null);
     } catch (err) {
       setError(
         err instanceof Error
@@ -1429,6 +1507,7 @@ export default function ProgressPage() {
         eyebrow: string;
         title: string;
         body: string;
+        tone: "navy" | "coral" | "neutral";
       }> = [];
 
       /*
@@ -1457,6 +1536,7 @@ export default function ProgressPage() {
               )} kg`,
           body:
             "Variazione tra la prima e l’ultima misurazione del periodo selezionato.",
+          tone: "navy",
         });
       }
 
@@ -1488,6 +1568,10 @@ export default function ProgressPage() {
             percentage >= 70
               ? `Nel ${percentage}% dei giorni con un budget disponibile sei rimasto entro il valore calcolato da SanoSync.`
               : `Sei rimasto entro budget nel ${percentage}% dei giorni per cui era disponibile un confronto.`,
+          tone:
+            percentage >= 70
+              ? "navy"
+              : "coral",
         });
       }
 
@@ -1543,6 +1627,10 @@ export default function ProgressPage() {
             )}% delle calorie`,
             body:
               "È il momento della giornata che pesa maggiormente sulla distribuzione calorica del periodo selezionato.",
+            tone:
+              dominant.value >= 50
+                ? "coral"
+                : "neutral",
           });
         }
       }
@@ -1561,6 +1649,7 @@ export default function ProgressPage() {
           )} g di proteine al giorno`,
           body:
             "Media giornaliera calcolata sui giorni registrati nel periodo nutrizionale selezionato.",
+          tone: "navy",
         });
       }
 
@@ -1572,6 +1661,10 @@ export default function ProgressPage() {
         nutritionMetric === "activity" &&
         metricStats.activeDays > 0
       ) {
+        const averageActivity =
+          metricStats.total /
+          metricStats.activeDays;
+
         result.push({
           eyebrow: "Attività",
           title: `${metricStats.activeDays} ${
@@ -1581,7 +1674,13 @@ export default function ProgressPage() {
           } nel periodo`,
           body: `${roundKcal(
             metricStats.total,
-          )} kcal di attività registrate complessivamente.`,
+          )} kcal registrate complessivamente · ${roundKcal(
+            averageActivity,
+          )} kcal per giorno attivo.`,
+          tone:
+            averageActivity >= 500
+              ? "navy"
+              : "coral",
         });
       }
 
@@ -1649,10 +1748,16 @@ export default function ProgressPage() {
             Progressi
           </p>
 
-          <h1>La tua direzione</h1>
+          <h1>
+            {zero
+              ? "Vediamo cosa dicono i numeri."
+              : "La tua direzione"}
+          </h1>
 
           <p className={styles.subtitle}>
-            Guarda la direzione, non il singolo numero.
+            {zero
+              ? "I dati non giudicano. Si limitano a ricordare tutto."
+              : "Guarda la direzione, non il singolo numero."}
           </p>
         </div>
       </header>
@@ -1667,9 +1772,9 @@ export default function ProgressPage() {
       ) : null}
 
       <section className={styles.hero}>
-        <div>
+        <div className={styles.heroSummary}>
           <p className={styles.kicker}>
-            Peso
+            Peso attuale
           </p>
 
           <div className={styles.currentWeight}>
@@ -1697,7 +1802,30 @@ export default function ProgressPage() {
               Nessuna misurazione disponibile.
             </p>
           )}
+          <div className={styles.directionNote}>
+            <span aria-hidden="true">↘</span>
+            <div>
+              <strong>
+                {zero
+                  ? stats && stats.change < 0
+                    ? "Sta scendendo. Non fare il fenomeno."
+                    : stats && stats.change > 0
+                      ? "Sta salendo. I grafici non hanno tatto."
+                      : "Fermo lì. Almeno qualcuno."
+                  : stats && stats.change < 0
+                    ? "Direzione costante"
+                    : "Il trend prende forma"}
+              </strong>
+              <small>
+                {zero
+                  ? "Un dato fa scena. Il trend almeno prova a dire qualcosa."
+                  : "Conta la direzione, non la singola giornata."}
+              </small>
+            </div>
+          </div>
         </div>
+
+        <HeroWeightChart items={visibleItems} />
 
         <form
           className={styles.weightForm}
@@ -1744,13 +1872,27 @@ export default function ProgressPage() {
         </form>
       </section>
 
-      <section className={styles.chartSection}>
+      <section className={styles.topStatsGrid}>
+        <article><span className={styles.statIcon}>↗</span><div><strong>{stats ? `${stats.change > 0 ? "+" : ""}${formatWeight(stats.change)} kg` : "—"}</strong><span>Variazione nel periodo</span></div></article>
+        <article><span className={styles.statIcon}>▣</span><div><strong>{stats?.count ?? 0}</strong><span>Misurazioni totali</span></div></article>
+        <article><span className={`${styles.statIcon} ${styles.statIconWarm}`}>◎</span><div><strong>{nutritionStats?.days_with_budget ? `${nutritionStats.days_within_budget}/${nutritionStats.days_with_budget}` : "—"}</strong><span>Giorni nel budget</span></div></article>
+        <article><span className={`${styles.statIcon} ${styles.statIconLilac}`}>◇</span><div><strong>{macroStats ? `${roundKcal(macroStats.protein)} g` : "—"}</strong><span>Proteine medie</span></div></article>
+      </section>
+
+      <section className={styles.overviewSection}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
-              Andamento
+              La tua storia
             </p>
-            <h2>Il tuo peso nel tempo</h2>
+            <h2>
+              {zero ? "I numeri non dimenticano" : "Il quadro completo"}
+            </h2>
+            <p className={styles.sectionSubtitle}>
+              {zero
+                ? "Peso, calorie e abitudini. Tutto nello stesso fascicolo."
+                : "Peso, bilancio calorico e abitudini letti insieme."}
+            </p>
           </div>
 
           <div
@@ -1775,71 +1917,51 @@ export default function ProgressPage() {
             ))}
           </div>
         </div>
-
-        {loading ? (
-          <div className={styles.loadingChart}>
-            Carico lo storico…
+        <div className={styles.overviewGrid}>
+          <div className={styles.overviewChart}>
+            {loading ? <div className={styles.loadingChart}>Carico lo storico…</div> : <WeightChart items={visibleItems} />}
           </div>
-        ) : (
-          <WeightChart
-            items={visibleItems}
-          />
-        )}
+          <aside className={styles.insightPanel}>
+            <p className={styles.kicker}>Insight</p>
+            <h3>
+              {zero ? "Cosa non è andato storto" : "Cosa sta funzionando"}
+            </h3>
+            {progressInsights.length ? progressInsights.slice(0, 3).map((insight, index) => (
+              <article key={`${insight.eyebrow}-summary-${index}`}>
+                <span aria-hidden="true">{index === 0 ? "↓" : index === 1 ? "◔" : "✓"}</span>
+                <div><strong>{insight.title}</strong><p>{insight.body}</p></div>
+              </article>
+            )) : (
+              <p className={styles.muted}>
+                {zero
+                  ? "Continua a registrare. Prima o poi i dati avranno qualcosa da confessare."
+                  : "Continua a registrare: presto troverai qui una lettura dei tuoi progressi."}
+              </p>
+            )}
+            <Link href="#nutrition-detail" className={styles.insightLink}>Vedi dettaglio nutrizione →</Link>
+          </aside>
+        </div>
       </section>
 
-      <section className={styles.statsGrid}>
-        <article>
-          <span>Minimo</span>
-          <strong>
-            {stats
-              ? `${formatWeight(stats.min)} kg`
-              : "—"}
-          </strong>
-        </article>
-
-        <article>
-          <span>Massimo</span>
-          <strong>
-            {stats
-              ? `${formatWeight(stats.max)} kg`
-              : "—"}
-          </strong>
-        </article>
-
-        <article>
-          <span>Variazione</span>
-          <strong>
-            {stats
-              ? `${stats.change > 0 ? "+" : ""}${formatWeight(
-                  stats.change,
-                )} kg`
-              : "—"}
-          </strong>
-        </article>
-
-        <article>
-          <span>Misurazioni</span>
-          <strong>
-            {stats?.count ?? 0}
-          </strong>
-        </article>
-      </section>
-
-      <section className={styles.analyticsSection}>
+      <section className={styles.analyticsSection} id="nutrition-detail">
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
-              Andamento
+              {zero ? "I conti" : "Andamento"}
             </p>
 
             <h2>
-              Nutrizione &amp; attività
+              {zero
+                ? "Nutrizione, attività e altre prove"
+                : "Nutrizione & attività"}
             </h2>
 
             <p className={styles.sectionSubtitle}>
-              {metricDescription(
-                nutritionMetric,
-              )}
+              {zero
+                ? "Vediamo cosa hai registrato. Il resto non può testimoniare."
+                : metricDescription(
+                    nutritionMetric,
+                  )}
             </p>
           </div>
         </div>
@@ -2110,53 +2232,33 @@ export default function ProgressPage() {
           </article>
         </section>
       )}
-      {progressInsights.length ? (
-        <section className={styles.insightsSection}>
-          <div className={styles.insightsHeader}>
-            <div>
-              <p className={styles.kicker}>
-                Insight
-              </p>
-
-              <h2>
-                Cosa sta succedendo
-              </h2>
-
-              <p className={styles.sectionSubtitle}>
-                Una lettura semplice dei dati che hai
-                registrato.
-              </p>
-            </div>
-          </div>
-
-          <div className={styles.insightsGrid}>
-            {progressInsights.map(
-              (insight, index) => (
-                <article
-                  key={`${insight.eyebrow}-${index}`}
-                  className={styles.insightCard}
-                >
-                  <span
-                    className={
-                      styles.insightEyebrow
-                    }
-                  >
-                    {insight.eyebrow}
-                  </span>
-
-                  <strong>
-                    {insight.title}
-                  </strong>
-
-                  <p>
-                    {insight.body}
-                  </p>
-                </article>
-              ),
-            )}
-          </div>
-        </section>
-      ) : null}
+      <section className={styles.consistencySection}>
+        <div>
+          <p className={styles.kicker}>
+            {zero ? "Sette giorni di prove" : "Costanza"}
+          </p>
+          <h2>Gli ultimi 7 giorni</h2>
+          <p className={styles.sectionSubtitle}>
+            {zero
+              ? "Abbastanza per un trend. Troppo pochi per una leggenda."
+              : "Una settimana è fatta di direzioni, non di giornate perfette."}
+          </p>
+        </div>
+        <div className={styles.consistencyDays}>
+          {(nutrition?.items ?? []).slice(-7).map((item) => {
+            const difference = item.difference_kcal;
+            const state = difference === null ? "empty" : difference > 100 ? "surplus" : difference < -100 ? "deficit" : "maintenance";
+            return (
+              <article key={`consistency-${item.date}`}>
+                <span className={`${styles.dayRing} ${styles[`dayRing_${state}`]}`}>{state === "deficit" ? "↓" : state === "surplus" ? "↑" : state === "maintenance" ? "=" : "·"}</span>
+                <strong>{new Date(`${item.date}T00:00:00`).toLocaleDateString("it-IT", { weekday: "short" })}</strong>
+                <small>{formatDate(item.date)}</small>
+              </article>
+            );
+          })}
+          {!nutrition?.items.length ? <p className={styles.muted}>Nessun dato disponibile per questa settimana.</p> : null}
+        </div>
+      </section>
 
       </main>
     </>

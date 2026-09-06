@@ -1,17 +1,44 @@
 import { apiRequest } from "./client";
 
+export interface ActivityRoutePoint {
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+  time?: string;
+}
+
+export interface ActivitySeriesPoint {
+  index: number;
+  time?: string;
+  cadence?: number;
+  heart_rate?: number;
+}
+
 export interface Activity {
   id?: string | number | null;
   user_id?: string;
   date: string;
   activity_name: string;
   burned_calories: number;
+  source?: "manual" | "gpx";
+  activity_type?: string | null;
+  started_at?: string | null;
+  duration_seconds?: number | null;
+  distance_meters?: number | null;
+  average_cadence?: number | null;
+  average_heart_rate?: number | null;
+  route_points?: ActivityRoutePoint[] | string;
+  series_points?: ActivitySeriesPoint[] | string;
+  original_point_count?: number | null;
+  gpx_file_name?: string | null;
 }
 
 export interface ActivityCreateInput {
   date: string;
   activity_name: string;
   burned_calories: number;
+  activity_type?: string;
+  duration_seconds?: number;
 }
 
 export interface ActivityUpdateInput {
@@ -19,9 +46,18 @@ export interface ActivityUpdateInput {
   burned_calories?: number;
 }
 
+export interface ActivityMovementSummary {
+  total_steps: number;
+  estimated_training_steps: number;
+  applied_step_offset: number;
+  net_daily_steps: number;
+  step_calories: number;
+}
+
 export interface ActivityCreateResponse {
   created: boolean;
   item: Activity;
+  movement?: ActivityMovementSummary;
 }
 
 export interface ActivityListResponse {
@@ -87,3 +123,543 @@ export function deleteActivity(
     },
   );
 }
+
+
+export interface GpxActivityPreview
+  extends Omit<Activity, "id" | "user_id" | "burned_calories"> {
+  source: "gpx";
+  original_point_count: number;
+  estimated_calories?: number;
+}
+
+export interface GpxPreviewResponse {
+  file_name: string;
+  preview: GpxActivityPreview;
+}
+
+export interface GpxImportInput {
+  file_name: string;
+  content_base64: string;
+  activity_name?: string;
+  activity_type?: string;
+  activity_date?: string;
+  burned_calories?: number;
+}
+
+export interface ActivityRangeResponse
+  extends ActivityListResponse {
+  start_date: string;
+  end_date: string;
+}
+
+export interface ActivityEnergyDay {
+  date: string;
+  state: "deficit" | "maintenance" | "surplus";
+  balance_kcal: number;
+}
+
+export interface ActivityOverviewResponse extends ActivityRangeResponse {
+  energy_days: ActivityEnergyDay[];
+  summary: {
+    workouts: number;
+    duration_seconds: number;
+    distance_meters: number;
+    burned_calories: number;
+  };
+}
+
+export function getActivityOverview(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<ActivityOverviewResponse> {
+  const query = new URLSearchParams({ start_date: startDate, end_date: endDate });
+  return apiRequest<ActivityOverviewResponse>(`/activities/overview?${query.toString()}`, { accessToken });
+}
+
+export function previewGpxActivity(
+  input: {
+    file_name: string;
+    content_base64: string;
+    activity_type?: string;
+  },
+  accessToken?: string | null,
+): Promise<GpxPreviewResponse> {
+  return apiRequest<GpxPreviewResponse>(
+    "/activities/gpx/preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function importGpxActivity(
+  input: GpxImportInput,
+  accessToken?: string | null,
+): Promise<ActivityCreateResponse> {
+  return apiRequest<ActivityCreateResponse>(
+    "/activities/gpx/import",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getActivitiesForRange(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<ActivityRangeResponse> {
+  const query = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+  });
+
+  return apiRequest<ActivityRangeResponse>(
+    `/activities/range?${query.toString()}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+
+export function getActivityMovement(
+  date: string,
+  accessToken?: string | null,
+): Promise<ActivityMovementSummary> {
+  return apiRequest<ActivityMovementSummary>(
+    `/activities/movement/${encodeURIComponent(date)}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+/* ACTIVITY AI COMMENT API START */
+
+export interface ActivityCommentResponse {
+  comment: string;
+  source: "groq" | "fallback";
+  mode: "standard" | "zero";
+}
+
+export function getActivityComment(
+  activity: Activity,
+  mode: "standard" | "zero",
+  accessToken?: string | null,
+): Promise<ActivityCommentResponse> {
+  return apiRequest<ActivityCommentResponse>(
+    "/activities/comment",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        activity_name:
+          activity.activity_name,
+        activity_type:
+          activity.activity_type ?? null,
+        burned_calories:
+          Number(
+            activity.burned_calories ?? 0,
+          ),
+        duration_seconds:
+          activity.duration_seconds ?? null,
+        distance_meters:
+          activity.distance_meters ?? null,
+        average_cadence:
+          activity.average_cadence ?? null,
+        average_heart_rate:
+          activity.average_heart_rate ?? null,
+        source:
+          activity.source ?? null,
+        mode,
+      }),
+    },
+  );
+}
+
+/* ACTIVITY AI COMMENT API END */
+
+/* PLANNED ACTIVITIES API START */
+
+export type PlannedActivityStatus =
+  | "planned"
+  | "completed"
+  | "skipped";
+
+export type PlannedActivityIntensity =
+  | "low"
+  | "moderate"
+  | "hard"
+  | "race"
+  | "unknown";
+
+export interface PlannedActivity {
+  id: string;
+  user_id?: string;
+  scheduled_date: string;
+  scheduled_time?: string | null;
+  title: string;
+  activity_type: string;
+  duration_minutes?: number | null;
+  distance_meters?: number | null;
+  intensity: PlannedActivityIntensity;
+  notes?: string | null;
+  status: PlannedActivityStatus;
+  training_plan_id?: string | null;
+  training_week?: number | null;
+  session_kind?:
+    | "easy"
+    | "recovery"
+    | "tempo"
+    | "interval"
+    | "long"
+    | "race"
+    | null;
+}
+
+export interface PlannedActivityInput {
+  scheduled_date: string;
+  scheduled_time?: string | null;
+  title: string;
+  activity_type: string;
+  duration_minutes?: number | null;
+  distance_meters?: number | null;
+  intensity?: PlannedActivityIntensity;
+  notes?: string | null;
+}
+
+export function getPlannedActivities(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<{
+  count: number;
+  items: PlannedActivity[];
+}> {
+  const query = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+  });
+
+  return apiRequest(
+    `/activities/planned?${query.toString()}`,
+    { accessToken },
+  );
+}
+
+export function createPlannedActivity(
+  input: PlannedActivityInput,
+  accessToken?: string | null,
+): Promise<{
+  created: boolean;
+  item: PlannedActivity;
+}> {
+  return apiRequest(
+    "/activities/planned",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function updatePlannedActivity(
+  id: string,
+  input: Partial<
+    PlannedActivityInput & {
+      status: PlannedActivityStatus;
+    }
+  >,
+  accessToken?: string | null,
+): Promise<{
+  updated: boolean;
+  item: PlannedActivity;
+}> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deletePlannedActivity(
+  id: string,
+  accessToken?: string | null,
+): Promise<{
+  deleted: boolean;
+  id: string;
+}> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      accessToken,
+    },
+  );
+}
+
+/* RUNNING PLAN ADAPTATION API START */
+
+export type PlannedActivityOutcomeKind =
+  | "on_target"
+  | "under"
+  | "over"
+  | "skipped"
+  | "unmatched";
+
+export type RunningAdaptationAction =
+  | "keep_plan"
+  | "ease_next"
+  | "recover_next"
+  | "review";
+
+export interface PlannedActivityOutcome {
+  planned_activity_id?: string | null;
+  training_plan_id?: string | null;
+  training_week?: number | null;
+  session_kind?: string | null;
+  outcome: PlannedActivityOutcomeKind;
+  recommended_action: RunningAdaptationAction;
+  message: string;
+  load_ratio?: number | null;
+}
+
+export interface RunningAdaptationSession {
+  id?: string | null;
+  scheduled_date?: string | null;
+  scheduled_time?: string | null;
+  title?: string | null;
+  session_kind?: string | null;
+  training_week?: number | null;
+  distance_meters?: number | null;
+  duration_minutes?: number | null;
+  intensity?: PlannedActivityIntensity | null;
+}
+
+export interface RunningAdaptationProposal {
+  adaptation_required: boolean;
+  source_planned_activity_id?: string | null;
+  training_plan_id?: string | null;
+  outcome?: PlannedActivityOutcomeKind | null;
+  recommended_action?: RunningAdaptationAction | null;
+  title: string;
+  message: string;
+  target: RunningAdaptationSession | null;
+  changes: Partial<{
+    distance_meters: number;
+    duration_minutes: number;
+    intensity: PlannedActivityIntensity;
+  }>;
+  preview: RunningAdaptationSession | null;
+}
+
+export interface PlannedActivityAdaptationResponse {
+  applied: boolean;
+  outcome: PlannedActivityOutcome;
+  proposal: RunningAdaptationProposal;
+}
+
+export interface AppliedPlannedActivityAdaptationResponse
+  extends PlannedActivityAdaptationResponse {
+  applied: true;
+  source_planned_activity_id: string;
+  target_planned_activity_id: string;
+  item: PlannedActivity;
+}
+
+export function getPlannedActivityAdaptation(
+  id: string,
+  accessToken?: string | null,
+): Promise<PlannedActivityAdaptationResponse> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(
+      id,
+    )}/adaptation`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function keepPlannedActivityAdaptation(
+  sourceId: string,
+  accessToken?: string | null,
+): Promise<{
+  kept: boolean;
+  outcome: PlannedActivityOutcome;
+  proposal: RunningAdaptationProposal;
+}> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(
+      sourceId,
+    )}/adaptation/keep`,
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
+}
+
+
+export function applyPlannedActivityAdaptation(
+  sourceId: string,
+  targetId: string,
+  accessToken?: string | null,
+): Promise<AppliedPlannedActivityAdaptationResponse> {
+  return apiRequest(
+    `/activities/planned/${encodeURIComponent(
+      sourceId,
+    )}/adaptation`,
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        target_planned_activity_id: targetId,
+      }),
+    },
+  );
+}
+
+/* RUNNING PLAN ADAPTATION API END */
+
+
+/* PLANNED ACTIVITIES API END */
+
+
+
+/* RUNNING TRAINING PLAN API START */
+
+export interface TrainingPlan {
+  id: string;
+  sport: "running";
+  start_date: string;
+  target_date: string;
+  current_distance_meters: number;
+  current_pace_seconds_per_km: number;
+  target_distance_meters: number;
+  target_pace_seconds_per_km: number;
+  sessions_per_week: number;
+  long_run_weekday: number;
+  total_weeks: number;
+  status:
+    | "active"
+    | "paused"
+    | "completed"
+    | "cancelled";
+}
+
+export interface RunningTrainingPlanInput {
+  start_date: string;
+  target_date: string;
+  current_distance_meters: number;
+  current_pace_seconds_per_km: number;
+  target_distance_meters: number;
+  target_pace_seconds_per_km: number;
+  sessions_per_week: number;
+  long_run_weekday: number;
+}
+
+export interface RunningTrainingPlanCreateResponse {
+  created: boolean;
+  plan: TrainingPlan;
+  session_count: number;
+  sessions: PlannedActivity[];
+  replaced_plan_ids?: string[];
+}
+
+export interface RunningTrainingPlanPreviewResponse {
+  preview: true;
+  total_weeks: number;
+  session_count: number;
+  sessions: PlannedActivity[];
+}
+
+export function getTrainingPlans(
+  accessToken?: string | null,
+): Promise<{
+  count: number;
+  items: TrainingPlan[];
+}> {
+  return apiRequest(
+    "/activities/training-plans",
+    { accessToken },
+  );
+}
+
+export function previewRunningTrainingPlan(
+  input: RunningTrainingPlanInput,
+  accessToken?: string | null,
+): Promise<RunningTrainingPlanPreviewResponse> {
+  return apiRequest(
+    "/activities/training-plans/running/preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getTrainingPlanSessions(
+  id: string,
+  accessToken?: string | null,
+): Promise<{
+  count: number;
+  items: PlannedActivity[];
+}> {
+  return apiRequest(
+    `/activities/training-plans/${encodeURIComponent(id)}/sessions`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function deleteTrainingPlan(
+  id: string,
+  accessToken?: string | null,
+): Promise<{
+  deleted: boolean;
+  id: string;
+}> {
+  return apiRequest(
+    `/activities/training-plans/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      accessToken,
+    },
+  );
+}
+
+export function createRunningTrainingPlan(
+  input: RunningTrainingPlanInput,
+  accessToken?: string | null,
+  options?: {
+    replaceActive?: boolean;
+  },
+): Promise<RunningTrainingPlanCreateResponse> {
+  return apiRequest(
+    "/activities/training-plans/running",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        ...input,
+        replace_active:
+          options?.replaceActive ?? false,
+      }),
+    },
+  );
+}
+
+/* RUNNING TRAINING PLAN API END */

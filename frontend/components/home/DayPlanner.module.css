@@ -1,0 +1,255 @@
+.card {
+  display: block;
+  margin: 0 0 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.summaryText {
+  min-width: 0;
+  flex: 1;
+}
+
+.kicker {
+  display: none;
+}
+
+.message {
+  margin: 0;
+  max-width: 70ch;
+  color: #172f4d;
+  font-family: inherit;
+  font-size: clamp(1.05rem, 1.8vw, 1.28rem);
+  font-weight: 450;
+  line-height: 1.45;
+  letter-spacing: -0.018em;
+}
+
+.description {
+  display: none;
+}
+
+.editButton {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  min-height: 38px;
+  padding: 7px 15px;
+  border: 1px solid #d8d8d1;
+  border-radius: 11px;
+  background: transparent;
+  color: #353530;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.editButton:hover {
+  border-color: #b8b8b0;
+  background: #f5f5f1;
+}
+
+.editButton:active {
+  transform: translateY(1px);
+}
+
+.editor {
+  display: grid;
+  gap: 20px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eeeeea;
+}
+
+.group {
+  display: grid;
+  gap: 9px;
+}
+
+.label {
+  color: #73736d;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.option,
+.optionActive {
+  min-height: 44px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.option {
+  border: 1px solid #deded7;
+  background: #ffffff;
+  color: #353530;
+}
+
+.option:hover {
+  border-color: #aaa9a1;
+  background: #f7f7f3;
+}
+
+.option:active,
+.optionActive:active {
+  transform: translateY(1px);
+}
+
+.optionActive {
+  border: 1px solid #171815;
+  background: #171815;
+  color: #ffffff;
+}
+
+@media (max-width: 700px) {
+  .summary {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .editButton {
+    width: auto;
+  }
+
+  .options {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ============================================================
+   HOME REDESIGN — DAY PLANNER INLINE
+   Step 2
+   ============================================================ */
+
+.card {
+  display: block;
+  margin: 0 0 20px;
+  padding: 0;
+
+  border: 0;
+  border-radius: 0;
+
+  background: transparent;
+  box-shadow: none;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+
+  gap: 24px;
+}
+
+.summaryText {
+  min-width: 0;
+}
+
+.kicker {
+  display: none;
+}
+
+.message {
+  margin: 0;
+
+  max-width: 900px;
+
+  color: var(--ss-navy-950, #102846);
+
+  font-size: clamp(1.15rem, 2.1vw, 1.55rem);
+  line-height: 1.35;
+
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.description {
+  display: none;
+}
+
+.editButton {
+  flex: 0 0 auto;
+
+  min-height: 42px;
+  padding: 0 18px;
+
+  border: 1px solid #d8d8d1;
+  border-radius: 12px;
+
+  background: #ffffff;
+  color: var(--ss-navy-950, #102846);
+
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+
+  cursor: pointer;
+
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.editButton:hover {
+  border-color: var(--ss-coral-500, #f47f7a);
+  background: #fff8f7;
+}
+
+.editButton:active {
+  transform: translateY(1px);
+}
+
+.editor {
+  margin-top: 18px;
+
+  padding: 18px;
+
+  border: 1px solid var(--ss-border, #dfdfd8);
+  border-radius: 16px;
+
+  background: #ffffff;
+}
+
+@media (max-width: 600px) {
+  .summary {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .editButton {
+    justify-self: start;
+  }
+
+  .message {
+    font-size: 1.08rem;
+  }
+}

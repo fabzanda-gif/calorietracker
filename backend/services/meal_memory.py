@@ -6,6 +6,7 @@ from typing import Any
 
 from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.meals import MealsRepository
+from backend.services.meal_routine_events import MealRoutineEventService
 
 
 LOW = "low"
@@ -47,6 +48,7 @@ class MealMemoryService:
         day_date: date,
         meal_type: str,
         day_context: str | None = None,
+        preloaded_daily_logs: list[dict] | None = None,
     ) -> dict:
         start_date = day_date - timedelta(weeks=self.lookback_weeks)
         end_date = day_date - timedelta(days=1)
@@ -57,11 +59,21 @@ class MealMemoryService:
             end_date=end_date,
         )
 
-        day_logs = self.daily_logs_repo.list_date_range(
-            user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        if preloaded_daily_logs is None:
+            day_logs = self.daily_logs_repo.list_date_range(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            day_logs = [
+                row
+                for row in preloaded_daily_logs
+                if row.get("date")
+                and start_date
+                <= date.fromisoformat(str(row["date"]))
+                <= end_date
+            ]
 
         context_by_date = {
             str(row.get("date")): row.get("day_type")
@@ -69,70 +81,52 @@ class MealMemoryService:
             if row.get("date")
         }
 
+        events = MealRoutineEventService().build(
+            meals=meals,
+            meal_type=meal_type,
+        )
+
         candidates: list[dict[str, Any]] = []
 
-        for meal in meals:
-            raw_date = meal.get("date")
-            name = meal.get("name")
-
-            if not raw_date or not name:
-                continue
-
-            if meal.get("meal_type") != meal_type:
-                continue
+        for event in events:
+            raw_date = event.get("date")
 
             try:
-                meal_date = date.fromisoformat(str(raw_date))
+                meal_date = date.fromisoformat(
+                    str(raw_date)
+                )
             except ValueError:
                 continue
 
-            if meal_date.weekday() != day_date.weekday():
-                continue
+            event_context = context_by_date.get(
+                str(raw_date)
+            )
 
-            if (
-                day_context is not None
-                and context_by_date.get(str(raw_date)) != day_context
+            if day_context is None:
+                if (
+                    meal_date.weekday()
+                    != day_date.weekday()
+                ):
+                    continue
+            elif not self._contexts_match(
+                day_context,
+                event_context,
             ):
                 continue
 
-            identity = self._meal_identity(meal)
-
             candidates.append(
                 {
+                    **event,
                     "date": meal_date,
-                    "name": identity,
-                    "quantity": self._safe_float(
-                        meal.get("quantity")
-                    ),
-                    "is_per_100g": meal.get("is_per_100g"),
-                    "base_calories": self._safe_float(
-                        meal.get("base_calories")
-                    ),
-                    "base_protein": self._safe_float(
-                        meal.get("base_protein")
-                    ),
-                    "base_carbs": self._safe_float(
-                        meal.get("base_carbs")
-                    ),
-                    "base_fat": self._safe_float(
-                        meal.get("base_fat")
-                    ),
-                    "calories": self._safe_float(
-                        meal.get("calories")
-                    ),
-                    "protein": self._safe_float(
-                        meal.get("protein")
-                    ),
-                    "carbs": self._safe_float(
-                        meal.get("carbs")
-                    ),
-                    "fat": self._safe_float(
-                        meal.get("fat")
-                    ),
+                    "name": str(
+                        event.get("name") or ""
+                    ).strip(),
                 }
             )
 
-        candidates.sort(key=lambda item: item["date"])
+        candidates.sort(
+            key=lambda item: item["date"]
+        )
 
         if not candidates:
             return self._unknown(
@@ -234,6 +228,14 @@ class MealMemoryService:
             "estimated_protein_g": estimated_protein,
             "estimated_carbs_g": estimated_carbs,
             "estimated_fat_g": estimated_fat,
+            "components": (
+                matching_items[-1].get(
+                    "components",
+                    [],
+                )
+                if matching_items
+                else []
+            ),
             "evidence": {
                 "observations": len(names),
                 "matches": matches,
@@ -241,6 +243,52 @@ class MealMemoryService:
                 "recent_matches": recent_names.count(winner),
             },
         }
+
+    @classmethod
+    def _contexts_match(
+        cls,
+        expected: object,
+        observed: object,
+    ) -> bool:
+        expected_value = cls._context_family(
+            expected
+        )
+        observed_value = cls._context_family(
+            observed
+        )
+
+        return (
+            bool(expected_value)
+            and expected_value == observed_value
+        )
+
+    @staticmethod
+    def _context_family(
+        value: object,
+    ) -> str:
+        normalized = " ".join(
+            str(value or "")
+            .strip()
+            .casefold()
+            .replace("_", " ")
+            .split()
+        )
+
+        home_contexts = {
+            "home",
+            "free",
+            "libero",
+            "giornata libera",
+            "lavoro da casa",
+            "work from home",
+            "wfh",
+        }
+
+        if normalized in home_contexts:
+            return "home"
+
+        return normalized
+
 
     @staticmethod
     def _meal_identity(meal: dict[str, Any]) -> str:
@@ -357,16 +405,35 @@ class MealMemoryService:
         field_name: str,
         quantity: float,
     ) -> float | None:
-        base = cls._average_field(
-            items,
-            field_name,
-        )
+        values: list[float] = []
 
-        if base is None:
+        for item in items:
+            base = cls._safe_float(
+                item.get(field_name)
+            )
+
+            if base is None:
+                continue
+
+            raw_is_per_100g = item.get("is_per_100g")
+            is_per_100g = (
+                raw_is_per_100g is True
+                or str(raw_is_per_100g).strip().lower()
+                in {"true", "1", "yes"}
+            )
+
+            if is_per_100g:
+                scaled = base * quantity / 100.0
+            else:
+                scaled = base * quantity
+
+            values.append(scaled)
+
+        if not values:
             return None
 
         return round(
-            base * quantity,
+            sum(values) / len(values),
             2,
         )
 

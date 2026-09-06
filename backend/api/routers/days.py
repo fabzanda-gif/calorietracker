@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date as Date
+from datetime import datetime, timedelta
+import hashlib
+import json
+import time
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
@@ -9,22 +14,47 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
+    get_day_briefings_repository,
     get_optional_decision_selections_repository,
     get_meal_prep_repository,
+    get_planned_activities_repository,
+    get_strength_plans_repository,
+    get_strength_workouts_repository,
     get_meals_repository,
     get_recipes_repository,
+    get_weekly_schedule_repository,
     get_weight_repository,
 )
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.day_briefings import DayBriefingsRepository
 from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.meal_prep import MealPrepRepository
+from backend.repositories.planned_activities import (
+    PlannedActivitiesRepository,
+)
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
+from backend.repositories.strength_plans import (
+    StrengthPlansRepository,
+)
+from backend.repositories.strength_workouts import (
+    StrengthWorkoutsRepository,
+)
+from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
+from backend.services.day_briefing import (
+    DayBriefingError,
+    DayBriefingService,
+    build_status_hint,
+    fallback_day_briefing,
+)
+from backend.services.daily_context import (
+    DailyContextService,
+)
 from backend.services.decision_feedback import DecisionFeedbackService
 from backend.services.decision_learning_pipeline import DecisionLearningPipelineService
 from backend.services.decision_mode import (
@@ -43,6 +73,9 @@ from backend.services.generic_eating_out_candidates import (
 )
 from backend.services.generic_order_candidates import (
     GenericOrderCandidateService,
+)
+from backend.services.future_training_nutrition import (
+    FutureTrainingNutritionService,
 )
 from backend.services.meal_candidates import MealCandidateService
 from backend.services.meal_confirmation import (
@@ -64,9 +97,95 @@ from backend.services.order_personalization import (
 router = APIRouter(prefix="/days", tags=["days"])
 
 
+_DAY_BRIEFING_CACHE_TTL_SECONDS = 2 * 60 * 60
+_DAY_BRIEFING_CACHE: dict[
+    tuple,
+    tuple[float, dict],
+] = {}
+
+
+def _briefing_calorie_bucket(
+    value: float,
+    size: int = 25,
+) -> int:
+    return int(
+        round(float(value) / size) * size
+    )
+
+
+def _is_briefing_training(
+    activity: dict,
+) -> bool:
+    name = str(
+        activity.get("activity_name") or ""
+    ).strip().lower()
+
+    daily_movement_prefixes = (
+        "passi",
+        "steps",
+        "bici",
+        "bicicletta",
+    )
+
+    return not any(
+        name == prefix
+        or name.startswith(f"{prefix} ")
+        or name.startswith(f"{prefix} (")
+        for prefix in daily_movement_prefixes
+    )
+
+
+def _briefing_activity_signature(
+    activities: list[dict],
+) -> tuple:
+    return tuple(
+        sorted(
+            (
+                str(activity.get("id") or ""),
+                str(
+                    activity.get(
+                        "activity_name"
+                    )
+                    or ""
+                ),
+                str(
+                    activity.get(
+                        "activity_type"
+                    )
+                    or ""
+                ),
+                round(
+                    float(
+                        activity.get(
+                            "burned_calories"
+                        )
+                        or 0
+                    ),
+                    1,
+                ),
+                int(
+                    activity.get(
+                        "duration_seconds"
+                    )
+                    or 0
+                ),
+                int(
+                    activity.get(
+                        "estimated_steps"
+                    )
+                    or 0
+                ),
+            )
+            for activity in activities
+            if _is_briefing_training(activity)
+        )
+    )
+
+
 MEAL_SLOT_TO_TYPE = {
     "breakfast": "Colazione",
     "lunch": "Pranzo",
+    "snack": "Snack",
     "dinner": "Cena",
 }
 
@@ -78,6 +197,87 @@ def _validate_slot(meal_slot: str) -> str:
             detail="Unknown meal slot",
         )
     return MEAL_SLOT_TO_TYPE[meal_slot]
+
+
+def _is_home_day_context(value: object) -> bool:
+    normalized = " ".join(
+        str(value or "")
+        .strip()
+        .casefold()
+        .replace("_", " ")
+        .split()
+    )
+
+    return normalized in {
+        "home",
+        "casa",
+        "wfh",
+        "work from home",
+        "lavoro da casa",
+    }
+
+
+def _inventory_expiry_key(candidate: dict) -> tuple[int, str]:
+    expires_at = candidate.get("expires_at")
+
+    if expires_at:
+        return (0, str(expires_at))
+
+    return (1, "")
+
+
+def _deterministic_primary_recommendation(
+    *,
+    meal_slot: str,
+    day_context: object,
+    mode: str,
+    candidates: list[dict],
+    fallback: dict | None,
+) -> dict | None:
+    """
+    Apply simple explainable meal priorities before the general replanner.
+
+    Baseline rules:
+    - auto + home breakfast -> recurring routine first;
+    - auto + lunch -> available meal-prep first;
+    - everything else -> existing replanning result.
+
+    Candidate generation remains responsible for inventory validity
+    (available status, remaining portions and expiry).
+    """
+    if str(mode or "").strip().casefold() != "auto":
+        return fallback
+
+    if (
+        meal_slot == "breakfast"
+        and _is_home_day_context(day_context)
+    ):
+        routine = next(
+            (
+                candidate
+                for candidate in candidates
+                if candidate.get("source") == "routine"
+            ),
+            None,
+        )
+
+        if routine is not None:
+            return routine
+
+    if meal_slot == "lunch":
+        inventory = [
+            candidate
+            for candidate in candidates
+            if candidate.get("source") == "meal_prep"
+        ]
+
+        if inventory:
+            return min(
+                inventory,
+                key=_inventory_expiry_key,
+            )
+
+    return fallback
 
 
 def _meal_memory(
@@ -96,9 +296,11 @@ def _build_day(
     day_date: Date,
     daily_logs_repo: DailyLogsRepository,
     meals_repo: MealsRepository,
+    weekly_schedule_repo: WeeklyScheduleRepository,
 ) -> dict:
     return DayService(
         daily_logs_repo=daily_logs_repo,
+        weekly_schedule_repo=weekly_schedule_repo,
         meal_memory_service=_meal_memory(
             meals_repo,
             daily_logs_repo,
@@ -115,6 +317,7 @@ def _build_budget(
     day_date: Date,
     meals_repo: MealsRepository,
     activities_repo: ActivitiesRepository,
+    daily_logs_repo: DailyLogsRepository,
     weight_repo: WeightRepository,
 ) -> dict:
     latest_weight = weight_repo.latest(current_user.id)
@@ -127,6 +330,7 @@ def _build_budget(
     return DayBudgetService(
         meals_repo=meals_repo,
         activities_repo=activities_repo,
+        daily_logs_repo=daily_logs_repo,
     ).build(
         user_id=current_user.id,
         day_date=day_date,
@@ -226,6 +430,9 @@ def get_day_budget(
     activities_repo: ActivitiesRepository = Depends(
         get_activities_repository
     ),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
     weight_repo: WeightRepository = Depends(
         get_weight_repository
     ),
@@ -236,6 +443,7 @@ def get_day_budget(
             day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
         )
     except RepositoryError as exc:
@@ -266,43 +474,93 @@ def get_ranked_meal_options(
     meal_prep_repo: MealPrepRepository = Depends(
         get_meal_prep_repository
     ),
+    planned_activities_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    strength_plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
+    strength_workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
     recipes_repo: RecipesRepository = Depends(
         get_recipes_repository
     ),
     decision_selections_repo: DecisionSelectionsRepository | None = Depends(
         get_optional_decision_selections_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
+
 ):
     meal_type = _validate_slot(meal_slot)
 
     try:
-        day = _build_day(
-            user_id=current_user.id,
-            day_date=day_date,
-            daily_logs_repo=daily_logs_repo,
-            meals_repo=meals_repo,
-        )
+        # Day prediction and budget calculation are independent
+        # read-only branches. Overlap their Supabase I/O instead of
+        # paying both latency chains sequentially.
+        with ThreadPoolExecutor(
+            max_workers=2,
+            thread_name_prefix="meal_options_executor",
+        ) as executor:
+            day_future = executor.submit(
+                _build_day,
+                user_id=current_user.id,
+                day_date=day_date,
+                daily_logs_repo=daily_logs_repo,
+                meals_repo=meals_repo,
+                weekly_schedule_repo=weekly_schedule_repo,
+            )
 
-        budget_result = _build_budget(
-            current_user=current_user,
-            day_date=day_date,
-            meals_repo=meals_repo,
-            activities_repo=activities_repo,
-            weight_repo=weight_repo,
-        )
+            budget_future = executor.submit(
+                _build_budget,
+                current_user=current_user,
+                day_date=day_date,
+                meals_repo=meals_repo,
+                activities_repo=activities_repo,
+                daily_logs_repo=daily_logs_repo,
+                weight_repo=weight_repo,
+            )
+
+            day = day_future.result()
+            budget_result = budget_future.result()
 
         budget = budget_result.get("budget") or {}
         available_kcal = budget.get("available_kcal")
         protein_remaining_g = budget.get(
             "protein_remaining_g"
         )
+        maintenance_kcal = float(budget.get("maintenance_kcal") or 0)
+        max_main_meal_kcal = 1400.0 if maintenance_kcal >= 2800 else 1000.0
 
         normalized_mode = str(mode or "auto").strip().lower()
 
-        history = _history(
-            user_id=current_user.id,
-            meals_repo=meals_repo,
-        )
+        # These candidate-source reads are independent.
+        # Overlap their Supabase I/O before candidate construction.
+        with ThreadPoolExecutor(
+            max_workers=3,
+            thread_name_prefix="meal_options_read_executor",
+        ) as executor:
+            history_future = executor.submit(
+                _history,
+                user_id=current_user.id,
+                meals_repo=meals_repo,
+            )
+
+            meal_prep_future = executor.submit(
+                meal_prep_repo.list_available,
+                current_user.id,
+            )
+
+            recipes_future = executor.submit(
+                recipes_repo.list_available,
+                current_user.id,
+            )
+
+            history = history_future.result()
+            meal_prep_items = meal_prep_future.result()
+            available_recipes = recipes_future.result()
 
         known_orders = _build_known_order_candidates(
             history=history,
@@ -337,13 +595,9 @@ def get_ranked_meal_options(
         all_candidates = MealCandidateService().build(
             day_date=day_date,
             meal_type=meal_type,
-            meal_prep_items=meal_prep_repo.list_available(
-                current_user.id
-            ),
+            meal_prep_items=meal_prep_items,
             routine_prediction=day["meals"][meal_slot],
-            recipes=recipes_repo.list_available(
-                current_user.id
-            ),
+            recipes=available_recipes,
             order_candidates=[
                 *known_orders,
                 *generic_orders,
@@ -404,6 +658,95 @@ def get_ranked_meal_options(
             mode=mode_result["mode"],
         )
 
+        future_training_context = None
+
+        if meal_slot == "dinner":
+            tomorrow = (
+                day_date
+                + timedelta(days=1)
+            )
+
+            try:
+                tomorrow_sessions = (
+                    planned_activities_repo.list_range(
+                        current_user.id,
+                        tomorrow,
+                        tomorrow,
+                    )
+                )
+            except RepositoryError:
+                # Future training is an optional enhancement.
+                # Meal recommendations must remain usable if
+                # planned-activity storage is unavailable.
+                tomorrow_sessions = []
+
+            tomorrow_strength_workouts = []
+
+            try:
+                if (
+                    hasattr(
+                        strength_plans_repo,
+                        "list_for_user",
+                    )
+                    and hasattr(
+                        strength_workouts_repo,
+                        "list_for_plan",
+                    )
+                ):
+                    strength_plans = (
+                        strength_plans_repo.list_for_user(
+                            current_user.id
+                        )
+                    )
+
+                    active_strength_plans = [
+                        item
+                        for item in strength_plans
+                        if item.get("status") == "active"
+                        and item.get("id")
+                    ]
+
+                    for strength_plan in (
+                        active_strength_plans
+                    ):
+                        plan_workouts = (
+                            strength_workouts_repo
+                            .list_for_plan(
+                                current_user.id,
+                                strength_plan["id"],
+                            )
+                        )
+
+                        tomorrow_strength_workouts.extend(
+                            item
+                            for item in plan_workouts
+                            if (
+                                str(
+                                    item.get(
+                                        "scheduled_date"
+                                    )
+                                    or ""
+                                )
+                                == str(tomorrow)
+                                and item.get("status")
+                                == "planned"
+                            )
+                        )
+
+            except RepositoryError:
+                # Strength context is optional too.
+                tomorrow_strength_workouts = []
+
+            future_training_context = (
+                FutureTrainingNutritionService().build(
+                    day_date=day_date,
+                    planned_activities=tomorrow_sessions,
+                    strength_workouts=(
+                        tomorrow_strength_workouts
+                    ),
+                )
+            )
+
         ranked = DecisionRankingService().rank(
             candidates=feedback["candidates"],
             available_kcal=available_kcal,
@@ -411,6 +754,10 @@ def get_ranked_meal_options(
             mode=mode_result["mode"],
             preferred_lens=feedback["preferred_lens"],
             preferred_mode=feedback["preferred_mode"],
+            max_main_meal_kcal=max_main_meal_kcal,
+            future_training_context=(
+                future_training_context
+            ),
         )
 
         routine_candidate = None
@@ -425,11 +772,34 @@ def get_ranked_meal_options(
                 None,
             )
 
-        recommended = MealReplanningService().recommend(
+        fallback_recommended = MealReplanningService().recommend(
             routine_candidate=routine_candidate,
             ranked_options=ranked["options"],
             available_kcal=available_kcal,
+            max_main_meal_kcal=max_main_meal_kcal,
         )
+
+        priority_candidate = _deterministic_primary_recommendation(
+            meal_slot=meal_slot,
+            day_context=day.get("context", {}).get("value"),
+            mode=mode_result["mode"],
+            candidates=feedback["candidates"],
+            fallback=None,
+        )
+
+        if priority_candidate is not None:
+            priority_strategy = (
+                "inventory_priority"
+                if priority_candidate.get("source") == "meal_prep"
+                else "routine"
+            )
+
+            recommended = MealReplanningService().recommend_candidate(
+                candidate=priority_candidate,
+                strategy=priority_strategy,
+            )
+        else:
+            recommended = fallback_recommended
 
         replanning_context = MealReplanningContextService().build(
             recommendation=recommended,
@@ -472,6 +842,7 @@ def get_ranked_meal_options(
             "candidates": mode_result["candidates"],
             "recommended": recommended,
             "replanning_context": replanning_context,
+            "future_training": future_training_context,
             **ranked,
         }
 
@@ -507,6 +878,9 @@ def get_meal_decision(
     meal_prep_repo: MealPrepRepository = Depends(
         get_meal_prep_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -516,6 +890,7 @@ def get_meal_decision(
             day_date=day_date,
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
         )
 
         budget_result = _build_budget(
@@ -523,6 +898,7 @@ def get_meal_decision(
             day_date=day_date,
             meals_repo=meals_repo,
             activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
         )
 
@@ -561,6 +937,12 @@ def confirm_meal_prediction(
     meals_repo: MealsRepository = Depends(
         get_meals_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -570,6 +952,7 @@ def confirm_meal_prediction(
             day_date=day_date,
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
         )
 
         prediction = day["meals"][meal_slot]
@@ -605,10 +988,28 @@ def confirm_meal_prediction(
                     "estimated_fat_g": recommendation.get(
                         "fat_g"
                     ),
+                    "replanning_strategy": (
+                        recommendation.get("strategy")
+                    ),
+                    "recommendation_source": recommendation.get(
+                        "source"
+                    ),
+                    "recommendation_source_id": recommendation.get(
+                        "source_id"
+                    ),
+                    "components": recommendation.get(
+                        "components"
+                    ),
+                    "removed_components": (
+                        recommendation.get(
+                            "removed_components"
+                        )
+                    ),
                 }
 
         return MealConfirmationService(
-            meals_repo
+            meals_repo,
+            meal_prep_repo,
         ).confirm(
             user_id=current_user.id,
             day_date=day_date,
@@ -630,6 +1031,278 @@ def confirm_meal_prediction(
         ) from exc
 
 
+
+
+@router.get("/{day_date}/briefing")
+def get_day_briefing(
+    day_date: Date,
+    moment: str = Query(
+        default="evening",
+        pattern="^(morning|afternoon|evening)$",
+    ),
+    mode: str = Query(
+        default="standard",
+        pattern="^(standard|zero)$",
+    ),
+    hour: int | None = Query(
+        default=None,
+        ge=0,
+        le=23,
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+    briefing_repo: DayBriefingsRepository = Depends(
+        get_day_briefings_repository
+    ),
+):
+    try:
+        day = _build_day(
+            user_id=current_user.id,
+            day_date=day_date,
+            daily_logs_repo=daily_logs_repo,
+            meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
+        )
+        budget_result = _build_budget(
+            current_user=current_user,
+            day_date=day_date,
+            meals_repo=meals_repo,
+            activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
+            weight_repo=weight_repo,
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    actual = budget_result.get("actual") or {}
+    budget = budget_result.get("budget") or {}
+
+    try:
+        day_activities = (
+            activities_repo.list_for_date(
+                current_user.id,
+                day_date,
+            )
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    training_activities = [
+        activity
+        for activity in day_activities
+        if _is_briefing_training(activity)
+    ]
+
+    consumed_kcal = float(
+        budget.get(
+            "consumed_kcal",
+            actual.get("consumed_kcal", 0),
+        )
+        or 0
+    )
+    daily_budget_kcal = float(
+        budget.get("daily_budget_kcal", 0) or 0
+    )
+    maintenance_kcal = float(
+        budget.get("maintenance_kcal", 0) or 0
+    )
+
+    metadata = current_user.metadata or {}
+    full_name = (
+        metadata.get("first_name")
+        or metadata.get("name")
+        or metadata.get("full_name")
+        or ""
+    )
+    first_name = str(full_name).strip().split(" ")[0]
+    city = str(
+        metadata.get("city") or ""
+    ).strip()
+
+    daily_context = {}
+
+    if moment == "morning" and city:
+        daily_context = DailyContextService(
+            timeout=2.0,
+        ).build(
+            city=city,
+            day_date=day_date,
+        )
+
+    payload = {
+        "first_name": first_name,
+        "moment": moment,
+        "daily_context": daily_context,
+        "day_type": day.get("context", {}).get("value"),
+        "activity_level": (
+            day.get("activity_plan", {}).get("value")
+        ),
+        "meal_count": int(
+            actual.get("meal_count", 0) or 0
+        ),
+        "activity_count": len(
+            training_activities
+        ),
+        "activity_kcal": sum(
+            float(
+                activity.get(
+                    "burned_calories"
+                )
+                or 0
+            )
+            for activity in training_activities
+        ),
+        "consumed_kcal": consumed_kcal,
+        "daily_budget_kcal": daily_budget_kcal,
+        "maintenance_kcal": maintenance_kcal,
+        "available_kcal": float(
+            budget.get("available_kcal", 0) or 0
+        ),
+        "status_hint": build_status_hint(
+            consumed_kcal=consumed_kcal,
+            daily_budget_kcal=daily_budget_kcal,
+            maintenance_kcal=maintenance_kcal,
+        ),
+    }
+
+    activity_signature = (
+        _briefing_activity_signature(
+            training_activities
+        )
+    )
+
+    input_signature = hashlib.sha256(
+        json.dumps(
+            {**payload, "activity_signature": activity_signature},
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    try:
+        persisted = briefing_repo.get(
+            current_user.id, day_date, moment, mode
+        )
+    except RepositoryError:
+        persisted = None
+
+    if persisted and persisted.get("input_signature") == input_signature:
+        return {
+            "date": str(day_date),
+            "mode": mode,
+            "message": persisted.get("message") or "",
+            "source": persisted.get("source") or "fallback",
+            "cached": True,
+        }
+
+    cache_key = (
+        current_user.id,
+        str(day_date),
+        mode,
+        moment,
+        payload["day_type"],
+        payload["activity_level"],
+        payload["status_hint"],
+        payload["meal_count"],
+        repr(payload["daily_context"]),
+        _briefing_calorie_bucket(
+            payload["available_kcal"]
+        ),
+        _briefing_calorie_bucket(
+            payload["consumed_kcal"]
+        ),
+        activity_signature,
+    )
+
+    cached_entry = _DAY_BRIEFING_CACHE.get(
+        cache_key
+    )
+
+    if cached_entry is not None:
+        expires_at, cached_response = (
+            cached_entry
+        )
+
+        if expires_at > time.monotonic():
+            return {
+                **cached_response,
+                "cached": True,
+            }
+
+        _DAY_BRIEFING_CACHE.pop(
+            cache_key,
+            None,
+        )
+
+    try:
+        message = DayBriefingService().generate(
+            payload,
+            mode=mode,
+        )
+        source = "ai"
+    except DayBriefingError:
+        message = fallback_day_briefing(
+            payload,
+            mode=mode,
+        )
+        source = "fallback"
+
+    response = {
+        "date": str(day_date),
+        "mode": mode,
+        "message": message,
+        "source": source,
+        "cached": False,
+    }
+
+    try:
+        briefing_repo.save({
+            "user_id": current_user.id,
+            "date": str(day_date),
+            "moment": moment,
+            "mode": mode,
+            "input_signature": input_signature,
+            "message": message,
+            "source": source,
+            "updated_at": datetime.utcnow().isoformat(),
+        })
+    except RepositoryError:
+        # Briefings remain available even before/while the cache migration is
+        # deployed; the in-process cache below is the graceful fallback.
+        pass
+
+    if len(_DAY_BRIEFING_CACHE) >= 512:
+        _DAY_BRIEFING_CACHE.clear()
+
+    _DAY_BRIEFING_CACHE[cache_key] = (
+        time.monotonic()
+        + _DAY_BRIEFING_CACHE_TTL_SECONDS,
+        response,
+    )
+    return response
+
+
 @router.get("/{day_date}")
 def get_day(
     day_date: Date,
@@ -640,6 +1313,9 @@ def get_day(
     meals_repo: MealsRepository = Depends(
         get_meals_repository
     ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
 ):
     try:
         return _build_day(
@@ -647,6 +1323,7 @@ def get_day(
             day_date=day_date,
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
         )
     except RepositoryError as exc:
         raise HTTPException(

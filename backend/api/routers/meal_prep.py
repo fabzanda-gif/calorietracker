@@ -50,6 +50,10 @@ class MealPrepRemainingUpdate(BaseModel):
     portions_remaining: int = Field(ge=0)
 
 
+class MealPrepDiscard(BaseModel):
+    portions: int = Field(default=1, gt=0)
+
+
 class MealPrepStatusUpdate(BaseModel):
     status: str
 
@@ -74,6 +78,7 @@ def get_meal_prep_inventory(
     available_only: bool = False,
     current_user: CurrentUser = Depends(get_current_user),
     repo: MealPrepRepository = Depends(get_meal_prep_repository),
+    recipes_repo: RecipesRepository = Depends(get_recipes_repository),
 ):
     try:
         items = (
@@ -81,9 +86,30 @@ def get_meal_prep_inventory(
             if available_only
             else repo.list_all(current_user.id)
         )
+
+        enriched_items = []
+
+        for item in items:
+            enriched = dict(item)
+
+            recipe_id = item.get("recipe_id")
+            image_url = None
+
+            if recipe_id:
+                recipe = recipes_repo.get_personal_by_id(
+                    recipe_id,
+                    current_user.id,
+                )
+
+                if recipe is not None:
+                    image_url = recipe.get("image_url")
+
+            enriched["image_url"] = image_url
+            enriched_items.append(enriched)
+
         return {
-            "count": len(items),
-            "items": items,
+            "count": len(enriched_items),
+            "items": enriched_items,
         }
     except RepositoryError as exc:
         raise HTTPException(
@@ -245,6 +271,79 @@ def update_meal_prep_remaining(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/{batch_id}/discard")
+def discard_meal_prep_portions(
+    batch_id: str,
+    data: MealPrepDiscard,
+    current_user: CurrentUser = Depends(get_current_user),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
+):
+    try:
+        batch = meal_prep_repo.get_by_id(
+            batch_id,
+            current_user.id,
+        )
+
+        if batch is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meal prep batch not found",
+            )
+
+        remaining = int(
+            batch.get("portions_remaining") or 0
+        )
+
+        if data.portions > remaining:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot discard more portions than remain in inventory",
+            )
+
+        new_remaining = remaining - data.portions
+
+        item = meal_prep_repo.update(
+            batch_id,
+            current_user.id,
+            {
+                "portions_remaining": new_remaining,
+                "status": (
+                    "finished"
+                    if new_remaining == 0
+                    else "available"
+                ),
+            },
+        )
+
+        if item is None:
+            item = {
+                **batch,
+                "portions_remaining": new_remaining,
+                "status": (
+                    "finished"
+                    if new_remaining == 0
+                    else "available"
+                ),
+            }
+
+        return {
+            "updated": True,
+            "discarded": data.portions,
+            "item": item,
+        }
+
+    except HTTPException:
+        raise
+
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

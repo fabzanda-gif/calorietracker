@@ -53,12 +53,16 @@ export interface DayResponse {
 export interface DayBudget {
   goal_mode: "loss" | "maintenance" | "gain";
   goal_adjustment_kcal: number;
+  effective_goal_adjustment_kcal: number;
   maintenance_kcal: number;
+  base_daily_budget_kcal: number;
   daily_budget_kcal: number;
   consumed_kcal: number;
   planned_kcal: number;
   available_kcal: number;
   unallocated_kcal: number;
+  remaining_meal_reserve_kcal: number;
+  budget_adapted: boolean;
   protein_consumed_g: number;
   protein_target_g: number | null;
   protein_remaining_g: number | null;
@@ -66,7 +70,12 @@ export interface DayBudget {
 
 export interface NextMealResponse {
   date: string;
-  next_slot: "breakfast" | "lunch" | "dinner" | null;
+  next_slot:
+    | "breakfast"
+    | "lunch"
+    | "snack"
+    | "dinner"
+    | null;
   next_meal_type: string | null;
 }
 
@@ -134,7 +143,8 @@ export interface DayDecisionContext {
     | "tight_budget"
     | "protein_focus"
     | "flexible"
-    | "balanced";
+    | "balanced"
+    | "training_prep";
   title: string;
   message: string;
 }
@@ -142,6 +152,7 @@ export interface DayDecisionContext {
 export type MealReplanningStrategy =
   | "routine"
   | "adapted_routine"
+  | "component_reduction"
   | "alternate_candidate"
   | "adapted_alternative";
 
@@ -152,6 +163,7 @@ export interface MealReplanningContext {
   available_kcal: number | null;
   title: string;
   message: string;
+  removed_components?: string[];
 }
 
 export interface MealReplanningRecommendation {
@@ -162,9 +174,15 @@ export interface MealReplanningRecommendation {
   reason: string;
   adaptation: {
     changed: boolean;
+    type?: "component_reduction";
     original_calories: number;
     recommended_calories: number;
     calorie_delta: number;
+    removed_components?: Array<{
+      name?: string;
+      calories?: number;
+      [key: string]: unknown;
+    }>;
   };
 }
 
