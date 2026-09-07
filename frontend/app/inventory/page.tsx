@@ -32,6 +32,13 @@ type PantryMealSlot =
   | "snack"
   | "dinner";
 
+type InventoryFilter =
+  | "all"
+  | "breakfast_snack"
+  | "lunch_dinner"
+  | "meal_prep"
+  | "expiring";
+
 const EMPTY_PANTRY_FORM = {
   ingredientId: "",
   quantity: "",
@@ -72,6 +79,10 @@ export default function InventoryPage() {
   const [showNewFoodForm, setShowNewFoodForm] = useState(false);
   const [newFoodSaving, setNewFoodSaving] = useState(false);
   const [newFoodForm, setNewFoodForm] = useState(EMPTY_NEW_FOOD_FORM);
+
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [inventoryFilter, setInventoryFilter] =
+    useState<InventoryFilter>("all");
 
   async function refresh() {
     if (!accessToken) {
@@ -438,6 +449,136 @@ export default function InventoryPage() {
     }
   }
 
+  function pantrySlots(item: PantryItem) {
+    return (
+      ingredientForPantryId(item.ingredient_id)
+        ?.meal_slots ?? []
+    );
+  }
+
+  function expiresSoon(expiresAt: string | null) {
+    if (!expiresAt) {
+      return false;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expires = new Date(`${expiresAt}T00:00:00`);
+
+    if (Number.isNaN(expires.getTime())) {
+      return false;
+    }
+
+    const diffDays = Math.ceil(
+      (expires.getTime() - today.getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
+    return diffDays >= 0 && diffDays <= 7;
+  }
+
+  const normalizedInventorySearch =
+    inventorySearch.trim().toLowerCase();
+
+  const breakfastSnackCount = pantryItems.filter(
+    (item) => {
+      const slots = pantrySlots(item);
+
+      return (
+        slots.includes("breakfast") ||
+        slots.includes("snack")
+      );
+    },
+  ).length;
+
+  const lunchDinnerCount = pantryItems.filter(
+    (item) => {
+      const slots = pantrySlots(item);
+
+      return (
+        slots.includes("lunch") ||
+        slots.includes("dinner")
+      );
+    },
+  ).length;
+
+  const cookedPortionsCount = items.reduce(
+    (total, item) =>
+      total + item.portions_remaining,
+    0,
+  );
+
+  const expiringCount = pantryItems.filter((item) =>
+    expiresSoon(item.expires_at),
+  ).length;
+
+  const filteredPantryItems = pantryItems.filter(
+    (item) => {
+      if (inventoryFilter === "meal_prep") {
+        return false;
+      }
+
+      const name =
+        item.ingredient_name?.toLowerCase() ?? "";
+
+      if (
+        normalizedInventorySearch &&
+        !name.includes(normalizedInventorySearch)
+      ) {
+        return false;
+      }
+
+      const slots = pantrySlots(item);
+
+      if (
+        inventoryFilter === "breakfast_snack"
+      ) {
+        return (
+          slots.includes("breakfast") ||
+          slots.includes("snack")
+        );
+      }
+
+      if (
+        inventoryFilter === "lunch_dinner"
+      ) {
+        return (
+          slots.includes("lunch") ||
+          slots.includes("dinner")
+        );
+      }
+
+      if (inventoryFilter === "expiring") {
+        return expiresSoon(item.expires_at);
+      }
+
+      return true;
+    },
+  );
+
+  const filteredMealPrepItems = items.filter(
+    (item) => {
+      if (
+        inventoryFilter !== "all" &&
+        inventoryFilter !== "meal_prep"
+      ) {
+        return false;
+      }
+
+      if (
+        normalizedInventorySearch &&
+        !item.name
+          .toLowerCase()
+          .includes(normalizedInventorySearch)
+      ) {
+        return false;
+      }
+
+      return true;
+    },
+  );
+
   if (!accessToken) {
     return (
       <>
@@ -521,6 +662,145 @@ export default function InventoryPage() {
             {error}
           </section>
         )}
+
+        <section className={styles.inventorySummary}>
+          <button
+            type="button"
+            className={
+              inventoryFilter === "breakfast_snack"
+                ? styles.inventorySummaryActive
+                : undefined
+            }
+            onClick={() =>
+              setInventoryFilter(
+                inventoryFilter === "breakfast_snack"
+                  ? "all"
+                  : "breakfast_snack",
+              )
+            }
+          >
+            <span className={styles.summaryCoral}>☕</span>
+            <span>
+              <strong>{breakfastSnackCount}</strong>
+              <small>Colazione / Snack</small>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={
+              inventoryFilter === "lunch_dinner"
+                ? styles.inventorySummaryActive
+                : undefined
+            }
+            onClick={() =>
+              setInventoryFilter(
+                inventoryFilter === "lunch_dinner"
+                  ? "all"
+                  : "lunch_dinner",
+              )
+            }
+          >
+            <span className={styles.summaryGreen}>🍴</span>
+            <span>
+              <strong>{lunchDinnerCount}</strong>
+              <small>Pranzo / Cena</small>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={
+              inventoryFilter === "meal_prep"
+                ? styles.inventorySummaryActive
+                : undefined
+            }
+            onClick={() =>
+              setInventoryFilter(
+                inventoryFilter === "meal_prep"
+                  ? "all"
+                  : "meal_prep",
+              )
+            }
+          >
+            <span className={styles.summaryBlue}>▣</span>
+            <span>
+              <strong>{cookedPortionsCount}</strong>
+              <small>Porzioni cucinate</small>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={
+              inventoryFilter === "expiring"
+                ? styles.inventorySummaryActive
+                : undefined
+            }
+            onClick={() =>
+              setInventoryFilter(
+                inventoryFilter === "expiring"
+                  ? "all"
+                  : "expiring",
+              )
+            }
+          >
+            <span className={styles.summaryAmber}>◷</span>
+            <span>
+              <strong>{expiringCount}</strong>
+              <small>In scadenza</small>
+            </span>
+          </button>
+        </section>
+
+        <section className={styles.inventoryToolbar}>
+          <label className={styles.inventorySearch}>
+            <span aria-hidden="true">⌕</span>
+            <input
+              type="search"
+              value={inventorySearch}
+              placeholder="Cerca nella dispensa..."
+              onChange={(event) =>
+                setInventorySearch(
+                  event.target.value,
+                )
+              }
+            />
+          </label>
+
+          <div className={styles.inventoryFilters}>
+            {[
+              ["all", "Tutti"],
+              [
+                "breakfast_snack",
+                "Colazione / Snack",
+              ],
+              [
+                "lunch_dinner",
+                "Pranzo / Cena",
+              ],
+              ["meal_prep", "Porzioni cucinate"],
+              ["expiring", "In scadenza"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={
+                  inventoryFilter === value
+                    ? styles.inventoryFilterActive
+                    : undefined
+                }
+                onClick={() =>
+                  setInventoryFilter(
+                    value as InventoryFilter,
+                  )
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
 
         {showNewFoodForm && (
           <section className={styles.newFoodPanel}>
@@ -664,7 +944,13 @@ export default function InventoryPage() {
           </section>
         )}
 
-        <section className={styles.pantrySection}>
+        <section
+          className={`${styles.pantrySection} ${
+            inventoryFilter === "meal_prep"
+              ? styles.inventorySectionHidden
+              : ""
+          }`}
+        >
           <div className={styles.pantrySectionHead}>
             <div>
               <p className={styles.pantryKicker}>ALIMENTI</p>
@@ -943,9 +1229,10 @@ export default function InventoryPage() {
             </form>
           )}
 
-          {!loading && pantryItems.length > 0 && (
+          {!loading &&
+            filteredPantryItems.length > 0 && (
             <div className={styles.pantryList}>
-              {pantryItems.map((item) => (
+              {filteredPantryItems.map((item) => (
                 <article
                   key={item.id}
                   className={styles.pantryItem}
@@ -1070,17 +1357,31 @@ export default function InventoryPage() {
 
           {!loading &&
             ingredients.length > 0 &&
-            pantryItems.length === 0 && (
+            filteredPantryItems.length === 0 &&
+            inventoryFilter !== "meal_prep" && (
               <div className={styles.pantryEmpty}>
-                <strong>Nessun alimento registrato.</strong>
+                <strong>
+                  {pantryItems.length === 0
+                    ? "Nessun alimento registrato."
+                    : "Nessun alimento corrisponde ai filtri."}
+                </strong>
                 <p>
-                  Usa il modulo qui sopra per aggiungere il primo alimento.
+                  {pantryItems.length === 0
+                    ? "Usa “Aggiungi scorta” per inserire il primo alimento."
+                    : "Prova un altro filtro o modifica la ricerca."}
                 </p>
               </div>
             )}
         </section>
 
-        <section className={styles.pantrySection}>
+        <section
+          className={`${styles.pantrySection} ${
+            inventoryFilter !== "all" &&
+            inventoryFilter !== "meal_prep"
+              ? styles.inventorySectionHidden
+              : ""
+          }`}
+        >
           <div className={styles.pantrySectionHead}>
             <div>
               <p className={styles.pantryKicker}>MEAL PREP</p>
@@ -1095,7 +1396,7 @@ export default function InventoryPage() {
             <section className={styles.card}>
               <p>Caricamento dispensa...</p>
             </section>
-          ) : items.length === 0 ? (
+          ) : filteredMealPrepItems.length === 0 ? (
             <section className={styles.empty}>
               <h2>Nessuna porzione disponibile</h2>
               <p>
@@ -1105,7 +1406,7 @@ export default function InventoryPage() {
             </section>
           ) : (
             <div className={styles.list}>
-              {items.map((item) => (
+              {filteredMealPrepItems.map((item) => (
                 <article
                   key={item.id}
                   className={styles.item}
