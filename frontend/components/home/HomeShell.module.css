@@ -15247,3 +15247,12 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* HOME DAILY ADD MENU OVERFLOW FIX V1
+   The add dropdown is absolutely positioned outside its <details>.
+   Generic .mealsSection details { overflow: hidden } must not clip it.
+*/
+.mealsSection .dailyAddMenu {
+  overflow: visible !important;
+}
