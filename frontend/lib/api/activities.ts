@@ -31,6 +31,7 @@ export interface Activity {
   series_points?: ActivitySeriesPoint[] | string;
   original_point_count?: number | null;
   gpx_file_name?: string | null;
+  planned_activity_id?: string | null;
 }
 
 export interface ActivityCreateInput {
@@ -40,6 +41,7 @@ export interface ActivityCreateInput {
   activity_type?: string;
   duration_seconds?: number;
   distance_meters?: number;
+  planned_activity_id?: string;
 }
 
 export interface ActivityUpdateInput {
@@ -145,6 +147,7 @@ export interface GpxImportInput {
   activity_type?: string;
   activity_date?: string;
   burned_calories?: number;
+  planned_activity_id?: string;
 }
 
 export interface ActivityRangeResponse
