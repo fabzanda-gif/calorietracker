@@ -521,6 +521,9 @@ export function HomeShell() {
     useState<string | null>(null);
   const [alternateSlot, setAlternateSlot] =
     useState<string | null>(null);
+
+  const [quickAddMealSlot, setQuickAddMealSlot] =
+    useState<string | null>(null);
   const [alternateName, setAlternateName] =
     useState("");
   const [alternateCalories, setAlternateCalories] =
@@ -2945,8 +2948,24 @@ export function HomeShell() {
     }
   }
 
+  function openQuickAddMeal(slot: string) {
+    setError(null);
+
+    setAlternateSelectedKey(null);
+    setAlternateQuantity(1);
+
+    setAlternateName("");
+    setAlternateCalories("");
+    setAlternateProtein("");
+    setAlternateCarbs("");
+    setAlternateFat("");
+
+    setQuickAddMealSlot(slot);
+  }
+
   function closeAlternateMeal() {
     setAlternateSlot(null);
+    setQuickAddMealSlot(null);
     setAlternateName("");
     setAlternateCalories("");
     setAlternateProtein("");
@@ -4346,6 +4365,161 @@ export function HomeShell() {
             ) : null}
           </section>
 
+          {quickAddMealSlot ? (
+            <div
+              className={styles.quickMealOverlay}
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  closeAlternateMeal();
+                }
+              }}
+            >
+              <section
+                className={styles.quickMealModal}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="quick-meal-title"
+              >
+                <div className={styles.quickMealModalHeader}>
+                  <div>
+                    <span>REGISTRA ALIMENTO</span>
+
+                    <h3 id="quick-meal-title">
+                      Aggiungi a{" "}
+                      {mealLabel(quickAddMealSlot).toLowerCase()}
+                    </h3>
+
+                    <p>
+                      Verrà aggiunto al pasto già registrato,
+                      senza sostituirlo.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label="Chiudi"
+                    onClick={closeAlternateMeal}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className={styles.quickMealModalBody}>
+                  <label>
+                    <span>Cosa hai mangiato?</span>
+
+                    <input
+                      type="text"
+                      autoFocus
+                      value={alternateName}
+                      placeholder="Es. Yogurt greco"
+                      onChange={(event) => {
+                        setAlternateName(event.target.value);
+                      }}
+                    />
+                  </label>
+
+                  <div className={styles.quickMealMacroGrid}>
+                    <label>
+                      <span>Kcal</span>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        value={alternateCalories}
+                        placeholder="150"
+                        onChange={(event) => {
+                          setAlternateCalories(
+                            event.target.value,
+                          );
+                        }}
+                      />
+                    </label>
+
+                    <label>
+                      <span>Proteine</span>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="decimal"
+                        value={alternateProtein}
+                        placeholder="10"
+                        onChange={(event) => {
+                          setAlternateProtein(
+                            event.target.value,
+                          );
+                        }}
+                      />
+                    </label>
+
+                    <label>
+                      <span>Carbo</span>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="decimal"
+                        value={alternateCarbs}
+                        placeholder="15"
+                        onChange={(event) => {
+                          setAlternateCarbs(
+                            event.target.value,
+                          );
+                        }}
+                      />
+                    </label>
+
+                    <label>
+                      <span>Grassi</span>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="decimal"
+                        value={alternateFat}
+                        placeholder="5"
+                        onChange={(event) => {
+                          setAlternateFat(
+                            event.target.value,
+                          );
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className={styles.quickMealModalActions}>
+                  <button
+                    type="button"
+                    className={styles.quickMealCancel}
+                    disabled={savingAlternate}
+                    onClick={closeAlternateMeal}
+                  >
+                    Annulla
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.quickMealSave}
+                    disabled={
+                      savingAlternate ||
+                      !alternateName.trim() ||
+                      !alternateCalories.trim()
+                    }
+                    onClick={() => {
+                      void saveAlternateMeal(
+                        quickAddMealSlot,
+                      );
+                    }}
+                  >
+                    {savingAlternate
+                      ? "Registro…"
+                      : "Aggiungi al pasto"}
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+
           <section
 
             className={`${styles.section} ${styles.mealsSection}`}
@@ -4408,7 +4582,7 @@ export function HomeShell() {
                             menuDetails.open = false;
                           }
 
-                          openAlternateMeal(slot);
+                          openQuickAddMeal(slot);
                         }}
                       >
                         <span aria-hidden="true">
@@ -4639,7 +4813,7 @@ export function HomeShell() {
                         event.preventDefault();
                         event.stopPropagation();
 
-                        openAlternateMeal(slot);
+                        openQuickAddMeal(slot);
                       }}
                     >
                       <span aria-hidden="true">+</span>
