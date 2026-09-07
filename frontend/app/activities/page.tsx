@@ -327,6 +327,16 @@ function runningSessionLabel(
   );
 }
 
+// STEP A: planned activity editor
+type PlannedActivityEditDraft = {
+  scheduledDate: string;
+  scheduledTime: string;
+  title: string;
+  durationMinutes: string;
+  distanceKm: string;
+  notes: string;
+};
+
 function plannedDateLabel(
   value: string,
 ): string {
@@ -621,6 +631,25 @@ export default function ActivitiesPage() {
     useState(false);
   const [busyPlanId, setBusyPlanId] =
     useState<string | null>(null);
+
+  const [
+    editingPlan,
+    setEditingPlan,
+  ] = useState<PlannedActivity | null>(
+    null,
+  );
+
+  const [
+    editPlan,
+    setEditPlan,
+  ] = useState<PlannedActivityEditDraft | null>(
+    null,
+  );
+
+  const [
+    savingPlanEdit,
+    setSavingPlanEdit,
+  ] = useState(false);
 
   const [
     planAdaptations,
@@ -918,6 +947,190 @@ export default function ActivitiesPage() {
       );
     } finally {
       setSavingPlan(false);
+    }
+  }
+
+  function startPlannedActivityEdit(
+    item: PlannedActivity,
+  ) {
+    if (item.status !== "planned") {
+      return;
+    }
+
+    setEditingPlan(item);
+
+    setEditPlan({
+      scheduledDate: item.scheduled_date,
+      scheduledTime:
+        item.scheduled_time?.slice(0, 5) ??
+        "",
+      title: item.title,
+      durationMinutes:
+        item.duration_minutes != null
+          ? String(item.duration_minutes)
+          : "",
+      distanceKm:
+        item.distance_meters != null
+          ? String(
+              item.distance_meters / 1000,
+            )
+          : "",
+      notes: item.notes ?? "",
+    });
+
+    setError(null);
+  }
+
+  function cancelPlannedActivityEdit() {
+    if (savingPlanEdit) {
+      return;
+    }
+
+    setEditingPlan(null);
+    setEditPlan(null);
+  }
+
+  async function savePlannedActivityEdit() {
+    if (
+      !accessToken ||
+      !editingPlan ||
+      !editPlan
+    ) {
+      return;
+    }
+
+    const title = editPlan.title.trim();
+
+    if (!title) {
+      setError(
+        "Inserisci un titolo per l’attività.",
+      );
+      return;
+    }
+
+    const runningRace = Boolean(
+      editingPlan.training_plan_id &&
+        editingPlan.session_kind === "race",
+    );
+
+    if (
+      !runningRace &&
+      !editPlan.scheduledDate
+    ) {
+      setError(
+        "Inserisci una data per l’attività.",
+      );
+      return;
+    }
+
+    const durationText =
+      editPlan.durationMinutes.trim();
+
+    const durationMinutes =
+      durationText.length > 0
+        ? Number(durationText)
+        : null;
+
+    if (
+      durationMinutes !== null &&
+      (
+        !Number.isFinite(durationMinutes) ||
+        durationMinutes <= 0
+      )
+    ) {
+      setError(
+        "La durata deve essere maggiore di zero.",
+      );
+      return;
+    }
+
+    const supportsDistance =
+      plannedActivitySupportsDistance(
+        editingPlan.activity_type,
+      );
+
+    let distanceMeters: number | null =
+      null;
+
+    if (
+      supportsDistance &&
+      editPlan.distanceKm.trim()
+    ) {
+      const distanceKm = Number(
+        editPlan.distanceKm,
+      );
+
+      if (
+        !Number.isFinite(distanceKm) ||
+        distanceKm < 0
+      ) {
+        setError(
+          "La distanza non può essere negativa.",
+        );
+        return;
+      }
+
+      distanceMeters =
+        distanceKm * 1000;
+    }
+
+    const input: Parameters<
+      typeof updatePlannedActivity
+    >[1] = {
+      scheduled_time:
+        editPlan.scheduledTime || null,
+      title,
+      duration_minutes:
+        durationMinutes,
+      notes:
+        editPlan.notes.trim() || null,
+    };
+
+    // Race date/distance are intentionally
+    // kept under control of the Running plan.
+    if (!runningRace) {
+      input.scheduled_date =
+        editPlan.scheduledDate;
+
+      if (supportsDistance) {
+        input.distance_meters =
+          distanceMeters;
+      }
+    }
+
+    setSavingPlanEdit(true);
+    setError(null);
+
+    try {
+      const response =
+        await updatePlannedActivity(
+          editingPlan.id,
+          input,
+          accessToken,
+        );
+
+      setPlannedActivities(
+        (current) =>
+          current.map((item) =>
+            item.id ===
+            response.item.id
+              ? response.item
+              : item,
+          ),
+      );
+
+      setEditingPlan(null);
+      setEditPlan(null);
+
+      await loadMonth();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a modificare l’attività pianificata.",
+      );
+    } finally {
+      setSavingPlanEdit(false);
     }
   }
 
@@ -2114,6 +2327,303 @@ export default function ActivitiesPage() {
                           </small>
                         ) : null}
 
+                        {editingPlan?.id ===
+                          item.id &&
+                        editPlan ? (
+                          <div
+                            className={
+                              styles.planEditPanel
+                            }
+                          >
+                            <div
+                              className={
+                                styles.planEditHeading
+                              }
+                            >
+                              <strong>
+                                Modifica attività
+                              </strong>
+
+                              <span>
+                                {item.training_plan_id
+                                  ? "Sessione Running"
+                                  : "Attività pianificata"}
+                              </span>
+                            </div>
+
+                            <div
+                              className={
+                                styles.planEditGrid
+                              }
+                            >
+                              <label
+                                className={
+                                  styles.planEditWide
+                                }
+                              >
+                                Titolo
+                                <input
+                                  maxLength={160}
+                                  value={
+                                    editPlan.title
+                                  }
+                                  onChange={(
+                                    event,
+                                  ) =>
+                                    setEditPlan(
+                                      (
+                                        current,
+                                      ) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              title:
+                                                event
+                                                  .target
+                                                  .value,
+                                            }
+                                          : current,
+                                    )
+                                  }
+                                />
+                              </label>
+
+                              <label>
+                                Data
+                                <input
+                                  type="date"
+                                  value={
+                                    editPlan.scheduledDate
+                                  }
+                                  disabled={Boolean(
+                                    item.training_plan_id &&
+                                      item.session_kind ===
+                                        "race",
+                                  )}
+                                  onChange={(
+                                    event,
+                                  ) =>
+                                    setEditPlan(
+                                      (
+                                        current,
+                                      ) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              scheduledDate:
+                                                event
+                                                  .target
+                                                  .value,
+                                            }
+                                          : current,
+                                    )
+                                  }
+                                />
+                              </label>
+
+                              <label>
+                                Ora
+                                <input
+                                  type="time"
+                                  value={
+                                    editPlan.scheduledTime
+                                  }
+                                  onChange={(
+                                    event,
+                                  ) =>
+                                    setEditPlan(
+                                      (
+                                        current,
+                                      ) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              scheduledTime:
+                                                event
+                                                  .target
+                                                  .value,
+                                            }
+                                          : current,
+                                    )
+                                  }
+                                />
+                              </label>
+
+                              <label>
+                                Durata
+                                <div
+                                  className={
+                                    styles.planUnitInput
+                                  }
+                                >
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={
+                                      editPlan.durationMinutes
+                                    }
+                                    placeholder="60"
+                                    onChange={(
+                                      event,
+                                    ) =>
+                                      setEditPlan(
+                                        (
+                                          current,
+                                        ) =>
+                                          current
+                                            ? {
+                                                ...current,
+                                                durationMinutes:
+                                                  event
+                                                    .target
+                                                    .value,
+                                              }
+                                            : current,
+                                      )
+                                    }
+                                  />
+                                  <span>
+                                    min
+                                  </span>
+                                </div>
+                              </label>
+
+                              {plannedActivitySupportsDistance(
+                                item.activity_type,
+                              ) ? (
+                                <label>
+                                  Distanza
+                                  <div
+                                    className={
+                                      styles.planUnitInput
+                                    }
+                                  >
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.1"
+                                      disabled={Boolean(
+                                        item.training_plan_id &&
+                                          item.session_kind ===
+                                            "race",
+                                      )}
+                                      value={
+                                        editPlan.distanceKm
+                                      }
+                                      onChange={(
+                                        event,
+                                      ) =>
+                                        setEditPlan(
+                                          (
+                                            current,
+                                          ) =>
+                                            current
+                                              ? {
+                                                  ...current,
+                                                  distanceKm:
+                                                    event
+                                                      .target
+                                                      .value,
+                                                }
+                                              : current,
+                                        )
+                                      }
+                                    />
+                                    <span>
+                                      km
+                                    </span>
+                                  </div>
+                                </label>
+                              ) : null}
+
+                              <label
+                                className={
+                                  styles.planEditWide
+                                }
+                              >
+                                Note
+                                <textarea
+                                  rows={3}
+                                  maxLength={2000}
+                                  value={
+                                    editPlan.notes
+                                  }
+                                  onChange={(
+                                    event,
+                                  ) =>
+                                    setEditPlan(
+                                      (
+                                        current,
+                                      ) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              notes:
+                                                event
+                                                  .target
+                                                  .value,
+                                            }
+                                          : current,
+                                    )
+                                  }
+                                />
+                              </label>
+                            </div>
+
+                            {item.training_plan_id ? (
+                              <p
+                                className={
+                                  styles.planEditHint
+                                }
+                              >
+                                Tipo e intensità
+                                restano gestiti dal
+                                Running plan.
+                                {item.session_kind ===
+                                "race"
+                                  ? " Data e distanza della gara restano protette."
+                                  : ""}
+                              </p>
+                            ) : null}
+
+                            <div
+                              className={
+                                styles.planEditActions
+                              }
+                            >
+                              <button
+                                type="button"
+                                disabled={
+                                  savingPlanEdit
+                                }
+                                onClick={
+                                  cancelPlannedActivityEdit
+                                }
+                              >
+                                Annulla
+                              </button>
+
+                              <button
+                                type="button"
+                                className={
+                                  styles.savePlanEditButton
+                                }
+                                disabled={
+                                  savingPlanEdit ||
+                                  !editPlan.title.trim()
+                                }
+                                onClick={() => {
+                                  void savePlannedActivityEdit();
+                                }}
+                              >
+                                {savingPlanEdit
+                                  ? "Salvo…"
+                                  : "Salva modifiche"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
                         {adaptationFeedback[
                           item.id
                         ] ? (
@@ -2376,6 +2886,36 @@ export default function ActivitiesPage() {
                           {item.status ===
                           "planned" ? (
                             <>
+                              <button
+                                type="button"
+                                className={
+                                  styles.editPlanButton
+                                }
+                                disabled={
+                                  busyPlanId ===
+                                    item.id ||
+                                  savingPlanEdit
+                                }
+                                onClick={() => {
+                                  if (
+                                    editingPlan?.id ===
+                                    item.id
+                                  ) {
+                                    cancelPlannedActivityEdit();
+                                    return;
+                                  }
+
+                                  startPlannedActivityEdit(
+                                    item,
+                                  );
+                                }}
+                              >
+                                {editingPlan?.id ===
+                                item.id
+                                  ? "Chiudi modifica"
+                                  : "Modifica"}
+                              </button>
+
                               <button
                                 type="button"
                                 className={

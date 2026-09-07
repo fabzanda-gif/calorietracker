@@ -1154,6 +1154,99 @@ def update_planned_activity(
         )
 
     try:
+        # STEP A: planned edit guardrails
+        existing = repo.get(
+            planned_id,
+            current_user.id,
+        )
+
+        if existing is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Planned activity not found",
+            )
+
+        editable_fields = {
+            "scheduled_date",
+            "scheduled_time",
+            "title",
+            "activity_type",
+            "duration_minutes",
+            "distance_meters",
+            "intensity",
+            "notes",
+        }
+
+        requested_edits = (
+            set(payload).intersection(
+                editable_fields
+            )
+        )
+
+        if (
+            (
+                existing.get("status")
+                or "planned"
+            )
+            != "planned"
+            and requested_edits
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Only activities with planned status "
+                    "can be edited"
+                ),
+            )
+
+        if existing.get("training_plan_id"):
+            plan_owned_fields = {
+                "activity_type",
+                "intensity",
+            }
+
+            requested_plan_owned_fields = (
+                set(payload).intersection(
+                    plan_owned_fields
+                )
+            )
+
+            if requested_plan_owned_fields:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Activity type and intensity of a "
+                        "generated Running session are "
+                        "managed by the training plan"
+                    ),
+                )
+
+            if (
+                existing.get("session_kind")
+                == "race"
+            ):
+                race_locked_fields = {
+                    "scheduled_date",
+                    "distance_meters",
+                }
+
+                requested_race_fields = (
+                    set(payload).intersection(
+                        race_locked_fields
+                    )
+                )
+
+                if requested_race_fields:
+                    raise HTTPException(
+                        status_code=(
+                            status.HTTP_409_CONFLICT
+                        ),
+                        detail=(
+                            "Race date and distance are "
+                            "managed by the Running plan"
+                        ),
+                    )
+
         item = repo.update(
             planned_id,
             current_user.id,

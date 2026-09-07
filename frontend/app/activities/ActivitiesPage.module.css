@@ -1639,6 +1639,150 @@ summary.loggerHeading {
   }
 }
 
+/* STEP A: PLANNED ACTIVITY EDITOR START */
+
+.planEditPanel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #dfe4ea;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.planEditHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.planEditHeading strong {
+  color: #102846;
+  font-size: 0.88rem;
+}
+
+.planEditHeading span {
+  color: #718096;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.planEditGrid {
+  display: grid;
+  grid-template-columns: repeat(
+    2,
+    minmax(0, 1fr)
+  );
+  gap: 10px;
+}
+
+.planEditGrid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #5f6d7f;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.planEditGrid input,
+.planEditGrid textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border: 1px solid #d9dee5;
+  border-radius: 10px;
+  background: #fff;
+  color: #102846;
+  font: inherit;
+}
+
+.planEditGrid input {
+  min-height: 41px;
+}
+
+.planEditGrid textarea {
+  resize: vertical;
+}
+
+.planEditGrid input:disabled {
+  background: #eef1f4;
+  color: #7a8491;
+  cursor: not-allowed;
+}
+
+.planEditWide {
+  grid-column: 1 / -1;
+}
+
+.planEditHint {
+  margin: 10px 0 0;
+  color: #6d7886;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.planEditActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.planEditActions button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d7dde5;
+  border-radius: 10px;
+  background: #fff;
+  color: #102846;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.planEditActions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.planEditActions .savePlanEditButton {
+  border-color: #102846;
+  background: #102846;
+  color: #fff;
+}
+
+.upcomingActions .editPlanButton {
+  border-color: #cbd4df;
+  background: #f6f8fb;
+}
+
+@media(max-width: 620px) {
+  .planEditGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .planEditWide {
+    grid-column: auto;
+  }
+
+  .planEditHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .planEditActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* STEP A: PLANNED ACTIVITY EDITOR END */
+
 /* PLANNER UI POLISH END */
 
 
