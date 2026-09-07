@@ -116,9 +116,6 @@ def get_google_calendar_authorization(
 @router.post("/exchange")
 def exchange_google_calendar_code(
     body: GoogleCalendarExchangeRequest,
-    current_user: CurrentUser = Depends(
-        get_current_user
-    ),
     repo: GoogleCalendarConnectionsRepository = Depends(
         get_google_calendar_connections_repository
     ),
@@ -128,9 +125,8 @@ def exchange_google_calendar_code(
             GoogleCalendarOAuthService()
         )
 
-        service.verify_state(
-            body.state,
-            current_user.id,
+        user_id = service.get_state_user_id(
+            body.state
         )
 
         tokens = service.exchange_code(
@@ -141,7 +137,7 @@ def exchange_google_calendar_code(
             "refresh_token"
         ):
             existing = repo.get_private(
-                current_user.id
+                user_id
             )
 
             existing_refresh = (
@@ -161,7 +157,7 @@ def exchange_google_calendar_code(
                 )
 
         repo.upsert_tokens(
-            user_id=current_user.id,
+            user_id=user_id,
             values=tokens,
         )
 
@@ -237,7 +233,7 @@ def sync_google_calendar(
             planned_repo=planned_repo,
             strength_repo=strength_repo,
         ).sync_range(
-            user_id=current_user.id,
+            user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )

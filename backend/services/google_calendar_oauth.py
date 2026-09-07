@@ -180,6 +180,86 @@ class GoogleCalendarOAuthService:
             f"{body}.{encoded_signature}"
         )
 
+    def get_state_user_id(
+        self,
+        state: str,
+        *,
+        max_age_seconds: int = 900,
+    ) -> str:
+        try:
+            body, supplied_signature = (
+                str(state).split(".", 1)
+            )
+
+            expected = hmac.new(
+                self.state_secret.encode("utf-8"),
+                body.encode("ascii"),
+                hashlib.sha256,
+            ).digest()
+
+            expected_signature = (
+                base64.urlsafe_b64encode(expected)
+                .decode("ascii")
+                .rstrip("=")
+            )
+
+            if not hmac.compare_digest(
+                supplied_signature,
+                expected_signature,
+            ):
+                raise GoogleCalendarOAuthError(
+                    "Invalid Google OAuth state"
+                )
+
+            padded = body + "=" * (-len(body) % 4)
+
+            payload = json.loads(
+                base64.urlsafe_b64decode(
+                    padded
+                ).decode("utf-8")
+            )
+
+            user_id = str(
+                payload.get("uid") or ""
+            ).strip()
+
+            if not user_id:
+                raise GoogleCalendarOAuthError(
+                    "Invalid Google OAuth state"
+                )
+
+            issued_at = int(
+                payload.get("ts") or 0
+            )
+
+            age = (
+                int(
+                    datetime.now(
+                        timezone.utc
+                    ).timestamp()
+                )
+                - issued_at
+            )
+
+            if (
+                age < 0
+                or age > max_age_seconds
+            ):
+                raise GoogleCalendarOAuthError(
+                    "Expired Google OAuth state"
+                )
+
+            return user_id
+
+        except GoogleCalendarOAuthError:
+            raise
+
+        except Exception as exc:
+            raise GoogleCalendarOAuthError(
+                "Invalid Google OAuth state"
+            ) from exc
+
+
     def verify_state(
         self,
         state: str,

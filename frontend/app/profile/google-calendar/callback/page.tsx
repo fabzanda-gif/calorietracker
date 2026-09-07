@@ -10,7 +10,6 @@ import {
   useSearchParams,
 } from "next/navigation";
 
-import { useAuth } from "@/components/auth/AuthProvider";
 import {
   exchangeGoogleCalendarCode,
 } from "@/lib/api/google-calendar";
@@ -20,9 +19,6 @@ function GoogleCalendarCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const {
-    accessToken,
-  } = useAuth();
 
   const [message, setMessage] =
     useState(
@@ -33,11 +29,6 @@ function GoogleCalendarCallbackContent() {
     useState(false);
 
   useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
-
-    const token = accessToken;
 
     const error =
       searchParams.get("error");
@@ -72,7 +63,6 @@ function GoogleCalendarCallbackContent() {
     async function completeConnection() {
       try {
         await exchangeGoogleCalendarCode(
-          token,
           authorizationCode,
           oauthState,
         );
@@ -110,7 +100,6 @@ function GoogleCalendarCallbackContent() {
       active = false;
     };
   }, [
-    accessToken,
     router,
     searchParams,
   ]);

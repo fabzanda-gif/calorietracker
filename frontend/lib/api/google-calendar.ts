@@ -46,7 +46,6 @@ export function getGoogleCalendarAuthorization(
 }
 
 export function exchangeGoogleCalendarCode(
-  accessToken: string,
   code: string,
   state: string,
 ): Promise<{
@@ -58,7 +57,6 @@ export function exchangeGoogleCalendarCode(
     "/integrations/google-calendar/exchange",
     {
       method: "POST",
-      accessToken,
       body: JSON.stringify({
         code,
         state,
