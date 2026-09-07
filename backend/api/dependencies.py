@@ -34,6 +34,9 @@ from backend.repositories.oura_connections import (
 from backend.repositories.google_calendar_connections import (
     GoogleCalendarConnectionsRepository,
 )
+from backend.repositories.google_calendar_events import (
+    GoogleCalendarEventsRepository,
+)
 from backend.repositories.recipe_ingredients import RecipeIngredientsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.training_plans import (
@@ -289,6 +292,16 @@ def get_authenticated_supabase(
     )
 
     return client
+
+
+def get_google_calendar_events_repository(
+    supabase: Client = Depends(
+        get_admin_supabase_client
+    ),
+) -> GoogleCalendarEventsRepository:
+    return GoogleCalendarEventsRepository(
+        supabase
+    )
 
 
 def get_google_calendar_connections_repository(
