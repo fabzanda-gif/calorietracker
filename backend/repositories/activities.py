@@ -10,7 +10,8 @@ ACTIVITY_SELECT = (
     "source,activity_type,started_at,duration_seconds,"
     "distance_meters,average_cadence,"
     "average_heart_rate,route_points,series_points,"
-    "original_point_count,gpx_file_name,estimated_steps"
+    "original_point_count,gpx_file_name,estimated_steps,"
+    "planned_activity_id"
 )
 
 

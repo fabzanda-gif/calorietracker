@@ -66,6 +66,29 @@ from backend.services.running_plan import (
 router = APIRouter(prefix="/activities", tags=["activities"])
 
 
+def _validate_planned_activity_link(
+    *,
+    planned_activity_id: str | None,
+    user_id: str,
+    repo: PlannedActivitiesRepository,
+) -> dict | None:
+    if not planned_activity_id:
+        return None
+
+    planned = repo.get(
+        planned_activity_id,
+        user_id,
+    )
+
+    if planned is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Planned activity not found",
+        )
+
+    return planned
+
+
 def _is_training_activity(activity: dict) -> bool:
     if activity.get("source") == "gpx":
         return True
@@ -105,6 +128,12 @@ class ActivityCreate(BaseModel):
     distance_meters: float | None = Field(
         default=None,
         ge=0,
+    )
+
+    planned_activity_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
     )
 
 
@@ -281,6 +310,11 @@ class GpxImportRequest(GpxPreviewRequest):
     )
     activity_date: date | None = None
     burned_calories: int | None = Field(default=None, ge=0)
+    planned_activity_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+    )
 
 
 @router.get("/training-plans")
@@ -1460,6 +1494,9 @@ def import_gpx_activity(
     repo: ActivitiesRepository = Depends(
         get_activities_repository
     ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
     daily_logs_repo: DailyLogsRepository = Depends(
         get_daily_logs_repository
     ),
@@ -1511,6 +1548,12 @@ def import_gpx_activity(
         request.activity_name.strip()
         if request.activity_name
         else parsed["activity_name"]
+    )
+
+    _validate_planned_activity_link(
+        planned_activity_id=request.planned_activity_id,
+        user_id=current_user.id,
+        repo=planned_repo,
     )
 
     latest_weight = weight_repo.latest(current_user.id)
@@ -1566,6 +1609,11 @@ def import_gpx_activity(
         ),
         "gpx_file_name": request.file_name,
     }
+
+    if request.planned_activity_id:
+        payload["planned_activity_id"] = (
+            request.planned_activity_id
+        )
 
     try:
         item = repo.create(payload)
@@ -1698,6 +1746,9 @@ def create_activity(
     repo: ActivitiesRepository = Depends(
         get_activities_repository
     ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
     daily_logs_repo: DailyLogsRepository = Depends(
         get_daily_logs_repository
     ),
@@ -1706,6 +1757,22 @@ def create_activity(
 
     if payload.get("distance_meters") is None:
         payload.pop("distance_meters", None)
+
+    planned_activity_id = payload.get(
+        "planned_activity_id"
+    )
+
+    if planned_activity_id:
+        _validate_planned_activity_link(
+            planned_activity_id=planned_activity_id,
+            user_id=current_user.id,
+            repo=planned_repo,
+        )
+    else:
+        payload.pop(
+            "planned_activity_id",
+            None,
+        )
 
     payload["date"] = str(payload["date"])
     payload["user_id"] = current_user.id

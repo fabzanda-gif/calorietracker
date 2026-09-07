@@ -219,3 +219,32 @@ def test_completed_planned_activity_cannot_be_rewritten():
 
     assert exc.value.status_code == 409
     assert repo.last_update is None
+
+
+def test_activity_create_accepts_planned_activity_id():
+    from backend.api.routers.activities import ActivityCreate
+
+    item = ActivityCreate(
+        date="2026-09-10",
+        activity_name="Corsa facile",
+        burned_calories=350,
+        planned_activity_id=(
+            "11111111-1111-1111-1111-111111111111"
+        ),
+    )
+
+    assert item.planned_activity_id == (
+        "11111111-1111-1111-1111-111111111111"
+    )
+
+
+def test_activity_create_planned_activity_id_is_optional():
+    from backend.api.routers.activities import ActivityCreate
+
+    item = ActivityCreate(
+        date="2026-09-10",
+        activity_name="Corsa libera",
+        burned_calories=300,
+    )
+
+    assert item.planned_activity_id is None
