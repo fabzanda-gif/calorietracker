@@ -59,6 +59,12 @@ from backend.services.structured_meal import (
     StructuredMealError,
     StructuredMealService,
 )
+from backend.services.pantry_meal_logging import (
+    PantryMealLoggingError,
+    PantryMealItemNotFoundError,
+    PantryMealUnavailableError,
+    PantryMealLoggingService,
+)
 
 
 router = APIRouter(prefix="/meals", tags=["meals"])
@@ -68,6 +74,13 @@ class StructuredMealIngredient(BaseModel):
     ingredient_id: str
     quantity: float = Field(gt=0)
     unit: str = "g"
+    quantity_g: float = Field(gt=0)
+
+
+class PantryMealLogRequest(BaseModel):
+    date: date
+    meal_type: str = Field(min_length=1)
+    pantry_item_id: str = Field(min_length=1)
     quantity_g: float = Field(gt=0)
 
 
@@ -557,6 +570,61 @@ def confirm_conversational_meal(
             [],
         ),
     }
+
+
+@router.post(
+    "/pantry-log",
+    status_code=status.HTTP_201_CREATED,
+)
+def log_pantry_meal(
+    data: PantryMealLogRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    pantry_repo: PantryRepository = Depends(
+        get_pantry_repository
+    ),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    meal_ingredients_repo: MealIngredientsRepository = Depends(
+        get_meal_ingredients_repository
+    ),
+):
+    try:
+        return PantryMealLoggingService(
+            pantry_repo=pantry_repo,
+            ingredients_repo=ingredients_repo,
+            meals_repo=meals_repo,
+            meal_ingredients_repo=meal_ingredients_repo,
+        ).log(
+            user_id=current_user.id,
+            pantry_item_id=data.pantry_item_id,
+            meal_date=data.date,
+            meal_type=data.meal_type,
+            quantity_g=data.quantity_g,
+        )
+    except PantryMealItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except PantryMealUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except PantryMealLoggingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/history")

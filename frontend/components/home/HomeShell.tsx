@@ -45,6 +45,7 @@ import { confirmMealPrediction } from "@/lib/api/confirm";
 import { commitMealDecision } from "@/lib/api/decision";
 import {
   createMeal,
+  logPantryMeal,
   confirmConversationalMeal,
   deleteMeal,
   getMeal,
@@ -62,7 +63,7 @@ import {
   type ConversationalDayPreview,
 } from "@/lib/api/conversation";
 import {
-  getAvailableRecipes,
+  getRecipes,
   type Recipe,
 } from "@/lib/api/recipes";
 import {
@@ -73,6 +74,11 @@ import {
   getPantry,
   type PantryItem,
 } from "@/lib/api/pantry";
+import {
+  getMealPrepInventory,
+  logMealPrepPortion,
+  type MealPrepItem,
+} from "@/lib/api/mealPrep";
 import {
   getDay,
   getDayBriefing,
@@ -582,13 +588,18 @@ export function HomeShell() {
     carbs: number;
     fat: number;
     source:
+      | "meal_prep"
       | "pantry"
       | "recipe"
       | "history"
       | "ingredient";
     ingredientId?: string;
     portionGrams?: number;
+    pantryItemId?: string;
     pantryExpiresAt?: string | null;
+    mealPrepBatchId?: string;
+    mealPrepRemaining?: number;
+    stockLabel?: string;
   }>>([]);
   const [savingAlternate, setSavingAlternate] =
     useState(false);
@@ -763,15 +774,17 @@ export function HomeShell() {
     let active = true;
 
     Promise.allSettled([
-      getAvailableRecipes(accessToken),
+      getRecipes(accessToken),
       getMealHistory(accessToken),
       getIngredients(accessToken),
       getPantry(accessToken),
+      getMealPrepInventory(accessToken, true),
     ]).then(([
       recipesResult,
       historyResult,
       ingredientsResult,
       pantryResult,
+      mealPrepResult,
     ]) => {
       if (!active) return;
 
@@ -795,6 +808,11 @@ export function HomeShell() {
       const pantry =
         pantryResult.status === "fulfilled"
           ? pantryResult.value.items
+          : [];
+
+      const mealPrep =
+        mealPrepResult.status === "fulfilled"
+          ? mealPrepResult.value.items
           : [];
 
       setPantryInventory(pantry);
@@ -936,8 +954,19 @@ export function HomeShell() {
             return [];
           }
 
+          const storedPortionGrams =
+            pantryItem.quantity_mode === "portion"
+              ? Number(
+                  pantryItem.grams_per_portion || 0,
+                )
+              : 0;
+
           const portionGrams =
-            ingredientPortionGrams(ingredient);
+            storedPortionGrams > 0
+              ? storedPortionGrams
+              : ingredientPortionGrams(
+                  ingredient,
+                );
 
           const factor = portionGrams / 100;
 
@@ -967,11 +996,69 @@ export function HomeShell() {
             source: "pantry" as const,
             ingredientId: ingredient.id,
             portionGrams,
+            pantryItemId: String(pantryItem.id),
             pantryExpiresAt: pantryItem.expires_at,
+            stockLabel:
+              pantryItem.quantity_mode === "portion"
+                ? `${pantryItem.quantity} ${
+                    Number(pantryItem.quantity) === 1
+                      ? "porzione"
+                      : "porzioni"
+                  }`
+                : `${pantryItem.quantity} ${pantryItem.unit}`,
           }];
         });
 
+      const mealPrepAlternates =
+        mealPrep.flatMap(
+          (batch: MealPrepItem) => {
+            const recipe = recipes.find(
+              (candidate: Recipe) =>
+                String(candidate.id) ===
+                String(batch.recipe_id),
+            );
+
+            if (!recipe) {
+              return [];
+            }
+
+            return [{
+              key: `meal-prep:${batch.id}`,
+              name: batch.name,
+              mealType:
+                recipe.meal_type || null,
+              mealSlots: null,
+              calories: Number(
+                batch.calories_per_portion || 0,
+              ),
+              protein: Number(
+                batch.protein_per_portion || 0,
+              ),
+              carbs: Number(
+                batch.carbs_per_portion || 0,
+              ),
+              fat: Number(
+                batch.fat_per_portion || 0,
+              ),
+              source: "meal_prep" as const,
+              mealPrepBatchId:
+                String(batch.id),
+              mealPrepRemaining:
+                Number(
+                  batch.portions_remaining || 0,
+                ),
+              stockLabel:
+                `${batch.portions_remaining} ${
+                  batch.portions_remaining === 1
+                    ? "porzione"
+                    : "porzioni"
+                }`,
+            }];
+          },
+        );
+
       const items = [
+        ...mealPrepAlternates,
         ...pantryAlternates,
 
         ...recipes.map((recipe: Recipe) => {
@@ -1083,11 +1170,11 @@ export function HomeShell() {
           },
         ),
       ].filter((item) => {
-        const key = item.name
+        const key = `${item.source}:${item.name
           .trim()
-          .toLocaleLowerCase("it");
+          .toLocaleLowerCase("it")}`;
 
-        if (!key || seen.has(key)) {
+        if (!item.name.trim() || seen.has(key)) {
           return false;
         }
 
@@ -3215,45 +3302,56 @@ export function HomeShell() {
     item: (typeof knownAlternates)[number],
     slot: string,
   ): boolean {
+    const requested =
+      normalizedMealSlot(slot);
+
+    const compatibleFamily = (
+      candidate: string,
+    ): boolean => {
+      const normalized =
+        normalizedMealSlot(candidate);
+
+      if (
+        requested === "breakfast" ||
+        requested === "snack"
+      ) {
+        return (
+          normalized === "breakfast" ||
+          normalized === "snack"
+        );
+      }
+
+      if (
+        requested === "lunch" ||
+        requested === "dinner"
+      ) {
+        return (
+          normalized === "lunch" ||
+          normalized === "dinner"
+        );
+      }
+
+      return normalized === requested;
+    };
+
     if (
       item.source === "recipe" ||
-      item.source === "history"
+      item.source === "history" ||
+      item.source === "meal_prep"
     ) {
       return Boolean(
         item.mealType &&
-        mealFitsSlot(item.mealType, slot),
+        compatibleFamily(item.mealType),
       );
     }
 
-    const normalizedSlot =
-      normalizedMealSlot(slot);
-
     return Boolean(
-      item.mealSlots?.some((candidate) => {
-        if (
-          normalizedSlot === "breakfast" ||
-          normalizedSlot === "snack"
-        ) {
-          return (
-            candidate === "breakfast" ||
-            candidate === "snack"
-          );
-        }
-
-        if (
-          normalizedSlot === "lunch" ||
-          normalizedSlot === "dinner"
-        ) {
-          return (
-            candidate === "lunch" ||
-            candidate === "dinner"
-          );
-        }
-
-        return candidate === normalizedSlot;
-      }),
+      item.mealSlots?.some(
+        compatibleFamily,
+      ),
     );
   }
+
 
   function selectQuickMealAlternate(
     key: string,
@@ -3290,6 +3388,41 @@ export function HomeShell() {
       String(Math.round(selected.fat)),
     );
   }
+
+  function updateQuickMealName(
+    value: string,
+    slot: string,
+  ) {
+    setAlternateName(value);
+
+    const normalized =
+      value.trim().toLocaleLowerCase("it");
+
+    const exact =
+      knownAlternates.find(
+        (item) =>
+          quickMealFitsSlot(item, slot) &&
+          item.name
+            .trim()
+            .toLocaleLowerCase("it") ===
+            normalized,
+      );
+
+    if (exact) {
+      selectQuickMealAlternate(exact.key);
+      return;
+    }
+
+    if (alternateSelectedKey) {
+      setAlternateSelectedKey(null);
+      setAlternateQuantity(1);
+      setAlternateCalories("");
+      setAlternateProtein("");
+      setAlternateCarbs("");
+      setAlternateFat("");
+    }
+  }
+
 
   function openQuickAddMeal(slot: string) {
     setError(null);
@@ -3607,18 +3740,55 @@ export function HomeShell() {
     setError(null);
 
     try {
-      await createMeal(
-        {
-          date: todayIso(),
-          meal_type: mealLabel(slot),
-          name,
-          calories: Math.round(calories),
-          protein: Math.round(protein),
-          carbs: Math.round(carbs),
-          fat: Math.round(fat),
-        },
-        accessToken,
-      );
+      const selected =
+        alternateSelectedKey
+          ? knownAlternates.find(
+              (item) =>
+                item.key ===
+                alternateSelectedKey,
+            )
+          : null;
+
+      if (
+        selected?.source === "meal_prep" &&
+        selected.mealPrepBatchId
+      ) {
+        await logMealPrepPortion(
+          accessToken,
+          selected.mealPrepBatchId,
+          todayIso(),
+          mealLabel(slot),
+        );
+      } else if (
+        selected?.source === "pantry" &&
+        selected.pantryItemId &&
+        selected.portionGrams
+      ) {
+        await logPantryMeal(
+          {
+            date: todayIso(),
+            meal_type: mealLabel(slot),
+            pantry_item_id:
+              selected.pantryItemId,
+            quantity_g:
+              selected.portionGrams,
+          },
+          accessToken,
+        );
+      } else {
+        await createMeal(
+          {
+            date: todayIso(),
+            meal_type: mealLabel(slot),
+            name,
+            calories: Math.round(calories),
+            protein: Math.round(protein),
+            carbs: Math.round(carbs),
+            fat: Math.round(fat),
+          },
+          accessToken,
+        );
+      }
 
       closeAlternateMeal();
       await refreshHome();
@@ -5008,30 +5178,59 @@ export function HomeShell() {
                                 alternateSelectedKey ??
                                 ""
                               }
-                              onChange={(
-                                event,
-                              ) => {
+                              onChange={(event) => {
                                 selectQuickMealAlternate(
-                                  event.target
-                                    .value,
+                                  event.target.value,
                                 );
                               }}
                             >
                               <option value="">
-                                Seleziona oppure
-                                scrivi manualmente…
+                                Seleziona da dispensa o recenti…
                               </option>
 
                               {knownAlternates.some(
                                 (item) =>
                                   item.source ===
-                                    "pantry" &&
+                                    "meal_prep" &&
                                   quickMealFitsSlot(
                                     item,
                                     quickAddMealSlot,
                                   ),
                               ) ? (
-                                <optgroup label="🏠 In dispensa">
+                                <optgroup label="🏠 Dispensa · porzioni cucinate">
+                                  {knownAlternates
+                                    .filter(
+                                      (item) =>
+                                        item.source ===
+                                          "meal_prep" &&
+                                        quickMealFitsSlot(
+                                          item,
+                                          quickAddMealSlot,
+                                        ),
+                                    )
+                                    .map((item) => (
+                                      <option
+                                        key={item.key}
+                                        value={item.key}
+                                      >
+                                        {item.name}
+                                        {item.stockLabel
+                                          ? ` · ${item.stockLabel}`
+                                          : ""}
+                                      </option>
+                                    ))}
+                                </optgroup>
+                              ) : null}
+
+                              {knownAlternates.some(
+                                (item) =>
+                                  item.source === "pantry" &&
+                                  quickMealFitsSlot(
+                                    item,
+                                    quickAddMealSlot,
+                                  ),
+                              ) ? (
+                                <optgroup label="🏠 Dispensa · alimenti">
                                   {knownAlternates
                                     .filter(
                                       (item) =>
@@ -5042,73 +5241,17 @@ export function HomeShell() {
                                           quickAddMealSlot,
                                         ),
                                     )
-                                    .map(
-                                      (item) => (
-                                        <option
-                                          key={
-                                            item.key
-                                          }
-                                          value={
-                                            item.key
-                                          }
-                                        >
-                                          {
-                                            item.name
-                                          }
-                                          {item.pantryExpiresAt
-                                            ? ` · scad. ${new Date(
-                                                `${item.pantryExpiresAt}T00:00:00`,
-                                              ).toLocaleDateString(
-                                                "it-IT",
-                                                {
-                                                  day: "numeric",
-                                                  month:
-                                                    "short",
-                                                },
-                                              )}`
-                                            : ""}
-                                        </option>
-                                      ),
-                                    )}
-                                </optgroup>
-                              ) : null}
-
-                              {knownAlternates.some(
-                                (item) =>
-                                  item.source ===
-                                    "recipe" &&
-                                  quickMealFitsSlot(
-                                    item,
-                                    quickAddMealSlot,
-                                  ),
-                              ) ? (
-                                <optgroup label="Ricette compatibili">
-                                  {knownAlternates
-                                    .filter(
-                                      (item) =>
-                                        item.source ===
-                                          "recipe" &&
-                                        quickMealFitsSlot(
-                                          item,
-                                          quickAddMealSlot,
-                                        ),
-                                    )
-                                    .map(
-                                      (item) => (
-                                        <option
-                                          key={
-                                            item.key
-                                          }
-                                          value={
-                                            item.key
-                                          }
-                                        >
-                                          {
-                                            item.name
-                                          }
-                                        </option>
-                                      ),
-                                    )}
+                                    .map((item) => (
+                                      <option
+                                        key={item.key}
+                                        value={item.key}
+                                      >
+                                        {item.name}
+                                        {item.stockLabel
+                                          ? ` · ${item.stockLabel}`
+                                          : ""}
+                                      </option>
+                                    ))}
                                 </optgroup>
                               ) : null}
 
@@ -5121,7 +5264,7 @@ export function HomeShell() {
                                     quickAddMealSlot,
                                   ),
                               ) ? (
-                                <optgroup label="Pasti recenti">
+                                <optgroup label="🕘 Consumati di recente">
                                   {knownAlternates
                                     .filter(
                                       (item) =>
@@ -5132,61 +5275,15 @@ export function HomeShell() {
                                           quickAddMealSlot,
                                         ),
                                     )
-                                    .map(
-                                      (item) => (
-                                        <option
-                                          key={
-                                            item.key
-                                          }
-                                          value={
-                                            item.key
-                                          }
-                                        >
-                                          {
-                                            item.name
-                                          }
-                                        </option>
-                                      ),
-                                    )}
-                                </optgroup>
-                              ) : null}
-
-                              {knownAlternates.some(
-                                (item) =>
-                                  item.source ===
-                                    "ingredient" &&
-                                  quickMealFitsSlot(
-                                    item,
-                                    quickAddMealSlot,
-                                  ),
-                              ) ? (
-                                <optgroup label="Altri alimenti compatibili">
-                                  {knownAlternates
-                                    .filter(
-                                      (item) =>
-                                        item.source ===
-                                          "ingredient" &&
-                                        quickMealFitsSlot(
-                                          item,
-                                          quickAddMealSlot,
-                                        ),
-                                    )
-                                    .map(
-                                      (item) => (
-                                        <option
-                                          key={
-                                            item.key
-                                          }
-                                          value={
-                                            item.key
-                                          }
-                                        >
-                                          {
-                                            item.name
-                                          }
-                                        </option>
-                                      ),
-                                    )}
+                                    .slice(0, 12)
+                                    .map((item) => (
+                                      <option
+                                        key={item.key}
+                                        value={item.key}
+                                      >
+                                        {item.name}
+                                      </option>
+                                    ))}
                                 </optgroup>
                               ) : null}
                             </select>
@@ -5201,19 +5298,54 @@ export function HomeShell() {
                             <input
                               type="text"
                               autoFocus
+                              list="home-quick-known-foods"
                               value={
                                 alternateName
                               }
-                              placeholder="Es. Yogurt greco"
-                              onChange={(
-                                event,
-                              ) => {
-                                setAlternateName(
-                                  event.target
-                                    .value,
+                              placeholder="Cerca o scrivi cosa hai mangiato…"
+                              onChange={(event) => {
+                                updateQuickMealName(
+                                  event.target.value,
+                                  quickAddMealSlot,
                                 );
                               }}
                             />
+
+                            <datalist id="home-quick-known-foods">
+                              {knownAlternates
+                                .filter((item) =>
+                                  quickMealFitsSlot(
+                                    item,
+                                    quickAddMealSlot,
+                                  ),
+                                )
+                                .filter(
+                                  (
+                                    item,
+                                    index,
+                                    list,
+                                  ) =>
+                                    list.findIndex(
+                                      (candidate) =>
+                                        candidate.name
+                                          .trim()
+                                          .toLocaleLowerCase(
+                                            "it",
+                                          ) ===
+                                        item.name
+                                          .trim()
+                                          .toLocaleLowerCase(
+                                            "it",
+                                          ),
+                                    ) === index,
+                                )
+                                .map((item) => (
+                                  <option
+                                    key={`known:${item.key}`}
+                                    value={item.name}
+                                  />
+                                ))}
+                            </datalist>
                           </label>
 
                           <div

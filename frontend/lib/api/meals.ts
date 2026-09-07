@@ -134,6 +134,33 @@ export interface MealCreateResponse {
   item: LoggedMeal;
 }
 
+export interface PantryMealLogInput {
+  date: string;
+  meal_type: string;
+  pantry_item_id: string;
+  quantity_g: number;
+}
+
+export function logPantryMeal(
+  input: PantryMealLogInput,
+  accessToken?: string | null,
+): Promise<{
+  logged: boolean;
+  meal: LoggedMeal;
+  inventory: unknown;
+  consumed_grams: number;
+}> {
+  return apiRequest(
+    "/meals/pantry-log",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+
 export function createMeal(
   input: MealCreateInput,
   accessToken?: string | null,
