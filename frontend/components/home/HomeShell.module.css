@@ -13596,3 +13596,1098 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+/* ==========================================================
+   RHYTHM / WEEK CARD VISUAL PASS
+   Makes "Ritmo" feel closer to the mockup:
+   - light tinted surface
+   - more visible border
+   - clearer KPI chips
+   - stronger current-day tile
+   - more present progress bar
+   ========================================================== */
+
+.weekOverviewCard {
+  background: linear-gradient(180deg, #fbfdff 0%, #f5faff 100%) !important;
+  border-color: #dbeafe !important;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.05) !important;
+}
+
+.weekOverviewCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.09), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(251, 113, 133, 0.06), transparent 24%);
+  opacity: 1;
+}
+
+.weekOverviewCard > * {
+  position: relative;
+  z-index: 1;
+}
+
+.weekOverviewCard .sectionEyebrow,
+.weekOverviewCard .sectionTitle,
+.weekOverviewCard .sectionSubtitle {
+  position: relative;
+  z-index: 1;
+}
+
+.weekOverviewCard .sectionEyebrow {
+  color: #ff6b63 !important;
+}
+
+.weekOverviewCard .sectionSubtitle {
+  color: #64748b !important;
+}
+
+.weekHeaderAction,
+.weekBadge {
+  background: #eef6ff !important;
+  border: 1px solid #d7e9ff !important;
+  color: #5b8def !important;
+  box-shadow: 0 6px 14px rgba(91, 141, 239, 0.08) !important;
+}
+
+/* Weekly KPI chips */
+.weekKpis {
+  gap: 10px !important;
+  margin-top: 16px !important;
+  margin-bottom: 14px !important;
+}
+
+.weekKpi,
+.weekKpiCard,
+.weekMiniStat,
+.weekStatCard {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border: 1px solid #dbeafe !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05) !important;
+}
+
+.weekKpiLabel,
+.weekKpiCardLabel,
+.weekMiniStatLabel,
+.weekStatLabel {
+  color: #64748b !important;
+}
+
+.weekKpiValue,
+.weekKpiCardValue,
+.weekMiniStatValue,
+.weekStatValue {
+  color: #183153 !important;
+}
+
+/* Calendar row */
+.weekCalendar,
+.weekDays,
+.weekDaysRow {
+  margin-top: 8px !important;
+}
+
+.weekDay,
+.weekDayCell,
+.weekCalendarDay {
+  border-radius: 16px !important;
+  padding: 10px 8px !important;
+  min-height: 82px !important;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.weekDay:hover,
+.weekDayCell:hover,
+.weekCalendarDay:hover {
+  transform: translateY(-1px);
+}
+
+.weekDayCurrent,
+.weekDayActive,
+.weekCurrentDay,
+.weekCalendarDayCurrent,
+.weekCalendarDayActive,
+.weekDayToday {
+  background: linear-gradient(180deg, #fff4f3 0%, #ffe8e6 100%) !important;
+  border: 1px solid #ffd3cf !important;
+  box-shadow: 0 10px 20px rgba(255, 107, 99, 0.12) !important;
+}
+
+.weekDayRegistered,
+.weekCalendarDayRegistered,
+.weekDayDone {
+  background: rgba(255, 255, 255, 0.74) !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.weekDayName,
+.weekDayLabel,
+.weekCalendarDayName {
+  color: #7c8ca0 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+}
+
+.weekDayNumber,
+.weekCalendarDayNumber {
+  color: #183153 !important;
+  font-weight: 800 !important;
+}
+
+.weekDayCurrent .weekDayName,
+.weekDayCurrent .weekDayNumber,
+.weekDayActive .weekDayName,
+.weekDayActive .weekDayNumber,
+.weekCurrentDay .weekDayName,
+.weekCurrentDay .weekDayNumber,
+.weekDayToday .weekDayName,
+.weekDayToday .weekDayNumber {
+  color: #ef635d !important;
+}
+
+.weekDayDot,
+.weekCalendarDayDot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 999px !important;
+  background: #d8dee8 !important;
+}
+
+.weekDayCurrent .weekDayDot,
+.weekDayActive .weekDayDot,
+.weekCurrentDay .weekDayDot,
+.weekDayToday .weekDayDot,
+.weekCalendarDayCurrent .weekCalendarDayDot,
+.weekCalendarDayActive .weekCalendarDayDot {
+  background: #ff6b63 !important;
+}
+
+.weekDayCheck,
+.weekCalendarDayCheck {
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.18) !important;
+}
+
+/* Progress / budget area */
+.weekProgress,
+.weekBudgetProgress,
+.weekProgressSection {
+  margin-top: 12px !important;
+}
+
+.weekProgressBar,
+.weekBudgetBar,
+.weekProgressTrack {
+  height: 10px !important;
+  border-radius: 999px !important;
+  background: #e9eef7 !important;
+  overflow: hidden !important;
+}
+
+.weekProgressFill,
+.weekBudgetFill,
+.weekProgressValue {
+  background: linear-gradient(90deg, #ff6b63 0%, #ff8b80 100%) !important;
+  border-radius: 999px !important;
+  min-height: 10px !important;
+  box-shadow: 0 6px 12px rgba(255, 107, 99, 0.22) !important;
+}
+
+.weekBudgetLabel,
+.weekProgressLabel {
+  color: #183153 !important;
+  font-weight: 800 !important;
+}
+
+.weekBudgetMeta,
+.weekProgressMeta,
+.weekProgressCaption {
+  color: #64748b !important;
+}
+
+/* Positive footer */
+.weekFooterNote,
+.weekStreakNote,
+.weekCompletionNote {
+  margin-top: 10px !important;
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  background: #edfdf2 !important;
+  border: 1px solid #ccefd8 !important;
+  color: #228b5a !important;
+  font-weight: 600 !important;
+}
+
+/* Slightly denser layout on desktop */
+@media (min-width: 900px) {
+  .weekOverviewCard {
+    padding: 28px 28px 22px !important;
+  }
+
+  .weekKpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+
+/* ==========================================================
+   HOME DENSITY PASS V2
+   Resoconto + AI visual density
+   ========================================================== */
+
+
+/* ==========================================================
+   RESOCONTO GIORNALIERO
+   ========================================================== */
+
+.mealsSection {
+  position: relative;
+
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(255, 104, 104, .055),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      #fffdfd 0%,
+      #ffffff 100%
+    ) !important;
+
+  border-color:
+    rgba(255, 104, 104, .18) !important;
+
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, .045) !important;
+}
+
+.dailySummaryHeaderIcon {
+  width: 42px !important;
+  height: 42px !important;
+
+  border-radius: 12px !important;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ff6868,
+      #f47d76
+    ) !important;
+
+  color: #fff !important;
+
+  box-shadow:
+    0 8px 18px rgba(255, 104, 104, .20) !important;
+}
+
+/*
+  Give the rows a more "dashboard" feel while preserving
+  the existing structure/interaction.
+*/
+
+.mealsSection details {
+  overflow: hidden;
+
+  border-color:
+    rgba(33, 62, 94, .10) !important;
+
+  background:
+    rgba(255, 255, 255, .92) !important;
+
+  box-shadow:
+    0 5px 14px rgba(15, 23, 42, .025);
+}
+
+.mealsSection details + details {
+  margin-top: 2px;
+}
+
+.mealsSection summary {
+  transition:
+    background 130ms ease,
+    border-color 130ms ease;
+}
+
+.mealsSection summary:hover {
+  background:
+    rgba(255, 247, 246, .72);
+}
+
+.mealsSection details[open] {
+  border-color:
+    rgba(255, 104, 104, .18) !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #fffafa
+    ) !important;
+
+  box-shadow:
+    0 8px 20px rgba(255, 104, 104, .055);
+}
+
+/*
+  Existing macro detail area becomes visually richer
+  without inventing any new values.
+*/
+
+.mealsSection details[open] > div {
+  border-top-color:
+    rgba(255, 104, 104, .10) !important;
+}
+
+.mealsSection strong {
+  color: #123252;
+}
+
+.mealsSection small,
+.mealsSection p {
+  color: #697b90;
+}
+
+
+/* Aggiungi button */
+
+.mealsSection > div button,
+.mealsSection > header button {
+  box-shadow:
+    0 8px 18px rgba(255, 104, 104, .14);
+}
+
+
+/* ==========================================================
+   SANO SYNC AI
+   ========================================================== */
+
+.conversationCard {
+  position: relative;
+  overflow: hidden;
+
+  border-color:
+    rgba(255, 104, 104, .20) !important;
+
+  background:
+    radial-gradient(
+      circle at 92% 5%,
+      rgba(255, 104, 104, .095),
+      transparent 26%
+    ),
+    linear-gradient(
+      145deg,
+      #fffafa 0%,
+      #ffffff 52%,
+      #fffdfd 100%
+    ) !important;
+
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, .045) !important;
+}
+
+.conversationCard::before {
+  content: "";
+
+  position: absolute;
+  top: -48px;
+  right: -48px;
+
+  width: 140px;
+  height: 140px;
+
+  border-radius: 999px;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(255, 104, 104, .085),
+      transparent 68%
+    );
+
+  pointer-events: none;
+}
+
+.conversationCard > * {
+  position: relative;
+  z-index: 1;
+}
+
+
+/* Main AI icon/title identity */
+
+.conversationCard h2 {
+  color: #f15f5d !important;
+}
+
+.aiCapabilityPill {
+  padding:
+    6px 10px !important;
+
+  border:
+    1px solid rgba(255, 104, 104, .17) !important;
+
+  background:
+    rgba(255, 240, 239, .9) !important;
+
+  color: #df5a58 !important;
+
+  font-weight: 780 !important;
+}
+
+
+/* Helper banner */
+
+.aiHelperPanel {
+  padding:
+    12px 14px !important;
+
+  border:
+    1px solid rgba(255, 104, 104, .14) !important;
+
+  border-radius:
+    13px !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      #fff3f2,
+      #fff9f8
+    ) !important;
+
+  color:
+    #5f7390 !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+
+
+/* Text / photo mode switch */
+
+.conversationControls {
+  padding: 4px !important;
+
+  border:
+    1px solid rgba(33, 62, 94, .07) !important;
+
+  border-radius:
+    12px !important;
+
+  background:
+    rgba(239, 239, 236, .72) !important;
+}
+
+.conversationControls button {
+  min-height:
+    38px !important;
+
+  border-radius:
+    9px !important;
+
+  font-weight:
+    780 !important;
+}
+
+.conversationControls button[aria-pressed="true"],
+.conversationControls button[data-active="true"] {
+  background:
+    #fff !important;
+
+  color:
+    #123252 !important;
+
+  box-shadow:
+    0 5px 13px rgba(15, 23, 42, .07) !important;
+}
+
+
+/* Composer */
+
+.conversationCard textarea {
+  min-height:
+    86px !important;
+
+  padding:
+    15px 16px !important;
+
+  border:
+    1px solid rgba(33, 62, 94, .13) !important;
+
+  border-radius:
+    15px !important;
+
+  background:
+    rgba(255, 255, 255, .95) !important;
+
+  color:
+    #123252 !important;
+
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, .025);
+
+  resize:
+    vertical;
+}
+
+.conversationCard textarea:focus {
+  outline:
+    none !important;
+
+  border-color:
+    rgba(255, 104, 104, .48) !important;
+
+  box-shadow:
+    0 0 0 3px rgba(255, 104, 104, .09) !important;
+}
+
+
+/* Microphone gets stronger prominence */
+
+.aiMicButton {
+  width:
+    40px !important;
+
+  min-width:
+    40px !important;
+
+  height:
+    40px !important;
+
+  min-height:
+    40px !important;
+
+  border:
+    1px solid rgba(255, 104, 104, .23) !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      #fff1f0,
+      #ffe8e6
+    ) !important;
+
+  color:
+    #e85957 !important;
+
+  box-shadow:
+    0 7px 15px rgba(255, 104, 104, .13) !important;
+}
+
+.aiMicButton:hover {
+  transform:
+    translateY(-1px);
+
+  background:
+    #ffe4e2 !important;
+}
+
+
+/*
+  Primary action: visually closer to mockup's coral CTA.
+  We deliberately avoid changing behavior.
+*/
+
+.conversationCard textarea + .aiMicButton + button {
+  width:
+    40px !important;
+
+  min-width:
+    40px !important;
+
+  height:
+    40px !important;
+
+  min-height:
+    40px !important;
+
+  border-radius:
+    999px !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ff6868,
+      #f45f62
+    ) !important;
+
+  color:
+    #fff !important;
+
+  box-shadow:
+    0 8px 16px rgba(255, 104, 104, .20) !important;
+}
+
+.conversationCard textarea + .aiMicButton + button:disabled {
+  background:
+    #edf0ee !important;
+
+  color:
+    #adb5b5 !important;
+
+  box-shadow:
+    none !important;
+}
+
+
+/* Suggestion chips */
+
+.aiSuggestionChips {
+  gap:
+    7px !important;
+
+  margin-top:
+    4px !important;
+}
+
+.aiSuggestionChips button {
+  min-height:
+    29px !important;
+
+  padding:
+    6px 10px !important;
+
+  border:
+    1px solid rgba(255, 104, 104, .14) !important;
+
+  border-radius:
+    999px !important;
+
+  background:
+    rgba(255, 250, 249, .92) !important;
+
+  color:
+    #657a96 !important;
+
+  font-size:
+    .66rem !important;
+
+  font-weight:
+    650 !important;
+
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.aiSuggestionChips button:hover {
+  transform:
+    translateY(-1px);
+
+  border-color:
+    rgba(255, 104, 104, .31) !important;
+
+  background:
+    #fff0ef !important;
+
+  color:
+    #dd5b59 !important;
+}
+
+
+/* Give the whole AI block a bit more vertical substance */
+
+@media (min-width: 900px) {
+  .conversationCard {
+    padding-bottom:
+      22px !important;
+  }
+
+  .mealsSection,
+  .conversationCard {
+    min-height:
+      430px;
+  }
+}
+
+@media (max-width: 899px) {
+  .conversationCard textarea {
+    min-height:
+      100px !important;
+  }
+}
+
+
+
+/* ==========================================================
+   HOME FOCUS + SPACING FINAL PASS
+   ========================================================== */
+
+
+/* ==========================================================
+   GENERAL DENSITY
+   ========================================================== */
+
+.homeMain,
+.dashboardShell,
+.homeDashboard {
+  gap: 14px !important;
+}
+
+.homePrimaryGrid,
+.homeBottomGrid,
+.dashboardGrid {
+  gap: 14px !important;
+}
+
+.mealsSection,
+.conversationCard,
+.dailyFocusCard,
+.weekOverviewCard {
+  border-radius: 18px !important;
+}
+
+.bottomOverviewHeader {
+  margin-bottom: 12px !important;
+}
+
+.bottomOverviewHeader h2 {
+  margin: 0 !important;
+  line-height: 1.08 !important;
+}
+
+.bottomOverviewKicker {
+  margin-bottom: 3px !important;
+}
+
+.bottomOverviewTitleGroup {
+  gap: 9px !important;
+}
+
+
+/* ==========================================================
+   FOCUS DELLA GIORNATA
+   ========================================================== */
+
+.dailyFocusCard {
+  position: relative;
+  overflow: hidden;
+
+  border-color:
+    rgba(255, 104, 104, .16) !important;
+
+  background:
+    radial-gradient(
+      circle at 92% 5%,
+      rgba(255, 104, 104, .08),
+      transparent 28%
+    ),
+    linear-gradient(
+      145deg,
+      #fffafa 0%,
+      #ffffff 56%,
+      #fffdfd 100%
+    ) !important;
+
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, .045) !important;
+}
+
+.dailyFocusCard::before {
+  content: "";
+
+  position: absolute;
+  left: -36px;
+  bottom: -36px;
+
+  width: 120px;
+  height: 120px;
+
+  border-radius: 999px;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(255, 104, 104, .045),
+      transparent 68%
+    );
+
+  pointer-events: none;
+}
+
+.dailyFocusCard > * {
+  position: relative;
+  z-index: 1;
+}
+
+.focusTitleIcon {
+  width: 38px !important;
+  height: 38px !important;
+
+  border-radius: 11px !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      #fff0ef,
+      #ffe7e5
+    ) !important;
+
+  color: #e85f5f !important;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 104, 104, .12),
+    0 7px 15px rgba(255, 104, 104, .08);
+}
+
+.bottomOverviewBadge {
+  padding: 6px 9px !important;
+
+  border-radius: 999px !important;
+
+  background:
+    #effbf4 !important;
+
+  color:
+    #2e9960 !important;
+
+  font-size:
+    .58rem !important;
+
+  font-weight:
+    800 !important;
+}
+
+
+/* ==========================================================
+   FOCUS METRICS
+   ========================================================== */
+
+.dailyFocusGrid {
+  gap: 10px !important;
+}
+
+.dailyFocusItem {
+  padding: 10px 8px !important;
+
+  border:
+    1px solid rgba(33, 62, 94, .07);
+
+  border-radius:
+    14px;
+
+  background:
+    rgba(255, 255, 255, .78);
+
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, .025);
+
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.dailyFocusItem:hover {
+  transform:
+    translateY(-1px);
+
+  box-shadow:
+    0 10px 20px rgba(15, 23, 42, .04);
+}
+
+.dailyFocusMetricIcon {
+  width: 24px !important;
+  height: 24px !important;
+
+  margin-bottom: 4px !important;
+
+  border-radius: 7px !important;
+
+  font-size: .72rem !important;
+}
+
+.dailyFocusLabel {
+  margin-top: 4px !important;
+
+  font-size:
+    .62rem !important;
+
+  font-weight:
+    800 !important;
+}
+
+.dailyFocusValue {
+  margin-top:
+    2px !important;
+
+  color:
+    #123252 !important;
+
+  font-weight:
+    850 !important;
+}
+
+.dailyFocusMeta,
+.dailyFocusTarget,
+.dailyFocusPercent {
+  color:
+    #7a899a !important;
+
+  font-size:
+    .55rem !important;
+}
+
+
+/* CALORIE */
+
+.dailyFocusItem[data-focus="Calorie"] {
+  background:
+    linear-gradient(
+      180deg,
+      #fffafa,
+      #fff5f4
+    );
+}
+
+.dailyFocusItem[data-focus="Calorie"] .dailyFocusMetricIcon {
+  background:
+    #ffeceb !important;
+
+  color:
+    #e85f5f !important;
+}
+
+
+/* PROTEINE */
+
+.dailyFocusItem[data-focus="Proteine"] {
+  background:
+    linear-gradient(
+      180deg,
+      #fbfffc,
+      #f3fbf6
+    );
+}
+
+.dailyFocusItem[data-focus="Proteine"] .dailyFocusMetricIcon {
+  background:
+    #eaf8f0 !important;
+
+  color:
+    #319d63 !important;
+}
+
+
+/* CARBOIDRATI */
+
+.dailyFocusItem[data-focus="Carboidrati"] {
+  background:
+    linear-gradient(
+      180deg,
+      #fbfdff,
+      #f2f7ff
+    );
+}
+
+.dailyFocusItem[data-focus="Carboidrati"] .dailyFocusMetricIcon {
+  background:
+    #eaf3ff !important;
+
+  color:
+    #438ce9 !important;
+}
+
+
+/* GRASSI */
+
+.dailyFocusItem[data-focus="Grassi"] {
+  background:
+    linear-gradient(
+      180deg,
+      #fffefa,
+      #fff9e8
+    );
+}
+
+.dailyFocusItem[data-focus="Grassi"] .dailyFocusMetricIcon {
+  background:
+    #fff3cf !important;
+
+  color:
+    #bd8616 !important;
+}
+
+
+/* ==========================================================
+   COMPACT BOTTOM ROW
+   ========================================================== */
+
+.dailyFocusCard,
+.weekOverviewCard {
+  padding-top: 18px !important;
+  padding-bottom: 16px !important;
+}
+
+.weekKpis {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+.weekDays,
+.weekDaysRow,
+.weekCalendar {
+  margin-top: 6px !important;
+}
+
+.weekTodayProgress,
+.weekProgress,
+.weekBudgetProgress {
+  margin-top: 8px !important;
+}
+
+
+/* ==========================================================
+   PRIMARY ROW DENSITY
+   ========================================================== */
+
+.mealsSection,
+.conversationCard {
+  padding-top: 18px !important;
+  padding-bottom: 18px !important;
+}
+
+/*
+  Previous pass gave these cards substance.
+  Keep them balanced without creating artificial empty height.
+*/
+
+@media (min-width: 900px) {
+  .mealsSection,
+  .conversationCard {
+    min-height: 0 !important;
+  }
+
+  .dailyFocusCard,
+  .weekOverviewCard {
+    min-height: 0 !important;
+  }
+}
+
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media (max-width: 899px) {
+  .dailyFocusGrid {
+    gap: 8px !important;
+  }
+
+  .dailyFocusItem {
+    padding: 9px 6px !important;
+  }
+
+  .dailyFocusCard,
+  .weekOverviewCard {
+    padding-top: 16px !important;
+  }
+
+  .bottomOverviewHeader {
+    margin-bottom: 10px !important;
+  }
+}
+
