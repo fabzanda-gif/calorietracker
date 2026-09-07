@@ -13,6 +13,8 @@ import {
 import {
   createIngredient,
   getIngredients,
+  previewIngredientFromText,
+  scanNutritionLabel,
   updateIngredient,
   type Ingredient,
 } from "@/lib/api/ingredients";
@@ -59,6 +61,36 @@ const EMPTY_NEW_FOOD_FORM = {
   mealSlots: [] as PantryMealSlot[],
 };
 
+function fileToBase64(
+  file: File,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const value = String(
+        reader.result ?? "",
+      );
+      const comma = value.indexOf(",");
+
+      resolve(
+        comma >= 0
+          ? value.slice(comma + 1)
+          : value,
+      );
+    };
+
+    reader.onerror = () =>
+      reject(
+        new Error(
+          "Non riesco a leggere la foto.",
+        ),
+      );
+
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function InventoryPage() {
   const { accessToken } = useAuth();
 
@@ -79,6 +111,14 @@ export default function InventoryPage() {
   const [showNewFoodForm, setShowNewFoodForm] = useState(false);
   const [newFoodSaving, setNewFoodSaving] = useState(false);
   const [newFoodForm, setNewFoodForm] = useState(EMPTY_NEW_FOOD_FORM);
+
+  const [foodAIText, setFoodAIText] = useState("");
+  const [foodAIWorking, setFoodAIWorking] = useState(false);
+  const [foodAIMessage, setFoodAIMessage] = useState<string | null>(null);
+  const [foodAIPhoto, setFoodAIPhoto] = useState<File | null>(null);
+  const [foodAIPhotoPreview, setFoodAIPhotoPreview] =
+    useState<string | null>(null);
+  const [foodAIListening, setFoodAIListening] = useState(false);
 
   const [inventorySearch, setInventorySearch] = useState("");
   const [inventoryFilter, setInventoryFilter] =
@@ -213,6 +253,238 @@ export default function InventoryPage() {
         ? current.mealSlots.filter((item) => item !== slot)
         : [...current.mealSlots, slot],
     }));
+  }
+
+  function applyFoodAIPreview(result: {
+    name?: string | null;
+    calories_per_100g?: number | null;
+    protein_per_100g?: number | null;
+    carbs_per_100g?: number | null;
+    fat_per_100g?: number | null;
+    kind?: "ingredient" | "product" | "prepared_food";
+    meal_slots?: PantryMealSlot[];
+    confidence?: "high" | "medium" | "low";
+    estimated?: boolean;
+    notes?: string | null;
+    ready_for_form?: boolean;
+  }) {
+    setNewFoodForm((current) => ({
+      ...current,
+      name: result.name ?? current.name,
+      calories:
+        result.calories_per_100g != null
+          ? String(result.calories_per_100g)
+          : current.calories,
+      protein:
+        result.protein_per_100g != null
+          ? String(result.protein_per_100g)
+          : current.protein,
+      carbs:
+        result.carbs_per_100g != null
+          ? String(result.carbs_per_100g)
+          : current.carbs,
+      fat:
+        result.fat_per_100g != null
+          ? String(result.fat_per_100g)
+          : current.fat,
+      kind: result.kind ?? current.kind,
+      mealSlots:
+        result.meal_slots != null
+          ? result.meal_slots
+          : current.mealSlots,
+    }));
+
+    const confidence =
+      result.confidence === "high"
+        ? "alta"
+        : result.confidence === "medium"
+          ? "media"
+          : "bassa";
+
+    setFoodAIMessage(
+      [
+        result.ready_for_form
+          ? "Proposta pronta da controllare."
+          : "Ho compilato quello che riesco: completa i campi mancanti.",
+        result.estimated
+          ? "I valori nutrizionali sono una stima."
+          : null,
+        `Affidabilità ${confidence}.`,
+        result.notes ?? null,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    );
+  }
+
+  async function analyzeFoodAIText(
+    value?: string,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    const textValue = (
+      value ?? foodAIText
+    ).trim();
+
+    if (!textValue) {
+      setFoodAIMessage(
+        "Descrivi l'alimento prima di analizzarlo.",
+      );
+      return;
+    }
+
+    setFoodAIWorking(true);
+    setFoodAIMessage(null);
+    setError(null);
+
+    try {
+      const response =
+        await previewIngredientFromText(
+          textValue,
+          accessToken,
+        );
+
+      applyFoodAIPreview(
+        response.result,
+      );
+    } catch (err) {
+      setFoodAIMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad analizzare l'alimento.",
+      );
+    } finally {
+      setFoodAIWorking(false);
+    }
+  }
+
+  async function analyzeFoodAIPhoto() {
+    if (
+      !accessToken ||
+      !foodAIPhoto
+    ) {
+      return;
+    }
+
+    setFoodAIWorking(true);
+    setFoodAIMessage(null);
+    setError(null);
+
+    try {
+      const contentBase64 =
+        await fileToBase64(
+          foodAIPhoto,
+        );
+
+      const response =
+        await scanNutritionLabel(
+          {
+            content_base64:
+              contentBase64,
+            mime_type:
+              foodAIPhoto.type,
+          },
+          accessToken,
+        );
+
+      const result = response.result;
+
+      applyFoodAIPreview({
+        name: result.name,
+        calories_per_100g:
+          result.calories,
+        protein_per_100g:
+          result.protein,
+        carbs_per_100g:
+          result.carbs,
+        fat_per_100g:
+          result.fat,
+        kind: newFoodForm.kind,
+        meal_slots:
+          newFoodForm.mealSlots,
+        confidence:
+          result.confidence,
+        estimated: false,
+        notes: result.notes,
+        ready_for_form:
+          result.ready_for_form,
+      });
+    } catch (err) {
+      setFoodAIMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a leggere l'etichetta.",
+      );
+    } finally {
+      setFoodAIWorking(false);
+    }
+  }
+
+  function startFoodAIVoice() {
+    const speechWindow =
+      window as typeof window & {
+        SpeechRecognition?: new () => any;
+        webkitSpeechRecognition?: new () => any;
+      };
+
+    const Recognition =
+      speechWindow.SpeechRecognition ??
+      speechWindow.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      setFoodAIMessage(
+        "La dettatura non è supportata da questo browser.",
+      );
+      return;
+    }
+
+    const recognition =
+      new Recognition();
+
+    recognition.lang = "it-IT";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setFoodAIListening(true);
+      setFoodAIMessage(
+        "Ti ascolto…",
+      );
+    };
+
+    recognition.onend = () => {
+      setFoodAIListening(false);
+    };
+
+    recognition.onerror = () => {
+      setFoodAIListening(false);
+      setFoodAIMessage(
+        "Non riesco a usare il microfono.",
+      );
+    };
+
+    recognition.onresult = (
+      event: any,
+    ) => {
+      const transcript =
+        String(
+          event.results?.[0]?.[0]
+            ?.transcript ?? "",
+        ).trim();
+
+      if (!transcript) {
+        return;
+      }
+
+      setFoodAIText(transcript);
+      void analyzeFoodAIText(
+        transcript,
+      );
+    };
+
+    recognition.start();
   }
 
   async function saveNewFood(event: FormEvent) {
@@ -823,6 +1095,142 @@ export default function InventoryPage() {
               </button>
             </div>
 
+            <section className={styles.foodAIAssistant}>
+              <div className={styles.foodAIHead}>
+                <div>
+                  <strong>✦ Compila con SanoSync AI</strong>
+                  <span>
+                    Descrivi il prodotto, fotografa l'etichetta o dettalo.
+                    Controllerai sempre i valori prima di salvarli.
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.foodAIComposer}>
+                <textarea
+                  value={foodAIText}
+                  placeholder="Es. Yogurt greco Fage 0%, vasetto 170 g..."
+                  onChange={(event) =>
+                    setFoodAIText(
+                      event.target.value,
+                    )
+                  }
+                />
+
+                <button
+                  type="button"
+                  className={styles.foodAIVoice}
+                  disabled={
+                    foodAIWorking ||
+                    foodAIListening
+                  }
+                  onClick={startFoodAIVoice}
+                >
+                  {foodAIListening
+                    ? "Ascolto…"
+                    : "🎙 Voce"}
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.foodAIAnalyze}
+                  disabled={
+                    foodAIWorking ||
+                    !foodAIText.trim()
+                  }
+                  onClick={() => {
+                    void analyzeFoodAIText();
+                  }}
+                >
+                  {foodAIWorking
+                    ? "Analizzo…"
+                    : "Analizza testo"}
+                </button>
+              </div>
+
+              <div className={styles.foodAIPhotoRow}>
+                <label className={styles.foodAIPhotoButton}>
+                  <span>▧ Foto etichetta</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    onChange={(event) => {
+                      const file =
+                        event.target.files?.[0] ??
+                        null;
+
+                      setFoodAIPhoto(file);
+                      setFoodAIMessage(null);
+
+                      if (!file) {
+                        setFoodAIPhotoPreview(null);
+                        return;
+                      }
+
+                      if (
+                        file.size >
+                        8 * 1024 * 1024
+                      ) {
+                        setFoodAIPhoto(null);
+                        setFoodAIPhotoPreview(null);
+                        setFoodAIMessage(
+                          "La foto supera il limite di 8 MB.",
+                        );
+                        return;
+                      }
+
+                      const reader =
+                        new FileReader();
+
+                      reader.onload = () => {
+                        if (
+                          typeof reader.result ===
+                          "string"
+                        ) {
+                          setFoodAIPhotoPreview(
+                            reader.result,
+                          );
+                        }
+                      };
+
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  className={styles.foodAIPhotoAnalyze}
+                  disabled={
+                    foodAIWorking ||
+                    !foodAIPhoto
+                  }
+                  onClick={() => {
+                    void analyzeFoodAIPhoto();
+                  }}
+                >
+                  {foodAIWorking
+                    ? "Analizzo…"
+                    : "Leggi etichetta"}
+                </button>
+
+                {foodAIPhotoPreview ? (
+                  <img
+                    className={styles.foodAIPhotoPreview}
+                    src={foodAIPhotoPreview}
+                    alt="Anteprima etichetta nutrizionale"
+                  />
+                ) : null}
+              </div>
+
+              {foodAIMessage ? (
+                <p className={styles.foodAIMessage}>
+                  {foodAIMessage}
+                </p>
+              ) : null}
+            </section>
+
             <form
               className={styles.newFoodForm}
               onSubmit={saveNewFood}
@@ -884,9 +1292,15 @@ export default function InventoryPage() {
                     })
                   }
                 >
-                  <option value="product">Alimento / prodotto</option>
-                  <option value="ingredient">Ingrediente ricetta</option>
-                  <option value="prepared_food">Alimento preparato</option>
+                  <option value="product">
+                    Prodotto / alimento da consumare
+                  </option>
+                  <option value="ingredient">
+                    Ingrediente per ricette
+                  </option>
+                  <option value="prepared_food">
+                    Preparato / piatto pronto
+                  </option>
                 </select>
               </label>
 

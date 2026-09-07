@@ -21,6 +21,10 @@ from backend.services.nutrition_label_vision import (
     NutritionLabelVisionError,
     NutritionLabelVisionService,
 )
+from backend.services.ingredient_ai_interpreter import (
+    IngredientAIInterpreter,
+    IngredientAIInterpreterError,
+)
 
 
 router = APIRouter(
@@ -78,6 +82,13 @@ class NutritionLabelScanRequest(BaseModel):
     )
 
 
+class IngredientAIPreviewRequest(BaseModel):
+    text: str = Field(
+        min_length=1,
+        max_length=1200,
+    )
+
+
 class IngredientUpdate(BaseModel):
     name: str | None = Field(
         default=None,
@@ -130,6 +141,30 @@ class IngredientUpdate(BaseModel):
             "dinner",
         ]
     ] | None = None
+
+
+@router.post("/ai-preview")
+def preview_ingredient_ai(
+    request: IngredientAIPreviewRequest,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+):
+    _ = current_user
+
+    try:
+        result = IngredientAIInterpreter().interpret(
+            text=request.text,
+        )
+    except IngredientAIInterpreterError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "result": result,
+    }
 
 
 @router.post("/scan-label")

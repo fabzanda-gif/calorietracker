@@ -75,6 +75,51 @@ export async function createIngredient(
   );
 }
 
+export interface IngredientAIPreviewResult {
+  name: string | null;
+  calories_per_100g: number | null;
+  protein_per_100g: number | null;
+  carbs_per_100g: number | null;
+  fat_per_100g: number | null;
+  kind:
+    | "ingredient"
+    | "product"
+    | "prepared_food";
+  meal_slots: Array<
+    | "breakfast"
+    | "lunch"
+    | "snack"
+    | "dinner"
+  >;
+  default_unit: string;
+  default_quantity: number | null;
+  grams_per_unit: number | null;
+  confidence:
+    | "high"
+    | "medium"
+    | "low";
+  estimated: boolean;
+  notes: string | null;
+  ready_for_form: boolean;
+}
+
+export async function previewIngredientFromText(
+  text: string,
+  accessToken?: string | null,
+): Promise<{
+  result: IngredientAIPreviewResult;
+}> {
+  return apiRequest(
+    "/ingredients/ai-preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({ text }),
+    },
+  );
+}
+
+
 export async function updateIngredient(
   ingredientId: string,
   input: Partial<IngredientCreateInput>,
