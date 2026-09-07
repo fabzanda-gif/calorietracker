@@ -694,15 +694,9 @@ export default function ActivitiesPage() {
       const today = new Date();
       const rollingStart = new Date(today);
       rollingStart.setDate(today.getDate() - 29);
-      const plannedStart = new Date(today);
-      plannedStart.setDate(
-        today.getDate() - 7,
-      );
 
-      const plannedEnd = new Date(today);
-      plannedEnd.setDate(
-        today.getDate() + 30,
-      );
+      const plannedStart = bounds.start;
+      const plannedEnd = bounds.end;
 
       const loadStartedAt = performance.now();
 
@@ -765,8 +759,8 @@ export default function ActivitiesPage() {
       });
 
       const plannedPromise = getPlannedActivities(
-        isoDate(plannedStart),
-        isoDate(plannedEnd),
+        plannedStart,
+        plannedEnd,
         accessToken,
       ).then((plannedResponse) => {
         setPlannedActivities(
@@ -890,6 +884,24 @@ export default function ActivitiesPage() {
 
     return grouped;
   }, [trainingActivities]);
+
+  const plannedActivitiesByDate = useMemo(() => {
+    const grouped =
+      new Map<string, PlannedActivity[]>();
+
+    for (const item of plannedActivities) {
+      const current =
+        grouped.get(item.scheduled_date) ?? [];
+
+      current.push(item);
+      grouped.set(
+        item.scheduled_date,
+        current,
+      );
+    }
+
+    return grouped;
+  }, [plannedActivities]);
 
   async function savePlannedActivity() {
     if (
@@ -1767,8 +1779,32 @@ export default function ActivitiesPage() {
                 const date = isoDate(day);
                 const dayActivities =
                   activitiesByDate.get(date) ?? [];
+
+                const dayPlannedActivities =
+                  plannedActivitiesByDate.get(
+                    date,
+                  ) ?? [];
+
+                const visiblePlannedActivities =
+                  dayPlannedActivities.filter(
+                    (item) =>
+                      item.status === "planned",
+                  );
+
+                const skippedPlannedActivities =
+                  dayPlannedActivities.filter(
+                    (item) =>
+                      item.status === "skipped",
+                  );
+
                 const active =
                   dayActivities.length > 0;
+
+                const hasPlanned =
+                  visiblePlannedActivities.length > 0;
+
+                const hasSkipped =
+                  skippedPlannedActivities.length > 0;
                 const selected =
                   selectedDate === date;
                 const today =
@@ -1781,6 +1817,14 @@ export default function ActivitiesPage() {
                     type="button"
                     className={`${styles.day} ${
                       active ? styles.activeDay : ""
+                    } ${
+                      hasPlanned
+                        ? styles.plannedDay
+                        : ""
+                    } ${
+                      hasSkipped
+                        ? styles.skippedDay
+                        : ""
                     } ${
                       selected
                         ? styles.selectedDay
@@ -1839,6 +1883,45 @@ export default function ActivitiesPage() {
                         {activityIcon(
                           dayActivities[0],
                         )}
+                      </span>
+                    ) : null}
+
+                    {hasPlanned ? (
+                      <span
+                        className={
+                          styles.dayPlannedMarker
+                        }
+                        aria-label="Attività pianificata"
+                        title={
+                          visiblePlannedActivities
+                            .map(
+                              (item) =>
+                                item.title,
+                            )
+                            .join(", ")
+                        }
+                      >
+                        P
+                      </span>
+                    ) : null}
+
+                    {!hasPlanned &&
+                    hasSkipped ? (
+                      <span
+                        className={
+                          styles.daySkippedMarker
+                        }
+                        aria-label="Attività saltata"
+                        title={
+                          skippedPlannedActivities
+                            .map(
+                              (item) =>
+                                item.title,
+                            )
+                            .join(", ")
+                        }
+                      >
+                        S
                       </span>
                     ) : null}
 
