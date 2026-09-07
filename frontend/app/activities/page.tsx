@@ -885,11 +885,33 @@ export default function ActivitiesPage() {
     return grouped;
   }, [trainingActivities]);
 
+  const linkedPlannedActivityIds = useMemo(
+    () =>
+      new Set(
+        trainingActivities
+          .map(
+            (activity) =>
+              activity.planned_activity_id,
+          )
+          .filter(
+            (id): id is string =>
+              Boolean(id),
+          ),
+      ),
+    [trainingActivities],
+  );
+
   const plannedActivitiesByDate = useMemo(() => {
     const grouped =
       new Map<string, PlannedActivity[]>();
 
     for (const item of plannedActivities) {
+      if (
+        linkedPlannedActivityIds.has(item.id)
+      ) {
+        continue;
+      }
+
       const current =
         grouped.get(item.scheduled_date) ?? [];
 
@@ -901,7 +923,10 @@ export default function ActivitiesPage() {
     }
 
     return grouped;
-  }, [plannedActivities]);
+  }, [
+    plannedActivities,
+    linkedPlannedActivityIds,
+  ]);
 
   async function savePlannedActivity() {
     if (

@@ -285,6 +285,30 @@ export function createStrengthPlan(
 }
 
 
+export interface StrengthWorkoutRangeResponse {
+  count: number;
+  items: StrengthWorkout[];
+}
+
+export function getStrengthWorkouts(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<StrengthWorkoutRangeResponse> {
+  const query = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+  });
+
+  return apiRequest<StrengthWorkoutRangeResponse>(
+    `/strength/workouts?${query.toString()}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+
 export function getStrengthPlans(
   accessToken?: string | null,
 ): Promise<StrengthPlanListResponse> {

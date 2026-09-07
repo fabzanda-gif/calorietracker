@@ -53,6 +53,38 @@ class StrengthWorkoutsRepository(BaseRepository):
                 f"{exc}"
             ) from exc
 
+    def list_date_range(
+        self,
+        user_id: str,
+        start_date: Any,
+        end_date: Any,
+    ) -> list[dict]:
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_SELECT)
+                .eq("user_id", user_id)
+                .gte(
+                    "scheduled_date",
+                    str(start_date),
+                )
+                .lte(
+                    "scheduled_date",
+                    str(end_date),
+                )
+                .order("scheduled_date")
+                .order("workout_index")
+                .execute()
+            )
+
+            return self._data(response)
+
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to load strength workouts "
+                f"for date range: {exc}"
+            ) from exc
+
     def get(
         self,
         user_id: str,

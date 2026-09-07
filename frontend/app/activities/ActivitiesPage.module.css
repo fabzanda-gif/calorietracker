@@ -2414,3 +2414,20 @@ summary.loggerHeading {
     height: 32px;
   }
 }
+
+
+.dayStrengthMarker {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1px solid #8a7c63;
+  background: #fff;
+  color: #655a46;
+  font-size: 0.56rem;
+  font-weight: 900;
+}

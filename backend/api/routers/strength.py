@@ -525,6 +525,48 @@ def list_strength_plans(
             detail=str(exc),
         ) from exc
 
+@router.get("/workouts")
+def list_strength_workouts(
+    start_date: date,
+    end_date: date,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
+):
+    if end_date < start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid strength workout date range",
+        )
+
+    if (end_date - start_date).days > 366:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Strength workout range is too large",
+        )
+
+    try:
+        items = workouts_repo.list_date_range(
+            current_user.id,
+            start_date,
+            end_date,
+        )
+
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post(
     "/workouts/{workout_id}/log",
     status_code=status.HTTP_201_CREATED,
