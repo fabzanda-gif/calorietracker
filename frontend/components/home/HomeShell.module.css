@@ -14980,3 +14980,55 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* ==========================================================
+   HOME DAILY ADD FORM FIX V1
+   ========================================================== */
+
+.alternateMealFormActive {
+  position: relative;
+
+  border:
+    1px solid rgba(255, 104, 104, .26) !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fffafa 0%,
+      #fff7f6 100%
+    ) !important;
+
+  box-shadow:
+    0 10px 24px rgba(255, 104, 104, .08) !important;
+
+  animation:
+    homeAddMealReveal 220ms ease-out;
+}
+
+.alternateMealFormActive::before {
+  content: "Aggiungi a questo pasto";
+
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: #e45f5c;
+
+  font-size: .62rem;
+  font-weight: 850;
+  letter-spacing: .02em;
+}
+
+@keyframes homeAddMealReveal {
+  from {
+    opacity: .55;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

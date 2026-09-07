@@ -2955,6 +2955,9 @@ export function HomeShell() {
   }
 
   function openAlternateMeal(slot: string) {
+    setError(null);
+    setAlternateSelectedKey(null);
+    setAlternateQuantity(1);
     setAlternateName("");
     setAlternateCalories("");
     setAlternateProtein("");
@@ -2962,21 +2965,49 @@ export function HomeShell() {
     setAlternateFat("");
     setAlternateSlot(slot);
 
+    /*
+     * The add form lives inside the meal <details>.
+     * Opening only the details made the click appear to do
+     * nothing because the form can be much further down.
+     *
+     * First open the meal, then wait for React to render the
+     * alternate form and scroll directly to it.
+     */
     window.requestAnimationFrame(() => {
       const mealDetails =
         document.querySelector<HTMLDetailsElement>(
           `[data-meal-slot="${slot}"]`,
         );
 
-      if (!mealDetails) {
-        return;
+      if (mealDetails) {
+        mealDetails.open = true;
       }
 
-      mealDetails.open = true;
+      window.requestAnimationFrame(() => {
+        const form =
+          document.getElementById(
+            `home-add-meal-${slot}`,
+          );
 
-      mealDetails.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+        if (!form) {
+          return;
+        }
+
+        form.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+
+        const nameInput =
+          form.querySelector<HTMLInputElement>(
+            '[data-home-add-meal-name="true"]',
+          );
+
+        window.setTimeout(() => {
+          nameInput?.focus({
+            preventScroll: true,
+          });
+        }, 250);
       });
     });
   }
@@ -5356,17 +5387,10 @@ export function HomeShell() {
                               savingAlternate
                             }
                             onClick={() => {
-                              setError(null);
-
                               if (alternateSlot === slot) {
                                 closeAlternateMeal();
                               } else {
-                                setAlternateSlot(slot);
-                                setAlternateName("");
-                                setAlternateCalories("");
-                                setAlternateProtein("");
-                                setAlternateCarbs("");
-                                setAlternateFat("");
+                                openAlternateMeal(slot);
                               }
                             }}
                           >
@@ -5422,7 +5446,10 @@ export function HomeShell() {
                     ) : null}
 
                         {alternateSlot === slot ? (
-                          <div className={styles.alternateMealForm}>
+                          <div
+                            id={`home-add-meal-${slot}`}
+                            className={`${styles.alternateMealForm} ${styles.alternateMealFormActive}`}
+                          >
                             <label>
                               Cosa hai mangiato?
                               <select
@@ -5655,6 +5682,7 @@ export function HomeShell() {
                               <span className={styles.manualMealLabel}>oppure scrivi manualmente</span>
                               <input
                                 type="text"
+                                data-home-add-meal-name="true"
                                 value={alternateName}
                                 placeholder="Es. Piadina con pollo"
                                 onChange={(event) => {
