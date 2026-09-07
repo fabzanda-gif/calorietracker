@@ -233,7 +233,7 @@ def sync_google_calendar(
             planned_repo=planned_repo,
             strength_repo=strength_repo,
         ).sync_range(
-            user_id=user_id,
+            user_id=current_user.id,
             start_date=start_date,
             end_date=end_date,
         )

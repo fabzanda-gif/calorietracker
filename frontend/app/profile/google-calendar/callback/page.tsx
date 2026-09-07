@@ -14,6 +14,8 @@ import {
   exchangeGoogleCalendarCode,
 } from "@/lib/api/google-calendar";
 
+import { ApiError } from "@/lib/api/client";
+
 
 function GoogleCalendarCallbackContent() {
   const router = useRouter();
@@ -80,16 +82,38 @@ function GoogleCalendarCallbackContent() {
             "/profile?googleCalendar=connected",
           );
         }, 700);
-      } catch {
+      } catch (err) {
         if (!active) {
           return;
         }
 
         setFailed(true);
 
+        if (err instanceof ApiError) {
+          const payload = err.payload;
+
+          if (
+            payload
+            && typeof payload === "object"
+            && "detail" in payload
+          ) {
+            setMessage(
+              String(
+                (payload as { detail?: unknown }).detail
+                ?? err.message,
+              ),
+            );
+            return;
+          }
+
+          setMessage(err.message);
+          return;
+        }
+
         setMessage(
-          "Non è stato possibile completare "
-          + "il collegamento con Google Calendar.",
+          err instanceof Error
+            ? err.message
+            : "Non è stato possibile completare il collegamento con Google Calendar.",
         );
       }
     }
