@@ -2931,23 +2931,65 @@ export function HomeShell() {
       };
     }
 
-    const factor = simpleMealEdit.is_per_100g
-      ? simpleMealQuantity / 100
-      : simpleMealQuantity;
+    const originalQuantity = Math.max(
+      0.01,
+      Number(simpleMealEdit.quantity) || 1,
+    );
+
+    const originalFactor =
+      simpleMealEdit.is_per_100g
+        ? originalQuantity / 100
+        : originalQuantity;
+
+    const editedFactor =
+      simpleMealEdit.is_per_100g
+        ? simpleMealQuantity / 100
+        : simpleMealQuantity;
+
+    const baseNutritionValue = (
+      baseValue: number | null | undefined,
+      currentValue: number | null | undefined,
+    ): number => {
+      if (
+        baseValue !== null &&
+        baseValue !== undefined &&
+        Number.isFinite(Number(baseValue))
+      ) {
+        return Number(baseValue);
+      }
+
+      const current = Number(currentValue);
+
+      if (!Number.isFinite(current)) {
+        return 0;
+      }
+
+      return originalFactor > 0
+        ? current / originalFactor
+        : current;
+    };
 
     return {
       calories:
-        Number(simpleMealEdit.base_calories ?? 0) *
-        factor,
+        baseNutritionValue(
+          simpleMealEdit.base_calories,
+          simpleMealEdit.calories,
+        ) * editedFactor,
       protein:
-        Number(simpleMealEdit.base_protein ?? 0) *
-        factor,
+        baseNutritionValue(
+          simpleMealEdit.base_protein,
+          simpleMealEdit.protein,
+        ) * editedFactor,
       carbs:
-        Number(simpleMealEdit.base_carbs ?? 0) *
-        factor,
+        baseNutritionValue(
+          simpleMealEdit.base_carbs,
+          simpleMealEdit.carbs,
+        ) * editedFactor,
       fat:
-        Number(simpleMealEdit.base_fat ?? 0) *
-        factor,
+        baseNutritionValue(
+          simpleMealEdit.base_fat,
+          simpleMealEdit.fat,
+        ) * editedFactor,
     };
   }
 

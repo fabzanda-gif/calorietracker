@@ -544,3 +544,111 @@
     flex-direction: column;
   }
 }
+
+
+/* ==========================================================
+   PANTRY MEAL SLOT CLASSIFICATION V1
+   ========================================================== */
+
+.pantryMealSlots {
+  min-width: 0;
+
+  margin: 0;
+  padding: 0;
+
+  border: 0;
+}
+
+.pantryMealSlots legend {
+  margin-bottom: 7px;
+
+  color: #53677b;
+
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.pantryMealSlots > p {
+  margin: 0 0 9px;
+
+  color: #7a8998;
+
+  font-size: .68rem;
+  line-height: 1.4;
+}
+
+.pantryMealSlotOptions {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.pantryMealSlotOptions label {
+  min-height: 42px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  padding: 7px 9px;
+
+  border: 1px solid #dce3e8;
+  border-radius: 10px;
+
+  background: #fff;
+  color: #607387;
+
+  cursor: pointer;
+}
+
+.pantryMealSlotOptions input {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pantryMealSlotOptions label.pantryMealSlotActive {
+  border-color: rgba(232, 101, 101, .34);
+
+  background: #fff4f3;
+  color: #d95555;
+}
+
+.pantryMealSlotOptions strong {
+  font-size: .7rem;
+  font-weight: 850;
+}
+
+.pantryMealSlotTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+
+  margin-top: 8px;
+}
+
+.pantryMealSlotTags span {
+  padding: 4px 7px;
+
+  border-radius: 999px;
+
+  background: #eef4f8;
+  color: #516b82;
+
+  font-size: .64rem;
+  font-weight: 800;
+}
+
+@media (max-width: 680px) {
+  .pantryMealSlotOptions {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+

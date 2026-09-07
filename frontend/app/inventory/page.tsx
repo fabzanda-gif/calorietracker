@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/mealPrep";
 import {
   getIngredients,
+  updateIngredient,
   type Ingredient,
 } from "@/lib/api/ingredients";
 import {
@@ -24,6 +25,12 @@ import {
 
 import styles from "./InventoryPage.module.css";
 
+type PantryMealSlot =
+  | "breakfast"
+  | "lunch"
+  | "snack"
+  | "dinner";
+
 const EMPTY_PANTRY_FORM = {
   ingredientId: "",
   quantity: "",
@@ -31,6 +38,7 @@ const EMPTY_PANTRY_FORM = {
   unit: "g",
   gramsPerPortion: "",
   expiresAt: "",
+  mealSlots: [] as PantryMealSlot[],
 };
 
 export default function InventoryPage() {
@@ -146,6 +154,31 @@ export default function InventoryPage() {
     }
   }
 
+  function ingredientForPantryId(
+    ingredientId: string,
+  ): Ingredient | null {
+    return (
+      ingredients.find(
+        (ingredient) =>
+          String(ingredient.id) ===
+          String(ingredientId),
+      ) ?? null
+    );
+  }
+
+  function togglePantryMealSlot(
+    slot: PantryMealSlot,
+  ) {
+    setPantryForm((current) => ({
+      ...current,
+      mealSlots: current.mealSlots.includes(slot)
+        ? current.mealSlots.filter(
+            (item) => item !== slot,
+          )
+        : [...current.mealSlots, slot],
+    }));
+  }
+
   async function savePantry(event: FormEvent) {
     event.preventDefault();
 
@@ -183,10 +216,25 @@ export default function InventoryPage() {
       return;
     }
 
+    if (pantryForm.mealSlots.length === 0) {
+      setError(
+        "Scegli almeno un momento in cui questo alimento è adatto.",
+      );
+      return;
+    }
+
     setPantrySaving(true);
     setError(null);
 
     try {
+      await updateIngredient(
+        pantryForm.ingredientId,
+        {
+          meal_slots: pantryForm.mealSlots,
+        },
+        accessToken,
+      );
+
       if (editingPantryId) {
         await updatePantryItem(
           accessToken,
@@ -234,6 +282,11 @@ export default function InventoryPage() {
   }
 
   function editPantry(item: PantryItem) {
+    const ingredient =
+      ingredientForPantryId(
+        item.ingredient_id,
+      );
+
     setEditingPantryId(item.id);
     setPantryForm({
       ingredientId: item.ingredient_id,
@@ -248,6 +301,9 @@ export default function InventoryPage() {
           ? String(item.grams_per_portion)
           : "",
       expiresAt: item.expires_at || "",
+      mealSlots:
+        (ingredient?.meal_slots ??
+          []) as PantryMealSlot[],
     });
   }
 
@@ -375,12 +431,23 @@ export default function InventoryPage() {
                   required
                   disabled={Boolean(editingPantryId)}
                   value={pantryForm.ingredientId}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const ingredientId =
+                      event.target.value;
+
+                    const ingredient =
+                      ingredientForPantryId(
+                        ingredientId,
+                      );
+
                     setPantryForm({
                       ...pantryForm,
-                      ingredientId: event.target.value,
-                    })
-                  }
+                      ingredientId,
+                      mealSlots:
+                        (ingredient?.meal_slots ??
+                          []) as PantryMealSlot[],
+                    });
+                  }}
                 >
                   <option value="">Seleziona alimento</option>
 
@@ -500,6 +567,70 @@ export default function InventoryPage() {
                 </label>
               )}
 
+              <fieldset
+                className={styles.pantryMealSlots}
+              >
+                <legend>Usalo per</legend>
+
+                <p>
+                  Colazione e snack vengono considerati
+                  compatibili tra loro; lo stesso vale per
+                  pranzo e cena.
+                </p>
+
+                <div
+                  className={
+                    styles.pantryMealSlotOptions
+                  }
+                >
+                  {[
+                    [
+                      "breakfast",
+                      "☕",
+                      "Colazione",
+                    ],
+                    ["snack", "🍎", "Snack"],
+                    ["lunch", "🍽️", "Pranzo"],
+                    ["dinner", "🥗", "Cena"],
+                  ].map(([slot, icon, label]) => {
+                    const value =
+                      slot as PantryMealSlot;
+
+                    const checked =
+                      pantryForm.mealSlots.includes(
+                        value,
+                      );
+
+                    return (
+                      <label
+                        key={value}
+                        className={
+                          checked
+                            ? styles.pantryMealSlotActive
+                            : undefined
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            togglePantryMealSlot(
+                              value,
+                            )
+                          }
+                        />
+
+                        <span aria-hidden="true">
+                          {icon}
+                        </span>
+
+                        <strong>{label}</strong>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
               <label>
                 <span>Scadenza</span>
                 <input
@@ -580,6 +711,37 @@ export default function InventoryPage() {
                         )} g equivalenti
                       </p>
                     ) : null}
+
+                    {(() => {
+                      const ingredient =
+                        ingredientForPantryId(
+                          item.ingredient_id,
+                        );
+
+                      const labels = {
+                        breakfast: "Colazione",
+                        lunch: "Pranzo",
+                        snack: "Snack",
+                        dinner: "Cena",
+                      } as const;
+
+                      const slots =
+                        ingredient?.meal_slots ?? [];
+
+                      return slots.length > 0 ? (
+                        <div
+                          className={
+                            styles.pantryMealSlotTags
+                          }
+                        >
+                          {slots.map((slot) => (
+                            <span key={slot}>
+                              {labels[slot]}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
 
                     {item.expires_at && (
                       <p>
