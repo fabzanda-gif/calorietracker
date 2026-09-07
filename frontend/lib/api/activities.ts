@@ -39,6 +39,7 @@ export interface ActivityCreateInput {
   burned_calories: number;
   activity_type?: string;
   duration_seconds?: number;
+  distance_meters?: number;
 }
 
 export interface ActivityUpdateInput {

@@ -102,6 +102,10 @@ class ActivityCreate(BaseModel):
         default=None,
         ge=0,
     )
+    distance_meters: float | None = Field(
+        default=None,
+        ge=0,
+    )
 
 
 class ActivityUpdate(BaseModel):
@@ -1606,12 +1610,17 @@ def create_activity(
     ),
 ):
     payload = activity.model_dump()
+
+    if payload.get("distance_meters") is None:
+        payload.pop("distance_meters", None)
+
     payload["date"] = str(payload["date"])
     payload["user_id"] = current_user.id
 
     if (
         payload.get("activity_type")
         or payload.get("duration_seconds")
+        or payload.get("distance_meters")
     ):
         activity_type = normalize_activity_type(
             payload.get("activity_type")

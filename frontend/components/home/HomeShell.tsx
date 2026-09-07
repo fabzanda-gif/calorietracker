@@ -17,6 +17,7 @@ import {
   type DayHistoryResponse,
 } from "@/lib/api/dayHistory";
 import {
+  createActivity,
   getActivitiesForDate,
   getPlannedActivities,
   type Activity,
@@ -54,6 +55,10 @@ import {
   type LoggedMeal,
   type StructuredMealIngredient,
 } from "@/lib/api/meals";
+import {
+  previewConversationalDay,
+  type ConversationalDayPreview,
+} from "@/lib/api/conversation";
 import {
   getAvailableRecipes,
   type Recipe,
@@ -658,6 +663,10 @@ export function HomeShell() {
     useState("Pranzo");
   const [conversationPreview, setConversationPreview] =
     useState<ConversationalMealPreview | null>(null);
+  const [
+    conversationDayPreview,
+    setConversationDayPreview,
+  ] = useState<ConversationalDayPreview | null>(null);
   const [conversationLoading, setConversationLoading] =
     useState(false);
   const [conversationError, setConversationError] =
@@ -874,6 +883,7 @@ export function HomeShell() {
   useEffect(() => {
     if (
       conversationPreview ||
+      conversationDayPreview ||
       conversationText.trim() ||
       conversationPhoto
     ) {
@@ -886,6 +896,7 @@ export function HomeShell() {
   }, [
     recommendedMealType,
     conversationPreview,
+    conversationDayPreview,
     conversationText,
     conversationPhoto,
   ]);
@@ -2032,7 +2043,7 @@ export function HomeShell() {
     recognition.start();
   }
 
-  async function analyzeConversationMeal() {
+  async function analyzeConversationDay() {
     if (!accessToken || !conversationText.trim()) {
       return;
     }
@@ -2040,25 +2051,179 @@ export function HomeShell() {
     setConversationLoading(true);
     setConversationError(null);
     setConversationPreview(null);
+    setConversationDayPreview(null);
+    setConversationSuccess(null);
 
     try {
-      const preview = await previewConversationalMeal(
-        conversationText.trim(),
-        conversationMealType,
-        accessToken,
-      );
+      const preview =
+        await previewConversationalDay(
+          conversationText.trim(),
+          conversationMealType,
+          accessToken,
+        );
 
-      setConversationPreview(preview);
+      setConversationDayPreview(preview);
     } catch (err) {
       setConversationError(
         err instanceof Error
           ? err.message
-          : "Non riesco ad analizzare questo pasto.",
+          : "Non riesco a interpretare questa registrazione.",
       );
     } finally {
       setConversationLoading(false);
     }
   }
+
+
+  async function confirmConversationDay() {
+    if (
+      !accessToken ||
+      !conversationDayPreview ||
+      !conversationDayPreview.actions.length
+    ) {
+      return;
+    }
+
+    setConversationConfirming(true);
+    setConversationError(null);
+    setConversationSuccess(null);
+
+    const originalPreview =
+      conversationDayPreview;
+
+    let remainingActions = [
+      ...originalPreview.actions,
+    ];
+
+    let completed = 0;
+
+    try {
+      for (const action of originalPreview.actions) {
+        if (action.kind === "meal") {
+          await confirmConversationalMeal(
+            {
+              date: todayIso(),
+              meal_type: action.meal_type,
+              items: action.items,
+            },
+            accessToken,
+          );
+        } else if (action.kind === "activity") {
+          await createActivity(
+            {
+              date: todayIso(),
+              activity_name:
+                action.activity_name,
+              burned_calories:
+                Math.max(
+                  0,
+                  Math.round(
+                    action.burned_calories,
+                  ),
+                ),
+              activity_type:
+                action.activity_type,
+              duration_seconds:
+                action.duration_seconds ??
+                undefined,
+              distance_meters:
+                action.distance_meters ??
+                undefined,
+            },
+            accessToken,
+          );
+        } else {
+          const result = await createWeight(
+            {
+              date: todayIso(),
+              weight: action.weight_kg,
+            },
+            accessToken,
+          );
+
+          const savedEntry =
+            result.item ?? null;
+
+          setLatestWeight(
+            Number(action.weight_kg),
+          );
+
+          if (savedEntry) {
+            setLatestWeightEntry(savedEntry);
+
+            setWeightHistory((current) => [
+              ...current.filter(
+                (item) =>
+                  String(item.id) !==
+                    String(savedEntry.id) &&
+                  item.date !==
+                    savedEntry.date,
+              ),
+              savedEntry,
+            ]);
+          }
+        }
+
+        completed += 1;
+
+        remainingActions =
+          remainingActions.filter(
+            (item) => item.id !== action.id,
+          );
+
+        if (remainingActions.length) {
+          setConversationDayPreview({
+            ...originalPreview,
+            actions: remainingActions,
+            needs_review:
+              remainingActions.some(
+                (item) => item.needs_review,
+              ),
+          });
+        }
+      }
+
+      setConversationSuccess(
+        completed === 1
+          ? "Registrazione completata. Ho aggiornato la tua giornata."
+          : `${completed} registrazioni completate. Ho aggiornato la tua giornata.`,
+      );
+
+      setConversationText("");
+      setConversationPreview(null);
+      setConversationDayPreview(null);
+
+      await refreshHome();
+    } catch (err) {
+      setConversationDayPreview({
+        ...originalPreview,
+        actions: remainingActions,
+        needs_review:
+          remainingActions.some(
+            (item) => item.needs_review,
+          ),
+      });
+
+      setConversationError(
+        completed > 0
+          ? `Ho registrato ${completed} elementi. ${
+              err instanceof Error
+                ? err.message
+                : "Riprova per quelli rimasti."
+            }`
+          : err instanceof Error
+            ? err.message
+            : "Non riesco a completare la registrazione.",
+      );
+
+      await refreshHome().catch(
+        () => undefined,
+      );
+    } finally {
+      setConversationConfirming(false);
+    }
+  }
+
 
   async function analyzePhotoMeal() {
     if (!accessToken || !conversationPhoto) {
@@ -2068,6 +2233,7 @@ export function HomeShell() {
     setConversationLoading(true);
     setConversationError(null);
     setConversationPreview(null);
+    setConversationDayPreview(null);
     setConversationSuccess(null);
 
     try {
@@ -2160,6 +2326,7 @@ export function HomeShell() {
 
       setConversationText("");
       setConversationPreview(null);
+      setConversationDayPreview(null);
       setConversationPhoto(null);
       setConversationPhotoPreview(null);
 
@@ -3552,15 +3719,15 @@ export function HomeShell() {
               </div>
 
               <span className={styles.aiCapabilityPill}>
-                ✦ Testo o foto
+                ✦ Tutto in un input
               </span>
             </div>
 
             <div className={styles.aiHelperPanel}>
               <span aria-hidden="true">✦</span>
               <p>
-                Puoi registrare pasti con testo o foto,
-                anche tutto in una sola frase.
+                Puoi registrare pasti, attività e peso,
+                anche insieme nello stesso messaggio.
               </p>
             </div>
 
@@ -3575,6 +3742,7 @@ export function HomeShell() {
                 onClick={() => {
                   setConversationMode("text");
                   setConversationPreview(null);
+                  setConversationDayPreview(null);
                   setConversationError(null);
                   setConversationSuccess(null);
                 }}
@@ -3593,6 +3761,7 @@ export function HomeShell() {
                 onClick={() => {
                   setConversationMode("photo");
                   setConversationPreview(null);
+                  setConversationDayPreview(null);
                   setConversationError(null);
                   setConversationSuccess(null);
                 }}
@@ -3635,7 +3804,7 @@ export function HomeShell() {
                         event.target.value,
                       )
                     }
-                    placeholder="Es. Ho mangiato una piadina con pollo..."
+                    placeholder="Es. Ho mangiato una piadina, corso 5 km e peso 77,4 kg..."
                     rows={3}
                   />
 
@@ -3673,7 +3842,7 @@ export function HomeShell() {
                   <button
                     type="button"
                     onClick={() => {
-                      void analyzeConversationMeal();
+                      void analyzeConversationDay();
                     }}
                     disabled={
                       conversationLoading ||
@@ -3713,6 +3882,7 @@ export function HomeShell() {
 
                           setConversationPhoto(file);
                           setConversationPreview(null);
+                          setConversationDayPreview(null);
                           setConversationError(null);
                           setConversationSuccess(null);
 
@@ -3756,6 +3926,7 @@ export function HomeShell() {
 
                           setConversationPhoto(file);
                           setConversationPreview(null);
+                          setConversationDayPreview(null);
                           setConversationError(null);
                           setConversationSuccess(null);
 
@@ -3826,15 +3997,17 @@ export function HomeShell() {
             </div>
 
             {conversationMode === "text" &&
-            !conversationPreview ? (
+            !conversationPreview &&
+            !conversationDayPreview ? (
               <div
                 className={styles.aiSuggestionChips}
                 aria-label="Esempi da provare"
               >
                 {[
                   "Ho mangiato una piadina con pollo",
-                  "A pranzo pasta al pomodoro e una mela",
-                  "Ho fatto colazione con yogurt e avena",
+                  "Ho corso 5 km in 30 minuti",
+                  "Stamattina peso 77,4 kg",
+                  "A pranzo pasta, poi palestra 45 minuti",
                 ].map((example) => (
                   <button
                     key={example}
@@ -3861,6 +4034,173 @@ export function HomeShell() {
               <p className={styles.conversationSuccess}>
                 {conversationSuccess}
               </p>
+            ) : null}
+
+            {conversationDayPreview ? (
+              <div className={styles.conversationPreview}>
+                <div
+                  className={styles.conversationPreviewTop}
+                >
+                  <strong>Ho capito così</strong>
+
+                  {conversationDayPreview.needs_review ? (
+                    <span>
+                      Controlla le stime prima di registrare
+                    </span>
+                  ) : (
+                    <span>
+                      Pronto da registrare
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  className={styles.conversationDayActions}
+                >
+                  {conversationDayPreview.actions.map(
+                    (action) => (
+                      <div
+                        key={action.id}
+                        className={
+                          styles.conversationDayAction
+                        }
+                      >
+                        <span
+                          className={
+                            styles.conversationDayActionIcon
+                          }
+                          aria-hidden="true"
+                        >
+                          {action.kind === "meal"
+                            ? "🍽️"
+                            : action.kind === "activity"
+                              ? "🏃"
+                              : "⚖️"}
+                        </span>
+
+                        <div
+                          className={
+                            styles.conversationDayActionMain
+                          }
+                        >
+                          <strong>
+                            {action.kind === "meal"
+                              ? action.meal_type
+                              : action.kind === "activity"
+                                ? action.activity_name
+                                : "Peso"}
+                          </strong>
+
+                          <span>
+                            {action.kind === "meal"
+                              ? action.items
+                                  .map(
+                                    (item) =>
+                                      item.name,
+                                  )
+                                  .join(" · ")
+                              : action.kind === "activity"
+                                ? [
+                                    action.activity_type,
+                                    action.duration_seconds
+                                      ? `${Math.round(
+                                          action.duration_seconds /
+                                            60,
+                                        )} min`
+                                      : null,
+                                    action.distance_meters
+                                      ? `${(
+                                          action.distance_meters /
+                                          1000
+                                        ).toLocaleString(
+                                          "it-IT",
+                                          {
+                                            maximumFractionDigits:
+                                              2,
+                                          },
+                                        )} km`
+                                      : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                : "Peso di oggi"}
+                          </span>
+
+                          {action.needs_review ? (
+                            <small
+                              className={
+                                styles.conversationDayActionWarning
+                              }
+                            >
+                              {action.kind === "activity" &&
+                              action.calories_estimated
+                                ? "Consumo energetico stimato"
+                                : "Dato da controllare"}
+                            </small>
+                          ) : null}
+                        </div>
+
+                        <strong
+                          className={
+                            styles.conversationDayActionMetric
+                          }
+                        >
+                          {action.kind === "meal"
+                            ? `${roundNumber(
+                                action.totals.calories,
+                              )} kcal`
+                            : action.kind === "activity"
+                              ? action.burned_calories > 0
+                                ? `${roundNumber(
+                                    action.burned_calories,
+                                  )} kcal`
+                                : "kcal n/d"
+                              : `${Number(
+                                  action.weight_kg,
+                                ).toLocaleString(
+                                  "it-IT",
+                                  {
+                                    maximumFractionDigits:
+                                      1,
+                                  },
+                                )} kg`}
+                        </strong>
+                      </div>
+                    ),
+                  )}
+                </div>
+
+                <div
+                  className={
+                    styles.conversationPreviewActions
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void confirmConversationDay();
+                    }}
+                    disabled={conversationConfirming}
+                  >
+                    {conversationConfirming
+                      ? "Registro..."
+                      : conversationDayPreview.actions.length ===
+                          1
+                        ? "Conferma e registra"
+                        : `Conferma ${conversationDayPreview.actions.length} registrazioni`}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConversationDayPreview(null)
+                    }
+                    disabled={conversationConfirming}
+                  >
+                    Modifica testo
+                  </button>
+                </div>
+              </div>
             ) : null}
 
             {conversationPreview ? (
