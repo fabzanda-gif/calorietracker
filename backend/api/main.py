@@ -20,6 +20,7 @@ from backend.api.routers.learned_insights import router as learned_insights_rout
 from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
 from backend.api.routers.oura import router as oura_router
+from backend.api.routers.google_calendar import router as google_calendar_router
 from backend.api.routers.pantry import router as pantry_router
 from backend.api.routers.recipes import router as recipes_router
 from backend.api.routers.progress import router as progress_router
@@ -180,6 +181,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(meals_router)
 app.include_router(oura_router)
+app.include_router(google_calendar_router)
 app.include_router(activities_router)
 app.include_router(weight_router)
 app.include_router(progress_router)

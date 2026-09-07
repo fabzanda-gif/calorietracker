@@ -31,6 +31,9 @@ from backend.repositories.planned_activities import (
 from backend.repositories.oura_connections import (
     OuraConnectionsRepository,
 )
+from backend.repositories.google_calendar_connections import (
+    GoogleCalendarConnectionsRepository,
+)
 from backend.repositories.recipe_ingredients import RecipeIngredientsRepository
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.training_plans import (
@@ -286,6 +289,16 @@ def get_authenticated_supabase(
     )
 
     return client
+
+
+def get_google_calendar_connections_repository(
+    supabase: Client = Depends(
+        get_admin_supabase_client
+    ),
+) -> GoogleCalendarConnectionsRepository:
+    return GoogleCalendarConnectionsRepository(
+        supabase
+    )
 
 
 def get_oura_connections_repository(
