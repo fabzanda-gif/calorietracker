@@ -70,6 +70,10 @@ import {
   type Ingredient,
 } from "@/lib/api/ingredients";
 import {
+  getPantry,
+  type PantryItem,
+} from "@/lib/api/pantry";
+import {
   getDay,
   getDayBriefing,
   getDayBudget,
@@ -526,6 +530,27 @@ export function HomeShell() {
 
   const [quickAddMealSlot, setQuickAddMealSlot] =
     useState<string | null>(null);
+  const [quickAddMode, setQuickAddMode] =
+    useState<"meal" | "activity" | "weight" | null>(null);
+
+  const [quickActivityName, setQuickActivityName] =
+    useState("");
+  const [quickActivityCalories, setQuickActivityCalories] =
+    useState("");
+  const [
+    quickActivityDurationMinutes,
+    setQuickActivityDurationMinutes,
+  ] = useState("");
+  const [
+    quickActivityDistanceKm,
+    setQuickActivityDistanceKm,
+  ] = useState("");
+  const [quickActivitySaving, setQuickActivitySaving] =
+    useState(false);
+
+  const [pantryInventory, setPantryInventory] =
+    useState<PantryItem[]>([]);
+
   const [alternateName, setAlternateName] =
     useState("");
   const [alternateCalories, setAlternateCalories] =
@@ -547,11 +572,19 @@ export function HomeShell() {
     key: string;
     name: string;
     mealType: string | null;
+    mealSlots: string[] | null;
     calories: number;
     protein: number;
     carbs: number;
     fat: number;
-    source: "recipe" | "history" | "ingredient";
+    source:
+      | "pantry"
+      | "recipe"
+      | "history"
+      | "ingredient";
+    ingredientId?: string;
+    portionGrams?: number;
+    pantryExpiresAt?: string | null;
   }>>([]);
   const [savingAlternate, setSavingAlternate] =
     useState(false);
@@ -699,10 +732,12 @@ export function HomeShell() {
       getAvailableRecipes(accessToken),
       getMealHistory(accessToken),
       getIngredients(accessToken),
+      getPantry(accessToken),
     ]).then(([
       recipesResult,
       historyResult,
       ingredientsResult,
+      pantryResult,
     ]) => {
       if (!active) return;
 
@@ -722,6 +757,13 @@ export function HomeShell() {
         ingredientsResult.status === "fulfilled"
           ? ingredientsResult.value.items
           : [];
+
+      const pantry =
+        pantryResult.status === "fulfilled"
+          ? pantryResult.value.items
+          : [];
+
+      setPantryInventory(pantry);
 
       const seen = new Set<string>();
 
@@ -762,7 +804,64 @@ export function HomeShell() {
         return 100;
       };
 
+      const pantryAlternates = [...pantry]
+        .sort((left, right) => {
+          const leftExpiry =
+            left.expires_at ?? "9999-12-31";
+          const rightExpiry =
+            right.expires_at ?? "9999-12-31";
+
+          return leftExpiry.localeCompare(rightExpiry);
+        })
+        .flatMap((pantryItem) => {
+          const ingredient = ingredients.find(
+            (candidate: Ingredient) =>
+              String(candidate.id) ===
+              String(pantryItem.ingredient_id),
+          );
+
+          if (!ingredient) {
+            return [];
+          }
+
+          const portionGrams =
+            ingredientPortionGrams(ingredient);
+
+          const factor = portionGrams / 100;
+
+          return [{
+            key: `pantry:${pantryItem.id}`,
+            name:
+              pantryItem.ingredient_name ||
+              ingredient.name,
+            mealType: null,
+            mealSlots: ingredient.meal_slots ?? [],
+            calories:
+              Number(
+                ingredient.calories_per_100g || 0,
+              ) * factor,
+            protein:
+              Number(
+                ingredient.protein_per_100g || 0,
+              ) * factor,
+            carbs:
+              Number(
+                ingredient.carbs_per_100g || 0,
+              ) * factor,
+            fat:
+              Number(
+                ingredient.fat_per_100g || 0,
+              ) * factor,
+            source: "pantry" as const,
+            ingredientId: ingredient.id,
+            portionGrams,
+            pantryExpiresAt: pantryItem.expires_at,
+          }];
+        });
+
       const items = [
+        ...pantryAlternates,
+
         ...recipes.map((recipe: Recipe) => {
           const servings = Math.max(
             1,
@@ -773,6 +872,7 @@ export function HomeShell() {
             key: `recipe:${recipe.id}`,
             name: recipe.name,
             mealType: recipe.meal_type || "Pranzo",
+            mealSlots: null,
             calories:
               Number(recipe.calories || 0) / servings,
             protein:
@@ -804,6 +904,7 @@ export function HomeShell() {
             name: meal.base_name || meal.name,
             mealType:
               meal.meal_type || "Pranzo",
+            mealSlots: null,
             calories: Number(
               meal.base_calories ??
                 Number(meal.calories || 0) *
@@ -842,6 +943,9 @@ export function HomeShell() {
               key: `ingredient:${ingredient.id}`,
               name: ingredient.name,
               mealType: null,
+              mealSlots: ingredient.meal_slots ?? [],
+              ingredientId: ingredient.id,
+              portionGrams,
               calories:
                 Number(
                   ingredient.calories_per_100g ||
@@ -1802,6 +1906,7 @@ export function HomeShell() {
 
   async function openWeightQuickAdd(
     entry: WeightEntry | null = null,
+    scrollToOverview = true,
   ) {
     setWeightQuickAddMessage(null);
     setWeightQuickAddOpen(true);
@@ -1848,14 +1953,16 @@ export function HomeShell() {
         : "",
     );
 
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById("home-week-overview")
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-    });
+    if (scrollToOverview) {
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById("home-week-overview")
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+      });
+    }
   }
 
   async function saveWeightQuickAdd() {
@@ -2950,8 +3057,72 @@ export function HomeShell() {
     }
   }
 
+  function quickMealFitsSlot(
+    item: (typeof knownAlternates)[number],
+    slot: string,
+  ): boolean {
+    if (
+      item.source === "recipe" ||
+      item.source === "history"
+    ) {
+      return Boolean(
+        item.mealType &&
+        mealFitsSlot(item.mealType, slot),
+      );
+    }
+
+    const normalizedSlot =
+      normalizedMealSlot(slot);
+
+    return Boolean(
+      item.mealSlots?.some(
+        (candidate) =>
+          candidate === normalizedSlot,
+      ),
+    );
+  }
+
+  function selectQuickMealAlternate(
+    key: string,
+  ) {
+    setAlternateSelectedKey(
+      key || null,
+    );
+    setAlternateQuantity(1);
+
+    if (!key) {
+      return;
+    }
+
+    const selected =
+      knownAlternates.find(
+        (item) => item.key === key,
+      );
+
+    if (!selected) {
+      return;
+    }
+
+    setAlternateName(selected.name);
+    setAlternateCalories(
+      String(Math.round(selected.calories)),
+    );
+    setAlternateProtein(
+      String(Math.round(selected.protein)),
+    );
+    setAlternateCarbs(
+      String(Math.round(selected.carbs)),
+    );
+    setAlternateFat(
+      String(Math.round(selected.fat)),
+    );
+  }
+
   function openQuickAddMeal(slot: string) {
     setError(null);
+
+    setQuickAddMode("meal");
+    setQuickAddMealSlot(slot);
 
     setAlternateSelectedKey(null);
     setAlternateQuantity(1);
@@ -2961,18 +3132,77 @@ export function HomeShell() {
     setAlternateProtein("");
     setAlternateCarbs("");
     setAlternateFat("");
-
-    setQuickAddMealSlot(slot);
   }
 
-  function closeAlternateMeal() {
+  function openQuickAddActivity() {
+    setError(null);
+
+    setQuickActivityName("");
+    setQuickActivityCalories("");
+    setQuickActivityDurationMinutes("");
+    setQuickActivityDistanceKm("");
+
+    setQuickAddMode("activity");
+  }
+
+  async function openQuickAddWeight() {
+    setError(null);
+
+    await openWeightQuickAdd(
+      null,
+      false,
+    );
+
+    setQuickAddMode("weight");
+  }
+
+  function switchQuickAddMode(
+    mode: "meal" | "activity" | "weight",
+  ) {
+    if (mode === "meal") {
+      if (!quickAddMealSlot) {
+        setQuickAddMealSlot(
+          recommendedMealType ||
+          "Colazione",
+        );
+      }
+
+      setQuickAddMode("meal");
+      return;
+    }
+
+    if (mode === "activity") {
+      setQuickAddMode("activity");
+      return;
+    }
+
+    void openQuickAddWeight();
+  }
+
+  function closeUnifiedQuickAdd() {
+    setQuickAddMode(null);
+
     setAlternateSlot(null);
     setQuickAddMealSlot(null);
+    setAlternateSelectedKey(null);
+    setAlternateQuantity(1);
+
     setAlternateName("");
     setAlternateCalories("");
     setAlternateProtein("");
     setAlternateCarbs("");
     setAlternateFat("");
+
+    setQuickActivityName("");
+    setQuickActivityCalories("");
+    setQuickActivityDurationMinutes("");
+    setQuickActivityDistanceKm("");
+
+    setWeightQuickAddOpen(false);
+  }
+
+  function closeAlternateMeal() {
+    closeUnifiedQuickAdd();
   }
 
   function openAlternateMeal(slot: string) {
@@ -3031,6 +3261,113 @@ export function HomeShell() {
         }, 250);
       });
     });
+  }
+
+  async function saveQuickActivity() {
+    if (!accessToken) {
+      return;
+    }
+
+    const name = quickActivityName.trim();
+    const calories = Number(
+      quickActivityCalories,
+    );
+
+    const durationMinutes =
+      quickActivityDurationMinutes.trim()
+        ? Number(
+            quickActivityDurationMinutes,
+          )
+        : 0;
+
+    const distanceKm =
+      quickActivityDistanceKm.trim()
+        ? Number(
+            quickActivityDistanceKm.replace(
+              ",",
+              ".",
+            ),
+          )
+        : 0;
+
+    if (!name) {
+      setError(
+        "Inserisci il nome dell’attività.",
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(calories) ||
+      calories < 0
+    ) {
+      setError(
+        "Inserisci delle kcal valide.",
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(durationMinutes) ||
+      durationMinutes < 0
+    ) {
+      setError(
+        "Inserisci una durata valida.",
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(distanceKm) ||
+      distanceKm < 0
+    ) {
+      setError(
+        "Inserisci una distanza valida.",
+      );
+      return;
+    }
+
+    setQuickActivitySaving(true);
+    setError(null);
+
+    try {
+      await createActivity(
+        {
+          date: todayIso(),
+          activity_name: name,
+          burned_calories:
+            Math.round(calories),
+          ...(durationMinutes > 0
+            ? {
+                duration_seconds:
+                  Math.round(
+                    durationMinutes * 60,
+                  ),
+              }
+            : {}),
+          ...(distanceKm > 0
+            ? {
+                distance_meters:
+                  Math.round(
+                    distanceKm * 1000,
+                  ),
+              }
+            : {}),
+        },
+        accessToken,
+      );
+
+      closeUnifiedQuickAdd();
+      await refreshHome();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare l’attività.",
+      );
+    } finally {
+      setQuickActivitySaving(false);
+    }
   }
 
   async function saveAlternateMeal(
@@ -4368,162 +4705,701 @@ export function HomeShell() {
           </section>
 
           {typeof document !== "undefined" &&
-          quickAddMealSlot
+          quickAddMode
             ? createPortal(
                 <div
                   className={styles.quickMealOverlay}
-              role="presentation"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget) {
-                  closeAlternateMeal();
-                }
-              }}
-            >
-              <section
-                className={styles.quickMealModal}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="quick-meal-title"
-              >
-                <div className={styles.quickMealModalHeader}>
-                  <div>
-                    <span>REGISTRA ALIMENTO</span>
-
-                    <h3 id="quick-meal-title">
-                      Aggiungi a{" "}
-                      {mealLabel(quickAddMealSlot).toLowerCase()}
-                    </h3>
-
-                    <p>
-                      Verrà aggiunto al pasto già registrato,
-                      senza sostituirlo.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    aria-label="Chiudi"
-                    onClick={closeAlternateMeal}
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <div className={styles.quickMealModalBody}>
-                  <label>
-                    <span>Cosa hai mangiato?</span>
-
-                    <input
-                      type="text"
-                      autoFocus
-                      value={alternateName}
-                      placeholder="Es. Yogurt greco"
-                      onChange={(event) => {
-                        setAlternateName(event.target.value);
-                      }}
-                    />
-                  </label>
-
-                  <div className={styles.quickMealMacroGrid}>
-                    <label>
-                      <span>Kcal</span>
-                      <input
-                        type="number"
-                        min="0"
-                        inputMode="numeric"
-                        value={alternateCalories}
-                        placeholder="150"
-                        onChange={(event) => {
-                          setAlternateCalories(
-                            event.target.value,
-                          );
-                        }}
-                      />
-                    </label>
-
-                    <label>
-                      <span>Proteine</span>
-                      <input
-                        type="number"
-                        min="0"
-                        inputMode="decimal"
-                        value={alternateProtein}
-                        placeholder="10"
-                        onChange={(event) => {
-                          setAlternateProtein(
-                            event.target.value,
-                          );
-                        }}
-                      />
-                    </label>
-
-                    <label>
-                      <span>Carbo</span>
-                      <input
-                        type="number"
-                        min="0"
-                        inputMode="decimal"
-                        value={alternateCarbs}
-                        placeholder="15"
-                        onChange={(event) => {
-                          setAlternateCarbs(
-                            event.target.value,
-                          );
-                        }}
-                      />
-                    </label>
-
-                    <label>
-                      <span>Grassi</span>
-                      <input
-                        type="number"
-                        min="0"
-                        inputMode="decimal"
-                        value={alternateFat}
-                        placeholder="5"
-                        onChange={(event) => {
-                          setAlternateFat(
-                            event.target.value,
-                          );
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className={styles.quickMealModalActions}>
-                  <button
-                    type="button"
-                    className={styles.quickMealCancel}
-                    disabled={savingAlternate}
-                    onClick={closeAlternateMeal}
-                  >
-                    Annulla
-                  </button>
-
-                  <button
-                    type="button"
-                    className={styles.quickMealSave}
-                    disabled={
-                      savingAlternate ||
-                      !alternateName.trim() ||
-                      !alternateCalories.trim()
+                  role="presentation"
+                  onMouseDown={(event) => {
+                    if (
+                      event.target ===
+                      event.currentTarget
+                    ) {
+                      closeUnifiedQuickAdd();
                     }
-                    onClick={() => {
-                      void saveAlternateMeal(
-                        quickAddMealSlot,
-                      );
-                    }}
+                  }}
+                >
+                  <section
+                    className={styles.quickMealModal}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="quick-add-title"
                   >
-                    {savingAlternate
-                      ? "Registro…"
-                      : "Aggiungi al pasto"}
-                  </button>
-                </div>
-                </section>
-              </div>,
-              document.body,
-            )
+                    <div
+                      className={
+                        styles.quickMealModalHeader
+                      }
+                    >
+                      <div>
+                        <span>AGGIUNGI A OGGI</span>
+
+                        <h3 id="quick-add-title">
+                          {quickAddMode === "meal"
+                            ? quickAddMealSlot
+                              ? `Aggiungi a ${mealLabel(
+                                  quickAddMealSlot,
+                                ).toLowerCase()}`
+                              : "Aggiungi un pasto"
+                            : quickAddMode ===
+                                "activity"
+                              ? "Registra attività"
+                              : "Registra peso"}
+                        </h3>
+
+                        <p>
+                          Tutto senza lasciare la Home.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        aria-label="Chiudi"
+                        onClick={
+                          closeUnifiedQuickAdd
+                        }
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div
+                      className={
+                        styles.quickAddTabs
+                      }
+                      role="tablist"
+                      aria-label="Tipo di registrazione"
+                    >
+                      {[
+                        ["meal", "🍽️", "Pasto"],
+                        [
+                          "activity",
+                          "🏃",
+                          "Attività",
+                        ],
+                        ["weight", "⚖️", "Peso"],
+                      ].map(
+                        ([
+                          mode,
+                          icon,
+                          label,
+                        ]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            role="tab"
+                            aria-selected={
+                              quickAddMode ===
+                              mode
+                            }
+                            className={
+                              quickAddMode ===
+                              mode
+                                ? styles.quickAddTabActive
+                                : undefined
+                            }
+                            onClick={() =>
+                              switchQuickAddMode(
+                                mode as
+                                  | "meal"
+                                  | "activity"
+                                  | "weight",
+                              )
+                            }
+                          >
+                            <span
+                              aria-hidden="true"
+                            >
+                              {icon}
+                            </span>
+                            {label}
+                          </button>
+                        ),
+                      )}
+                    </div>
+
+                    {quickAddMode === "meal" &&
+                    quickAddMealSlot ? (
+                      <>
+                        <div
+                          className={
+                            styles.quickMealModalBody
+                          }
+                        >
+                          <label>
+                            <span>
+                              Scegli un alimento
+                            </span>
+
+                            <select
+                              value={
+                                alternateSelectedKey ??
+                                ""
+                              }
+                              onChange={(
+                                event,
+                              ) => {
+                                selectQuickMealAlternate(
+                                  event.target
+                                    .value,
+                                );
+                              }}
+                            >
+                              <option value="">
+                                Seleziona oppure
+                                scrivi manualmente…
+                              </option>
+
+                              {knownAlternates.some(
+                                (item) =>
+                                  item.source ===
+                                    "pantry" &&
+                                  quickMealFitsSlot(
+                                    item,
+                                    quickAddMealSlot,
+                                  ),
+                              ) ? (
+                                <optgroup label="🏠 In dispensa">
+                                  {knownAlternates
+                                    .filter(
+                                      (item) =>
+                                        item.source ===
+                                          "pantry" &&
+                                        quickMealFitsSlot(
+                                          item,
+                                          quickAddMealSlot,
+                                        ),
+                                    )
+                                    .map(
+                                      (item) => (
+                                        <option
+                                          key={
+                                            item.key
+                                          }
+                                          value={
+                                            item.key
+                                          }
+                                        >
+                                          {
+                                            item.name
+                                          }
+                                          {item.pantryExpiresAt
+                                            ? ` · scad. ${new Date(
+                                                `${item.pantryExpiresAt}T00:00:00`,
+                                              ).toLocaleDateString(
+                                                "it-IT",
+                                                {
+                                                  day: "numeric",
+                                                  month:
+                                                    "short",
+                                                },
+                                              )}`
+                                            : ""}
+                                        </option>
+                                      ),
+                                    )}
+                                </optgroup>
+                              ) : null}
+
+                              {knownAlternates.some(
+                                (item) =>
+                                  item.source ===
+                                    "recipe" &&
+                                  quickMealFitsSlot(
+                                    item,
+                                    quickAddMealSlot,
+                                  ),
+                              ) ? (
+                                <optgroup label="Ricette compatibili">
+                                  {knownAlternates
+                                    .filter(
+                                      (item) =>
+                                        item.source ===
+                                          "recipe" &&
+                                        quickMealFitsSlot(
+                                          item,
+                                          quickAddMealSlot,
+                                        ),
+                                    )
+                                    .map(
+                                      (item) => (
+                                        <option
+                                          key={
+                                            item.key
+                                          }
+                                          value={
+                                            item.key
+                                          }
+                                        >
+                                          {
+                                            item.name
+                                          }
+                                        </option>
+                                      ),
+                                    )}
+                                </optgroup>
+                              ) : null}
+
+                              {knownAlternates.some(
+                                (item) =>
+                                  item.source ===
+                                    "history" &&
+                                  quickMealFitsSlot(
+                                    item,
+                                    quickAddMealSlot,
+                                  ),
+                              ) ? (
+                                <optgroup label="Pasti recenti">
+                                  {knownAlternates
+                                    .filter(
+                                      (item) =>
+                                        item.source ===
+                                          "history" &&
+                                        quickMealFitsSlot(
+                                          item,
+                                          quickAddMealSlot,
+                                        ),
+                                    )
+                                    .map(
+                                      (item) => (
+                                        <option
+                                          key={
+                                            item.key
+                                          }
+                                          value={
+                                            item.key
+                                          }
+                                        >
+                                          {
+                                            item.name
+                                          }
+                                        </option>
+                                      ),
+                                    )}
+                                </optgroup>
+                              ) : null}
+
+                              {knownAlternates.some(
+                                (item) =>
+                                  item.source ===
+                                    "ingredient" &&
+                                  quickMealFitsSlot(
+                                    item,
+                                    quickAddMealSlot,
+                                  ),
+                              ) ? (
+                                <optgroup label="Altri alimenti compatibili">
+                                  {knownAlternates
+                                    .filter(
+                                      (item) =>
+                                        item.source ===
+                                          "ingredient" &&
+                                        quickMealFitsSlot(
+                                          item,
+                                          quickAddMealSlot,
+                                        ),
+                                    )
+                                    .map(
+                                      (item) => (
+                                        <option
+                                          key={
+                                            item.key
+                                          }
+                                          value={
+                                            item.key
+                                          }
+                                        >
+                                          {
+                                            item.name
+                                          }
+                                        </option>
+                                      ),
+                                    )}
+                                </optgroup>
+                              ) : null}
+                            </select>
+                          </label>
+
+                          <label>
+                            <span>
+                              Oppure scrivi
+                              manualmente
+                            </span>
+
+                            <input
+                              type="text"
+                              autoFocus
+                              value={
+                                alternateName
+                              }
+                              placeholder="Es. Yogurt greco"
+                              onChange={(
+                                event,
+                              ) => {
+                                setAlternateName(
+                                  event.target
+                                    .value,
+                                );
+                              }}
+                            />
+                          </label>
+
+                          <div
+                            className={
+                              styles.quickMealMacroGrid
+                            }
+                          >
+                            <label>
+                              <span>Kcal</span>
+                              <input
+                                type="number"
+                                min="0"
+                                inputMode="numeric"
+                                value={
+                                  alternateCalories
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setAlternateCalories(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span>
+                                Proteine
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                inputMode="decimal"
+                                value={
+                                  alternateProtein
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setAlternateProtein(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span>Carbo</span>
+                              <input
+                                type="number"
+                                min="0"
+                                inputMode="decimal"
+                                value={
+                                  alternateCarbs
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setAlternateCarbs(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span>Grassi</span>
+                              <input
+                                type="number"
+                                min="0"
+                                inputMode="decimal"
+                                value={
+                                  alternateFat
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setAlternateFat(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div
+                          className={
+                            styles.quickMealModalActions
+                          }
+                        >
+                          <button
+                            type="button"
+                            className={
+                              styles.quickMealCancel
+                            }
+                            onClick={
+                              closeUnifiedQuickAdd
+                            }
+                          >
+                            Annulla
+                          </button>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.quickMealSave
+                            }
+                            disabled={
+                              savingAlternate ||
+                              !alternateName.trim() ||
+                              !alternateCalories.trim()
+                            }
+                            onClick={() => {
+                              void saveAlternateMeal(
+                                quickAddMealSlot,
+                              );
+                            }}
+                          >
+                            {savingAlternate
+                              ? "Registro…"
+                              : "Aggiungi al pasto"}
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {quickAddMode ===
+                    "activity" ? (
+                      <>
+                        <div
+                          className={
+                            styles.quickMealModalBody
+                          }
+                        >
+                          <label>
+                            <span>
+                              Attività
+                            </span>
+                            <input
+                              type="text"
+                              autoFocus
+                              value={
+                                quickActivityName
+                              }
+                              placeholder="Es. Corsa, palestra, bici"
+                              onChange={(
+                                event,
+                              ) =>
+                                setQuickActivityName(
+                                  event.target
+                                    .value,
+                                )
+                              }
+                            />
+                          </label>
+
+                          <div
+                            className={
+                              styles.quickActivityGrid
+                            }
+                          >
+                            <label>
+                              <span>Kcal</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={
+                                  quickActivityCalories
+                                }
+                                placeholder="350"
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setQuickActivityCalories(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span>
+                                Durata (min)
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={
+                                  quickActivityDurationMinutes
+                                }
+                                placeholder="45"
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setQuickActivityDurationMinutes(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span>
+                                Distanza (km)
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={
+                                  quickActivityDistanceKm
+                                }
+                                placeholder="5"
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setQuickActivityDistanceKm(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div
+                          className={
+                            styles.quickMealModalActions
+                          }
+                        >
+                          <button
+                            type="button"
+                            className={
+                              styles.quickMealCancel
+                            }
+                            onClick={
+                              closeUnifiedQuickAdd
+                            }
+                          >
+                            Annulla
+                          </button>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.quickMealSave
+                            }
+                            disabled={
+                              quickActivitySaving ||
+                              !quickActivityName.trim() ||
+                              !quickActivityCalories.trim()
+                            }
+                            onClick={() => {
+                              void saveQuickActivity();
+                            }}
+                          >
+                            {quickActivitySaving
+                              ? "Registro…"
+                              : "Aggiungi attività"}
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {quickAddMode ===
+                    "weight" ? (
+                      <>
+                        <div
+                          className={
+                            styles.quickMealModalBody
+                          }
+                        >
+                          <label>
+                            <span>
+                              Peso di oggi (kg)
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoFocus
+                              value={
+                                weightQuickAddValue
+                              }
+                              placeholder="77,4"
+                              onChange={(
+                                event,
+                              ) =>
+                                setWeightQuickAddValue(
+                                  event.target
+                                    .value,
+                                )
+                              }
+                            />
+                          </label>
+
+                          {weightQuickAddMessage ? (
+                            <p
+                              className={
+                                styles.quickAddMessage
+                              }
+                            >
+                              {
+                                weightQuickAddMessage
+                              }
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div
+                          className={
+                            styles.quickMealModalActions
+                          }
+                        >
+                          <button
+                            type="button"
+                            className={
+                              styles.quickMealCancel
+                            }
+                            onClick={
+                              closeUnifiedQuickAdd
+                            }
+                          >
+                            Chiudi
+                          </button>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.quickMealSave
+                            }
+                            disabled={
+                              weightQuickAddSaving ||
+                              !weightQuickAddValue.trim()
+                            }
+                            onClick={() => {
+                              void saveWeightQuickAdd();
+                            }}
+                          >
+                            {weightQuickAddSaving
+                              ? "Salvo…"
+                              : weightQuickAddEditingEntry
+                                ? "Aggiorna peso"
+                                : "Registra peso"}
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+                  </section>
+                </div>,
+                document.body,
+              )
             : null}
 
           <section
@@ -4598,10 +5474,24 @@ export function HomeShell() {
                       </button>
                     ))}
 
-                  <a href="/activities">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      const menuDetails =
+                        event.currentTarget.closest(
+                          "details",
+                        );
+
+                      if (menuDetails) {
+                        menuDetails.open = false;
+                      }
+
+                      openQuickAddActivity();
+                    }}
+                  >
                     <span aria-hidden="true">🏃</span>
                     Attività
-                  </a>
+                  </button>
 
                   <button
                     type="button"
@@ -4613,7 +5503,7 @@ export function HomeShell() {
                         menuDetails.open = false;
                       }
 
-                      void openWeightQuickAdd(null);
+                      void openQuickAddWeight();
                     }}
                   >
                     <span aria-hidden="true">⚖️</span>
@@ -4698,6 +5588,21 @@ export function HomeShell() {
                       </strong>
                     </div>
                   ))}
+
+                  <button
+                    type="button"
+                    className={
+                      styles.dailyActivityAddAnother
+                    }
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openQuickAddActivity();
+                    }}
+                  >
+                    <span aria-hidden="true">+</span>
+                    Aggiungi attività
+                  </button>
                 </div>
               </details>
             ) : null}

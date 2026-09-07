@@ -15256,3 +15256,133 @@ details[open] > summary .dailyEntryChevron {
 .mealsSection .dailyAddMenu {
   overflow: visible !important;
 }
+
+
+/* ==========================================================
+   HOME UNIFIED QUICK ADD V1
+   Pasto / Attività / Peso in un unico flusso Home
+   ========================================================== */
+
+.quickAddTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+
+  margin: 16px 22px 0;
+  padding: 5px;
+
+  border: 1px solid #e6ebef;
+  border-radius: 13px;
+
+  background: #f6f8fa;
+}
+
+.quickAddTabs button {
+  min-height: 39px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  border: 0;
+  border-radius: 9px;
+
+  background: transparent;
+  color: #60758a;
+
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 850;
+
+  cursor: pointer;
+}
+
+.quickAddTabs button.quickAddTabActive {
+  background: #ffffff;
+  color: #123252;
+
+  box-shadow:
+    0 3px 10px rgba(15, 35, 55, .08);
+}
+
+.quickMealModalBody select {
+  width: 100%;
+  min-height: 44px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce3e8;
+  border-radius: 11px;
+
+  padding: 10px 12px;
+
+  background: #ffffff;
+  color: #123252;
+
+  font: inherit;
+}
+
+.quickActivityGrid {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.quickAddMessage {
+  margin: 0;
+  padding: 9px 11px;
+
+  border-radius: 10px;
+
+  background: #f6f8fa;
+  color: #4d647a;
+
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.dailyActivityAddAnother {
+  width: calc(100% - 24px);
+  min-height: 38px;
+
+  margin: 8px 12px 10px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  border: 1px dashed rgba(255, 104, 104, .38);
+  border-radius: 10px;
+
+  background: #fffafa;
+  color: #e85f5f;
+
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 850;
+
+  cursor: pointer;
+}
+
+.dailyActivityAddAnother:hover {
+  background: #fff4f3;
+}
+
+@media (max-width: 620px) {
+  .quickAddTabs {
+    margin-inline: 16px;
+  }
+
+  .quickActivityGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .quickActivityGrid label:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
