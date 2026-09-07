@@ -3075,10 +3075,29 @@ export function HomeShell() {
       normalizedMealSlot(slot);
 
     return Boolean(
-      item.mealSlots?.some(
-        (candidate) =>
-          candidate === normalizedSlot,
-      ),
+      item.mealSlots?.some((candidate) => {
+        if (
+          normalizedSlot === "breakfast" ||
+          normalizedSlot === "snack"
+        ) {
+          return (
+            candidate === "breakfast" ||
+            candidate === "snack"
+          );
+        }
+
+        if (
+          normalizedSlot === "lunch" ||
+          normalizedSlot === "dinner"
+        ) {
+          return (
+            candidate === "lunch" ||
+            candidate === "dinner"
+          );
+        }
+
+        return candidate === normalizedSlot;
+      }),
     );
   }
 
