@@ -25,6 +25,7 @@ import {
   updatePantryItem,
   type PantryItem,
 } from "@/lib/api/pantry";
+import { ApiError } from "@/lib/api/client";
 
 import styles from "./InventoryPage.module.css";
 
@@ -547,11 +548,22 @@ export default function InventoryPage() {
       setShowNewFoodForm(false);
       setShowPantryForm(true);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Impossibile creare l'alimento.",
-      );
+      if (
+        err instanceof ApiError &&
+        err.status === 409 &&
+        err.payload &&
+        typeof err.payload === "object" &&
+        "detail" in err.payload &&
+        typeof err.payload.detail === "string"
+      ) {
+        setError(err.payload.detail);
+      } else {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Impossibile creare l'alimento.",
+        );
+      }
     } finally {
       setNewFoodSaving(false);
     }

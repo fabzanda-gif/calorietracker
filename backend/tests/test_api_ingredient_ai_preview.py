@@ -80,3 +80,75 @@ def test_ingredient_ai_preview_returns_result(
             get_current_user,
             None,
         )
+
+
+def test_create_ingredient_duplicate_returns_409(
+    monkeypatch,
+):
+    from backend.api.dependencies import (
+        get_ingredients_repository,
+    )
+
+    class FakeRepo:
+        def get_by_normalized_name(
+            self,
+            normalized_name,
+            user_id,
+        ):
+            assert normalized_name == "yogurt greco"
+            assert user_id == "user-test"
+            return {
+                "id": "existing-1",
+                "name": "Yogurt greco",
+            }
+
+        def create(self, payload):
+            raise AssertionError(
+                "create() non deve essere chiamato"
+            )
+
+    app.dependency_overrides[
+        get_current_user
+    ] = lambda: FakeUser()
+
+    app.dependency_overrides[
+        get_ingredients_repository
+    ] = lambda: FakeRepo()
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            "/ingredients",
+            json={
+                "name": "Yogurt greco",
+                "calories_per_100g": 60,
+                "protein_per_100g": 10,
+                "carbs_per_100g": 4,
+                "fat_per_100g": 0,
+                "default_unit": "g",
+                "default_quantity": 100,
+                "kind": "product",
+                "meal_slots": [
+                    "breakfast",
+                    "snack",
+                ],
+            },
+        )
+
+        assert response.status_code == 409
+        assert response.json() == {
+            "detail": (
+                "Questo alimento esiste già "
+                "nella tua libreria."
+            ),
+        }
+    finally:
+        app.dependency_overrides.pop(
+            get_current_user,
+            None,
+        )
+        app.dependency_overrides.pop(
+            get_ingredients_repository,
+            None,
+        )

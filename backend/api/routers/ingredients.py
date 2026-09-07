@@ -315,6 +315,20 @@ def create_ingredient(
     payload["user_id"] = current_user.id
 
     try:
+        existing = repo.get_by_normalized_name(
+            payload["normalized_name"],
+            current_user.id,
+        )
+
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Questo alimento esiste già "
+                    "nella tua libreria."
+                ),
+            )
+
         item = repo.create(payload)
 
         return {
@@ -326,6 +340,8 @@ def create_ingredient(
             ),
         }
 
+    except HTTPException:
+        raise
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
