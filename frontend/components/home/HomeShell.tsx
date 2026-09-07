@@ -38,6 +38,8 @@ import {
   useState,
 } from "react";
 
+import { createPortal } from "react-dom";
+
 import { useAuth } from "@/components/auth/AuthProvider";
 import { confirmMealPrediction } from "@/lib/api/confirm";
 import { commitMealDecision } from "@/lib/api/decision";
@@ -4365,9 +4367,11 @@ export function HomeShell() {
             ) : null}
           </section>
 
-          {quickAddMealSlot ? (
-            <div
-              className={styles.quickMealOverlay}
+          {typeof document !== "undefined" &&
+          quickAddMealSlot
+            ? createPortal(
+                <div
+                  className={styles.quickMealOverlay}
               role="presentation"
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
@@ -4516,9 +4520,11 @@ export function HomeShell() {
                       : "Aggiungi al pasto"}
                   </button>
                 </div>
-              </section>
-            </div>
-          ) : null}
+                </section>
+              </div>,
+              document.body,
+            )
+            : null}
 
           <section
 
