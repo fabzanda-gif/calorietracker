@@ -13442,3 +13442,157 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* HOME WEIGHT EDIT + AI MIC V2 */
+
+.weekWeightRecent {
+  grid-column: 1 / -1;
+
+  display: grid;
+  gap: 6px;
+
+  padding-top: 7px;
+
+  border-top: 1px solid rgba(16, 40, 70, .07);
+}
+
+.weekWeightRecentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.weekWeightRecentHeader strong {
+  color: #102846;
+  font-size: .59rem;
+  font-weight: 850;
+}
+
+.weekWeightRecentHeader span {
+  color: #7a899a;
+  font-size: .55rem;
+}
+
+.weekWeightRecentList {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.weekWeightRecentList > button {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 7px;
+  align-items: center;
+
+  min-width: 105px;
+  padding: 6px 8px;
+
+  border: 1px solid #e4e8ec;
+  border-radius: 8px;
+
+  background: #fff;
+  color: #6f7f91;
+
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.weekWeightRecentList > button:hover,
+.weekWeightRecentList > .weekWeightRecentActive {
+  border-color: rgba(255, 104, 104, .32);
+  background: #fff4f3;
+}
+
+.weekWeightRecentList > button > span:first-child {
+  font-size: .52rem;
+}
+
+.weekWeightRecentList > button > strong {
+  color: #102846;
+  font-size: .62rem;
+}
+
+.weekWeightRecentList > button > span:last-child {
+  grid-column: 1 / -1;
+
+  color: #e85f5f;
+
+  font-size: .49rem;
+  font-weight: 750;
+}
+
+.weekWeightRecentEmpty {
+  color: #7a899a;
+  font-size: .56rem;
+}
+
+.aiMicButton {
+  flex: 0 0 auto !important;
+
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  padding: 0 !important;
+
+  border: 1px solid rgba(255, 104, 104, .20) !important;
+  border-radius: 50% !important;
+
+  background: #fff0ef !important;
+  color: #e65f5f !important;
+
+  cursor: pointer !important;
+
+  font-size: .82rem !important;
+  line-height: 1 !important;
+
+  box-shadow: none !important;
+}
+
+.aiMicButton:hover {
+  border-color: rgba(255, 104, 104, .40) !important;
+  background: #ffe6e4 !important;
+}
+
+.aiMicButtonListening {
+  background: #ff6868 !important;
+  color: #fff !important;
+
+  box-shadow:
+    0 0 0 4px rgba(255, 104, 104, .12) !important;
+
+  animation:
+    aiMicPulse 1.25s ease-in-out infinite;
+}
+
+@keyframes aiMicPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (max-width: 759px) {
+  .weekWeightRecentList {
+    display: grid;
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .weekWeightRecentList > button {
+    min-width: 0;
+  }
+}
+

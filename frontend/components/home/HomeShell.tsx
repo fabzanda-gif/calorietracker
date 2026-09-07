@@ -33,6 +33,7 @@ import {
   type DragEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -84,6 +85,8 @@ import {
 import {
   createWeight,
   getLatestWeight,
+  getWeightHistory,
+  updateWeight,
   type WeightEntry,
 } from "@/lib/api/weight";
 import {
@@ -412,6 +415,35 @@ function readDashboardSizes():
   return DEFAULT_DASHBOARD_SIZES;
 }
 
+type HomeSpeechRecognitionResult = {
+  0?: {
+    transcript: string;
+  };
+  length: number;
+};
+
+type HomeSpeechRecognitionEvent = {
+  results: ArrayLike<HomeSpeechRecognitionResult>;
+};
+
+type HomeSpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult:
+    | ((event: HomeSpeechRecognitionEvent) => void)
+    | null;
+  onerror:
+    | ((event: { error?: string }) => void)
+    | null;
+  onend: (() => void) | null;
+};
+
+type HomeSpeechRecognitionConstructor =
+  new () => HomeSpeechRecognition;
+
 export function HomeShell() {
   const {
     experienceMode,
@@ -545,6 +577,8 @@ export function HomeShell() {
 
   const [latestWeight, setLatestWeight] =
     useState<number | null>(null);
+  const [latestWeightEntry, setLatestWeightEntry] =
+    useState<WeightEntry | null>(null);
 
   const [weightQuickAddOpen, setWeightQuickAddOpen] =
     useState(false);
@@ -552,6 +586,12 @@ export function HomeShell() {
     useState("");
   const [weightQuickAddSaving, setWeightQuickAddSaving] =
     useState(false);
+  const [weightHistoryLoading, setWeightHistoryLoading] =
+    useState(false);
+  const [
+    weightQuickAddEditingEntry,
+    setWeightQuickAddEditingEntry,
+  ] = useState<WeightEntry | null>(null);
   const [weightQuickAddMessage, setWeightQuickAddMessage] =
     useState<string | null>(null);
 
@@ -601,6 +641,11 @@ export function HomeShell() {
 
   const [conversationText, setConversationText] =
     useState("");
+  const [conversationListening, setConversationListening] =
+    useState(false);
+  const speechRecognitionRef =
+    useRef<HomeSpeechRecognition | null>(null);
+
   const [conversationMode, setConversationMode] =
     useState<"text" | "photo">("text");
   const [conversationPhoto, setConversationPhoto] =
@@ -1403,6 +1448,9 @@ export function HomeShell() {
               )[0] ?? null,
           );
 
+          setLatestWeightEntry(
+            latestWeightPayload.item ?? null,
+          );
           setLatestWeight(
             latestWeightPayload.item?.weight != null
               ? Number(latestWeightPayload.item.weight)
@@ -1736,16 +1784,53 @@ export function HomeShell() {
       (item) => item.mealCount > 0,
     ).length;
 
-  function openWeightQuickAdd() {
+  async function openWeightQuickAdd(
+    entry: WeightEntry | null = null,
+  ) {
+    setWeightQuickAddMessage(null);
+    setWeightQuickAddOpen(true);
+
+    let history = weightHistory;
+
+    if (accessToken && history.length === 0) {
+      setWeightHistoryLoading(true);
+
+      try {
+        const payload =
+          await getWeightHistory(accessToken);
+
+        history = payload.items;
+        setWeightHistory(history);
+      } catch {
+        // L'editor resta utilizzabile anche se lo storico fallisce.
+      } finally {
+        setWeightHistoryLoading(false);
+      }
+    }
+
+    const todayEntry =
+      history.find(
+        (item) => item.date === todayIso(),
+      ) ?? null;
+
+    const selectedEntry =
+      entry ?? todayEntry;
+
+    setWeightQuickAddEditingEntry(
+      selectedEntry,
+    );
+
     setWeightQuickAddValue(
-      latestWeight != null
+      selectedEntry
         ? String(
-            Number(latestWeight.toFixed(1)),
+            Number(
+              Number(
+                selectedEntry.weight,
+              ).toFixed(1),
+            ),
           )
         : "",
     );
-    setWeightQuickAddMessage(null);
-    setWeightQuickAddOpen(true);
 
     window.requestAnimationFrame(() => {
       document
@@ -1777,37 +1862,174 @@ export function HomeShell() {
     setWeightQuickAddMessage(null);
 
     try {
-      const result = await createWeight(
-        {
-          date: todayIso(),
+      const editingEntry =
+        weightQuickAddEditingEntry;
+
+      const result = editingEntry
+        ? await updateWeight(
+            editingEntry.id,
+            { weight },
+            accessToken,
+          )
+        : await createWeight(
+            {
+              date: todayIso(),
+              weight,
+            },
+            accessToken,
+          );
+
+      const savedEntry: WeightEntry =
+        result.item ?? {
+          id:
+            editingEntry?.id ??
+            `weight-${todayIso()}`,
+          date:
+            editingEntry?.date ??
+            todayIso(),
           weight,
-        },
-        accessToken,
+        };
+
+      setWeightHistory((current) => {
+        const withoutSaved =
+          current.filter(
+            (item) =>
+              String(item.id) !==
+              String(savedEntry.id),
+          );
+
+        return [
+          ...withoutSaved,
+          savedEntry,
+        ];
+      });
+
+      setWeightQuickAddEditingEntry(
+        savedEntry,
       );
 
-      const savedWeight =
-        result.item?.weight != null
-          ? Number(result.item.weight)
-          : weight;
+      if (
+        !latestWeightEntry ||
+        String(savedEntry.id) ===
+          String(latestWeightEntry.id) ||
+        savedEntry.date >= latestWeightEntry.date
+      ) {
+        setLatestWeightEntry(savedEntry);
+        setLatestWeight(
+          Number(savedEntry.weight),
+        );
+      }
 
-      setLatestWeight(savedWeight);
       setWeightQuickAddValue(
         String(
-          Number(savedWeight.toFixed(1)),
+          Number(
+            Number(
+              savedEntry.weight,
+            ).toFixed(1),
+          ),
         ),
       );
+
       setWeightQuickAddMessage(
-        "Peso di oggi registrato.",
+        editingEntry
+          ? "Peso aggiornato."
+          : "Peso di oggi registrato.",
       );
     } catch (err) {
       setWeightQuickAddMessage(
         err instanceof Error
           ? err.message
-          : "Non riesco a registrare il peso.",
+          : "Non riesco a salvare il peso.",
       );
     } finally {
       setWeightQuickAddSaving(false);
     }
+  }
+
+  useEffect(() => {
+    return () => {
+      speechRecognitionRef.current?.stop();
+    };
+  }, []);
+
+  function toggleConversationDictation() {
+    if (conversationListening) {
+      speechRecognitionRef.current?.stop();
+      return;
+    }
+
+    const speechWindow =
+      window as typeof window & {
+        SpeechRecognition?:
+          HomeSpeechRecognitionConstructor;
+        webkitSpeechRecognition?:
+          HomeSpeechRecognitionConstructor;
+      };
+
+    const Recognition =
+      speechWindow.SpeechRecognition ??
+      speechWindow.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      setConversationError(
+        "Il riconoscimento vocale non è disponibile in questo browser.",
+      );
+      return;
+    }
+
+    const recognition = new Recognition();
+    const startingText =
+      conversationText.trim();
+
+    recognition.lang = "it-IT";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+
+      for (
+        let index = 0;
+        index < event.results.length;
+        index += 1
+      ) {
+        transcript +=
+          event.results[index][0]
+            ?.transcript ?? "";
+      }
+
+      const spoken = transcript.trim();
+
+      setConversationText(
+        startingText && spoken
+          ? `${startingText} ${spoken}`
+          : spoken || startingText,
+      );
+    };
+
+    recognition.onerror = (event) => {
+      if (
+        event.error !== "aborted" &&
+        event.error !== "no-speech"
+      ) {
+        setConversationError(
+          "Non sono riuscito a capire l'audio. Riprova.",
+        );
+      }
+    };
+
+    recognition.onend = () => {
+      speechRecognitionRef.current = null;
+      setConversationListening(false);
+    };
+
+    speechRecognitionRef.current =
+      recognition;
+
+    setConversationError(null);
+    setConversationListening(true);
+
+    recognition.start();
   }
 
   async function analyzeConversationMeal() {
@@ -3419,6 +3641,37 @@ export function HomeShell() {
 
                   <button
                     type="button"
+                    className={`${styles.aiMicButton} ${
+                      conversationListening
+                        ? styles.aiMicButtonListening
+                        : ""
+                    }`}
+                    onClick={
+                      toggleConversationDictation
+                    }
+                    aria-pressed={
+                      conversationListening
+                    }
+                    title={
+                      conversationListening
+                        ? "Ferma dettatura"
+                        : "Detta con il microfono"
+                    }
+                  >
+                    <span aria-hidden="true">
+                      {conversationListening
+                        ? "■"
+                        : "🎙"}
+                    </span>
+                    <span className={styles.srOnly}>
+                      {conversationListening
+                        ? "Ferma dettatura"
+                        : "Detta con il microfono"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       void analyzeConversationMeal();
                     }}
@@ -3807,7 +4060,7 @@ export function HomeShell() {
                         menuDetails.open = false;
                       }
 
-                      openWeightQuickAdd();
+                      void openWeightQuickAdd(null);
                     }}
                   >
                     <span aria-hidden="true">⚖️</span>
@@ -5481,7 +5734,11 @@ export function HomeShell() {
                 <button
                   type="button"
                   className={`${styles.weekKpi} ${styles.weekWeightKpi}`}
-                  onClick={openWeightQuickAdd}
+                  onClick={() => {
+                    void openWeightQuickAdd(
+                      latestWeightEntry,
+                    );
+                  }}
                   aria-expanded={weightQuickAddOpen}
                 >
                   <span
@@ -5520,7 +5777,17 @@ export function HomeShell() {
                   <div className={styles.weekWeightQuickAddCopy}>
                     <span>Peso di oggi</span>
                     <strong>
-                      Registra il peso senza lasciare la Home.
+                      {weightQuickAddEditingEntry
+                        ? `Modifica il peso del ${new Date(
+                            `${weightQuickAddEditingEntry.date}T00:00:00`,
+                          ).toLocaleDateString(
+                            "it-IT",
+                            {
+                              day: "numeric",
+                              month: "short",
+                            },
+                          )}.`
+                        : "Registra il peso di oggi senza lasciare la Home."}
                     </strong>
                   </div>
 
@@ -5561,7 +5828,9 @@ export function HomeShell() {
                     >
                       {weightQuickAddSaving
                         ? "Salvo…"
-                        : "Registra"}
+                        : weightQuickAddEditingEntry
+                          ? "Aggiorna"
+                          : "Registra"}
                     </button>
 
                     <button
@@ -5574,6 +5843,98 @@ export function HomeShell() {
                     >
                       Chiudi
                     </button>
+                  </div>
+
+                  <div
+                    className={styles.weekWeightRecent}
+                    aria-label="Pesi recenti"
+                  >
+                    <div
+                      className={styles.weekWeightRecentHeader}
+                    >
+                      <strong>Pesi recenti</strong>
+                      {weightHistoryLoading ? (
+                        <span>Carico…</span>
+                      ) : null}
+                    </div>
+
+                    {weightHistory.length ? (
+                      <div
+                        className={styles.weekWeightRecentList}
+                      >
+                        {[...weightHistory]
+                          .sort(
+                            (left, right) =>
+                              right.date.localeCompare(
+                                left.date,
+                              ),
+                          )
+                          .slice(0, 5)
+                          .map((entry) => (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              className={
+                                String(
+                                  weightQuickAddEditingEntry?.id,
+                                ) ===
+                                String(entry.id)
+                                  ? styles.weekWeightRecentActive
+                                  : undefined
+                              }
+                              onClick={() => {
+                                setWeightQuickAddEditingEntry(
+                                  entry,
+                                );
+                                setWeightQuickAddValue(
+                                  String(
+                                    Number(
+                                      Number(
+                                        entry.weight,
+                                      ).toFixed(1),
+                                    ),
+                                  ),
+                                );
+                                setWeightQuickAddMessage(
+                                  null,
+                                );
+                              }}
+                            >
+                              <span>
+                                {new Date(
+                                  `${entry.date}T00:00:00`,
+                                ).toLocaleDateString(
+                                  "it-IT",
+                                  {
+                                    day: "numeric",
+                                    month: "short",
+                                  },
+                                )}
+                              </span>
+
+                              <strong>
+                                {Number(
+                                  entry.weight,
+                                ).toLocaleString(
+                                  "it-IT",
+                                  {
+                                    maximumFractionDigits: 1,
+                                  },
+                                )}{" "}
+                                kg
+                              </strong>
+
+                              <span>Modifica</span>
+                            </button>
+                          ))}
+                      </div>
+                    ) : (
+                      <span
+                        className={styles.weekWeightRecentEmpty}
+                      >
+                        Nessun peso precedente.
+                      </span>
+                    )}
                   </div>
 
                   {weightQuickAddMessage ? (

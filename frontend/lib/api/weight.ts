@@ -55,3 +55,25 @@ export function createWeight(
     },
   );
 }
+
+
+export function updateWeight(
+  rowId: string | number,
+  input: {
+    date?: string;
+    weight?: number;
+  },
+  accessToken?: string | null,
+): Promise<{
+  updated: boolean;
+  item: WeightEntry | null;
+}> {
+  return apiRequest(
+    `/weight/${rowId}`,
+    {
+      method: "PATCH",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
