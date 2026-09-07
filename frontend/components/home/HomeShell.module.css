@@ -15386,3 +15386,120 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* ==========================================================
+   HOME PANTRY CTA V1
+   ========================================================== */
+
+.homePantryCta {
+  min-height: 62px;
+
+  display: grid;
+  grid-template-columns:
+    38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+
+  border: 1px solid rgba(33, 62, 94, .10);
+  border-radius: 13px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(247, 250, 252, .98),
+      rgba(255, 255, 255, .98)
+    );
+
+  color: #173957;
+  text-decoration: none;
+
+  transition:
+    transform .15s ease,
+    border-color .15s ease,
+    box-shadow .15s ease;
+}
+
+.homePantryCta:hover {
+  transform: translateY(-1px);
+
+  border-color:
+    rgba(33, 62, 94, .18);
+
+  box-shadow:
+    0 6px 16px rgba(22, 48, 74, .07);
+}
+
+.homePantryCtaIcon {
+  width: 36px;
+  height: 36px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: #eef5f2;
+
+  font-size: 1rem;
+}
+
+.homePantryCtaCopy {
+  min-width: 0;
+
+  display: grid;
+  gap: 2px;
+}
+
+.homePantryCtaCopy strong {
+  color: #173957;
+
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.homePantryCtaCopy > span {
+  overflow: hidden;
+
+  color: #718296;
+
+  font-size: .68rem;
+  font-weight: 650;
+  line-height: 1.35;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.homePantryCtaAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  color: #e96565;
+
+  font-size: .68rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .homePantryCta {
+    grid-template-columns:
+      34px minmax(0, 1fr);
+  }
+
+  .homePantryCtaAction {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .homePantryCtaCopy > span {
+    white-space: normal;
+  }
+}
+

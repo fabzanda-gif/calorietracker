@@ -550,6 +550,10 @@ export function HomeShell() {
 
   const [pantryInventory, setPantryInventory] =
     useState<PantryItem[]>([]);
+  const [
+    pantryCookableRecipeCount,
+    setPantryCookableRecipeCount,
+  ] = useState(0);
 
   const [alternateName, setAlternateName] =
     useState("");
@@ -714,6 +718,36 @@ export function HomeShell() {
   const [conversationSuccess, setConversationSuccess] =
     useState<string | null>(null);
 
+  const pantryHomeSummary = useMemo(() => {
+    const pantryItems =
+      knownAlternates.filter(
+        (item) => item.source === "pantry",
+      );
+
+    const breakfastSnack =
+      pantryItems.filter((item) =>
+        item.mealSlots?.some(
+          (slot) =>
+            slot === "breakfast" ||
+            slot === "snack",
+        ),
+      ).length;
+
+    const lunchDinner =
+      pantryItems.filter((item) =>
+        item.mealSlots?.some(
+          (slot) =>
+            slot === "lunch" ||
+            slot === "dinner",
+        ),
+      ).length;
+
+    return {
+      breakfastSnack,
+      lunchDinner,
+    };
+  }, [knownAlternates]);
+
   const recommendedMealType = useMemo(
     () =>
       nextMealType(
@@ -764,6 +798,84 @@ export function HomeShell() {
           : [];
 
       setPantryInventory(pantry);
+
+      const availableGramsByIngredient =
+        new Map<string, number>();
+
+      pantry.forEach((item) => {
+        let grams = 0;
+
+        if (item.quantity_mode === "portion") {
+          grams =
+            Number(item.quantity || 0) *
+            Number(item.grams_per_portion || 0);
+        } else {
+          const quantity =
+            Number(item.quantity || 0);
+
+          const unit =
+            String(item.unit || "")
+              .trim()
+              .toLowerCase();
+
+          if (
+            unit === "kg" ||
+            unit === "kilogram" ||
+            unit === "kilograms"
+          ) {
+            grams = quantity * 1000;
+          } else if (
+            unit === "g" ||
+            unit === "gr" ||
+            unit === "gram" ||
+            unit === "grams"
+          ) {
+            grams = quantity;
+          }
+        }
+
+        if (grams <= 0) {
+          return;
+        }
+
+        const key =
+          String(item.ingredient_id);
+
+        availableGramsByIngredient.set(
+          key,
+          (availableGramsByIngredient.get(key) ?? 0) +
+            grams,
+        );
+      });
+
+      const cookableRecipeCount =
+        recipes.filter((recipe: Recipe) => {
+          const components =
+            recipe.structured_ingredients ?? [];
+
+          if (components.length === 0) {
+            return false;
+          }
+
+          return components.every((component) => {
+            const required =
+              Number(component.quantity_g || 0);
+
+            const available =
+              availableGramsByIngredient.get(
+                String(component.ingredient_id),
+              ) ?? 0;
+
+            return (
+              required > 0 &&
+              available >= required
+            );
+          });
+        }).length;
+
+      setPantryCookableRecipeCount(
+        cookableRecipeCount,
+      );
 
       const seen = new Set<string>();
 
@@ -5531,6 +5643,59 @@ export function HomeShell() {
                 </div>
               </details>
             </div>
+
+            <a
+              href="/inventory"
+              className={styles.homePantryCta}
+            >
+              <span
+                className={styles.homePantryCtaIcon}
+                aria-hidden="true"
+              >
+                🧺
+              </span>
+
+              <span
+                className={styles.homePantryCtaCopy}
+              >
+                <strong>Dispensa</strong>
+
+                <span>
+                  {pantryHomeSummary.breakfastSnack > 0
+                    ? `${pantryHomeSummary.breakfastSnack} ${
+                        pantryHomeSummary.breakfastSnack === 1
+                          ? "alimento"
+                          : "alimenti"
+                      } per colazione/snack`
+                    : "Nessun alimento per colazione/snack"}
+
+                  {" · "}
+
+                  {pantryHomeSummary.lunchDinner > 0
+                    ? `${pantryHomeSummary.lunchDinner} ${
+                        pantryHomeSummary.lunchDinner === 1
+                          ? "alimento"
+                          : "alimenti"
+                      } per pranzo/cena`
+                    : "nessun alimento per pranzo/cena"}
+
+                  {pantryCookableRecipeCount > 0
+                    ? ` · ${
+                        pantryCookableRecipeCount === 1
+                          ? "1 ricetta pronta"
+                          : `${pantryCookableRecipeCount} ricette pronte`
+                      }`
+                    : ""}
+                </span>
+              </span>
+
+              <span
+                className={styles.homePantryCtaAction}
+              >
+                Apri dispensa
+                <span aria-hidden="true">→</span>
+              </span>
+            </a>
 
             {actualActivities.length > 0 ? (
               <details className={styles.dailyActivityEntry}>
