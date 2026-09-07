@@ -82,6 +82,7 @@ import {
 } from "@/lib/mealSlots";
 
 import {
+  createWeight,
   getLatestWeight,
   type WeightEntry,
 } from "@/lib/api/weight";
@@ -544,6 +545,16 @@ export function HomeShell() {
 
   const [latestWeight, setLatestWeight] =
     useState<number | null>(null);
+
+  const [weightQuickAddOpen, setWeightQuickAddOpen] =
+    useState(false);
+  const [weightQuickAddValue, setWeightQuickAddValue] =
+    useState("");
+  const [weightQuickAddSaving, setWeightQuickAddSaving] =
+    useState(false);
+  const [weightQuickAddMessage, setWeightQuickAddMessage] =
+    useState<string | null>(null);
+
   const [profile, setProfile] =
     useState<ProfileResponse | null>(null);
   const [showWelcomeJourney, setShowWelcomeJourney] =
@@ -1724,6 +1735,80 @@ export function HomeShell() {
     weekOverviewDays.filter(
       (item) => item.mealCount > 0,
     ).length;
+
+  function openWeightQuickAdd() {
+    setWeightQuickAddValue(
+      latestWeight != null
+        ? String(
+            Number(latestWeight.toFixed(1)),
+          )
+        : "",
+    );
+    setWeightQuickAddMessage(null);
+    setWeightQuickAddOpen(true);
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("home-week-overview")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+    });
+  }
+
+  async function saveWeightQuickAdd() {
+    if (!accessToken) {
+      return;
+    }
+
+    const weight = Number(
+      weightQuickAddValue.replace(",", "."),
+    );
+
+    if (!Number.isFinite(weight) || weight <= 0) {
+      setWeightQuickAddMessage(
+        "Inserisci un peso valido.",
+      );
+      return;
+    }
+
+    setWeightQuickAddSaving(true);
+    setWeightQuickAddMessage(null);
+
+    try {
+      const result = await createWeight(
+        {
+          date: todayIso(),
+          weight,
+        },
+        accessToken,
+      );
+
+      const savedWeight =
+        result.item?.weight != null
+          ? Number(result.item.weight)
+          : weight;
+
+      setLatestWeight(savedWeight);
+      setWeightQuickAddValue(
+        String(
+          Number(savedWeight.toFixed(1)),
+        ),
+      );
+      setWeightQuickAddMessage(
+        "Peso di oggi registrato.",
+      );
+    } catch (err) {
+      setWeightQuickAddMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare il peso.",
+      );
+    } finally {
+      setWeightQuickAddSaving(false);
+    }
+  }
 
   async function analyzeConversationMeal() {
     if (!accessToken || !conversationText.trim()) {
@@ -3711,6 +3796,23 @@ export function HomeShell() {
                     <span aria-hidden="true">🏃</span>
                     Attività
                   </a>
+
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      const menuDetails =
+                        event.currentTarget.closest("details");
+
+                      if (menuDetails) {
+                        menuDetails.open = false;
+                      }
+
+                      openWeightQuickAdd();
+                    }}
+                  >
+                    <span aria-hidden="true">⚖️</span>
+                    Peso
+                  </button>
                 </div>
               </details>
             </div>
@@ -5294,7 +5396,10 @@ export function HomeShell() {
               </div>
             </div>
 
-            <div className={styles.weekOverviewCard}>
+            <div
+              id="home-week-overview"
+              className={styles.weekOverviewCard}
+            >
               <div className={styles.bottomOverviewHeader}>
                 <div>
                   <p className={styles.bottomOverviewKicker}>
@@ -5355,12 +5460,22 @@ export function HomeShell() {
                   </div>
                 </div>
 
-                <div className={styles.weekKpi}>
-                  <span className={styles.weekKpiIcon} aria-hidden="true">
+                <button
+                  type="button"
+                  className={`${styles.weekKpi} ${styles.weekWeightKpi}`}
+                  onClick={openWeightQuickAdd}
+                  aria-expanded={weightQuickAddOpen}
+                >
+                  <span
+                    className={styles.weekKpiIcon}
+                    aria-hidden="true"
+                  >
                     ⚖
                   </span>
+
                   <div>
                     <span>Ultimo peso</span>
+
                     <strong>
                       {latestWeight != null
                         ? `${latestWeight.toLocaleString(
@@ -5369,11 +5484,89 @@ export function HomeShell() {
                               maximumFractionDigits: 1,
                             },
                           )} kg`
-                        : "—"}
+                        : "Aggiungi"}
                     </strong>
                   </div>
-                </div>
+
+                  <span
+                    className={styles.weekWeightEditHint}
+                    aria-hidden="true"
+                  >
+                    +
+                  </span>
+                </button>
               </div>
+
+              {weightQuickAddOpen ? (
+                <div className={styles.weekWeightQuickAdd}>
+                  <div className={styles.weekWeightQuickAddCopy}>
+                    <span>Peso di oggi</span>
+                    <strong>
+                      Registra il peso senza lasciare la Home.
+                    </strong>
+                  </div>
+
+                  <div className={styles.weekWeightQuickAddControls}>
+                    <label>
+                      <span className={styles.srOnly}>
+                        Peso in kg
+                      </span>
+
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={weightQuickAddValue}
+                        placeholder="77,8"
+                        onChange={(event) => {
+                          setWeightQuickAddValue(
+                            event.target.value,
+                          );
+                          setWeightQuickAddMessage(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            void saveWeightQuickAdd();
+                          }
+                        }}
+                      />
+
+                      <span>kg</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void saveWeightQuickAdd();
+                      }}
+                      disabled={weightQuickAddSaving}
+                    >
+                      {weightQuickAddSaving
+                        ? "Salvo…"
+                        : "Registra"}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.weekWeightCancel}
+                      onClick={() => {
+                        setWeightQuickAddOpen(false);
+                        setWeightQuickAddMessage(null);
+                      }}
+                    >
+                      Chiudi
+                    </button>
+                  </div>
+
+                  {weightQuickAddMessage ? (
+                    <p
+                      className={styles.weekWeightQuickAddMessage}
+                    >
+                      {weightQuickAddMessage}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className={styles.weekDays}>
                 {weekOverviewDays.map((item) => (
