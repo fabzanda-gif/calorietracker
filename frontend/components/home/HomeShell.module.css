@@ -14691,3 +14691,149 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* ==========================================================
+   HOME FOCUS + RHYTHM TUNE
+   ========================================================== */
+
+@media (min-width: 900px) {
+  /* Ritmo: neutralize cold blue cast */
+  .weekOverviewCard {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, .98) 0%,
+        rgba(255, 250, 249, .98) 100%
+      ) !important;
+
+    border:
+      1px solid rgba(255, 110, 102, .14) !important;
+
+    box-shadow:
+      0 18px 44px rgba(21, 41, 74, .06),
+      inset 0 1px 0 rgba(255, 255, 255, .72) !important;
+  }
+
+  .weekOverviewCard::before,
+  .weekOverviewCard::after {
+    opacity: .18 !important;
+    filter: saturate(.8) !important;
+  }
+
+  .weekOverviewHeaderIcon {
+    background: rgba(83, 140, 255, .08) !important;
+    border: 1px solid rgba(83, 140, 255, .14) !important;
+  }
+
+  .weekOverviewBadge {
+    background: rgba(83, 140, 255, .08) !important;
+    color: #5f8ff9 !important;
+    border: 1px solid rgba(83, 140, 255, .14) !important;
+  }
+
+  .weekStatCard {
+    background: rgba(255, 255, 255, .88) !important;
+    border: 1px solid rgba(18, 42, 76, .08) !important;
+    box-shadow: none !important;
+  }
+
+  .weekDayActive {
+    background: rgba(255, 110, 102, .10) !important;
+    border: 1px solid rgba(255, 110, 102, .16) !important;
+  }
+
+  .weekBudgetTrack {
+    background: rgba(18, 42, 76, .08) !important;
+  }
+
+  .weekBudgetBar {
+    background:
+      linear-gradient(
+        90deg,
+        #ff6b66 0%,
+        #ff7f73 100%
+      ) !important;
+  }
+
+  /* Focus: make metric cards fill the card much better */
+  .dailyFocusCard {
+    padding: 28px 28px 26px !important;
+  }
+
+  .dailyFocusGrid {
+    display: grid !important;
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr)) !important;
+    gap: 18px !important;
+    width: 100% !important;
+    margin-top: 18px !important;
+  }
+
+  .dailyFocusItem {
+    min-height: 174px !important;
+    padding: 18px 14px !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+
+    border-radius: 20px !important;
+
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .78),
+      0 10px 24px rgba(21, 41, 74, .04) !important;
+  }
+
+  .dailyFocusRing {
+    width: 96px !important;
+    height: 96px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .dailyFocusLabel {
+    font-size: .78rem !important;
+    margin-top: 6px !important;
+  }
+
+  .dailyFocusValue {
+    font-size: 1rem !important;
+  }
+
+  .dailyFocusMeta,
+  .dailyFocusTarget,
+  .dailyFocusPercent {
+    font-size: .64rem !important;
+    line-height: 1.3 !important;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1240px) {
+  .dailyFocusGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .dailyFocusItem {
+    min-height: 160px !important;
+  }
+}
+
+/* Softer individual KPI surfaces inside Rhythm */
+.weekOverviewCard .weekStatCard:nth-child(1) {
+  background: rgba(241, 251, 245, .90) !important;
+}
+
+.weekOverviewCard .weekStatCard:nth-child(2) {
+  background: rgba(255, 248, 246, .92) !important;
+}
+
+.weekOverviewCard .weekStatCard:nth-child(3) {
+  background: rgba(247, 250, 255, .92) !important;
+}
+
+.weekOverviewCard .weekStatCard:nth-child(4) {
+  background: rgba(255, 251, 239, .92) !important;
+}
+
