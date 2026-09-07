@@ -11,6 +11,7 @@ import {
   type MealPrepItem,
 } from "@/lib/api/mealPrep";
 import {
+  createIngredient,
   getIngredients,
   updateIngredient,
   type Ingredient,
@@ -41,6 +42,16 @@ const EMPTY_PANTRY_FORM = {
   mealSlots: [] as PantryMealSlot[],
 };
 
+const EMPTY_NEW_FOOD_FORM = {
+  name: "",
+  calories: "",
+  protein: "",
+  carbs: "",
+  fat: "",
+  kind: "product" as "ingredient" | "product" | "prepared_food",
+  mealSlots: [] as PantryMealSlot[],
+};
+
 export default function InventoryPage() {
   const { accessToken } = useAuth();
 
@@ -56,6 +67,11 @@ export default function InventoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [mealType, setMealType] = useState("Cena");
   const [pantryForm, setPantryForm] = useState(EMPTY_PANTRY_FORM);
+
+  const [showPantryForm, setShowPantryForm] = useState(false);
+  const [showNewFoodForm, setShowNewFoodForm] = useState(false);
+  const [newFoodSaving, setNewFoodSaving] = useState(false);
+  const [newFoodForm, setNewFoodForm] = useState(EMPTY_NEW_FOOD_FORM);
 
   async function refresh() {
     if (!accessToken) {
@@ -179,6 +195,85 @@ export default function InventoryPage() {
     }));
   }
 
+  function toggleNewFoodMealSlot(slot: PantryMealSlot) {
+    setNewFoodForm((current) => ({
+      ...current,
+      mealSlots: current.mealSlots.includes(slot)
+        ? current.mealSlots.filter((item) => item !== slot)
+        : [...current.mealSlots, slot],
+    }));
+  }
+
+  async function saveNewFood(event: FormEvent) {
+    event.preventDefault();
+
+    if (!accessToken) {
+      return;
+    }
+
+    const calories = Number(newFoodForm.calories);
+    const protein = Number(newFoodForm.protein);
+    const carbs = Number(newFoodForm.carbs);
+    const fat = Number(newFoodForm.fat);
+
+    if (!newFoodForm.name.trim()) {
+      setError("Inserisci il nome dell'alimento.");
+      return;
+    }
+
+    if (
+      [calories, protein, carbs, fat].some(
+        (value) => !Number.isFinite(value) || value < 0,
+      )
+    ) {
+      setError("Inserisci valori nutrizionali validi.");
+      return;
+    }
+
+    setNewFoodSaving(true);
+    setError(null);
+
+    try {
+      const response = await createIngredient(
+        {
+          name: newFoodForm.name.trim(),
+          calories_per_100g: calories,
+          protein_per_100g: protein,
+          carbs_per_100g: carbs,
+          fat_per_100g: fat,
+          default_unit: "g",
+          default_quantity: 100,
+          kind: newFoodForm.kind,
+          meal_slots: newFoodForm.mealSlots,
+        },
+        accessToken,
+      );
+
+      setIngredients((current) =>
+        [...current.filter((item) => item.id !== response.item.id), response.item]
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      );
+
+      setPantryForm({
+        ...EMPTY_PANTRY_FORM,
+        ingredientId: response.item.id,
+        mealSlots: response.item.meal_slots as PantryMealSlot[],
+      });
+
+      setNewFoodForm(EMPTY_NEW_FOOD_FORM);
+      setShowNewFoodForm(false);
+      setShowPantryForm(true);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossibile creare l'alimento.",
+      );
+    } finally {
+      setNewFoodSaving(false);
+    }
+  }
+
   async function savePantry(event: FormEvent) {
     event.preventDefault();
 
@@ -282,6 +377,9 @@ export default function InventoryPage() {
   }
 
   function editPantry(item: PantryItem) {
+    setShowNewFoodForm(false);
+    setShowPantryForm(true);
+
     const ingredient =
       ingredientForPantryId(
         item.ingredient_id,
@@ -383,19 +481,186 @@ export default function InventoryPage() {
             </select>
           </label>
 
-          <button
-            type="button"
-            className={styles.refresh}
-            onClick={() => void refresh()}
-            disabled={loading}
-          >
-            Aggiorna
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.secondaryHeaderAction}
+              onClick={() => {
+                setShowNewFoodForm(false);
+                setShowPantryForm((current) => !current);
+              }}
+            >
+              + Aggiungi scorta
+            </button>
+
+            <button
+              type="button"
+              className={styles.primaryHeaderAction}
+              onClick={() => {
+                setShowPantryForm(false);
+                setShowNewFoodForm((current) => !current);
+              }}
+            >
+              + Nuovo alimento
+            </button>
+
+            <button
+              type="button"
+              className={styles.refresh}
+              onClick={() => void refresh()}
+              disabled={loading}
+              aria-label="Aggiorna dispensa"
+            >
+              ↻
+            </button>
+          </div>
         </div>
 
         {error && (
           <section className={styles.error}>
             {error}
+          </section>
+        )}
+
+        {showNewFoodForm && (
+          <section className={styles.newFoodPanel}>
+            <div className={styles.newFoodPanelHead}>
+              <div>
+                <p className={styles.pantryKicker}>NUOVO ALIMENTO</p>
+                <h2>Crea un alimento</h2>
+                <p>
+                  Inserisci i valori nutrizionali per 100 g e scegli quando usarlo.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={styles.panelClose}
+                onClick={() => setShowNewFoodForm(false)}
+                aria-label="Chiudi"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              className={styles.newFoodForm}
+              onSubmit={saveNewFood}
+            >
+              <label className={styles.newFoodName}>
+                <span>Nome alimento</span>
+                <input
+                  required
+                  value={newFoodForm.name}
+                  placeholder="Es. Yogurt greco"
+                  onChange={(event) =>
+                    setNewFoodForm({
+                      ...newFoodForm,
+                      name: event.target.value,
+                    })
+                  }
+                />
+              </label>
+
+              {[
+                ["calories", "kcal / 100 g"],
+                ["protein", "Proteine"],
+                ["carbs", "Carboidrati"],
+                ["fat", "Grassi"],
+              ].map(([key, label]) => (
+                <label key={key}>
+                  <span>{label}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={
+                      newFoodForm[
+                        key as "calories" | "protein" | "carbs" | "fat"
+                      ]
+                    }
+                    onChange={(event) =>
+                      setNewFoodForm({
+                        ...newFoodForm,
+                        [key]: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+              ))}
+
+              <label>
+                <span>Tipo</span>
+                <select
+                  value={newFoodForm.kind}
+                  onChange={(event) =>
+                    setNewFoodForm({
+                      ...newFoodForm,
+                      kind: event.target.value as
+                        | "ingredient"
+                        | "product"
+                        | "prepared_food",
+                    })
+                  }
+                >
+                  <option value="product">Alimento / prodotto</option>
+                  <option value="ingredient">Ingrediente ricetta</option>
+                  <option value="prepared_food">Alimento preparato</option>
+                </select>
+              </label>
+
+              <fieldset className={styles.newFoodSlots}>
+                <legend>Usalo per</legend>
+
+                <div>
+                  {[
+                    ["breakfast", "☕", "Colazione"],
+                    ["snack", "🍎", "Snack"],
+                    ["lunch", "🍽️", "Pranzo"],
+                    ["dinner", "🥗", "Cena"],
+                  ].map(([slot, icon, label]) => {
+                    const value = slot as PantryMealSlot;
+                    const active = newFoodForm.mealSlots.includes(value);
+
+                    return (
+                      <label
+                        key={value}
+                        className={
+                          active ? styles.newFoodSlotActive : undefined
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={() => toggleNewFoodMealSlot(value)}
+                        />
+                        <span>{icon}</span>
+                        <strong>{label}</strong>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <div className={styles.newFoodActions}>
+                <button
+                  type="submit"
+                  className={styles.primaryHeaderAction}
+                  disabled={newFoodSaving}
+                >
+                  {newFoodSaving ? "Creazione..." : "Crea alimento"}
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.secondaryHeaderAction}
+                  onClick={() => setShowNewFoodForm(false)}
+                >
+                  Annulla
+                </button>
+              </div>
+            </form>
           </section>
         )}
 
@@ -421,7 +686,11 @@ export default function InventoryPage() {
             </div>
           ) : (
             <form
-              className={styles.pantryForm}
+              className={`${styles.pantryForm} ${
+                showPantryForm || editingPantryId
+                  ? styles.pantryFormVisible
+                  : styles.pantryFormHidden
+              }`}
               onSubmit={savePantry}
             >
               <label className={styles.pantryFood}>
@@ -681,7 +950,35 @@ export default function InventoryPage() {
                   key={item.id}
                   className={styles.pantryItem}
                 >
-                  <div>
+                  <div
+                    className={styles.pantryItemIcon}
+                    aria-hidden="true"
+                  >
+                    {(() => {
+                      const ingredient =
+                        ingredientForPantryId(
+                          item.ingredient_id,
+                        );
+
+                      if (
+                        ingredient?.kind ===
+                        "prepared_food"
+                      ) {
+                        return "▣";
+                      }
+
+                      if (
+                        ingredient?.kind ===
+                        "ingredient"
+                      ) {
+                        return "◇";
+                      }
+
+                      return "○";
+                    })()}
+                  </div>
+
+                  <div className={styles.pantryItemBody}>
                     <p className={styles.pantryKicker}>
                       Alimento
                     </p>
@@ -813,19 +1110,11 @@ export default function InventoryPage() {
                   key={item.id}
                   className={styles.item}
                 >
-                  <div className={styles.photo}>
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className={styles.photoPlaceholder}>
-                        <span>🍽️</span>
-                        <small>Nessuna foto</small>
-                      </div>
-                    )}
+                  <div
+                    className={styles.mealPrepVisual}
+                    aria-hidden="true"
+                  >
+                    <span>▣</span>
                   </div>
 
                   <div className={styles.itemContent}>
