@@ -3716,7 +3716,7 @@ export function HomeShell() {
                 className={styles.dailySummaryHeaderIcon}
                 aria-hidden="true"
               >
-                🍴
+                ▤
               </span>
 
               <div className={styles.dailySummaryHeaderCopy}>
@@ -5276,13 +5276,22 @@ export function HomeShell() {
           >
             <div className={styles.dailyFocusCard}>
               <div className={styles.bottomOverviewHeader}>
-                <div>
-                  <p className={styles.bottomOverviewKicker}>
-                    Oggi
-                  </p>
-                  <h2>
-                    Focus della giornata
-                  </h2>
+                <div className={styles.bottomOverviewTitleGroup}>
+                  <span
+                    className={`${styles.bottomOverviewTitleIcon} ${styles.focusTitleIcon}`}
+                    aria-hidden="true"
+                  >
+                    ◎
+                  </span>
+
+                  <div>
+                    <p className={styles.bottomOverviewKicker}>
+                      Oggi
+                    </p>
+                    <h2>
+                      Focus della giornata
+                    </h2>
+                  </div>
                 </div>
 
                 <span
@@ -5401,13 +5410,22 @@ export function HomeShell() {
               className={styles.weekOverviewCard}
             >
               <div className={styles.bottomOverviewHeader}>
-                <div>
-                  <p className={styles.bottomOverviewKicker}>
-                    Ritmo
-                  </p>
-                  <h2>
-                    La tua settimana
-                  </h2>
+                <div className={styles.bottomOverviewTitleGroup}>
+                  <span
+                    className={`${styles.bottomOverviewTitleIcon} ${styles.weekTitleIcon}`}
+                    aria-hidden="true"
+                  >
+                    ▦
+                  </span>
+
+                  <div>
+                    <p className={styles.bottomOverviewKicker}>
+                      Ritmo
+                    </p>
+                    <h2>
+                      La tua settimana
+                    </h2>
+                  </div>
                 </div>
 
                 <span

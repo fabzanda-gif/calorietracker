@@ -13141,3 +13141,304 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* HOME ICONS + COLOR POLISH V1 */
+
+/* ==========================================================
+   Section identity
+   ========================================================== */
+
+.mealsSection {
+  border-color: rgba(255, 104, 104, .18) !important;
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #fffdfd 100%
+    ) !important;
+}
+
+.dailySummaryHeaderIcon {
+  background:
+    linear-gradient(
+      135deg,
+      #ff6868,
+      #f47f7a
+    ) !important;
+
+  color: #ffffff !important;
+
+  font-size: 1.18rem !important;
+  font-weight: 900 !important;
+
+  box-shadow:
+    0 7px 16px rgba(255, 104, 104, .18);
+}
+
+.bottomOverviewTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bottomOverviewTitleIcon {
+  flex: 0 0 auto;
+
+  width: 37px;
+  height: 37px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 10px;
+
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.focusTitleIcon {
+  background: #fff0ef;
+  color: #ff6868;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 104, 104, .12);
+}
+
+.weekTitleIcon {
+  background: #edf5ff;
+  color: #4c8fe8;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(76, 143, 232, .12);
+}
+
+/* ==========================================================
+   Focus card
+   ========================================================== */
+
+.dailyFocusCard {
+  border-color: rgba(255, 104, 104, .15) !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ffffff 0%,
+      #fffafa 100%
+    ) !important;
+}
+
+.bottomOverviewBadge {
+  border: 1px solid rgba(99, 207, 145, .2) !important;
+
+  background: #effbf4 !important;
+  color: #309760 !important;
+}
+
+.dailyFocusMetricIcon {
+  width: 20px;
+  height: 20px;
+
+  display: grid !important;
+  place-items: center;
+
+  margin: 0 auto 2px !important;
+
+  border-radius: 6px;
+}
+
+/* Calories */
+.dailyFocusItem[data-focus="Calorie"] .dailyFocusMetricIcon {
+  background: #fff0ef;
+}
+
+.dailyFocusItem[data-focus="Calorie"] .dailyFocusLabel {
+  color: #e55d5d !important;
+}
+
+/* Protein */
+.dailyFocusItem[data-focus="Proteine"] .dailyFocusMetricIcon {
+  background: #edf9f2;
+}
+
+.dailyFocusItem[data-focus="Proteine"] .dailyFocusLabel {
+  color: #319d63 !important;
+}
+
+/* Carbs */
+.dailyFocusItem[data-focus="Carboidrati"] .dailyFocusMetricIcon {
+  background: #edf5ff;
+}
+
+.dailyFocusItem[data-focus="Carboidrati"] .dailyFocusLabel {
+  color: #438ce9 !important;
+}
+
+/* Fat */
+.dailyFocusItem[data-focus="Grassi"] .dailyFocusMetricIcon {
+  background: #fff7df;
+}
+
+.dailyFocusItem[data-focus="Grassi"] .dailyFocusLabel {
+  color: #c58b12 !important;
+}
+
+/* ==========================================================
+   Week card
+   ========================================================== */
+
+.weekOverviewCard {
+  border-color: rgba(76, 143, 232, .14) !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ffffff 0%,
+      #fafdff 100%
+    ) !important;
+}
+
+.weekCalendarIcon {
+  border: 1px solid rgba(76, 143, 232, .14) !important;
+
+  background: #edf5ff !important;
+  color: #4c8fe8 !important;
+}
+
+.weekKpi {
+  transition:
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+/* days */
+.weekKpi:nth-child(1) .weekKpiIcon {
+  background: #edf9f2 !important;
+  color: #309d61 !important;
+}
+
+/* meals */
+.weekKpi:nth-child(2) .weekKpiIcon {
+  background: #fff0ef !important;
+  color: #e85f5f !important;
+}
+
+/* activity */
+.weekKpi:nth-child(3) .weekKpiIcon {
+  background: #edf5ff !important;
+  color: #438ce9 !important;
+}
+
+/* weight */
+.weekKpi:nth-child(4) .weekKpiIcon {
+  background: #fff7df !important;
+  color: #b98011 !important;
+}
+
+.weekKpi:nth-child(1) {
+  background: #fbfffc !important;
+}
+
+.weekKpi:nth-child(2) {
+  background: #fffdfd !important;
+}
+
+.weekKpi:nth-child(3) {
+  background: #fbfdff !important;
+}
+
+.weekKpi:nth-child(4) {
+  background: #fffefa !important;
+}
+
+.weekWeightKpi:hover {
+  background: #fff9ea !important;
+}
+
+.weekDayToday {
+  background: #fff0ef !important;
+}
+
+.weekDayToday .weekDayName,
+.weekDayToday > strong {
+  color: #e85f5f !important;
+}
+
+.weekTodayProgress {
+  background: #edf0f3 !important;
+}
+
+.weekTodayProgress > span {
+  background:
+    linear-gradient(
+      90deg,
+      #ff6868,
+      #f58b77
+    ) !important;
+}
+
+/* ==========================================================
+   AI: slightly richer coral identity
+   ========================================================== */
+
+.conversationCard {
+  border-color: rgba(255, 104, 104, .20) !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      #fffafa 0%,
+      #ffffff 52%,
+      #fffdfd 100%
+    ) !important;
+}
+
+.aiCapabilityPill {
+  border: 1px solid rgba(255, 104, 104, .16) !important;
+
+  background: #fff0ef !important;
+  color: #d95b5b !important;
+}
+
+.aiHelperPanel {
+  border-color: rgba(255, 104, 104, .12) !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      #fff5f4,
+      #fffafa
+    ) !important;
+}
+
+.aiSuggestionChips button {
+  border-color: rgba(255, 104, 104, .13) !important;
+
+  background: #fffafa !important;
+  color: #66768a !important;
+}
+
+.aiSuggestionChips button:hover {
+  border-color: rgba(255, 104, 104, .32) !important;
+
+  background: #fff0ef !important;
+  color: #d95b5b !important;
+}
+
+/* ==========================================================
+   Mobile
+   ========================================================== */
+
+@media (max-width: 759px) {
+  .bottomOverviewTitleIcon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .bottomOverviewTitleGroup {
+    gap: 8px;
+  }
+}
+
