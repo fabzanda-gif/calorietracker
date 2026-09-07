@@ -22,6 +22,13 @@ import {
   getOuraStatus,
 } from "@/lib/api/oura";
 
+import {
+  disconnectGoogleCalendar,
+  getGoogleCalendarAuthorization,
+  getGoogleCalendarStatus,
+  syncGoogleCalendar,
+} from "@/lib/api/google-calendar";
+
 import styles from "./ProfilePage.module.css";
 
 function firstNameValue(value: unknown): string {
@@ -174,6 +181,31 @@ export default function ProfilePage() {
     useState(true);
   const [ouraConnecting, setOuraConnecting] =
     useState(false);
+
+  const [
+    googleCalendarConnected,
+    setGoogleCalendarConnected,
+  ] = useState(false);
+
+  const [
+    googleCalendarStatusLoading,
+    setGoogleCalendarStatusLoading,
+  ] = useState(true);
+
+  const [
+    googleCalendarConnecting,
+    setGoogleCalendarConnecting,
+  ] = useState(false);
+
+  const [
+    googleCalendarSyncing,
+    setGoogleCalendarSyncing,
+  ] = useState(false);
+
+  const [
+    googleCalendarDisconnecting,
+    setGoogleCalendarDisconnecting,
+  ] = useState(false);
 
   const [currentWeekSchedule, setCurrentWeekSchedule] =
     useState<Record<string, WeeklyScheduleContext> | null>(null);
@@ -358,6 +390,53 @@ export default function ProfilePage() {
     const token = accessToken;
     let active = true;
 
+    async function loadGoogleCalendarStatus() {
+      try {
+        setGoogleCalendarStatusLoading(
+          true,
+        );
+
+        const response =
+          await getGoogleCalendarStatus(
+            token,
+          );
+
+        if (active) {
+          setGoogleCalendarConnected(
+            response.connected,
+          );
+        }
+      } catch {
+        if (active) {
+          setGoogleCalendarConnected(
+            false,
+          );
+        }
+      } finally {
+        if (active) {
+          setGoogleCalendarStatusLoading(
+            false,
+          );
+        }
+      }
+    }
+
+    void loadGoogleCalendarStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
+
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    const token = accessToken;
+    let active = true;
+
     async function loadCurrentWeek() {
       try {
         const weekStart = getCurrentWeekStart();
@@ -496,6 +575,125 @@ export default function ProfilePage() {
           : "Impossibile collegare Oura.",
       );
       setOuraConnecting(false);
+    }
+  }
+
+  async function connectGoogleCalendar() {
+    if (!accessToken) {
+      return;
+    }
+
+    setGoogleCalendarConnecting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response =
+        await getGoogleCalendarAuthorization(
+          accessToken,
+        );
+
+      window.location.assign(
+        response.authorization_url,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossibile collegare Google Calendar.",
+      );
+
+      setGoogleCalendarConnecting(false);
+    }
+  }
+
+  async function runGoogleCalendarSync() {
+    if (
+      !accessToken
+      || !googleCalendarConnected
+    ) {
+      return;
+    }
+
+    setGoogleCalendarSyncing(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const today = new Date();
+
+      const start = new Date(today);
+      start.setDate(
+        start.getDate() - 30,
+      );
+
+      const end = new Date(today);
+      end.setFullYear(
+        end.getFullYear() + 1,
+      );
+
+      const response =
+        await syncGoogleCalendar(
+          accessToken,
+          start
+            .toISOString()
+            .slice(0, 10),
+          end
+            .toISOString()
+            .slice(0, 10),
+        );
+
+      setSuccess(
+        "Google Calendar sincronizzato: "
+        + `${response.created} creati, `
+        + `${response.updated} aggiornati, `
+        + `${response.deleted} rimossi.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossibile sincronizzare Google Calendar.",
+      );
+    } finally {
+      setGoogleCalendarSyncing(false);
+    }
+  }
+
+  async function disconnectGoogleCalendarAccount() {
+    if (
+      !accessToken
+      || googleCalendarDisconnecting
+    ) {
+      return;
+    }
+
+    setGoogleCalendarDisconnecting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await disconnectGoogleCalendar(
+        accessToken,
+      );
+
+      setGoogleCalendarConnected(
+        false,
+      );
+
+      setSuccess(
+        "Google Calendar scollegato.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossibile scollegare Google Calendar.",
+      );
+    } finally {
+      setGoogleCalendarDisconnecting(
+        false,
+      );
     }
   }
 
@@ -1059,6 +1257,138 @@ export default function ProfilePage() {
                       ? "Connesso"
                       : "Collega"}
                   </button>
+                </div>
+
+                <div className={styles.integration}>
+                  <div>
+                    <strong>
+                      Google Calendar
+                    </strong>
+
+                    <span>
+                      Corsa e forza pianificate
+                    </span>
+
+                    <small>
+                      {googleCalendarStatusLoading
+                        ? "Verifico connessione…"
+                        : googleCalendarConnected
+                        ? "Calendario collegato"
+                        : "Calendario non collegato"}
+                    </small>
+                  </div>
+
+                  <div>
+                    {!googleCalendarConnected ? (
+                      <button
+                        type="button"
+                        disabled={
+                          googleCalendarStatusLoading
+                          || googleCalendarConnecting
+                        }
+                        onClick={() => {
+                          void connectGoogleCalendar();
+                        }}
+                      >
+                        {googleCalendarConnecting
+                          ? "Apro Google…"
+                          : "Collega"}
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={
+                            googleCalendarSyncing
+                          }
+                          onClick={() => {
+                            void runGoogleCalendarSync();
+                          }}
+                        >
+                          {googleCalendarSyncing
+                            ? "Sincronizzo…"
+                            : "Sincronizza"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={
+                            googleCalendarDisconnecting
+                          }
+                          onClick={() => {
+                            void disconnectGoogleCalendarAccount();
+                          }}
+                        >
+                          {googleCalendarDisconnecting
+                            ? "Scollego…"
+                            : "Scollega"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className={styles.integration}>
+                  <div>
+                    <strong>Google Calendar</strong>
+                    <span>
+                      Corsa e forza pianificate
+                    </span>
+                    <small>
+                      {googleCalendarStatusLoading
+                        ? "Verifico connessione…"
+                        : googleCalendarConnected
+                        ? "Calendario collegato"
+                        : "Calendario non collegato"}
+                    </small>
+                  </div>
+
+                  <div>
+                    {!googleCalendarConnected ? (
+                      <button
+                        type="button"
+                        disabled={
+                          googleCalendarStatusLoading
+                          || googleCalendarConnecting
+                        }
+                        onClick={() => {
+                          void connectGoogleCalendar();
+                        }}
+                      >
+                        {googleCalendarConnecting
+                          ? "Apro Google…"
+                          : "Collega"}
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={googleCalendarSyncing}
+                          onClick={() => {
+                            void runGoogleCalendarSync();
+                          }}
+                        >
+                          {googleCalendarSyncing
+                            ? "Sincronizzo…"
+                            : "Sincronizza"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={
+                            googleCalendarDisconnecting
+                          }
+                          onClick={() => {
+                            void disconnectGoogleCalendarAccount();
+                          }}
+                        >
+                          {googleCalendarDisconnecting
+                            ? "Scollego…"
+                            : "Scollega"}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </section>
