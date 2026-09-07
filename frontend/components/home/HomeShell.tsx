@@ -2961,6 +2961,24 @@ export function HomeShell() {
     setAlternateCarbs("");
     setAlternateFat("");
     setAlternateSlot(slot);
+
+    window.requestAnimationFrame(() => {
+      const mealDetails =
+        document.querySelector<HTMLDetailsElement>(
+          `[data-meal-slot="${slot}"]`,
+        );
+
+      if (!mealDetails) {
+        return;
+      }
+
+      mealDetails.open = true;
+
+      mealDetails.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   }
 
   async function saveAlternateMeal(
@@ -4350,32 +4368,16 @@ export function HomeShell() {
                         key={slot}
                         type="button"
                         onClick={(event) => {
-                          openAlternateMeal(slot);
-
                           const menuDetails =
-                            event.currentTarget.closest("details");
+                            event.currentTarget.closest(
+                              "details",
+                            );
 
                           if (menuDetails) {
                             menuDetails.open = false;
                           }
 
-                          window.requestAnimationFrame(() => {
-                            const mealDetails =
-                              document.querySelector<HTMLDetailsElement>(
-                                `[data-meal-slot="${slot}"]`,
-                              );
-
-                            if (!mealDetails) {
-                              return;
-                            }
-
-                            mealDetails.open = true;
-
-                            mealDetails.scrollIntoView({
-                              behavior: "smooth",
-                              block: "center",
-                            });
-                          });
+                          openAlternateMeal(slot);
                         }}
                       >
                         <span aria-hidden="true">
@@ -4596,6 +4598,22 @@ export function HomeShell() {
                         ▾
                       </span>
                     </summary>
+
+                    <button
+                      type="button"
+                      className={
+                        styles.dailyMealAddAnother
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        openAlternateMeal(slot);
+                      }}
+                    >
+                      <span aria-hidden="true">+</span>
+                      Aggiungi altro
+                    </button>
 
                     <div
                       className={

@@ -14928,3 +14928,55 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+
+
+/* ==========================================================
+   HOME DAILY ADD-ANOTHER V1
+   ========================================================== */
+
+.dailyMealAddAnother {
+  width: fit-content;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  margin: 6px 10px 8px 48px;
+  padding: 5px 8px;
+
+  border: 1px solid rgba(255, 104, 104, .15);
+  border-radius: 999px;
+
+  background: #fff8f7;
+  color: #e45f5c;
+
+  font: inherit;
+  font-size: .56rem;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.dailyMealAddAnother:hover {
+  transform: translateY(-1px);
+
+  border-color: rgba(255, 104, 104, .30);
+  background: #fff0ef;
+}
+
+.dailyMealAddAnother > span {
+  font-size: .72rem;
+  line-height: 1;
+}
+
+@media (max-width: 680px) {
+  .dailyMealAddAnother {
+    margin-left: 42px;
+  }
+}
+

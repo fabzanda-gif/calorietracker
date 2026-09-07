@@ -40,6 +40,7 @@ from backend.api.dependencies import (
     get_recipe_ingredients_repository,
     get_recipes_repository,
     get_weight_repository,
+    get_pantry_repository,
 )
 from backend.repositories.base import RepositoryError
 from backend.repositories.ingredients import IngredientsRepository
@@ -53,6 +54,7 @@ from backend.repositories.recipe_ingredients import (
 )
 from backend.repositories.recipes import RecipesRepository
 from backend.repositories.weight import WeightRepository
+from backend.repositories.pantry import PantryRepository
 from backend.services.structured_meal import (
     StructuredMealError,
     StructuredMealService,
@@ -511,6 +513,9 @@ def confirm_conversational_meal(
     meal_ingredients_repo: MealIngredientsRepository = Depends(
         get_meal_ingredients_repository
     ),
+    pantry_repo: PantryRepository = Depends(
+        get_pantry_repository
+    ),
 ):
     items = [item.model_dump() for item in request.items]
     meal_name = " + ".join(item["name"] for item in items)
@@ -520,6 +525,7 @@ def confirm_conversational_meal(
             meals_repo=repo,
             ingredients_repo=ingredients_repo,
             meal_ingredients_repo=meal_ingredients_repo,
+            pantry_repo=pantry_repo,
         ).confirm(
             user_id=current_user.id,
             meal_payload={
@@ -546,6 +552,10 @@ def confirm_conversational_meal(
         "structured": True,
         "item": result["meal"],
         "meal_ingredients": result["meal_ingredients"],
+        "pantry_consumption": result.get(
+            "pantry_consumption",
+            [],
+        ),
     }
 
 
