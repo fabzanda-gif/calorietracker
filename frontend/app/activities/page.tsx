@@ -577,6 +577,11 @@ export default function ActivitiesPage() {
 
   const [gpxFile, setGpxFile] =
     useState<File | null>(null);
+
+  const [
+    plannedGpxActivity,
+    setPlannedGpxActivity,
+  ] = useState<PlannedActivity | null>(null);
   const [gpxBase64, setGpxBase64] = useState("");
   const [gpxPreview, setGpxPreview] =
     useState<GpxActivityPreview | null>(null);
@@ -1492,8 +1497,22 @@ export default function ActivitiesPage() {
     }
   }
 
-  async function chooseGpx(file: File | null) {
+  async function chooseGpx(
+    file: File | null,
+    plannedActivity?: PlannedActivity | null,
+  ) {
     setGpxFile(file);
+
+    if (plannedActivity) {
+      setPlannedGpxActivity(plannedActivity);
+      setGpxType("Corsa");
+      setGpxName(plannedActivity.title);
+      setSelectedDate(
+        plannedActivity.scheduled_date,
+      );
+    } else {
+      setPlannedGpxActivity(null);
+    }
     setGpxPreview(null);
     setImportMessage(null);
     setError(null);
@@ -1527,17 +1546,31 @@ export default function ActivitiesPage() {
         {
           file_name: file.name,
           content_base64: contentBase64,
-          activity_type: gpxType,
+          activity_type:
+            plannedActivity
+              ? "Corsa"
+              : gpxType,
         },
         accessToken,
       );
 
       setGpxBase64(contentBase64);
       setGpxPreview(response.preview);
-      setGpxName(response.preview.activity_name);
-      setGpxCalories(String(response.preview.estimated_calories ?? 0));
+      setGpxName(
+        plannedActivity
+          ? plannedActivity.title
+          : response.preview.activity_name,
+      );
+      setGpxCalories(
+        String(
+          response.preview.estimated_calories ?? 0,
+        ),
+      );
+
       const previewDate =
-        response.preview.date || isoDate(new Date());
+        plannedActivity?.scheduled_date ||
+        response.preview.date ||
+        isoDate(new Date());
 
       setSelectedDate(previewDate);
 
@@ -1616,14 +1649,29 @@ export default function ActivitiesPage() {
               0,
               Number(gpxCalories) || 0,
             ),
+          planned_activity_id:
+            plannedGpxActivity?.id,
         },
         accessToken,
       );
 
-      setImportMessage("Attività GPX importata.");
+      if (plannedGpxActivity) {
+        await updatePlannedActivity(
+          plannedGpxActivity.id,
+          { status: "completed" },
+          accessToken,
+        );
+      }
+
+      setImportMessage(
+        plannedGpxActivity
+          ? "Corsa completata e GPX importato."
+          : "Attività GPX importata.",
+      );
       setGpxFile(null);
       setGpxBase64("");
       setGpxPreview(null);
+      setPlannedGpxActivity(null);
       setSelectedActivity(response.item);
 
       const importedDate = new Date(
@@ -3127,6 +3175,43 @@ export default function ActivitiesPage() {
                               >
                                 Completata
                               </button>
+
+                              {item.activity_type
+                                .trim()
+                                .toLocaleLowerCase(
+                                  "it-IT",
+                                ) === "corsa" ? (
+                                <label
+                                  className={
+                                    styles.completePlanButton
+                                  }
+                                >
+                                  Carica GPX
+                                  <input
+                                    hidden
+                                    type="file"
+                                    accept=".gpx,application/gpx+xml"
+                                    disabled={
+                                      busyPlanId ===
+                                      item.id
+                                    }
+                                    onChange={(event) => {
+                                      const file =
+                                        event.target
+                                          .files?.[0] ??
+                                        null;
+
+                                      void chooseGpx(
+                                        file,
+                                        item,
+                                      );
+
+                                      event.currentTarget.value =
+                                        "";
+                                    }}
+                                  />
+                                </label>
+                              ) : null}
 
                               <button
                                 type="button"
