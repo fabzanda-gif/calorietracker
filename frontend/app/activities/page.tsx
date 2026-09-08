@@ -963,7 +963,7 @@ export default function ActivitiesPage() {
       start.setDate(start.getDate() - 30);
 
       const end = new Date(today);
-      end.setFullYear(end.getFullYear() + 1);
+      end.setDate(end.getDate() + 335);
 
       const result = await syncGoogleCalendar(
         accessToken,
