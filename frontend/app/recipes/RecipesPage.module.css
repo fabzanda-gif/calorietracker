@@ -1547,3 +1547,35 @@
   font-size: 0.8rem;
   font-weight: 650;
 }
+
+/* RECIPE INGREDIENT QUANTITY LAYOUT FIX */
+
+.ingredientRow {
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(190px, 220px)
+    38px;
+}
+
+.quantityField {
+  min-width: 0;
+}
+
+.quantityField input {
+  min-width: 72px;
+}
+
+@media (max-width: 620px) {
+  .ingredientRow {
+    grid-template-columns:
+      minmax(0, 1fr)
+      155px
+      36px;
+  }
+
+  .quantityField:has(.quantityUnitSelect) {
+    grid-template-columns:
+      minmax(58px, 1fr)
+      78px;
+  }
+}
