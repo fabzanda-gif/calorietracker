@@ -723,3 +723,17 @@
       0 -4px 12px rgba(0, 0, 0, 0.24);
   }
 }
+
+@media (max-width: 759px) {
+  .mobileNavZero::before {
+    top: -76px;
+
+    width: 88px;
+    height: 82px;
+
+    border-radius: 48px 48px 0 0;
+
+    background-position: center 0;
+    background-size: 78px auto;
+  }
+}
