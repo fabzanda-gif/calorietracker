@@ -754,3 +754,56 @@
       0 -4px 10px rgba(0, 0, 0, 0.22);
   }
 }
+
+@media (max-width: 759px) {
+  .mobileNavZero {
+    overflow: visible;
+  }
+
+  .mobileNavZero::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -80px;
+
+    width: 78px;
+    height: 88px;
+
+    transform: translateX(-50%);
+
+    border: 2px solid rgba(150, 32, 32, 0.95);
+    border-bottom: 0;
+    border-radius: 39px 39px 0 0;
+
+    background: #050505;
+
+    box-shadow:
+      0 -4px 10px rgba(0, 0, 0, 0.22);
+
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .mobileNavZero::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -76px;
+
+    width: 70px;
+    height: 80px;
+
+    transform: translateX(-50%);
+
+    border-radius: 35px 35px 0 0;
+
+    background-color: #050505;
+    background-image: url("/assets/LogoZero.jpeg");
+    background-repeat: no-repeat;
+    background-position: center -2px;
+    background-size: 64px auto;
+
+    z-index: 1;
+    pointer-events: none;
+  }
+}
