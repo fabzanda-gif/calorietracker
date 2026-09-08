@@ -2431,3 +2431,52 @@ summary.loggerHeading {
   font-size: 0.56rem;
   font-weight: 900;
 }
+
+.calendarActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.googleCalendarButton {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #d8dde5;
+  border-radius: 11px;
+  background: #fff;
+  color: #102744;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.googleCalendarButton:hover:not(:disabled) {
+  border-color: #aebbc9;
+  background: #f7f9fc;
+}
+
+.googleCalendarButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.calendarSyncMessage {
+  margin: -6px 0 16px;
+  color: #5f7188;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .calendarActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .googleCalendarButton {
+    width: 100%;
+  }
+}

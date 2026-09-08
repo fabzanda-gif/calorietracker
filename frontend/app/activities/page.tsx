@@ -40,6 +40,11 @@ import {
   type PlannedActivityAdaptationResponse,
 } from "@/lib/api/activities";
 
+import {
+  getGoogleCalendarStatus,
+  syncGoogleCalendar,
+} from "@/lib/api/google-calendar";
+
 import styles from "./ActivitiesPage.module.css";
 
 const WEEKDAYS = [
@@ -565,6 +570,11 @@ export default function ActivitiesPage() {
   const [error, setError] =
     useState<string | null>(null);
 
+  const [calendarSyncing, setCalendarSyncing] =
+    useState(false);
+  const [calendarSyncMessage, setCalendarSyncMessage] =
+    useState<string | null>(null);
+
   const [gpxFile, setGpxFile] =
     useState<File | null>(null);
   const [gpxBase64, setGpxBase64] = useState("");
@@ -927,6 +937,60 @@ export default function ActivitiesPage() {
     plannedActivities,
     linkedPlannedActivityIds,
   ]);
+
+  async function syncActivitiesToGoogleCalendar() {
+    if (!accessToken || calendarSyncing) {
+      return;
+    }
+
+    setCalendarSyncing(true);
+    setCalendarSyncMessage(null);
+    setError(null);
+
+    try {
+      const status = await getGoogleCalendarStatus(
+        accessToken,
+      );
+
+      if (!status.connected) {
+        window.location.assign("/profile");
+        return;
+      }
+
+      const today = new Date();
+
+      const start = new Date(today);
+      start.setDate(start.getDate() - 30);
+
+      const end = new Date(today);
+      end.setFullYear(end.getFullYear() + 1);
+
+      const result = await syncGoogleCalendar(
+        accessToken,
+        isoDate(start),
+        isoDate(end),
+      );
+
+      const changes =
+        result.created +
+        result.updated +
+        result.deleted;
+
+      setCalendarSyncMessage(
+        changes > 0
+          ? `Google Calendar aggiornato: ${result.created} creati, ${result.updated} aggiornati, ${result.deleted} rimossi.`
+          : "Google Calendar è già aggiornato.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a sincronizzare Google Calendar.",
+      );
+    } finally {
+      setCalendarSyncing(false);
+    }
+  }
 
   async function savePlannedActivity() {
     if (
@@ -1739,7 +1803,21 @@ export default function ActivitiesPage() {
                 <h2>Calendario attività</h2>
               </div>
 
-              <div className={styles.monthControls}>
+              <div className={styles.calendarActions}>
+                <button
+                  type="button"
+                  className={styles.googleCalendarButton}
+                  disabled={calendarSyncing}
+                  onClick={() =>
+                    void syncActivitiesToGoogleCalendar()
+                  }
+                >
+                  {calendarSyncing
+                    ? "Sincronizzazione…"
+                    : "Sincronizza Google Calendar"}
+                </button>
+
+                <div className={styles.monthControls}>
                 <button
                   type="button"
                   aria-label="Mese precedente"
@@ -1778,8 +1856,15 @@ export default function ActivitiesPage() {
                 >
                   →
                 </button>
+                </div>
               </div>
             </div>
+
+            {calendarSyncMessage && (
+              <p className={styles.calendarSyncMessage}>
+                {calendarSyncMessage}
+              </p>
+            )}
 
             <div className={styles.calendar}>
               {WEEKDAYS.map((weekday) => (
