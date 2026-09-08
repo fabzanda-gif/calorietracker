@@ -17,6 +17,7 @@ import { useExperienceMode } from "@/components/experience/ExperienceModeProvide
 import {
   createIngredient,
   getIngredients,
+  previewIngredientFromText,
   type Ingredient,
 } from "@/lib/api/ingredients";
 import {
@@ -154,6 +155,12 @@ export default function RecipesPage() {
 
   const [showIngredientCreator, setShowIngredientCreator] =
     useState(false);
+
+  const [ingredientAiLoading, setIngredientAiLoading] =
+    useState(false);
+
+  const [ingredientAiMessage, setIngredientAiMessage] =
+    useState<string | null>(null);
 
   const [loading, setLoading] =
     useState(true);
@@ -925,6 +932,80 @@ export default function RecipesPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function fillIngredientWithAi() {
+    if (!accessToken) {
+      return;
+    }
+
+    const ingredientName =
+      ingredientDraft.name.trim();
+
+    if (!ingredientName) {
+      setMessage(
+        "Inserisci prima il nome dell'ingrediente.",
+      );
+      return;
+    }
+
+    setIngredientAiLoading(true);
+    setIngredientAiMessage(null);
+    setMessage(null);
+
+    try {
+      const response =
+        await previewIngredientFromText(
+          ingredientName,
+          accessToken,
+        );
+
+      const result = response.result;
+
+      setIngredientDraft((current) => ({
+        ...current,
+        name:
+          result.name ??
+          current.name,
+        calories:
+          result.calories_per_100g != null
+            ? String(result.calories_per_100g)
+            : current.calories,
+        protein:
+          result.protein_per_100g != null
+            ? String(result.protein_per_100g)
+            : current.protein,
+        carbs:
+          result.carbs_per_100g != null
+            ? String(result.carbs_per_100g)
+            : current.carbs,
+        fat:
+          result.fat_per_100g != null
+            ? String(result.fat_per_100g)
+            : current.fat,
+        portionGrams:
+          current.portionGrams ||
+          (
+            result.grams_per_unit != null
+              ? String(result.grams_per_unit)
+              : ""
+          ),
+      }));
+
+      setIngredientAiMessage(
+        result.confidence === "low"
+          ? "Valori stimati con bassa confidenza: controllali prima di salvare."
+          : "Valori nutrizionali compilati con AI.",
+      );
+    } catch (err) {
+      setIngredientAiMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a stimare i valori nutrizionali.",
+      );
+    } finally {
+      setIngredientAiLoading(false);
     }
   }
 
@@ -1998,6 +2079,30 @@ export default function RecipesPage() {
                 }}
               />
             </label>
+
+            <div className={styles.smallActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={
+                  ingredientAiLoading ||
+                  !ingredientDraft.name.trim()
+                }
+                onClick={() => {
+                  void fillIngredientWithAi();
+                }}
+              >
+                {ingredientAiLoading
+                  ? "Calcolo valori…"
+                  : "✨ Compila con AI"}
+              </button>
+            </div>
+
+            {ingredientAiMessage ? (
+              <p className={styles.aiIngredientMessage}>
+                {ingredientAiMessage}
+              </p>
+            ) : null}
 
             <label className={styles.field}>
               Porzione predefinita (g)

@@ -1540,3 +1540,10 @@
   }
 }
 
+
+.aiIngredientMessage {
+  margin: -4px 0 4px;
+  color: #66758a;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
