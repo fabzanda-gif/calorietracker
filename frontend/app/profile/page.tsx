@@ -1328,69 +1328,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className={styles.integration}>
-                  <div>
-                    <strong>Google Calendar</strong>
-                    <span>
-                      Corsa e forza pianificate
-                    </span>
-                    <small>
-                      {googleCalendarStatusLoading
-                        ? "Verifico connessione…"
-                        : googleCalendarConnected
-                        ? "Calendario collegato"
-                        : "Calendario non collegato"}
-                    </small>
-                  </div>
-
-                  <div>
-                    {!googleCalendarConnected ? (
-                      <button
-                        type="button"
-                        disabled={
-                          googleCalendarStatusLoading
-                          || googleCalendarConnecting
-                        }
-                        onClick={() => {
-                          void connectGoogleCalendar();
-                        }}
-                      >
-                        {googleCalendarConnecting
-                          ? "Apro Google…"
-                          : "Collega"}
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          disabled={googleCalendarSyncing}
-                          onClick={() => {
-                            void runGoogleCalendarSync();
-                          }}
-                        >
-                          {googleCalendarSyncing
-                            ? "Sincronizzo…"
-                            : "Sincronizza"}
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={
-                            googleCalendarDisconnecting
-                          }
-                          onClick={() => {
-                            void disconnectGoogleCalendarAccount();
-                          }}
-                        >
-                          {googleCalendarDisconnecting
-                            ? "Scollego…"
-                            : "Scollega"}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
+                              </div>
             </section>
 
             {error && (
