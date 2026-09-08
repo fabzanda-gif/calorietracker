@@ -241,7 +241,11 @@ export function AppNav() {
       </aside>
 
       <nav
-        className={styles.mobileNav}
+        className={
+          experienceMode === "zero"
+            ? `${styles.mobileNav} ${styles.mobileNavZero}`
+            : styles.mobileNav
+        }
         aria-label="Navigazione principale"
       >
         {MOBILE_ITEMS.map((item) => {
