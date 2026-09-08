@@ -671,3 +671,36 @@
     color: #ffffff !important;
   }
 }
+
+@media (max-width: 759px) {
+  .mobileNavZero::before {
+    left: 50%;
+    top: -62px;
+
+    width: 96px;
+    height: 68px;
+
+    transform: translateX(-50%);
+
+    border: 1px solid rgba(244, 61, 61, 0.42);
+    border-bottom: 0;
+
+    border-radius: 52px 52px 0 0;
+
+    background-color: #080808;
+    background-image: url("/assets/LogoZero.jpeg");
+    background-repeat: no-repeat;
+
+    /*
+     * Il logo sale leggermente così rimane visibile
+     * anche la scritta SanoSyncZero.
+     */
+    background-position: center 2px;
+    background-size: 82px auto;
+
+    box-shadow:
+      0 -4px 14px rgba(0, 0, 0, 0.28);
+
+    overflow: hidden;
+  }
+}
