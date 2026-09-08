@@ -704,3 +704,22 @@
     overflow: hidden;
   }
 }
+
+@media (max-width: 759px) {
+  .mobileNavZero::before {
+    top: -66px;
+
+    width: 88px;
+    height: 72px;
+
+    border-radius: 48px 48px 0 0;
+
+    background-position: center -4px;
+    background-size: 78px auto;
+
+    border-color: rgba(244, 61, 61, 0.5);
+
+    box-shadow:
+      0 -4px 12px rgba(0, 0, 0, 0.24);
+  }
+}
