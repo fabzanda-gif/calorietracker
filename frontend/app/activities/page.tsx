@@ -2173,11 +2173,10 @@ export default function ActivitiesPage() {
 
             <span
               className={
-                styles.trainingProgramsToggle
+                styles.expandToggle
               }
-            >
-              Apri programmi
-            </span>
+              aria-hidden="true"
+            />
           </summary>
 
           <div
@@ -3291,7 +3290,12 @@ export default function ActivitiesPage() {
               <span className={styles.eyebrow}>Registra</span>
               <strong>Nuova attività o passi</strong>
             </span>
-            <span className={styles.openHint}>Apri modulo ＋</span>
+            <span
+              className={
+                styles.expandToggle
+              }
+              aria-hidden="true"
+            />
           </summary>
           <ActivityLogger
             date={selectedDate || isoDate(new Date())}
