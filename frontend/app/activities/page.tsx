@@ -21,7 +21,6 @@ import {
   getActivityOverview,
   getPlannedActivities,
   getTrainingPlans,
-  getTrainingPlanSessions,
   createPlannedActivity,
   updatePlannedActivity,
   deletePlannedActivity,
@@ -874,20 +873,34 @@ export default function ActivitiesPage() {
             plan.status === "paused",
         );
 
-      const sessionResponses =
-        await Promise.all(
-          visiblePlans.map((plan) =>
-            getTrainingPlanSessions(
-              plan.id,
-              accessToken,
-            ),
-          ),
+      if (!visiblePlans.length) {
+        setTrainingPlanActivities([]);
+        return;
+      }
+
+      const planStart = visiblePlans
+        .map((plan) => plan.start_date)
+        .sort()[0];
+
+      const planEnd = visiblePlans
+        .map((plan) => plan.target_date)
+        .sort()
+        .at(-1);
+
+      if (!planStart || !planEnd) {
+        setTrainingPlanActivities([]);
+        return;
+      }
+
+      const response =
+        await getPlannedActivities(
+          planStart,
+          planEnd,
+          accessToken,
         );
 
       setTrainingPlanActivities(
-        sessionResponses.flatMap(
-          (response) => response.items,
-        ),
+        response.items,
       );
     } catch {
       // Calendario e attività manuali restano disponibili
