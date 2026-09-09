@@ -2,6 +2,9 @@ from datetime import date
 
 import pytest
 
+from backend.services.meal_prep_consumption import (
+    MealPrepConsistencyError,
+)
 from backend.services.meal_prep_logging import (
     MealPrepBatchNotFoundError,
     MealPrepBatchUnavailableError,
@@ -156,3 +159,34 @@ def test_inventory_failure_rolls_back_created_meal():
         ("meal-1", "u1"),
     ]
     assert inventory.item["portions_remaining"] == 2
+
+def test_concurrent_consumption_rolls_back_losing_meal():
+    service, inventory, meals = build(remaining=1)
+
+    def lose_race(
+        batch_id,
+        user_id,
+        *,
+        expected_remaining,
+    ):
+        return None
+
+    inventory.consume_portion = lose_race
+
+    with pytest.raises(
+        MealPrepConsistencyError,
+        match="already consumed",
+    ):
+        service.log_portion(
+            user_id="u1",
+            batch_id="batch-1",
+            meal_date=date(2026, 9, 6),
+            meal_type="Cena",
+        )
+
+    assert meals.created is None
+    assert meals.deleted == [
+        ("meal-1", "u1"),
+    ]
+    assert inventory.item["portions_remaining"] == 1
+
