@@ -227,7 +227,16 @@ class PantryMealLoggingService:
             ),
         }
 
-        meal = self.meals_repo.create(payload)
+        meal_response = self.meals_repo.create_compatible(
+            payload
+        )
+
+        meal_rows = (
+            getattr(meal_response, "data", None)
+            or []
+        )
+
+        meal = meal_rows[0] if meal_rows else None
 
         if meal is None or meal.get("id") is None:
             raise PantryMealLoggingError(
@@ -237,20 +246,27 @@ class PantryMealLoggingService:
         meal_id = meal["id"]
 
         try:
-            self.meal_ingredients_repo.create(
-                {
-                    "meal_id": meal_id,
-                    "ingredient_id": ingredient["id"],
-                    "name_snapshot": ingredient.get("name"),
-                    "quantity": quantity_g,
-                    "unit": "g",
-                    "quantity_g": quantity_g,
-                    "calories": calories,
-                    "protein": protein,
-                    "carbs": carbs,
-                    "fat": fat,
-                }
-            )
+            try:
+                self.meal_ingredients_repo.create(
+                    {
+                        "meal_id": meal_id,
+                        "ingredient_id": ingredient["id"],
+                        "name_snapshot": ingredient.get("name"),
+                        "quantity": quantity_g,
+                        "unit": "g",
+                        "quantity_g": quantity_g,
+                        "calories": calories,
+                        "protein": protein,
+                        "carbs": carbs,
+                        "fat": fat,
+                    }
+                )
+            except Exception as exc:
+                print(
+                    "[pantry-log] meal ingredient "
+                    f"link skipped: {exc}",
+                    flush=True,
+                )
 
             remaining = self._remaining_quantity(
                 pantry_item,
