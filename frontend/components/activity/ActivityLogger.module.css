@@ -39,7 +39,8 @@
 }
 
 .formGrid label,
-.stepsInput {
+.stepsInput,
+.dateInput {
   display: grid;
   align-content: start;
   gap: 6px;
@@ -50,7 +51,8 @@
 
 .formGrid input,
 .formGrid select,
-.stepsInput input {
+.stepsInput input,
+.dateInput input {
   width: 100%;
   min-width: 0;
   min-height: 43px;
@@ -64,6 +66,17 @@
 }
 
 .formGrid small {
+  color: #85857e;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.dateInput {
+  max-width: 240px;
+  margin-bottom: 12px;
+}
+
+.dateInput small {
   color: #85857e;
   font-size: 0.65rem;
   font-weight: 600;

@@ -18,7 +18,7 @@ import styles from "./ActivityLogger.module.css";
 type ActivityLoggerProps = {
   date: string;
   accessToken?: string | null;
-  onSaved: () => void | Promise<void>;
+  onSaved: (savedDate?: string) => void | Promise<void>;
   showMovement?: boolean;
   compact?: boolean;
 };
@@ -167,6 +167,7 @@ export function ActivityLogger({
   showMovement = false,
   compact = false,
 }: ActivityLoggerProps) {
+  const [logDate, setLogDate] = useState(date);
   const [activityType, setActivityType] =
     useState("Padel");
   const [durationMinutes, setDurationMinutes] =
@@ -205,6 +206,10 @@ export function ActivityLogger({
   );
 
   useEffect(() => {
+    setLogDate(date);
+  }, [date]);
+
+  useEffect(() => {
     if (!caloriesEdited) {
       setCalories(String(automaticCalories));
     }
@@ -214,7 +219,7 @@ export function ActivityLogger({
     if (
       !showMovement ||
       !accessToken ||
-      !date
+      !logDate
     ) {
       return;
     }
@@ -227,7 +232,7 @@ export function ActivityLogger({
       try {
         const response =
           await getActivityMovement(
-            date,
+            logDate,
             accessToken,
           );
 
@@ -253,7 +258,7 @@ export function ActivityLogger({
     return () => {
       active = false;
     };
-  }, [accessToken, date, showMovement]);
+  }, [accessToken, logDate, showMovement]);
 
   async function saveActivity() {
     if (!accessToken) {
@@ -292,7 +297,7 @@ export function ActivityLogger({
     try {
       const response = await createActivity(
         {
-          date,
+          date: logDate,
           activity_name: name,
           activity_type: activityType,
           duration_seconds:
@@ -308,7 +313,7 @@ export function ActivityLogger({
       }
 
       setMessage(`${name} registrato.`);
-      await onSaved();
+      await onSaved(logDate);
     } catch (err) {
       setError(
         err instanceof Error
@@ -344,7 +349,7 @@ export function ActivityLogger({
     try {
       const response = await updateDailyLog(
         accessToken,
-        date,
+        logDate,
         {
           steps: Math.round(totalSteps),
         },
@@ -361,14 +366,14 @@ export function ActivityLogger({
       } else {
         setMovement(
           await getActivityMovement(
-            date,
+            logDate,
             accessToken,
           ),
         );
       }
 
       setMessage("Passi aggiornati.");
-      await onSaved();
+      await onSaved(logDate);
     } catch (err) {
       setError(
         err instanceof Error
@@ -393,6 +398,22 @@ export function ActivityLogger({
             <h3>Registra attività</h3>
           </div>
         </div>
+
+        <label className={styles.dateInput}>
+          <span>Data dell’attività</span>
+          <input
+            type="date"
+            value={logDate}
+            onChange={(event) => {
+              setLogDate(event.target.value);
+              setMessage(null);
+              setError(null);
+            }}
+          />
+          <small>
+            Puoi registrare anche un’attività passata.
+          </small>
+        </label>
 
         <div className={styles.formGrid}>
           <label>

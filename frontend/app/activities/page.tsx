@@ -120,6 +120,26 @@ function calendarDays(month: Date): Array<Date | null> {
   return result;
 }
 
+function weekDays(anchor: Date): Date[] {
+  const monday = new Date(anchor);
+  const offset = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - offset);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + index);
+    return day;
+  });
+}
+
+function weekBounds(anchor: Date) {
+  const days = weekDays(anchor);
+  return {
+    start: isoDate(days[0]),
+    end: isoDate(days[6]),
+  };
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -557,6 +577,10 @@ export default function ActivitiesPage() {
   const [month, setMonth] = useState(
     () => new Date(),
   );
+  const [calendarView, setCalendarView] =
+    useState<"weekly" | "monthly">("monthly");
+  const [calendarExpanded, setCalendarExpanded] =
+    useState(true);
   const [activities, setActivities] = useState<
     Activity[]
   >([]);
@@ -705,7 +729,9 @@ export default function ActivitiesPage() {
     setError(null);
 
     try {
-      const bounds = monthBounds(month);
+      const bounds = calendarView === "weekly"
+        ? weekBounds(month)
+        : monthBounds(month);
       const today = new Date();
       const rollingStart = new Date(today);
       rollingStart.setDate(today.getDate() - 29);
@@ -817,16 +843,49 @@ export default function ActivitiesPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, month]);
+  }, [accessToken, calendarView, month]);
 
   useEffect(() => {
     void loadMonth();
   }, [loadMonth]);
 
   const days = useMemo(
-    () => calendarDays(month),
-    [month],
+    () => calendarView === "weekly"
+      ? weekDays(month)
+      : calendarDays(month),
+    [calendarView, month],
   );
+
+  const periodLabel = useMemo(() => {
+    if (calendarView === "monthly") {
+      return month.toLocaleDateString("it-IT", {
+        month: "long",
+        year: "numeric",
+      });
+    }
+
+    const range = weekDays(month);
+    const start = range[0];
+    const end = range[6];
+    const sameMonth =
+      start.getMonth() === end.getMonth();
+
+    return sameMonth
+      ? `${start.getDate()}–${end.getDate()} ${end.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}`
+      : `${start.toLocaleDateString("it-IT", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}`;
+  }, [calendarView, month]);
+
+  const navigatePeriod = useCallback((direction: -1 | 1) => {
+    setMonth((current) => {
+      const next = new Date(current);
+      if (calendarView === "weekly") {
+        next.setDate(next.getDate() + direction * 7);
+      } else {
+        next.setMonth(next.getMonth() + direction, 1);
+      }
+      return next;
+    });
+  }, [calendarView]);
 
   const trainingActivities = useMemo(
     () =>
@@ -1842,7 +1901,7 @@ export default function ActivitiesPage() {
         </section>
 
         <div className={styles.topGrid}>
-          <section className={styles.card}>
+          <section className={`${styles.card} ${styles.calendarCard}`}>
             <div className={styles.cardHeading}>
               <div>
                 <p className={styles.eyebrow}>
@@ -1852,6 +1911,26 @@ export default function ActivitiesPage() {
               </div>
 
               <div className={styles.calendarActions}>
+                <div
+                  className={styles.calendarViewToggle}
+                  aria-label="Vista calendario"
+                >
+                  <button
+                    type="button"
+                    className={calendarView === "weekly" ? styles.calendarViewActive : ""}
+                    onClick={() => setCalendarView("weekly")}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    type="button"
+                    className={calendarView === "monthly" ? styles.calendarViewActive : ""}
+                    onClick={() => setCalendarView("monthly")}
+                  >
+                    Monthly
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   className={styles.googleCalendarButton}
@@ -1869,42 +1948,33 @@ export default function ActivitiesPage() {
                 <button
                   type="button"
                   aria-label="Mese precedente"
-                  onClick={() =>
-                    setMonth(
-                      new Date(
-                        month.getFullYear(),
-                        month.getMonth() - 1,
-                        1,
-                      ),
-                    )
-                  }
+                  onClick={() => navigatePeriod(-1)}
                 >
                   ←
                 </button>
 
                 <strong>
-                  {month.toLocaleDateString("it-IT", {
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  {periodLabel}
                 </strong>
 
                 <button
                   type="button"
                   aria-label="Mese successivo"
-                  onClick={() =>
-                    setMonth(
-                      new Date(
-                        month.getFullYear(),
-                        month.getMonth() + 1,
-                        1,
-                      ),
-                    )
-                  }
+                  onClick={() => navigatePeriod(1)}
                 >
                   →
                 </button>
                 </div>
+
+                <button
+                  type="button"
+                  className={styles.circularToggle}
+                  aria-label={calendarExpanded ? "Comprimi calendario" : "Espandi calendario"}
+                  aria-expanded={calendarExpanded}
+                  onClick={() => setCalendarExpanded((current) => !current)}
+                >
+                  {calendarExpanded ? "−" : "+"}
+                </button>
               </div>
             </div>
 
@@ -1914,7 +1984,9 @@ export default function ActivitiesPage() {
               </p>
             )}
 
-            <div className={styles.calendar}>
+            {calendarExpanded ? (
+              <div className={styles.calendarBody}>
+            <div className={`${styles.calendar} ${calendarView === "weekly" ? styles.weekCalendar : ""}`}>
               {WEEKDAYS.map((weekday) => (
                 <span
                   key={weekday}
@@ -2104,10 +2176,13 @@ export default function ActivitiesPage() {
                 Carico il mese…
               </p>
             ) : null}
+              </div>
+            ) : null}
           </section>
 
-          <section className={styles.uploadCard}>
-            <div>
+          <details className={`${styles.uploadCard} ${styles.utilityCard}`}>
+            <summary className={styles.utilitySummary}>
+              <div>
               <p className={styles.eyebrow}>
                 Importa
               </p>
@@ -2116,8 +2191,11 @@ export default function ActivitiesPage() {
                 Percorso, durata, cadenza e frequenza
                 cardiaca vengono letti dal file.
               </p>
-            </div>
+              </div>
+              <span className={styles.expandToggle} aria-hidden="true" />
+            </summary>
 
+            <div className={styles.utilityBody}>
             <label className={styles.dropZone}>
               <input
                 type="file"
@@ -2145,7 +2223,8 @@ export default function ActivitiesPage() {
                 {gpxFile.name}
               </p>
             ) : null}
-          </section>
+            </div>
+          </details>
         </div>
 
 
@@ -2209,14 +2288,17 @@ export default function ActivitiesPage() {
               </p>
             </div>
 
-            <span className={styles.plannerCount}>
-              {
-                plannedActivities.filter(
-                  (item) =>
-                    item.status === "planned",
-                ).length
-              }{" "}
-              in programma
+            <span className={styles.summaryAside}>
+              <span className={styles.plannerCount}>
+                {
+                  plannedActivities.filter(
+                    (item) =>
+                      item.status === "planned",
+                  ).length
+                }{" "}
+                in programma
+              </span>
+              <span className={styles.expandToggle} aria-hidden="true" />
             </span>
           </summary>
 
@@ -3301,7 +3383,16 @@ export default function ActivitiesPage() {
             date={selectedDate || isoDate(new Date())}
             accessToken={accessToken}
             showMovement
-            onSaved={loadMonth}
+            onSaved={(savedDate) => {
+              if (!savedDate) {
+                return loadMonth();
+              }
+
+              setSelectedDate(savedDate);
+              setMonth(
+                new Date(`${savedDate}T12:00:00`),
+              );
+            }}
           />
         </details>
 

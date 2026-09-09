@@ -2480,3 +2480,285 @@ summary.loggerHeading {
     width: 100%;
   }
 }
+
+/* ACTIVITY INFORMATION ARCHITECTURE V3 */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+  grid-template-areas:
+    "header header"
+    "summary summary"
+    "calendar calendar"
+    "activities detail"
+    "activities planner"
+    "activities upload"
+    "activities programs"
+    "activities logger"
+    "preview preview";
+  gap: 20px;
+}
+
+.header {
+  grid-area: header;
+  margin-bottom: 8px;
+}
+
+.summarySection {
+  grid-area: summary;
+  margin-bottom: 0;
+}
+
+.topGrid,
+.contentGrid {
+  display: contents;
+}
+
+.calendarCard {
+  grid-area: calendar;
+  padding: 18px 20px;
+}
+
+.contentGrid > .card {
+  grid-area: activities;
+  align-self: start;
+}
+
+.detailCard {
+  grid-area: detail;
+  align-self: start;
+}
+
+.plannerSection {
+  grid-area: planner;
+  align-self: start;
+  margin: 0;
+  padding: 18px;
+}
+
+.uploadCard {
+  grid-area: upload;
+  align-self: start;
+}
+
+.trainingPrograms {
+  grid-area: programs;
+  align-self: start;
+  margin: 0;
+}
+
+.loggerCard {
+  grid-area: logger;
+  align-self: start;
+  margin: 0;
+  padding: 18px;
+}
+
+.previewCard {
+  grid-area: preview;
+  margin-top: 0;
+}
+
+.page > .error,
+.page > .success {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.calendarViewToggle {
+  display: flex;
+  padding: 3px;
+  border: 1px solid #e0e1dc;
+  border-radius: 999px;
+  background: #f4f5f2;
+}
+
+.calendarViewToggle button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #6a7380;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.calendarViewToggle .calendarViewActive {
+  background: #102744;
+  color: #ffffff;
+}
+
+.circularToggle,
+.expandToggle {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #d7d7d0;
+  border-radius: 50%;
+  background: #f7f7f3;
+  color: #102744;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.expandToggle::after {
+  content: "+";
+}
+
+details[open] > summary .expandToggle::after {
+  content: "−";
+}
+
+details[open] > summary .expandToggle {
+  background: #102744;
+  color: #ffffff;
+}
+
+.plannerCollapsible > .plannerHeading::after {
+  display: none;
+}
+
+.summaryAside {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.utilityCard {
+  overflow: hidden;
+  padding: 0;
+}
+
+.utilitySummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.utilitySummary::-webkit-details-marker {
+  display: none;
+}
+
+.utilitySummary h2 {
+  font-size: 1.15rem;
+}
+
+.utilitySummary p:last-child {
+  margin: 5px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.utilityBody {
+  padding: 0 18px 18px;
+  border-top: 1px solid #ecece7;
+}
+
+.utilityBody .dropZone {
+  min-height: 96px;
+  margin-top: 16px;
+}
+
+.trainingProgramsSummary {
+  padding: 18px;
+}
+
+.plannerHeading {
+  margin-bottom: 0;
+}
+
+.plannerCollapsible[open] > .plannerGrid {
+  margin-top: 18px;
+}
+
+.calendarBody {
+  margin-top: 4px;
+}
+
+.calendarCard .day,
+.calendarCard .emptyDay {
+  aspect-ratio: auto;
+  min-height: 70px;
+}
+
+.weekCalendar .day,
+.weekCalendar .emptyDay {
+  aspect-ratio: 1.35;
+  min-height: 74px;
+}
+
+.pageZero .calendarViewToggle .calendarViewActive,
+.pageZero details[open] > summary .expandToggle {
+  background: #f43d3d;
+}
+
+@media (max-width: 980px) {
+  .page {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "summary"
+      "calendar"
+      "activities"
+      "detail"
+      "planner"
+      "upload"
+      "programs"
+      "logger"
+      "preview";
+  }
+}
+
+@media (max-width: 620px) {
+  .page {
+    gap: 14px;
+  }
+
+  .calendarCard,
+  .contentGrid > .card,
+  .detailCard {
+    padding: 16px;
+  }
+
+  .calendarActions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .calendarViewToggle,
+  .googleCalendarButton,
+  .monthControls {
+    grid-column: 1 / -1;
+  }
+
+  .calendarViewToggle button {
+    flex: 1;
+  }
+
+  .circularToggle {
+    grid-column: 2;
+    grid-row: 4;
+    justify-self: end;
+  }
+
+  .weekCalendar .day,
+  .weekCalendar .emptyDay {
+    min-height: 58px;
+  }
+
+  .calendarCard .day,
+  .calendarCard .emptyDay {
+    min-height: 52px;
+  }
+}
