@@ -1,0 +1,540 @@
+From c29ca7586f2c5edaf48d3d31ea7d977b8696c1ef Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 9 Sep 2026 09:39:05 +0200
+Subject: [PATCH] Add read-only demo account alias
+
+---
+ .env.example                                  |   6 +
+ backend/api/dependencies.py                   | 107 +++++++++++++++---
+ backend/api/main.py                           |  69 ++++++++++-
+ backend/api/routers/profile.py                |  15 ++-
+ backend/tests/test_demo_read_only.py          |  95 ++++++++++++++++
+ .../components/navigation/AppNav.module.css   |  27 +++++
+ frontend/components/navigation/AppNav.tsx     |  41 ++++++-
+ frontend/lib/api/profile.ts                   |   2 +
+ 8 files changed, 344 insertions(+), 18 deletions(-)
+ create mode 100644 backend/tests/test_demo_read_only.py
+
+diff --git a/.env.example b/.env.example
+index 60a0f15..d4f7719 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,5 +1,11 @@
+ # Backend
+ CORS_ORIGINS=https://your-frontend.example.com
++SUPABASE_SERVICE_ROLE_KEY=your_server_only_service_role_key
++
++# Optional read-only demo account. Use Supabase Auth user UUIDs, not emails.
++# Never expose either value through NEXT_PUBLIC_* variables.
++DEMO_ACCOUNT_USER_ID=
++DEMO_SOURCE_USER_ID=
+ 
+ # Frontend
+ NEXT_PUBLIC_API_BASE_URL=https://your-backend.example.com
+diff --git a/backend/api/dependencies.py b/backend/api/dependencies.py
+index 625688a..091ad45 100644
+--- a/backend/api/dependencies.py
++++ b/backend/api/dependencies.py
+@@ -71,13 +71,84 @@ class CurrentUser:
+     id: str
+     access_token: str
+     metadata: dict[str, Any] = field(default_factory=dict)
++    authenticated_id: str | None = None
++    read_only: bool = False
+ 
+ 
+-_AUTH_CACHE: dict[str, tuple[float, str, dict]] = {}
++_AUTH_CACHE: dict[
++    str,
++    tuple[float, str, dict, str, bool],
++] = {}
+ _AUTH_CACHE_LOCK = threading.Lock()
+ _AUTH_CACHE_TTL_SECONDS = 60.0
+ 
+ 
++def _demo_user_ids() -> tuple[str, str] | None:
++    demo_id = os.getenv(
++        "DEMO_ACCOUNT_USER_ID",
++        "",
++    ).strip()
++    source_id = os.getenv(
++        "DEMO_SOURCE_USER_ID",
++        "",
++    ).strip()
++
++    if not demo_id or not source_id:
++        return None
++
++    return demo_id, source_id
++
++
++def _source_user_metadata(source_id: str) -> dict[str, Any]:
++    try:
++        response = (
++            get_admin_supabase_client()
++            .auth.admin.get_user_by_id(source_id)
++        )
++        user = getattr(response, "user", None)
++        metadata = getattr(
++            user,
++            "user_metadata",
++            None,
++        )
++        return dict(metadata or {})
++    except Exception as exc:
++        raise HTTPException(
++            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
++            detail="Demo source account is unavailable",
++        ) from exc
++
++
++def _resolved_identity(
++    authenticated_id: str,
++    metadata: dict[str, Any],
++) -> tuple[str, dict[str, Any], bool]:
++    demo_ids = _demo_user_ids()
++
++    if demo_ids is None or authenticated_id != demo_ids[0]:
++        return authenticated_id, metadata, False
++
++    source_id = demo_ids[1]
++    return (
++        source_id,
++        _source_user_metadata(source_id),
++        True,
++    )
++
++
++def _cached_current_user(
++    cached: tuple[float, str, dict, str, bool],
++    token: str,
++) -> CurrentUser:
++    return CurrentUser(
++        id=cached[1],
++        access_token=token,
++        metadata=dict(cached[2]),
++        authenticated_id=cached[3],
++        read_only=cached[4],
++    )
++
++
+ # Shared transport only:
+ # every authenticated Supabase client remains request-scoped,
+ # but TCP/TLS connections can be reused across requests.
+@@ -138,11 +209,7 @@ def get_current_user(
+             "[SUPA perf] auth cache hit",
+             flush=True,
+         )
+-        return CurrentUser(
+-            id=cached[1],
+-            access_token=token,
+-            metadata=dict(cached[2]),
+-        )
++        return _cached_current_user(cached, token)
+ 
+     # Una sola richiesta remota alla volta:
+     # le chiamate parallele della Home aspettano la prima validazione.
+@@ -151,11 +218,7 @@ def get_current_user(
+ 
+         cached = _AUTH_CACHE.get(token_key)
+         if cached and cached[0] > now:
+-            return CurrentUser(
+-                id=cached[1],
+-                access_token=token,
+-                metadata=dict(cached[2]),
+-            )
++            return _cached_current_user(cached, token)
+ 
+         try:
+             auth_started_at = time.perf_counter()
+@@ -214,12 +277,23 @@ def get_current_user(
+                 headers={"WWW-Authenticate": "Bearer"},
+             )
+ 
+-        metadata = user.get("user_metadata") or {}
++        metadata = dict(
++            user.get("user_metadata") or {}
++        )
++        authenticated_id = str(user_id)
++        effective_id, metadata, read_only = (
++            _resolved_identity(
++                authenticated_id,
++                metadata,
++            )
++        )
+ 
+         _AUTH_CACHE[token_key] = (
+             time.monotonic() + _AUTH_CACHE_TTL_SECONDS,
+-            str(user_id),
++            effective_id,
+             dict(metadata),
++            authenticated_id,
++            read_only,
+         )
+ 
+         # Pulizia minima delle entry scadute
+@@ -232,9 +306,11 @@ def get_current_user(
+             _AUTH_CACHE.pop(key_, None)
+ 
+         return CurrentUser(
+-            id=str(user_id),
++            id=effective_id,
+             access_token=token,
+             metadata=dict(metadata),
++            authenticated_id=authenticated_id,
++            read_only=read_only,
+         )
+ 
+ 
+@@ -259,6 +335,9 @@ def get_admin_supabase_client() -> Client:
+ def get_authenticated_supabase(
+     current_user: CurrentUser = Depends(get_current_user),
+ ) -> Client:
++    if current_user.read_only:
++        return get_admin_supabase_client()
++
+     url, key = _supabase_settings()
+ 
+     create_started_at = time.perf_counter()
+diff --git a/backend/api/main.py b/backend/api/main.py
+index c77f57a..f27b55b 100644
+--- a/backend/api/main.py
++++ b/backend/api/main.py
+@@ -5,7 +5,11 @@ from urllib.parse import urlparse
+ 
+ import httpx
+ from fastapi.middleware.cors import CORSMiddleware
+-from fastapi import FastAPI
++from fastapi import FastAPI, HTTPException
++from fastapi.responses import JSONResponse
++from fastapi.security import HTTPAuthorizationCredentials
++
++from backend.api.dependencies import get_current_user
+ 
+ from backend.api.routers.activities import router as activities_router
+ from backend.api.routers.daily_logs import router as daily_logs_router
+@@ -156,6 +160,69 @@ async def performance_timing_middleware(
+ 
+     return response
+ 
++
++@app.middleware("http")
++async def demo_read_only_middleware(
++    request,
++    call_next,
++):
++    if request.method not in {
++        "POST",
++        "PUT",
++        "PATCH",
++        "DELETE",
++    }:
++        return await call_next(request)
++
++    demo_id = os.getenv(
++        "DEMO_ACCOUNT_USER_ID",
++        "",
++    ).strip()
++    source_id = os.getenv(
++        "DEMO_SOURCE_USER_ID",
++        "",
++    ).strip()
++
++    if not demo_id or not source_id:
++        return await call_next(request)
++
++    authorization = request.headers.get(
++        "authorization",
++        "",
++    )
++
++    if not authorization.lower().startswith("bearer "):
++        return await call_next(request)
++
++    token = authorization.split(" ", 1)[1].strip()
++
++    try:
++        current_user = get_current_user(
++            HTTPAuthorizationCredentials(
++                scheme="Bearer",
++                credentials=token,
++            )
++        )
++    except HTTPException as exc:
++        return JSONResponse(
++            status_code=exc.status_code,
++            content={"detail": exc.detail},
++            headers=exc.headers,
++        )
++
++    if current_user.read_only:
++        return JSONResponse(
++            status_code=403,
++            content={
++                "detail": (
++                    "Account demo in sola lettura: "
++                    "le modifiche non vengono salvate."
++                )
++            },
++        )
++
++    return await call_next(request)
++
+ default_origins = [
+     "http://localhost:3000",
+     "https://ubiquitous-journey-p7g55w4jvrpvfwjp-3000.app.github.dev",
+diff --git a/backend/api/routers/profile.py b/backend/api/routers/profile.py
+index e1a7acd..8b7ea13 100644
+--- a/backend/api/routers/profile.py
++++ b/backend/api/routers/profile.py
+@@ -38,11 +38,22 @@ class ProfileUpdate(BaseModel):
+ def get_profile(
+     current_user: CurrentUser = Depends(get_current_user),
+ ) -> dict[str, Any]:
+-    return {
+-        "id": current_user.id,
++    response = {
++        "id": (
++            current_user.authenticated_id
++            or current_user.id
++        ),
+         "metadata": dict(current_user.metadata),
+     }
+ 
++    if current_user.read_only:
++        response.update({
++            "read_only": True,
++            "demo_mode": True,
++        })
++
++    return response
++
+ 
+ @router.put("")
+ def update_profile(
+diff --git a/backend/tests/test_demo_read_only.py b/backend/tests/test_demo_read_only.py
+new file mode 100644
+index 0000000..5b94abd
+--- /dev/null
++++ b/backend/tests/test_demo_read_only.py
+@@ -0,0 +1,95 @@
++from fastapi.testclient import TestClient
++
++from backend.api import dependencies
++from backend.api import main as api_main
++
++
++client = TestClient(api_main.app)
++
++
++def test_demo_identity_reads_source_metadata(monkeypatch):
++    monkeypatch.setenv(
++        "DEMO_ACCOUNT_USER_ID",
++        "demo-user",
++    )
++    monkeypatch.setenv(
++        "DEMO_SOURCE_USER_ID",
++        "source-user",
++    )
++    monkeypatch.setattr(
++        dependencies,
++        "_source_user_metadata",
++        lambda source_id: {
++            "name": "Fabio",
++            "source": source_id,
++        },
++    )
++
++    effective_id, metadata, read_only = (
++        dependencies._resolved_identity(
++            "demo-user",
++            {"name": "Demo"},
++        )
++    )
++
++    assert effective_id == "source-user"
++    assert metadata == {
++        "name": "Fabio",
++        "source": "source-user",
++    }
++    assert read_only is True
++
++
++def test_regular_identity_is_unchanged(monkeypatch):
++    monkeypatch.setenv(
++        "DEMO_ACCOUNT_USER_ID",
++        "demo-user",
++    )
++    monkeypatch.setenv(
++        "DEMO_SOURCE_USER_ID",
++        "source-user",
++    )
++
++    effective_id, metadata, read_only = (
++        dependencies._resolved_identity(
++            "regular-user",
++            {"name": "Regular"},
++        )
++    )
++
++    assert effective_id == "regular-user"
++    assert metadata == {"name": "Regular"}
++    assert read_only is False
++
++
++def test_demo_mutations_are_blocked_before_routes(monkeypatch):
++    monkeypatch.setenv(
++        "DEMO_ACCOUNT_USER_ID",
++        "demo-user",
++    )
++    monkeypatch.setenv(
++        "DEMO_SOURCE_USER_ID",
++        "source-user",
++    )
++    monkeypatch.setattr(
++        api_main,
++        "get_current_user",
++        lambda credentials: dependencies.CurrentUser(
++            id="source-user",
++            authenticated_id="demo-user",
++            access_token=credentials.credentials,
++            metadata={"name": "Fabio"},
++            read_only=True,
++        ),
++    )
++
++    response = client.post(
++        "/meals",
++        headers={
++            "Authorization": "Bearer demo-token",
++        },
++        json={},
++    )
++
++    assert response.status_code == 403
++    assert "sola lettura" in response.json()["detail"]
+diff --git a/frontend/components/navigation/AppNav.module.css b/frontend/components/navigation/AppNav.module.css
+index 905d1ed..8383a41 100644
+--- a/frontend/components/navigation/AppNav.module.css
++++ b/frontend/components/navigation/AppNav.module.css
+@@ -22,6 +22,33 @@
+     );
+ }
+ 
++.demoBanner {
++  position: fixed;
++  z-index: 140;
++  top: 12px;
++  left: 50%;
++  max-width: calc(100vw - 32px);
++  box-sizing: border-box;
++  padding: 9px 15px;
++  border: 1px solid #f2c86f;
++  border-radius: 999px;
++  background: #fff6d8;
++  box-shadow: 0 8px 24px rgba(16, 39, 68, 0.12);
++  color: #72520b;
++  font-size: 0.74rem;
++  font-weight: 850;
++  text-align: center;
++  transform: translateX(-50%);
++}
++
++@media (max-width: 759px) {
++  .demoBanner {
++    top: 8px;
++    width: max-content;
++    font-size: 0.68rem;
++  }
++}
++
+ .brandBlock {
+   display: grid;
+   justify-items: center;
+diff --git a/frontend/components/navigation/AppNav.tsx b/frontend/components/navigation/AppNav.tsx
+index 1a93c03..708b192 100644
+--- a/frontend/components/navigation/AppNav.tsx
++++ b/frontend/components/navigation/AppNav.tsx
+@@ -2,9 +2,11 @@
+ 
+ import Link from "next/link";
+ import { usePathname } from "next/navigation";
++import { useEffect, useState } from "react";
+ 
+ import { useAuth } from "@/components/auth/AuthProvider";
+ import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
++import { getProfile } from "@/lib/api/profile";
+ 
+ import styles from "./AppNav.module.css";
+ 
+@@ -63,7 +65,9 @@ function isActive(pathname: string, href: string): boolean {
+ 
+ export function AppNav() {
+   const pathname = usePathname();
+-  const { user, signOut } = useAuth();
++  const { user, accessToken, signOut } = useAuth();
++  const [readOnlyDemo, setReadOnlyDemo] =
++    useState(false);
+   const {
+     experienceMode,
+     setExperienceMode,
+@@ -96,8 +100,43 @@ export function AppNav() {
+       ? metadataAvatar
+       : null;
+ 
++  useEffect(() => {
++    if (!accessToken) {
++      setReadOnlyDemo(false);
++      return;
++    }
++
++    let active = true;
++    void getProfile(accessToken)
++      .then((profile) => {
++        if (active) {
++          setReadOnlyDemo(
++            profile.read_only === true,
++          );
++        }
++      })
++      .catch(() => {
++        if (active) {
++          setReadOnlyDemo(false);
++        }
++      });
++
++    return () => {
++      active = false;
++    };
++  }, [accessToken]);
++
+   return (
+     <>
++      {readOnlyDemo ? (
++        <div
++          className={styles.demoBanner}
++          role="status"
++        >
++          Modalità demo · dati reali in sola lettura
++        </div>
++      ) : null}
++
+       <div
+         className={styles.globalExperienceSwitch}
+         aria-label="Modalità SanoSync"
+diff --git a/frontend/lib/api/profile.ts b/frontend/lib/api/profile.ts
+index 86d2da7..9cf4537 100644
+--- a/frontend/lib/api/profile.ts
++++ b/frontend/lib/api/profile.ts
+@@ -3,6 +3,8 @@ import { apiRequest } from "./client";
+ export interface ProfileResponse {
+   id: string;
+   metadata: Record<string, unknown>;
++  read_only?: boolean;
++  demo_mode?: boolean;
+ }
+ 
+ export interface ProfileUpdate {
+-- 
+2.51.1
+
