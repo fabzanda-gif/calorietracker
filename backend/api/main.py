@@ -1,6 +1,5 @@
 import os
 import time
-from contextvars import ContextVar
 from urllib.parse import urlparse
 
 import httpx
@@ -10,6 +9,13 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 
 from backend.api.dependencies import get_current_user
+from backend.observability import (
+    bind_request,
+    current_api_path,
+    log_event,
+    new_request_id,
+    reset_request,
+)
 
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.daily_logs import router as daily_logs_router
@@ -39,11 +45,6 @@ app = FastAPI(
     version="0.3.0",
 )
 
-
-_CURRENT_API_PATH: ContextVar[str] = ContextVar(
-    "sanosync_current_api_path",
-    default="-",
-)
 
 _ORIGINAL_HTTPX_SEND = httpx.Client.send
 
@@ -110,14 +111,13 @@ def _timed_httpx_send(
             # può contenere filtri o dati utente.
             outbound_path += "?…"
 
-        print(
-            f"[DB perf] "
-            f"api={_CURRENT_API_PATH.get()} "
-            f"{request.method} "
-            f"{outbound_path}: "
-            f"{elapsed_ms:.0f} ms "
-            f"status={status_code}",
-            flush=True,
+        log_event(
+            "database_request",
+            api_path=current_api_path(),
+            method=request.method,
+            path=outbound_path,
+            duration_ms=round(elapsed_ms),
+            status_code=status_code,
         )
 
 
@@ -136,29 +136,44 @@ async def performance_timing_middleware(
     call_next,
 ):
     started_at = time.perf_counter()
-
-    token = _CURRENT_API_PATH.set(
+    request_id = new_request_id(
+        request.headers.get("x-request-id"),
+    )
+    tokens = bind_request(
+        request_id,
         request.url.path,
     )
+    response = None
 
     try:
         response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+    except Exception as exc:
+        log_event(
+            "api_error",
+            method=request.method,
+            path=request.url.path,
+            error_type=type(exc).__name__,
+        )
+        raise
     finally:
-        _CURRENT_API_PATH.reset(token)
+        elapsed_ms = (
+            time.perf_counter() - started_at
+        ) * 1000
 
-    elapsed_ms = (
-        time.perf_counter() - started_at
-    ) * 1000
-
-    print(
-        f"[API perf] {request.method} "
-        f"{request.url.path}: "
-        f"{elapsed_ms:.0f} ms "
-        f"status={response.status_code}",
-        flush=True,
-    )
-
-    return response
+        log_event(
+            "api_request",
+            method=request.method,
+            path=request.url.path,
+            duration_ms=round(elapsed_ms),
+            status_code=(
+                response.status_code
+                if response is not None
+                else "ERR"
+            ),
+        )
+        reset_request(tokens)
 
 
 @app.middleware("http")
