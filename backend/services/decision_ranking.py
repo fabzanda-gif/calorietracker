@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from backend.services.decision_feedback import DecisionFeedbackService
+from backend.services.meal_suggestion_policy import (
+    MealSuggestionPolicy,
+)
 
 
 class DecisionRankingService:
@@ -325,15 +328,18 @@ class DecisionRankingService:
         ).strip()
 
         if (
-            meal_type in {"Pranzo", "Cena"}
-            and (
-                calories < 500.0
-                or calories > max_main_meal_kcal
+            MealSuggestionPolicy.is_main_meal(meal_type)
+            and not MealSuggestionPolicy.main_meal_calories_are_valid(
+                calories,
+                max_kcal=max_main_meal_kcal,
             )
         ):
             return False
 
-        if available_kcal is not None and meal_type not in {"Pranzo", "Cena"}:
+        if (
+            available_kcal is not None
+            and not MealSuggestionPolicy.is_main_meal(meal_type)
+        ):
             available = float(available_kcal)
 
             # Calorie availability is a strong preference, not a
