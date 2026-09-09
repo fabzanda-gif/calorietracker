@@ -2760,25 +2760,30 @@ export function HomeShell() {
       ),
     ]);
 
-    const nextMealOptionsPayload =
-      nextMealPayload.next_slot
-        ? await getMealOptions(
-            date,
-            nextMealPayload.next_slot,
-            "auto",
-            accessToken,
-          )
-        : null;
-
     setDay(dayPayload);
     setBudgetResult(budgetPayload);
     setNextMeal(nextMealPayload);
-    setNextMealOptions(nextMealOptionsPayload);
-    setDinnerOptions(
-      nextMealPayload.next_slot === "dinner"
-        ? nextMealOptionsPayload
-        : null,
-    );
+
+    if (nextMealPayload.next_slot) {
+      void getMealOptions(
+        date,
+        nextMealPayload.next_slot,
+        "auto",
+        accessToken,
+      )
+        .then((payload) => {
+          setNextMealOptions(payload);
+          setDinnerOptions(
+            nextMealPayload.next_slot === "dinner"
+              ? payload
+              : null,
+          );
+        })
+        .catch(() => undefined);
+    } else {
+      setNextMealOptions(null);
+      setDinnerOptions(null);
+    }
     setActualMeals(mealsPayload.items);
     setActualActivities(
       activitiesPayload.items,
