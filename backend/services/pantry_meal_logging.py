@@ -227,18 +227,43 @@ class PantryMealLoggingService:
             ),
         }
 
-        meal_response = self.meals_repo.create_compatible(
-            payload
+        compatible_creator = getattr(
+            self.meals_repo,
+            "create_compatible",
+            None,
         )
 
-        meal_rows = (
-            getattr(meal_response, "data", None)
-            or []
-        )
+        if callable(compatible_creator):
+            meal_response = compatible_creator(
+                payload
+            )
 
-        meal = meal_rows[0] if meal_rows else None
+            if isinstance(meal_response, dict):
+                meal = meal_response
+            else:
+                meal_rows = (
+                    getattr(
+                        meal_response,
+                        "data",
+                        None,
+                    )
+                    or []
+                )
 
-        if meal is None or meal.get("id") is None:
+                meal = (
+                    meal_rows[0]
+                    if meal_rows
+                    else None
+                )
+        else:
+            # Compatibility with repository implementations
+            # that already normalize create() to a single row.
+            meal = self.meals_repo.create(payload)
+
+        if (
+            not isinstance(meal, dict)
+            or meal.get("id") is None
+        ):
             raise PantryMealLoggingError(
                 "Meal was created without an id"
             )
