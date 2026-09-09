@@ -2793,3 +2793,51 @@ details[open] > summary .expandToggle {
     text-align: center;
   }
 }
+
+
+/* ==========================================================
+   PLANNED RUN GPX BUTTON
+   Label styled exactly like neighbouring action buttons
+   ========================================================== */
+
+.upcomingActions label.completePlanButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  min-height: 38px;
+  padding: 7px 10px;
+
+  border: 1px solid #102846;
+  border-radius: 9px;
+
+  background: #102846;
+  color: #ffffff;
+
+  font: inherit;
+  font-weight: 750;
+  line-height: 1;
+
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.upcomingActions label.completePlanButton:hover {
+  opacity: 0.9;
+}
+
+.pageZero
+.upcomingActions
+label.completePlanButton {
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
+}
+
+@media (max-width: 620px) {
+  .upcomingActions label.completePlanButton {
+    min-height: 38px;
+  }
+}
