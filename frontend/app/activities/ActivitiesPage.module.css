@@ -2841,3 +2841,60 @@ label.completePlanButton {
     min-height: 38px;
   }
 }
+
+
+/* ==========================================================
+   NEXT PLANNED ACTIVITY
+   ========================================================== */
+
+.nextUpcomingCard {
+  position: relative;
+
+  border: 2px solid rgba(255, 104, 101, 0.72);
+
+  background:
+    linear-gradient(
+      135deg,
+      #fff8f7 0%,
+      #ffffff 72%
+    );
+
+  box-shadow:
+    0 12px 30px rgba(255, 104, 101, 0.10);
+}
+
+.nextActivityBadge {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 22px;
+  padding: 0 8px;
+
+  border-radius: 999px;
+
+  background: #102846;
+  color: #ffffff;
+
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.pageZero .nextUpcomingCard {
+  border-color: rgba(244, 61, 61, 0.85);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(244, 61, 61, 0.09) 0%,
+      #ffffff 72%
+    );
+
+  box-shadow:
+    0 12px 30px rgba(244, 61, 61, 0.10);
+}
+
+.pageZero .nextActivityBadge {
+  background: #111111;
+  color: #f43d3d;
+}

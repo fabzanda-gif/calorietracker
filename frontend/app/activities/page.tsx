@@ -945,6 +945,13 @@ export default function ActivitiesPage() {
       [plannedActivities],
     );
 
+  const nextPlannedActivityId =
+    sortedPlannedActivities.find(
+      (item) =>
+        item.status === "planned" &&
+        item.scheduled_date >= isoDate(new Date()),
+    )?.id ?? null;
+
   const activitiesByDate = useMemo(() => {
     const grouped = new Map<string, Activity[]>();
 
@@ -2506,6 +2513,10 @@ export default function ActivitiesPage() {
                         item.training_plan_id
                           ? styles.upcomingTrainingCard
                           : ""
+                      } ${
+                        item.id === nextPlannedActivityId
+                          ? styles.nextUpcomingCard
+                          : ""
                       }`}
                     >
                       <div
@@ -2594,6 +2605,16 @@ export default function ActivitiesPage() {
                             styles.upcomingBadges
                           }
                         >
+                          {item.id ===
+                          nextPlannedActivityId ? (
+                            <span
+                              className={
+                                styles.nextActivityBadge
+                              }
+                            >
+                              PROSSIMA
+                            </span>
+                          ) : null}
                           <span
                             className={`${styles.upcomingType} ${
                               item.training_plan_id
