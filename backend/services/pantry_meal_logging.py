@@ -49,7 +49,11 @@ class PantryMealLoggingService:
         except (TypeError, ValueError):
             return 0.0
 
-    def _available_grams(self, item: dict) -> float:
+    def _available_grams(
+        self,
+        item: dict,
+        fallback_grams_per_portion: float | None = None,
+    ) -> float:
         quantity = self._number(item.get("quantity"))
         mode = str(item.get("quantity_mode") or "weight").lower()
         unit = str(item.get("unit") or "").strip().lower()
@@ -58,10 +62,17 @@ class PantryMealLoggingService:
             grams_per_portion = self._number(
                 item.get("grams_per_portion")
             )
+
+            if grams_per_portion <= 0:
+                grams_per_portion = self._number(
+                    fallback_grams_per_portion
+                )
+
             if grams_per_portion <= 0:
                 raise PantryMealUnavailableError(
                     "Pantry portion has no gram weight"
                 )
+
             return quantity * grams_per_portion
 
         if unit in {"g", "gr", "gram", "grams"}:
@@ -78,6 +89,7 @@ class PantryMealLoggingService:
         self,
         item: dict,
         consumed_grams: float,
+        fallback_grams_per_portion: float | None = None,
     ) -> float:
         quantity = self._number(item.get("quantity"))
         mode = str(item.get("quantity_mode") or "weight").lower()
@@ -87,6 +99,17 @@ class PantryMealLoggingService:
             grams_per_portion = self._number(
                 item.get("grams_per_portion")
             )
+
+            if grams_per_portion <= 0:
+                grams_per_portion = self._number(
+                    fallback_grams_per_portion
+                )
+
+            if grams_per_portion <= 0:
+                raise PantryMealUnavailableError(
+                    "Pantry portion has no gram weight"
+                )
+
             return quantity - (
                 consumed_grams / grams_per_portion
             )
@@ -138,7 +161,8 @@ class PantryMealLoggingService:
             )
 
         available_grams = self._available_grams(
-            pantry_item
+            pantry_item,
+            fallback_grams_per_portion=quantity_g,
         )
 
         if quantity_g > available_grams + 0.001:
@@ -231,6 +255,7 @@ class PantryMealLoggingService:
             remaining = self._remaining_quantity(
                 pantry_item,
                 quantity_g,
+                fallback_grams_per_portion=quantity_g,
             )
 
             if remaining <= 0.001:
