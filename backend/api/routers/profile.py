@@ -119,11 +119,16 @@ def delete_account(
             detail="Supabase admin configuration is missing",
         )
 
+    authenticated_user_id = (
+        current_user.authenticated_id
+        or current_user.id
+    )
+
     try:
         response = requests.delete(
             (
                 f"{url.rstrip('/')}/auth/v1/admin/users/"
-                f"{current_user.id}"
+                f"{authenticated_user_id}"
             ),
             headers={
                 "apikey": service_role_key,
