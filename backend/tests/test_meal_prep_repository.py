@@ -75,3 +75,39 @@ def test_update_is_user_scoped():
 
     assert row["portions_remaining"] == 3
     assert names(fake).count("eq") == 2
+
+def test_consume_portion_uses_expected_quantity_guard():
+    fake = FakeSupabase(
+        [{
+            "id": "b1",
+            "portions_remaining": 0,
+            "status": "finished",
+        }]
+    )
+
+    row = MealPrepRepository(fake).consume_portion(
+        "b1",
+        "u1",
+        expected_remaining=1,
+    )
+
+    assert row["portions_remaining"] == 0
+    assert names(fake).count("eq") == 4
+    assert (
+        "eq",
+        ("portions_remaining", 1),
+        {},
+    ) in fake.calls
+
+
+def test_consume_portion_reports_lost_race():
+    fake = FakeSupabase([])
+
+    row = MealPrepRepository(fake).consume_portion(
+        "b1",
+        "u1",
+        expected_remaining=1,
+    )
+
+    assert row is None
+
