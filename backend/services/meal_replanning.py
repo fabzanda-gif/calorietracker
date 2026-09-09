@@ -5,6 +5,9 @@ from typing import Any
 from backend.services.meal_component_adaptation import (
     MealComponentAdaptationService,
 )
+from backend.services.meal_suggestion_policy import (
+    MealSuggestionPolicy,
+)
 
 
 class MealReplanningService:
@@ -52,7 +55,12 @@ class MealReplanningService:
                     original_candidate=routine_candidate,
                 )
 
-        if isinstance(routine_candidate, dict) and str(routine_candidate.get("meal_type")) not in {"Pranzo", "Cena"}:
+        if (
+            isinstance(routine_candidate, dict)
+            and not MealSuggestionPolicy.is_main_meal(
+                routine_candidate.get("meal_type")
+            )
+        ):
             adapted = (
                 MealComponentAdaptationService().adapt(
                     candidate=routine_candidate,
@@ -117,8 +125,13 @@ class MealReplanningService:
         meal_type = str(candidate.get("meal_type") or "").strip()
         calories = cls._number(candidate.get("calories"))
 
-        if meal_type in {"Pranzo", "Cena"}:
-            return 500.0 <= calories <= max_main_meal_kcal
+        if MealSuggestionPolicy.is_main_meal(meal_type):
+            return (
+                MealSuggestionPolicy.main_meal_calories_are_valid(
+                    calories,
+                    max_kcal=max_main_meal_kcal,
+                )
+            )
 
         if available_kcal is None:
             return True
