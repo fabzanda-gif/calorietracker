@@ -945,12 +945,15 @@ export default function ActivitiesPage() {
       [plannedActivities],
     );
 
-  const nextPlannedActivityId =
+  const nextPlannedActivity =
     sortedPlannedActivities.find(
       (item) =>
         item.status === "planned" &&
         item.scheduled_date >= isoDate(new Date()),
-    )?.id ?? null;
+    ) ?? null;
+
+  const nextPlannedActivityId =
+    nextPlannedActivity?.id ?? null;
 
   const activitiesByDate = useMemo(() => {
     const grouped = new Map<string, Activity[]>();
@@ -2284,29 +2287,138 @@ export default function ActivitiesPage() {
           className={`${styles.plannerSection} ${styles.plannerCollapsible}`}
         >
           <summary className={styles.plannerHeading}>
-            <div>
-              <p className={styles.eyebrow}>
-                Pianifica
-              </p>
-              <h2>Prossime attività</h2>
-              <p>
-                Quello che hai intenzione di fare,
-                non quello che è già successo.
-              </p>
-            </div>
+            {nextPlannedActivity ? (
+              <>
+                <div className={styles.nextActivitySpotlightCopy}>
+                  <p className={styles.eyebrow}>
+                    Prossima attività
+                  </p>
 
-            <span className={styles.summaryAside}>
-              <span className={styles.plannerCount}>
-                {
-                  plannedActivities.filter(
-                    (item) =>
-                      item.status === "planned",
-                  ).length
-                }{" "}
-                in programma
-              </span>
-              <span className={styles.expandToggle} aria-hidden="true" />
-            </span>
+                  <h2>{nextPlannedActivity.title}</h2>
+
+                  <p className={styles.nextActivitySpotlightMeta}>
+                    {plannedDateLabel(
+                      nextPlannedActivity.scheduled_date,
+                    )}
+
+                    {nextPlannedActivity.scheduled_time
+                      ? ` · ${nextPlannedActivity.scheduled_time.slice(
+                          0,
+                          5,
+                        )}`
+                      : ""}
+
+                    {nextPlannedActivity.duration_minutes
+                      ? ` · ${nextPlannedActivity.duration_minutes} min`
+                      : ""}
+
+                    {nextPlannedActivity.distance_meters &&
+                    plannedActivitySupportsDistance(
+                      nextPlannedActivity.activity_type,
+                    )
+                      ? ` · ${(
+                          nextPlannedActivity.distance_meters /
+                          1000
+                        ).toLocaleString("it-IT", {
+                          maximumFractionDigits: 1,
+                        })} km`
+                      : ""}
+
+                    {` · ${
+                      PLANNED_INTENSITY_LABELS[
+                        nextPlannedActivity.intensity
+                      ]
+                    }`}
+                  </p>
+                </div>
+
+                <div className={styles.nextActivitySpotlightActions}>
+                  <button
+                    type="button"
+                    className={styles.nextActivityConfirm}
+                    disabled={
+                      busyPlanId === nextPlannedActivity.id
+                    }
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+
+                      void setPlannedStatus(
+                        nextPlannedActivity,
+                        "completed",
+                      );
+                    }}
+                  >
+                    {nextPlannedActivity.activity_type
+                      .trim()
+                      .toLocaleLowerCase("it-IT") === "corsa"
+                      ? "✓ Conferma corsa"
+                      : "✓ Conferma attività"}
+                  </button>
+
+                  {nextPlannedActivity.activity_type
+                    .trim()
+                    .toLocaleLowerCase("it-IT") === "corsa" ? (
+                    <label
+                      className={styles.nextActivityGpx}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                      }}
+                    >
+                      Carica GPX
+
+                      <input
+                        hidden
+                        type="file"
+                        accept=".gpx,application/gpx+xml"
+                        disabled={
+                          busyPlanId === nextPlannedActivity.id
+                        }
+                        onChange={(event) => {
+                          const file =
+                            event.target.files?.[0] ?? null;
+
+                          void chooseGpx(
+                            file,
+                            nextPlannedActivity,
+                          );
+
+                          event.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                  ) : null}
+
+                  <span className={styles.plannerMorePrompt}>
+                    Vedi altre attività programmate
+                    <span
+                      className={styles.expandToggle}
+                      aria-hidden="true"
+                    />
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className={styles.eyebrow}>
+                    Pianifica
+                  </p>
+                  <h2>Nessuna attività in programma</h2>
+                  <p>
+                    Apri per aggiungere la prossima.
+                  </p>
+                </div>
+
+                <span className={styles.plannerMorePrompt}>
+                  Pianifica attività
+                  <span
+                    className={styles.expandToggle}
+                    aria-hidden="true"
+                  />
+                </span>
+              </>
+            )}
           </summary>
 
 
@@ -2504,8 +2616,16 @@ export default function ActivitiesPage() {
             </div>
 
             <div className={styles.upcomingList}>
-              {sortedPlannedActivities.length ? (
-                sortedPlannedActivities.map(
+              {sortedPlannedActivities.filter(
+                (item) =>
+                  item.id !== nextPlannedActivityId,
+              ).length ? (
+                sortedPlannedActivities
+                  .filter(
+                    (item) =>
+                      item.id !== nextPlannedActivityId,
+                  )
+                  .map(
                   (item) => (
                     <article
                       key={item.id}
@@ -3370,7 +3490,7 @@ export default function ActivitiesPage() {
               ) : (
                 <div className={styles.emptyPlan}>
                   <strong>
-                    Nessuna attività pianificata.
+                    Nessun'altra attività programmata.
                   </strong>
                   <p>
                     Per ora il futuro è sorprendentemente

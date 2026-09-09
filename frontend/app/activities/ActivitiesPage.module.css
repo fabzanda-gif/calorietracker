@@ -2898,3 +2898,110 @@ label.completePlanButton {
   background: #111111;
   color: #f43d3d;
 }
+
+
+/* ==========================================================
+   NEXT ACTIVITY SPOTLIGHT
+   ========================================================== */
+
+.plannerHeading {
+  align-items: center;
+  cursor: pointer;
+}
+
+.plannerHeading::-webkit-details-marker {
+  display: none;
+}
+
+.nextActivitySpotlightCopy {
+  min-width: 0;
+}
+
+.nextActivitySpotlightCopy h2 {
+  margin: 2px 0 6px;
+}
+
+.nextActivitySpotlightMeta {
+  margin: 0;
+  color: #65758a;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.nextActivitySpotlightActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.nextActivityConfirm,
+.nextActivityGpx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 38px;
+  padding: 0 14px;
+
+  border-radius: 11px;
+
+  font-size: 0.78rem;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.nextActivityConfirm {
+  border: 1px solid #102846;
+  background: #102846;
+  color: #ffffff;
+}
+
+.nextActivityGpx {
+  border: 1px solid #ff6967;
+  background: #fff7f6;
+  color: #ed5d59;
+}
+
+.plannerMorePrompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-left: 4px;
+
+  color: #607085;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pageZero .nextActivityConfirm {
+  border-color: #111111;
+  background: #111111;
+  color: #f43d3d;
+}
+
+.pageZero .nextActivityGpx {
+  border-color: #f43d3d;
+  background: #ffffff;
+  color: #f43d3d;
+}
+
+@media (max-width: 760px) {
+  .plannerHeading {
+    align-items: flex-start;
+  }
+
+  .nextActivitySpotlightActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .plannerMorePrompt {
+    width: 100%;
+    margin: 2px 0 0;
+  }
+}
