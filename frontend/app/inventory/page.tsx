@@ -776,16 +776,20 @@ export default function InventoryPage() {
     },
   ).length;
 
-  const lunchDinnerCount = pantryItems.filter(
-    (item) => {
-      const slots = pantrySlots(item);
+  const lunchDinnerCount =
+    pantryItems.filter(
+      (item) => {
+        const slots = pantrySlots(item);
 
-      return (
-        slots.includes("lunch") ||
-        slots.includes("dinner")
-      );
-    },
-  ).length;
+        return (
+          slots.includes("lunch") ||
+          slots.includes("dinner")
+        );
+      },
+    ).length +
+    items.filter(
+      (item) => item.portions_remaining > 0,
+    ).length;
 
   const cookedPortionsCount = items.reduce(
     (total, item) =>
@@ -845,7 +849,8 @@ export default function InventoryPage() {
     (item) => {
       if (
         inventoryFilter !== "all" &&
-        inventoryFilter !== "meal_prep"
+        inventoryFilter !== "meal_prep" &&
+        inventoryFilter !== "lunch_dinner"
       ) {
         return false;
       }
