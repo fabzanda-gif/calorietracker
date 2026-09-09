@@ -1,0 +1,766 @@
+From 72920d08f88abb33db17520ce189de2e145a016f Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 9 Sep 2026 09:13:08 +0200
+Subject: [PATCH] Reorganize activity workspace and support past logging
+
+---
+ .../app/activities/ActivitiesPage.module.css  | 282 ++++++++++++++++++
+ frontend/app/activities/page.tsx              | 173 ++++++++---
+ .../activity/ActivityLogger.module.css        |  17 +-
+ .../components/activity/ActivityLogger.tsx    |  39 ++-
+ 4 files changed, 459 insertions(+), 52 deletions(-)
+
+diff --git a/frontend/app/activities/ActivitiesPage.module.css b/frontend/app/activities/ActivitiesPage.module.css
+index db5a947..89252e0 100644
+--- a/frontend/app/activities/ActivitiesPage.module.css
++++ b/frontend/app/activities/ActivitiesPage.module.css
+@@ -2480,3 +2480,285 @@ summary.loggerHeading {
+     width: 100%;
+   }
+ }
++
++/* ACTIVITY INFORMATION ARCHITECTURE V3 */
++
++.page {
++  display: grid;
++  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
++  grid-template-areas:
++    "header header"
++    "summary summary"
++    "calendar calendar"
++    "activities detail"
++    "activities planner"
++    "activities upload"
++    "activities programs"
++    "activities logger"
++    "preview preview";
++  gap: 20px;
++}
++
++.header {
++  grid-area: header;
++  margin-bottom: 8px;
++}
++
++.summarySection {
++  grid-area: summary;
++  margin-bottom: 0;
++}
++
++.topGrid,
++.contentGrid {
++  display: contents;
++}
++
++.calendarCard {
++  grid-area: calendar;
++  padding: 18px 20px;
++}
++
++.contentGrid > .card {
++  grid-area: activities;
++  align-self: start;
++}
++
++.detailCard {
++  grid-area: detail;
++  align-self: start;
++}
++
++.plannerSection {
++  grid-area: planner;
++  align-self: start;
++  margin: 0;
++  padding: 18px;
++}
++
++.uploadCard {
++  grid-area: upload;
++  align-self: start;
++}
++
++.trainingPrograms {
++  grid-area: programs;
++  align-self: start;
++  margin: 0;
++}
++
++.loggerCard {
++  grid-area: logger;
++  align-self: start;
++  margin: 0;
++  padding: 18px;
++}
++
++.previewCard {
++  grid-area: preview;
++  margin-top: 0;
++}
++
++.page > .error,
++.page > .success {
++  grid-column: 1 / -1;
++  margin: 0;
++}
++
++.calendarViewToggle {
++  display: flex;
++  padding: 3px;
++  border: 1px solid #e0e1dc;
++  border-radius: 999px;
++  background: #f4f5f2;
++}
++
++.calendarViewToggle button {
++  min-height: 30px;
++  padding: 0 11px;
++  border: 0;
++  border-radius: 999px;
++  background: transparent;
++  color: #6a7380;
++  cursor: pointer;
++  font: inherit;
++  font-size: 0.7rem;
++  font-weight: 850;
++}
++
++.calendarViewToggle .calendarViewActive {
++  background: #102744;
++  color: #ffffff;
++}
++
++.circularToggle,
++.expandToggle {
++  flex: 0 0 auto;
++  display: grid;
++  place-items: center;
++  width: 34px;
++  height: 34px;
++  padding: 0;
++  border: 1px solid #d7d7d0;
++  border-radius: 50%;
++  background: #f7f7f3;
++  color: #102744;
++  font-size: 1.05rem;
++  font-weight: 900;
++  line-height: 1;
++}
++
++.expandToggle::after {
++  content: "+";
++}
++
++details[open] > summary .expandToggle::after {
++  content: "−";
++}
++
++details[open] > summary .expandToggle {
++  background: #102744;
++  color: #ffffff;
++}
++
++.plannerCollapsible > .plannerHeading::after {
++  display: none;
++}
++
++.summaryAside {
++  display: flex;
++  align-items: center;
++  gap: 9px;
++}
++
++.utilityCard {
++  overflow: hidden;
++  padding: 0;
++}
++
++.utilitySummary {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 16px;
++  padding: 18px;
++  cursor: pointer;
++  list-style: none;
++}
++
++.utilitySummary::-webkit-details-marker {
++  display: none;
++}
++
++.utilitySummary h2 {
++  font-size: 1.15rem;
++}
++
++.utilitySummary p:last-child {
++  margin: 5px 0 0;
++  font-size: 0.75rem;
++  line-height: 1.35;
++}
++
++.utilityBody {
++  padding: 0 18px 18px;
++  border-top: 1px solid #ecece7;
++}
++
++.utilityBody .dropZone {
++  min-height: 96px;
++  margin-top: 16px;
++}
++
++.trainingProgramsSummary {
++  padding: 18px;
++}
++
++.plannerHeading {
++  margin-bottom: 0;
++}
++
++.plannerCollapsible[open] > .plannerGrid {
++  margin-top: 18px;
++}
++
++.calendarBody {
++  margin-top: 4px;
++}
++
++.calendarCard .day,
++.calendarCard .emptyDay {
++  aspect-ratio: auto;
++  min-height: 70px;
++}
++
++.weekCalendar .day,
++.weekCalendar .emptyDay {
++  aspect-ratio: 1.35;
++  min-height: 74px;
++}
++
++.pageZero .calendarViewToggle .calendarViewActive,
++.pageZero details[open] > summary .expandToggle {
++  background: #f43d3d;
++}
++
++@media (max-width: 980px) {
++  .page {
++    grid-template-columns: 1fr;
++    grid-template-areas:
++      "header"
++      "summary"
++      "calendar"
++      "activities"
++      "detail"
++      "planner"
++      "upload"
++      "programs"
++      "logger"
++      "preview";
++  }
++}
++
++@media (max-width: 620px) {
++  .page {
++    gap: 14px;
++  }
++
++  .calendarCard,
++  .contentGrid > .card,
++  .detailCard {
++    padding: 16px;
++  }
++
++  .calendarActions {
++    display: grid;
++    grid-template-columns: 1fr auto;
++  }
++
++  .calendarViewToggle,
++  .googleCalendarButton,
++  .monthControls {
++    grid-column: 1 / -1;
++  }
++
++  .calendarViewToggle button {
++    flex: 1;
++  }
++
++  .circularToggle {
++    grid-column: 2;
++    grid-row: 4;
++    justify-self: end;
++  }
++
++  .weekCalendar .day,
++  .weekCalendar .emptyDay {
++    min-height: 58px;
++  }
++
++  .calendarCard .day,
++  .calendarCard .emptyDay {
++    min-height: 52px;
++  }
++}
+diff --git a/frontend/app/activities/page.tsx b/frontend/app/activities/page.tsx
+index 41dfd86..8856ec1 100644
+--- a/frontend/app/activities/page.tsx
++++ b/frontend/app/activities/page.tsx
+@@ -120,6 +120,26 @@ function calendarDays(month: Date): Array<Date | null> {
+   return result;
+ }
+ 
++function weekDays(anchor: Date): Date[] {
++  const monday = new Date(anchor);
++  const offset = (monday.getDay() + 6) % 7;
++  monday.setDate(monday.getDate() - offset);
++
++  return Array.from({ length: 7 }, (_, index) => {
++    const day = new Date(monday);
++    day.setDate(monday.getDate() + index);
++    return day;
++  });
++}
++
++function weekBounds(anchor: Date) {
++  const days = weekDays(anchor);
++  return {
++    start: isoDate(days[0]),
++    end: isoDate(days[6]),
++  };
++}
++
+ function fileToBase64(file: File): Promise<string> {
+   return new Promise((resolve, reject) => {
+     const reader = new FileReader();
+@@ -557,6 +577,10 @@ export default function ActivitiesPage() {
+   const [month, setMonth] = useState(
+     () => new Date(),
+   );
++  const [calendarView, setCalendarView] =
++    useState<"weekly" | "monthly">("monthly");
++  const [calendarExpanded, setCalendarExpanded] =
++    useState(true);
+   const [activities, setActivities] = useState<
+     Activity[]
+   >([]);
+@@ -705,7 +729,9 @@ export default function ActivitiesPage() {
+     setError(null);
+ 
+     try {
+-      const bounds = monthBounds(month);
++      const bounds = calendarView === "weekly"
++        ? weekBounds(month)
++        : monthBounds(month);
+       const today = new Date();
+       const rollingStart = new Date(today);
+       rollingStart.setDate(today.getDate() - 29);
+@@ -817,17 +843,50 @@ export default function ActivitiesPage() {
+     } finally {
+       setLoading(false);
+     }
+-  }, [accessToken, month]);
++  }, [accessToken, calendarView, month]);
+ 
+   useEffect(() => {
+     void loadMonth();
+   }, [loadMonth]);
+ 
+   const days = useMemo(
+-    () => calendarDays(month),
+-    [month],
++    () => calendarView === "weekly"
++      ? weekDays(month)
++      : calendarDays(month),
++    [calendarView, month],
+   );
+ 
++  const periodLabel = useMemo(() => {
++    if (calendarView === "monthly") {
++      return month.toLocaleDateString("it-IT", {
++        month: "long",
++        year: "numeric",
++      });
++    }
++
++    const range = weekDays(month);
++    const start = range[0];
++    const end = range[6];
++    const sameMonth =
++      start.getMonth() === end.getMonth();
++
++    return sameMonth
++      ? `${start.getDate()}–${end.getDate()} ${end.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}`
++      : `${start.toLocaleDateString("it-IT", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}`;
++  }, [calendarView, month]);
++
++  const navigatePeriod = useCallback((direction: -1 | 1) => {
++    setMonth((current) => {
++      const next = new Date(current);
++      if (calendarView === "weekly") {
++        next.setDate(next.getDate() + direction * 7);
++      } else {
++        next.setMonth(next.getMonth() + direction, 1);
++      }
++      return next;
++    });
++  }, [calendarView]);
++
+   const trainingActivities = useMemo(
+     () =>
+       activities.filter(
+@@ -1842,7 +1901,7 @@ export default function ActivitiesPage() {
+         </section>
+ 
+         <div className={styles.topGrid}>
+-          <section className={styles.card}>
++          <section className={`${styles.card} ${styles.calendarCard}`}>
+             <div className={styles.cardHeading}>
+               <div>
+                 <p className={styles.eyebrow}>
+@@ -1852,6 +1911,26 @@ export default function ActivitiesPage() {
+               </div>
+ 
+               <div className={styles.calendarActions}>
++                <div
++                  className={styles.calendarViewToggle}
++                  aria-label="Vista calendario"
++                >
++                  <button
++                    type="button"
++                    className={calendarView === "weekly" ? styles.calendarViewActive : ""}
++                    onClick={() => setCalendarView("weekly")}
++                  >
++                    Weekly
++                  </button>
++                  <button
++                    type="button"
++                    className={calendarView === "monthly" ? styles.calendarViewActive : ""}
++                    onClick={() => setCalendarView("monthly")}
++                  >
++                    Monthly
++                  </button>
++                </div>
++
+                 <button
+                   type="button"
+                   className={styles.googleCalendarButton}
+@@ -1869,42 +1948,33 @@ export default function ActivitiesPage() {
+                 <button
+                   type="button"
+                   aria-label="Mese precedente"
+-                  onClick={() =>
+-                    setMonth(
+-                      new Date(
+-                        month.getFullYear(),
+-                        month.getMonth() - 1,
+-                        1,
+-                      ),
+-                    )
+-                  }
++                  onClick={() => navigatePeriod(-1)}
+                 >
+                   ←
+                 </button>
+ 
+                 <strong>
+-                  {month.toLocaleDateString("it-IT", {
+-                    month: "long",
+-                    year: "numeric",
+-                  })}
++                  {periodLabel}
+                 </strong>
+ 
+                 <button
+                   type="button"
+                   aria-label="Mese successivo"
+-                  onClick={() =>
+-                    setMonth(
+-                      new Date(
+-                        month.getFullYear(),
+-                        month.getMonth() + 1,
+-                        1,
+-                      ),
+-                    )
+-                  }
++                  onClick={() => navigatePeriod(1)}
+                 >
+                   →
+                 </button>
+                 </div>
++
++                <button
++                  type="button"
++                  className={styles.circularToggle}
++                  aria-label={calendarExpanded ? "Comprimi calendario" : "Espandi calendario"}
++                  aria-expanded={calendarExpanded}
++                  onClick={() => setCalendarExpanded((current) => !current)}
++                >
++                  {calendarExpanded ? "−" : "+"}
++                </button>
+               </div>
+             </div>
+ 
+@@ -1914,7 +1984,9 @@ export default function ActivitiesPage() {
+               </p>
+             )}
+ 
+-            <div className={styles.calendar}>
++            {calendarExpanded ? (
++              <div className={styles.calendarBody}>
++            <div className={`${styles.calendar} ${calendarView === "weekly" ? styles.weekCalendar : ""}`}>
+               {WEEKDAYS.map((weekday) => (
+                 <span
+                   key={weekday}
+@@ -2104,10 +2176,13 @@ export default function ActivitiesPage() {
+                 Carico il mese…
+               </p>
+             ) : null}
++              </div>
++            ) : null}
+           </section>
+ 
+-          <section className={styles.uploadCard}>
+-            <div>
++          <details className={`${styles.uploadCard} ${styles.utilityCard}`}>
++            <summary className={styles.utilitySummary}>
++              <div>
+               <p className={styles.eyebrow}>
+                 Importa
+               </p>
+@@ -2116,8 +2191,11 @@ export default function ActivitiesPage() {
+                 Percorso, durata, cadenza e frequenza
+                 cardiaca vengono letti dal file.
+               </p>
+-            </div>
++              </div>
++              <span className={styles.expandToggle} aria-hidden="true" />
++            </summary>
+ 
++            <div className={styles.utilityBody}>
+             <label className={styles.dropZone}>
+               <input
+                 type="file"
+@@ -2145,7 +2223,8 @@ export default function ActivitiesPage() {
+                 {gpxFile.name}
+               </p>
+             ) : null}
+-          </section>
++            </div>
++          </details>
+         </div>
+ 
+ 
+@@ -2209,14 +2288,17 @@ export default function ActivitiesPage() {
+               </p>
+             </div>
+ 
+-            <span className={styles.plannerCount}>
+-              {
+-                plannedActivities.filter(
+-                  (item) =>
+-                    item.status === "planned",
+-                ).length
+-              }{" "}
+-              in programma
++            <span className={styles.summaryAside}>
++              <span className={styles.plannerCount}>
++                {
++                  plannedActivities.filter(
++                    (item) =>
++                      item.status === "planned",
++                  ).length
++                }{" "}
++                in programma
++              </span>
++              <span className={styles.expandToggle} aria-hidden="true" />
+             </span>
+           </summary>
+ 
+@@ -3301,7 +3383,16 @@ export default function ActivitiesPage() {
+             date={selectedDate || isoDate(new Date())}
+             accessToken={accessToken}
+             showMovement
+-            onSaved={loadMonth}
++            onSaved={(savedDate) => {
++              if (!savedDate) {
++                return loadMonth();
++              }
++
++              setSelectedDate(savedDate);
++              setMonth(
++                new Date(`${savedDate}T12:00:00`),
++              );
++            }}
+           />
+         </details>
+ 
+diff --git a/frontend/components/activity/ActivityLogger.module.css b/frontend/components/activity/ActivityLogger.module.css
+index ec7797a..d5b22d3 100644
+--- a/frontend/components/activity/ActivityLogger.module.css
++++ b/frontend/components/activity/ActivityLogger.module.css
+@@ -39,7 +39,8 @@
+ }
+ 
+ .formGrid label,
+-.stepsInput {
++.stepsInput,
++.dateInput {
+   display: grid;
+   align-content: start;
+   gap: 6px;
+@@ -50,7 +51,8 @@
+ 
+ .formGrid input,
+ .formGrid select,
+-.stepsInput input {
++.stepsInput input,
++.dateInput input {
+   width: 100%;
+   min-width: 0;
+   min-height: 43px;
+@@ -69,6 +71,17 @@
+   font-weight: 600;
+ }
+ 
++.dateInput {
++  max-width: 240px;
++  margin-bottom: 12px;
++}
++
++.dateInput small {
++  color: #85857e;
++  font-size: 0.65rem;
++  font-weight: 600;
++}
++
+ .saveButton,
+ .secondaryButton {
+   min-height: 43px;
+diff --git a/frontend/components/activity/ActivityLogger.tsx b/frontend/components/activity/ActivityLogger.tsx
+index 6ddde89..bcffdaf 100644
+--- a/frontend/components/activity/ActivityLogger.tsx
++++ b/frontend/components/activity/ActivityLogger.tsx
+@@ -18,7 +18,7 @@ import styles from "./ActivityLogger.module.css";
+ type ActivityLoggerProps = {
+   date: string;
+   accessToken?: string | null;
+-  onSaved: () => void | Promise<void>;
++  onSaved: (savedDate?: string) => void | Promise<void>;
+   showMovement?: boolean;
+   compact?: boolean;
+ };
+@@ -167,6 +167,7 @@ export function ActivityLogger({
+   showMovement = false,
+   compact = false,
+ }: ActivityLoggerProps) {
++  const [logDate, setLogDate] = useState(date);
+   const [activityType, setActivityType] =
+     useState("Padel");
+   const [durationMinutes, setDurationMinutes] =
+@@ -204,6 +205,10 @@ export function ActivityLogger({
+     [activityType, duration],
+   );
+ 
++  useEffect(() => {
++    setLogDate(date);
++  }, [date]);
++
+   useEffect(() => {
+     if (!caloriesEdited) {
+       setCalories(String(automaticCalories));
+@@ -214,7 +219,7 @@ export function ActivityLogger({
+     if (
+       !showMovement ||
+       !accessToken ||
+-      !date
++      !logDate
+     ) {
+       return;
+     }
+@@ -227,7 +232,7 @@ export function ActivityLogger({
+       try {
+         const response =
+           await getActivityMovement(
+-            date,
++            logDate,
+             accessToken,
+           );
+ 
+@@ -253,7 +258,7 @@ export function ActivityLogger({
+     return () => {
+       active = false;
+     };
+-  }, [accessToken, date, showMovement]);
++  }, [accessToken, logDate, showMovement]);
+ 
+   async function saveActivity() {
+     if (!accessToken) {
+@@ -292,7 +297,7 @@ export function ActivityLogger({
+     try {
+       const response = await createActivity(
+         {
+-          date,
++          date: logDate,
+           activity_name: name,
+           activity_type: activityType,
+           duration_seconds:
+@@ -308,7 +313,7 @@ export function ActivityLogger({
+       }
+ 
+       setMessage(`${name} registrato.`);
+-      await onSaved();
++      await onSaved(logDate);
+     } catch (err) {
+       setError(
+         err instanceof Error
+@@ -344,7 +349,7 @@ export function ActivityLogger({
+     try {
+       const response = await updateDailyLog(
+         accessToken,
+-        date,
++        logDate,
+         {
+           steps: Math.round(totalSteps),
+         },
+@@ -361,14 +366,14 @@ export function ActivityLogger({
+       } else {
+         setMovement(
+           await getActivityMovement(
+-            date,
++            logDate,
+             accessToken,
+           ),
+         );
+       }
+ 
+       setMessage("Passi aggiornati.");
+-      await onSaved();
++      await onSaved(logDate);
+     } catch (err) {
+       setError(
+         err instanceof Error
+@@ -394,6 +399,22 @@ export function ActivityLogger({
+           </div>
+         </div>
+ 
++        <label className={styles.dateInput}>
++          <span>Data dell’attività</span>
++          <input
++            type="date"
++            value={logDate}
++            onChange={(event) => {
++              setLogDate(event.target.value);
++              setMessage(null);
++              setError(null);
++            }}
++          />
++          <small>
++            Puoi registrare anche un’attività passata.
++          </small>
++        </label>
++
+         <div className={styles.formGrid}>
+           <label>
+             <span>Attività</span>
+-- 
+2.51.1
+
