@@ -3979,6 +3979,42 @@ export function HomeShell() {
     ? `${todayPlannedActivities.map((item) => item.title).join(", ")} · circa ${Math.round(plannedActivityKcal)} kcal già incluse nel bilancio.`
     : null;
 
+
+  function displayedMealName(
+    slot: string,
+    fallback?: string | null,
+  ): string {
+    if (
+      slot === nextMeal?.next_slot &&
+      !actualMealForSlot(slot) &&
+      nextMealOptions?.recommended
+    ) {
+      return nextMealOptions.recommended.candidate.name;
+    }
+
+    return fallback || "Nessuna routine abbastanza forte";
+  }
+
+  function displayedMealCalories(
+    slot: string,
+    fallback?: number | null,
+  ): number | null {
+    if (
+      slot === nextMeal?.next_slot &&
+      !actualMealForSlot(slot) &&
+      nextMealOptions?.recommended
+    ) {
+      return Number(
+        nextMealOptions.recommended.candidate.calories,
+      );
+    }
+
+    return typeof fallback === "number"
+      ? fallback
+      : null;
+  }
+
+
   return (
     <>
       <AppNav />
@@ -6091,7 +6127,7 @@ export function HomeShell() {
                                   ),
                                 )
                                 .join(" · ")
-                            : meal.value ??
+                            : displayedMealName(slot, meal.value) ??
                               "Da decidere"}
                         </span>
                       </span>
@@ -6118,10 +6154,10 @@ export function HomeShell() {
                                 0,
                               ),
                             )} kcal`
-                          : meal.estimated_calories != null
+                          : displayedMealCalories(slot, meal.estimated_calories) != null
                             ? `~${roundNumber(
                                 Number(
-                                  meal.estimated_calories,
+                                  displayedMealCalories(slot, meal.estimated_calories),
                                 ),
                               )} kcal`
                             : "—"}
