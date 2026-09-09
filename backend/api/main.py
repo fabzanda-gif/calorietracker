@@ -5,7 +5,11 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials
+
+from backend.api.dependencies import get_current_user
 
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.daily_logs import router as daily_logs_router
@@ -155,6 +159,69 @@ async def performance_timing_middleware(
     )
 
     return response
+
+
+@app.middleware("http")
+async def demo_read_only_middleware(
+    request,
+    call_next,
+):
+    if request.method not in {
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+    }:
+        return await call_next(request)
+
+    demo_id = os.getenv(
+        "DEMO_ACCOUNT_USER_ID",
+        "",
+    ).strip()
+    source_id = os.getenv(
+        "DEMO_SOURCE_USER_ID",
+        "",
+    ).strip()
+
+    if not demo_id or not source_id:
+        return await call_next(request)
+
+    authorization = request.headers.get(
+        "authorization",
+        "",
+    )
+
+    if not authorization.lower().startswith("bearer "):
+        return await call_next(request)
+
+    token = authorization.split(" ", 1)[1].strip()
+
+    try:
+        current_user = get_current_user(
+            HTTPAuthorizationCredentials(
+                scheme="Bearer",
+                credentials=token,
+            )
+        )
+    except HTTPException as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=exc.headers,
+        )
+
+    if current_user.read_only:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": (
+                    "Account demo in sola lettura: "
+                    "le modifiche non vengono salvate."
+                )
+            },
+        )
+
+    return await call_next(request)
 
 default_origins = [
     "http://localhost:3000",

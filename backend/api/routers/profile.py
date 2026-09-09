@@ -38,10 +38,21 @@ class ProfileUpdate(BaseModel):
 def get_profile(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
-    return {
-        "id": current_user.id,
+    response = {
+        "id": (
+            current_user.authenticated_id
+            or current_user.id
+        ),
         "metadata": dict(current_user.metadata),
     }
+
+    if current_user.read_only:
+        response.update({
+            "read_only": True,
+            "demo_mode": True,
+        })
+
+    return response
 
 
 @router.put("")

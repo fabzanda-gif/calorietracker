@@ -3,6 +3,8 @@ import { apiRequest } from "./client";
 export interface ProfileResponse {
   id: string;
   metadata: Record<string, unknown>;
+  read_only?: boolean;
+  demo_mode?: boolean;
 }
 
 export interface ProfileUpdate {

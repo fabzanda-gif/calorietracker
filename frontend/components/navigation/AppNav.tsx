@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
+import { getProfile } from "@/lib/api/profile";
 
 import styles from "./AppNav.module.css";
 
@@ -63,7 +65,9 @@ function isActive(pathname: string, href: string): boolean {
 
 export function AppNav() {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, accessToken, signOut } = useAuth();
+  const [readOnlyDemo, setReadOnlyDemo] =
+    useState(false);
   const {
     experienceMode,
     setExperienceMode,
@@ -96,8 +100,43 @@ export function AppNav() {
       ? metadataAvatar
       : null;
 
+  useEffect(() => {
+    if (!accessToken) {
+      setReadOnlyDemo(false);
+      return;
+    }
+
+    let active = true;
+    void getProfile(accessToken)
+      .then((profile) => {
+        if (active) {
+          setReadOnlyDemo(
+            profile.read_only === true,
+          );
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setReadOnlyDemo(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
+
   return (
     <>
+      {readOnlyDemo ? (
+        <div
+          className={styles.demoBanner}
+          role="status"
+        >
+          Modalità demo · dati reali in sola lettura
+        </div>
+      ) : null}
+
       <div
         className={styles.globalExperienceSwitch}
         aria-label="Modalità SanoSync"

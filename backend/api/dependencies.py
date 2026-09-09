@@ -71,11 +71,82 @@ class CurrentUser:
     id: str
     access_token: str
     metadata: dict[str, Any] = field(default_factory=dict)
+    authenticated_id: str | None = None
+    read_only: bool = False
 
 
-_AUTH_CACHE: dict[str, tuple[float, str, dict]] = {}
+_AUTH_CACHE: dict[
+    str,
+    tuple[float, str, dict, str, bool],
+] = {}
 _AUTH_CACHE_LOCK = threading.Lock()
 _AUTH_CACHE_TTL_SECONDS = 60.0
+
+
+def _demo_user_ids() -> tuple[str, str] | None:
+    demo_id = os.getenv(
+        "DEMO_ACCOUNT_USER_ID",
+        "",
+    ).strip()
+    source_id = os.getenv(
+        "DEMO_SOURCE_USER_ID",
+        "",
+    ).strip()
+
+    if not demo_id or not source_id:
+        return None
+
+    return demo_id, source_id
+
+
+def _source_user_metadata(source_id: str) -> dict[str, Any]:
+    try:
+        response = (
+            get_admin_supabase_client()
+            .auth.admin.get_user_by_id(source_id)
+        )
+        user = getattr(response, "user", None)
+        metadata = getattr(
+            user,
+            "user_metadata",
+            None,
+        )
+        return dict(metadata or {})
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo source account is unavailable",
+        ) from exc
+
+
+def _resolved_identity(
+    authenticated_id: str,
+    metadata: dict[str, Any],
+) -> tuple[str, dict[str, Any], bool]:
+    demo_ids = _demo_user_ids()
+
+    if demo_ids is None or authenticated_id != demo_ids[0]:
+        return authenticated_id, metadata, False
+
+    source_id = demo_ids[1]
+    return (
+        source_id,
+        _source_user_metadata(source_id),
+        True,
+    )
+
+
+def _cached_current_user(
+    cached: tuple[float, str, dict, str, bool],
+    token: str,
+) -> CurrentUser:
+    return CurrentUser(
+        id=cached[1],
+        access_token=token,
+        metadata=dict(cached[2]),
+        authenticated_id=cached[3],
+        read_only=cached[4],
+    )
 
 
 # Shared transport only:
@@ -138,11 +209,7 @@ def get_current_user(
             "[SUPA perf] auth cache hit",
             flush=True,
         )
-        return CurrentUser(
-            id=cached[1],
-            access_token=token,
-            metadata=dict(cached[2]),
-        )
+        return _cached_current_user(cached, token)
 
     # Una sola richiesta remota alla volta:
     # le chiamate parallele della Home aspettano la prima validazione.
@@ -151,11 +218,7 @@ def get_current_user(
 
         cached = _AUTH_CACHE.get(token_key)
         if cached and cached[0] > now:
-            return CurrentUser(
-                id=cached[1],
-                access_token=token,
-                metadata=dict(cached[2]),
-            )
+            return _cached_current_user(cached, token)
 
         try:
             auth_started_at = time.perf_counter()
@@ -214,12 +277,23 @@ def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        metadata = user.get("user_metadata") or {}
+        metadata = dict(
+            user.get("user_metadata") or {}
+        )
+        authenticated_id = str(user_id)
+        effective_id, metadata, read_only = (
+            _resolved_identity(
+                authenticated_id,
+                metadata,
+            )
+        )
 
         _AUTH_CACHE[token_key] = (
             time.monotonic() + _AUTH_CACHE_TTL_SECONDS,
-            str(user_id),
+            effective_id,
             dict(metadata),
+            authenticated_id,
+            read_only,
         )
 
         # Pulizia minima delle entry scadute
@@ -232,9 +306,11 @@ def get_current_user(
             _AUTH_CACHE.pop(key_, None)
 
         return CurrentUser(
-            id=str(user_id),
+            id=effective_id,
             access_token=token,
             metadata=dict(metadata),
+            authenticated_id=authenticated_id,
+            read_only=read_only,
         )
 
 
@@ -259,6 +335,9 @@ def get_admin_supabase_client() -> Client:
 def get_authenticated_supabase(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Client:
+    if current_user.read_only:
+        return get_admin_supabase_client()
+
     url, key = _supabase_settings()
 
     create_started_at = time.perf_counter()

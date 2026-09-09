@@ -22,6 +22,33 @@
     );
 }
 
+.demoBanner {
+  position: fixed;
+  z-index: 140;
+  top: 12px;
+  left: 50%;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  padding: 9px 15px;
+  border: 1px solid #f2c86f;
+  border-radius: 999px;
+  background: #fff6d8;
+  box-shadow: 0 8px 24px rgba(16, 39, 68, 0.12);
+  color: #72520b;
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 759px) {
+  .demoBanner {
+    top: 8px;
+    width: max-content;
+    font-size: 0.68rem;
+  }
+}
+
 .brandBlock {
   display: grid;
   justify-items: center;
