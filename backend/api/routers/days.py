@@ -17,7 +17,6 @@ from backend.api.dependencies import (
     get_day_briefings_repository,
     get_optional_decision_selections_repository,
     get_meal_prep_repository,
-    get_optional_planned_activities_repository,
     get_strength_plans_repository,
     get_strength_workouts_repository,
     get_meals_repository,
@@ -313,6 +312,20 @@ def _build_day(
     )
 
 
+def _planned_repo_from_activities(
+    activities_repo: ActivitiesRepository,
+) -> PlannedActivitiesRepository | None:
+    supabase = getattr(
+        activities_repo,
+        "supabase",
+        None,
+    )
+    if supabase is None:
+        return None
+
+    return PlannedActivitiesRepository(supabase)
+
+
 def _build_budget(
     *,
     current_user: CurrentUser,
@@ -323,6 +336,13 @@ def _build_budget(
     weight_repo: WeightRepository,
     planned_activities_repo: PlannedActivitiesRepository | None = None,
 ) -> dict:
+    if planned_activities_repo is None:
+        planned_activities_repo = (
+            _planned_repo_from_activities(
+                activities_repo
+            )
+        )
+
     latest_weight = weight_repo.latest(current_user.id)
     current_weight = (
         latest_weight.get("weight")
@@ -440,9 +460,6 @@ def get_day_budget(
     weight_repo: WeightRepository = Depends(
         get_weight_repository
     ),
-    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
-        get_optional_planned_activities_repository
-    ),
 ):
     try:
         return _build_budget(
@@ -452,7 +469,6 @@ def get_day_budget(
             activities_repo=activities_repo,
             daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
-            planned_activities_repo=planned_activities_repo,
         )
     except RepositoryError as exc:
         raise HTTPException(
@@ -481,9 +497,6 @@ def get_ranked_meal_options(
     ),
     meal_prep_repo: MealPrepRepository = Depends(
         get_meal_prep_repository
-    ),
-    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
-        get_optional_planned_activities_repository
     ),
     strength_plans_repo: StrengthPlansRepository = Depends(
         get_strength_plans_repository
@@ -530,7 +543,6 @@ def get_ranked_meal_options(
                 activities_repo=activities_repo,
                 daily_logs_repo=daily_logs_repo,
                 weight_repo=weight_repo,
-                planned_activities_repo=planned_activities_repo,
             )
 
             day = day_future.result()
@@ -676,6 +688,12 @@ def get_ranked_meal_options(
                 + timedelta(days=1)
             )
 
+            planned_activities_repo = (
+                _planned_repo_from_activities(
+                    activities_repo
+                )
+            )
+
             try:
                 tomorrow_sessions = (
                     planned_activities_repo.list_range(
@@ -683,6 +701,8 @@ def get_ranked_meal_options(
                         tomorrow,
                         tomorrow,
                     )
+                    if planned_activities_repo is not None
+                    else []
                 )
             except RepositoryError:
                 # Future training is an optional enhancement.
@@ -891,9 +911,6 @@ def get_meal_decision(
     weekly_schedule_repo: WeeklyScheduleRepository = Depends(
         get_weekly_schedule_repository
     ),
-    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
-        get_optional_planned_activities_repository
-    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -914,7 +931,6 @@ def get_meal_decision(
             activities_repo=activities_repo,
             daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
-            planned_activities_repo=planned_activities_repo,
         )
 
         available_kcal = None
@@ -1084,9 +1100,6 @@ def get_day_briefing(
     briefing_repo: DayBriefingsRepository = Depends(
         get_day_briefings_repository
     ),
-    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
-        get_optional_planned_activities_repository
-    ),
 ):
     try:
         day = _build_day(
@@ -1104,7 +1117,6 @@ def get_day_briefing(
             activities_repo=activities_repo,
             daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
-            planned_activities_repo=planned_activities_repo,
         )
     except RepositoryError as exc:
         raise HTTPException(
