@@ -122,3 +122,59 @@ def test_rejects_more_than_available():
 
     assert pantry.item["quantity"] == 100
     assert meals.created == []
+
+
+
+class FailingMealIngredientsRepo:
+    def __init__(self):
+        self.cleared_meal_ids = []
+
+    def create(self, payload):
+        raise RuntimeError(
+            "simulated ingredient link failure"
+        )
+
+    def delete_for_meal(self, meal_id):
+        self.cleared_meal_ids.append(meal_id)
+        return True
+
+
+def test_rolls_back_meal_when_ingredient_link_fails():
+    pantry = PantryRepo(
+        {
+            "id": "pantry-1",
+            "ingredient_id": "ingredient-1",
+            "quantity": 4,
+            "quantity_mode": "portion",
+            "unit": "portion",
+            "grams_per_portion": 120,
+        }
+    )
+    meals = MealsRepo()
+    meal_ingredients = FailingMealIngredientsRepo()
+
+    svc = PantryMealLoggingService(
+        pantry_repo=pantry,
+        ingredients_repo=IngredientRepo(),
+        meals_repo=meals,
+        meal_ingredients_repo=meal_ingredients,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="simulated ingredient link failure",
+    ):
+        svc.log(
+            user_id="user-1",
+            pantry_item_id="pantry-1",
+            meal_date=date(2026, 9, 7),
+            meal_type="Colazione",
+            quantity_g=120,
+        )
+
+    assert pantry.item["quantity"] == 4
+    assert pantry.deleted is False
+    assert meals.deleted == ["meal-1"]
+    assert meal_ingredients.cleared_meal_ids == [
+        "meal-1"
+    ]

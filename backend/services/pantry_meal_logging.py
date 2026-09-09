@@ -271,7 +271,7 @@ class PantryMealLoggingService:
         meal_id = meal["id"]
 
         try:
-            try:
+            meal_ingredient = (
                 self.meal_ingredients_repo.create(
                     {
                         "meal_id": meal_id,
@@ -286,11 +286,11 @@ class PantryMealLoggingService:
                         "fat": fat,
                     }
                 )
-            except Exception as exc:
-                print(
-                    "[pantry-log] meal ingredient "
-                    f"link skipped: {exc}",
-                    flush=True,
+            )
+
+            if meal_ingredient is None:
+                raise PantryMealLoggingError(
+                    "Meal ingredient link was not created"
                 )
 
             remaining = self._remaining_quantity(
@@ -315,6 +315,20 @@ class PantryMealLoggingService:
                 )
 
         except Exception:
+            # Compensazione applicativa: rimuove ogni dato
+            # parziale creato prima del fallimento.
+            delete_components = getattr(
+                self.meal_ingredients_repo,
+                "delete_for_meal",
+                None,
+            )
+
+            if callable(delete_components):
+                try:
+                    delete_components(meal_id)
+                except Exception:
+                    pass
+
             try:
                 self.meals_repo.delete(
                     meal_id,
@@ -322,6 +336,7 @@ class PantryMealLoggingService:
                 )
             except Exception:
                 pass
+
             raise
 
         return {
