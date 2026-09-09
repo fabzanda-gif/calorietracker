@@ -113,6 +113,7 @@ import {
 
 import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
 
+import QuickActivityForm from "./QuickActivityForm";
 import styles from "./HomeShell.module.css";
 
 function localIsoDate(
@@ -539,20 +540,14 @@ export function HomeShell() {
   const [quickAddMode, setQuickAddMode] =
     useState<"meal" | "activity" | "weight" | null>(null);
 
-  const [quickActivityName, setQuickActivityName] =
-    useState("");
-  const [quickActivityCalories, setQuickActivityCalories] =
-    useState("");
   const [
-    quickActivityDurationMinutes,
-    setQuickActivityDurationMinutes,
-  ] = useState("");
-  const [
-    quickActivityDistanceKm,
-    setQuickActivityDistanceKm,
-  ] = useState("");
-  const [quickActivitySaving, setQuickActivitySaving] =
-    useState(false);
+    quickActivityInitialValue,
+    setQuickActivityInitialValue,
+  ] = useState<{
+    name: string;
+    calories?: number | null;
+    durationMinutes?: number | null;
+  } | null>(null);
 
   const [pantryInventory, setPantryInventory] =
     useState<PantryItem[]>([]);
@@ -3504,12 +3499,7 @@ export function HomeShell() {
 
   function openQuickAddActivity() {
     setError(null);
-
-    setQuickActivityName("");
-    setQuickActivityCalories("");
-    setQuickActivityDurationMinutes("");
-    setQuickActivityDistanceKm("");
-
+    setQuickActivityInitialValue(null);
     setQuickAddMode("activity");
   }
 
@@ -3519,12 +3509,12 @@ export function HomeShell() {
     if (!suggestion) return;
 
     setError(null);
-    setQuickActivityName(suggestion.activity_name);
-    setQuickActivityCalories(String(suggestion.burned_calories));
-    setQuickActivityDurationMinutes(
-      suggestion.duration_minutes ? String(suggestion.duration_minutes) : "",
-    );
-    setQuickActivityDistanceKm("");
+    setQuickActivityInitialValue({
+      name: suggestion.activity_name,
+      calories: suggestion.burned_calories,
+      durationMinutes:
+        suggestion.duration_minutes ?? null,
+    });
     setQuickAddMode("activity");
   }
 
@@ -3576,10 +3566,7 @@ export function HomeShell() {
     setAlternateCarbs("");
     setAlternateFat("");
 
-    setQuickActivityName("");
-    setQuickActivityCalories("");
-    setQuickActivityDurationMinutes("");
-    setQuickActivityDistanceKm("");
+    setQuickActivityInitialValue(null);
 
     setWeightQuickAddOpen(false);
   }
@@ -3644,113 +3631,6 @@ export function HomeShell() {
         }, 250);
       });
     });
-  }
-
-  async function saveQuickActivity() {
-    if (!accessToken) {
-      return;
-    }
-
-    const name = quickActivityName.trim();
-    const calories = Number(
-      quickActivityCalories,
-    );
-
-    const durationMinutes =
-      quickActivityDurationMinutes.trim()
-        ? Number(
-            quickActivityDurationMinutes,
-          )
-        : 0;
-
-    const distanceKm =
-      quickActivityDistanceKm.trim()
-        ? Number(
-            quickActivityDistanceKm.replace(
-              ",",
-              ".",
-            ),
-          )
-        : 0;
-
-    if (!name) {
-      setError(
-        "Inserisci il nome dell’attività.",
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(calories) ||
-      calories < 0
-    ) {
-      setError(
-        "Inserisci delle kcal valide.",
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(durationMinutes) ||
-      durationMinutes < 0
-    ) {
-      setError(
-        "Inserisci una durata valida.",
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(distanceKm) ||
-      distanceKm < 0
-    ) {
-      setError(
-        "Inserisci una distanza valida.",
-      );
-      return;
-    }
-
-    setQuickActivitySaving(true);
-    setError(null);
-
-    try {
-      await createActivity(
-        {
-          date: todayIso(),
-          activity_name: name,
-          burned_calories:
-            Math.round(calories),
-          ...(durationMinutes > 0
-            ? {
-                duration_seconds:
-                  Math.round(
-                    durationMinutes * 60,
-                  ),
-              }
-            : {}),
-          ...(distanceKm > 0
-            ? {
-                distance_meters:
-                  Math.round(
-                    distanceKm * 1000,
-                  ),
-              }
-            : {}),
-        },
-        accessToken,
-      );
-
-      closeUnifiedQuickAdd();
-      await refreshHome();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Non riesco a registrare l’attività.",
-      );
-    } finally {
-      setQuickActivitySaving(false);
-    }
   }
 
   async function saveAlternateMeal(
@@ -5627,144 +5507,22 @@ export function HomeShell() {
                       </>
                     ) : null}
 
-                    {quickAddMode ===
-                    "activity" ? (
-                      <>
-                        <div
-                          className={
-                            styles.quickMealModalBody
-                          }
-                        >
-                          <label>
-                            <span>
-                              Attività
-                            </span>
-                            <input
-                              type="text"
-                              autoFocus
-                              value={
-                                quickActivityName
-                              }
-                              placeholder="Es. Corsa, palestra, bici"
-                              onChange={(
-                                event,
-                              ) =>
-                                setQuickActivityName(
-                                  event.target
-                                    .value,
-                                )
-                              }
-                            />
-                          </label>
-
-                          <div
-                            className={
-                              styles.quickActivityGrid
-                            }
-                          >
-                            <label>
-                              <span>Kcal</span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={
-                                  quickActivityCalories
-                                }
-                                placeholder="350"
-                                onChange={(
-                                  event,
-                                ) =>
-                                  setQuickActivityCalories(
-                                    event.target
-                                      .value,
-                                  )
-                                }
-                              />
-                            </label>
-
-                            <label>
-                              <span>
-                                Durata (min)
-                              </span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={
-                                  quickActivityDurationMinutes
-                                }
-                                placeholder="45"
-                                onChange={(
-                                  event,
-                                ) =>
-                                  setQuickActivityDurationMinutes(
-                                    event.target
-                                      .value,
-                                  )
-                                }
-                              />
-                            </label>
-
-                            <label>
-                              <span>
-                                Distanza (km)
-                              </span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={
-                                  quickActivityDistanceKm
-                                }
-                                placeholder="5"
-                                onChange={(
-                                  event,
-                                ) =>
-                                  setQuickActivityDistanceKm(
-                                    event.target
-                                      .value,
-                                  )
-                                }
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        <div
-                          className={
-                            styles.quickMealModalActions
-                          }
-                        >
-                          <button
-                            type="button"
-                            className={
-                              styles.quickMealCancel
-                            }
-                            onClick={
-                              closeUnifiedQuickAdd
-                            }
-                          >
-                            Annulla
-                          </button>
-
-                          <button
-                            type="button"
-                            className={
-                              styles.quickMealSave
-                            }
-                            disabled={
-                              quickActivitySaving ||
-                              !quickActivityName.trim() ||
-                              !quickActivityCalories.trim()
-                            }
-                            onClick={() => {
-                              void saveQuickActivity();
-                            }}
-                          >
-                            {quickActivitySaving
-                              ? "Registro…"
-                              : "Aggiungi attività"}
-                          </button>
-                        </div>
-                      </>
+                    {quickAddMode === "activity" &&
+                    accessToken ? (
+                      <QuickActivityForm
+                        accessToken={accessToken}
+                        date={todayIso()}
+                        weightKg={latestWeight}
+                        initialValue={quickActivityInitialValue}
+                        onCancel={closeUnifiedQuickAdd}
+                        onError={(message) =>
+                          setError(message || null)
+                        }
+                        onSaved={async () => {
+                          closeUnifiedQuickAdd();
+                          await refreshHome();
+                        }}
+                      />
                     ) : null}
 
                     {quickAddMode ===
