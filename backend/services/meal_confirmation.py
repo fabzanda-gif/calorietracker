@@ -5,6 +5,10 @@ from typing import Any
 
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
+from backend.services.meal_prep_consumption import (
+    MealPrepConsistencyError,
+    MealPrepConsumptionService,
+)
 
 
 class MealConfirmationError(ValueError):
@@ -168,72 +172,32 @@ class MealConfirmationService:
                     }
                 )
 
-        response = self.meals_repo.create_compatible(payload)
-        rows = getattr(response, "data", None) or []
-        item = rows[0] if rows else payload
-
         updated_inventory = None
 
         if meal_prep_batch is not None:
-            meal_id = (
-                item.get("id")
-                if isinstance(item, dict)
-                else None
-            )
-
-            if meal_id is None:
-                raise MealPredictionUnavailableError(
-                    "Confirmed meal was created without an id"
-                )
-
-            remaining = int(
-                meal_prep_batch.get("portions_remaining") or 0
-            )
-
-            new_remaining = remaining - 1
-
-            update = {
-                "portions_remaining": new_remaining,
-                "status": (
-                    "finished"
-                    if new_remaining == 0
-                    else "available"
-                ),
-            }
-
             try:
-                updated_inventory = (
-                    self.meal_prep_repo.update(
-                        source_id,
-                        user_id,
-                        update,
-                    )
+                consumption = MealPrepConsumptionService(
+                    meal_prep_repo=self.meal_prep_repo,
+                    meals_repo=self.meals_repo,
+                ).create_and_consume(
+                    user_id=user_id,
+                    batch_id=source_id,
+                    batch=meal_prep_batch,
+                    meal_payload=payload,
                 )
+            except MealPrepConsistencyError as exc:
+                raise MealPredictionUnavailableError(
+                    str(exc)
+                ) from exc
 
-                if updated_inventory is None:
-                    raise MealPredictionUnavailableError(
-                        "Meal prep inventory was not updated"
-                    )
-            except Exception:
-                # The meal and the inventory must describe
-                # the same event. If inventory cannot be
-                # decremented, remove the partial meal.
-                delete_meal = getattr(
-                    self.meals_repo,
-                    "delete",
-                    None,
-                )
-
-                if callable(delete_meal):
-                    try:
-                        delete_meal(
-                            meal_id,
-                            user_id,
-                        )
-                    except Exception:
-                        pass
-
-                raise
+            item = consumption.meal
+            updated_inventory = consumption.inventory
+        else:
+            response = self.meals_repo.create_compatible(
+                payload
+            )
+            rows = getattr(response, "data", None) or []
+            item = rows[0] if rows else payload
 
         result = {
             "confirmed": True,
