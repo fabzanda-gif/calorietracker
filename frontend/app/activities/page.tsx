@@ -20,6 +20,8 @@ import {
   getActivitiesForRange,
   getActivityOverview,
   getPlannedActivities,
+  getTrainingPlans,
+  getTrainingPlanSessions,
   createPlannedActivity,
   updatePlannedActivity,
   deletePlannedActivity,
@@ -636,6 +638,16 @@ export default function ActivitiesPage() {
     setPlannedActivities,
   ] = useState<PlannedActivity[]>([]);
 
+  const [
+    trainingPlanActivities,
+    setTrainingPlanActivities,
+  ] = useState<PlannedActivity[]>([]);
+
+  const [
+    showAllPlannedActivities,
+    setShowAllPlannedActivities,
+  ] = useState(false);
+
   const [planTitle, setPlanTitle] =
     useState("");
   const [planType, setPlanType] =
@@ -845,9 +857,52 @@ export default function ActivitiesPage() {
     }
   }, [accessToken, calendarView, month]);
 
+  const loadTrainingPlanActivities = useCallback(async () => {
+    if (!accessToken) {
+      setTrainingPlanActivities([]);
+      return;
+    }
+
+    try {
+      const plansResponse =
+        await getTrainingPlans(accessToken);
+
+      const visiblePlans =
+        plansResponse.items.filter(
+          (plan) =>
+            plan.status === "active" ||
+            plan.status === "paused",
+        );
+
+      const sessionResponses =
+        await Promise.all(
+          visiblePlans.map((plan) =>
+            getTrainingPlanSessions(
+              plan.id,
+              accessToken,
+            ),
+          ),
+        );
+
+      setTrainingPlanActivities(
+        sessionResponses.flatMap(
+          (response) => response.items,
+        ),
+      );
+    } catch {
+      // Calendario e attività manuali restano disponibili
+      // anche se il piano completo non può essere caricato.
+      setTrainingPlanActivities([]);
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     void loadMonth();
   }, [loadMonth]);
+
+  useEffect(() => {
+    void loadTrainingPlanActivities();
+  }, [loadTrainingPlanActivities]);
 
   const days = useMemo(
     () => calendarView === "weekly"
@@ -915,10 +970,27 @@ export default function ActivitiesPage() {
     [energyDays],
   );
 
+  const plannerActivities = useMemo(() => {
+    const byId =
+      new Map<string, PlannedActivity>();
+
+    for (const item of [
+      ...trainingPlanActivities,
+      ...plannedActivities,
+    ]) {
+      byId.set(item.id, item);
+    }
+
+    return [...byId.values()];
+  }, [
+    plannedActivities,
+    trainingPlanActivities,
+  ]);
+
   const sortedPlannedActivities =
     useMemo(
       () =>
-        [...plannedActivities].sort(
+        [...plannerActivities].sort(
           (left, right) => {
             const leftTime =
               `${left.scheduled_date}T${
@@ -942,7 +1014,7 @@ export default function ActivitiesPage() {
             );
           },
         ),
-      [plannedActivities],
+      [plannerActivities],
     );
 
   const nextPlannedActivity =
@@ -954,6 +1026,31 @@ export default function ActivitiesPage() {
 
   const nextPlannedActivityId =
     nextPlannedActivity?.id ?? null;
+
+  const remainingPlannedActivities =
+    useMemo(
+      () =>
+        sortedPlannedActivities.filter(
+          (item) =>
+            item.id !== nextPlannedActivityId,
+        ),
+      [
+        sortedPlannedActivities,
+        nextPlannedActivityId,
+      ],
+    );
+
+  const visiblePlannedActivities =
+    useMemo(
+      () =>
+        showAllPlannedActivities
+          ? remainingPlannedActivities
+          : remainingPlannedActivities.slice(0, 6),
+      [
+        remainingPlannedActivities,
+        showAllPlannedActivities,
+      ],
+    );
 
   const activitiesByDate = useMemo(() => {
     const grouped = new Map<string, Activity[]>();
@@ -2276,6 +2373,7 @@ export default function ActivitiesPage() {
             <RunningPlanBuilder
               onCreated={() => {
                 void loadMonth();
+                void loadTrainingPlanActivities();
               }}
             />
 
@@ -2616,16 +2714,8 @@ export default function ActivitiesPage() {
             </div>
 
             <div className={styles.upcomingList}>
-              {sortedPlannedActivities.filter(
-                (item) =>
-                  item.id !== nextPlannedActivityId,
-              ).length ? (
-                sortedPlannedActivities
-                  .filter(
-                    (item) =>
-                      item.id !== nextPlannedActivityId,
-                  )
-                  .map(
+              {visiblePlannedActivities.length ? (
+                visiblePlannedActivities.map(
                   (item) => (
                     <article
                       key={item.id}
@@ -3498,6 +3588,25 @@ export default function ActivitiesPage() {
                   </p>
                 </div>
               )}
+
+              {remainingPlannedActivities.length > 6 ? (
+                <button
+                  type="button"
+                  className={
+                    styles.showAllPlannedButton
+                  }
+                  onClick={() => {
+                    setShowAllPlannedActivities(
+                      (current) => !current,
+                    );
+                  }}
+                >
+                  {showAllPlannedActivities
+                    ? "Mostra i primi 6"
+                    : `Mostra tutti (${remainingPlannedActivities.length})`}
+                </button>
+              ) : null}
+
             </div>
           </div>
         </details>

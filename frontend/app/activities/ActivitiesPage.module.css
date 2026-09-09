@@ -3005,3 +3005,25 @@ label.completePlanButton {
     margin: 2px 0 0;
   }
 }
+
+
+.showAllPlannedButton{
+  min-height:42px;
+  width:100%;
+  border:1px solid #d9ddda;
+  border-radius:12px;
+  background:#fff;
+  color:#102846;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.showAllPlannedButton:hover{
+  border-color:#ff6666;
+  color:#ef5656;
+}
+
+.showAllPlannedButton:focus-visible{
+  outline:3px solid rgba(255,102,102,.24);
+  outline-offset:2px;
+}
