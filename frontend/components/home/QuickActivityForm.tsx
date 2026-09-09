@@ -16,10 +16,18 @@ type ActivityKind =
   | "padel"
   | "other";
 
+interface QuickActivityInitialValue {
+  name: string;
+  calories?: number | null;
+  durationMinutes?: number | null;
+  distanceKm?: number | null;
+}
+
 interface QuickActivityFormProps {
   accessToken: string;
   date: string;
   weightKg?: number | null;
+  initialValue?: QuickActivityInitialValue | null;
   onCancel: () => void;
   onSaved: () => Promise<void>;
   onError: (message: string) => void;
@@ -43,6 +51,19 @@ function numberValue(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function initialKind(
+  value?: QuickActivityInitialValue | null,
+): ActivityKind {
+  const name = value?.name.trim().toLocaleLowerCase("it-IT") ?? "";
+
+  if (name.includes("elettric")) return "ebike";
+  if (name.includes("bici") || name.includes("cicl")) return "bike";
+  if (name.includes("cors") || name.includes("running")) return "run";
+  if (name.includes("padel")) return "padel";
+  if (name.includes("palestr") || name.includes("forza")) return "gym";
+  return value ? "other" : "steps";
+}
+
 function paceSeconds(value: string): number {
   const match = value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
   if (!match) {
@@ -55,20 +76,40 @@ export default function QuickActivityForm({
   accessToken,
   date,
   weightKg,
+  initialValue,
   onCancel,
   onSaved,
   onError,
 }: QuickActivityFormProps) {
+  const startingKind = initialKind(initialValue);
   const [kind, setKind] =
-    useState<ActivityKind>("steps");
+    useState<ActivityKind>(startingKind);
   const [steps, setSteps] = useState("");
-  const [minutes, setMinutes] = useState("");
-  const [distanceKm, setDistanceKm] = useState("");
+  const [minutes, setMinutes] = useState(
+    initialValue?.durationMinutes
+      ? String(initialValue.durationMinutes)
+      : startingKind === "padel"
+        ? "90"
+        : "",
+  );
+  const [distanceKm, setDistanceKm] = useState(
+    initialValue?.distanceKm
+      ? String(initialValue.distanceKm)
+      : "",
+  );
   const [pace, setPace] = useState("");
-  const [calories, setCalories] = useState("");
+  const [calories, setCalories] = useState(
+    initialValue?.calories
+      ? String(initialValue.calories)
+      : "",
+  );
   const [caloriesEdited, setCaloriesEdited] =
-    useState(false);
-  const [otherName, setOtherName] = useState("");
+    useState(Boolean(initialValue?.calories));
+  const [otherName, setOtherName] = useState(
+    startingKind === "other"
+      ? initialValue?.name ?? ""
+      : "",
+  );
   const [saving, setSaving] = useState(false);
 
   const weight = Math.max(1, Number(weightKg) || 75);
