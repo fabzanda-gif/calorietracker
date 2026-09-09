@@ -175,6 +175,17 @@ class MealConfirmationService:
         updated_inventory = None
 
         if meal_prep_batch is not None:
+            meal_id = (
+                item.get("id")
+                if isinstance(item, dict)
+                else None
+            )
+
+            if meal_id is None:
+                raise MealPredictionUnavailableError(
+                    "Confirmed meal was created without an id"
+                )
+
             remaining = int(
                 meal_prep_batch.get("portions_remaining") or 0
             )
@@ -190,17 +201,39 @@ class MealConfirmationService:
                 ),
             }
 
-            updated_inventory = self.meal_prep_repo.update(
-                source_id,
-                user_id,
-                update,
-            )
+            try:
+                updated_inventory = (
+                    self.meal_prep_repo.update(
+                        source_id,
+                        user_id,
+                        update,
+                    )
+                )
 
-            if updated_inventory is None:
-                updated_inventory = {
-                    **meal_prep_batch,
-                    **update,
-                }
+                if updated_inventory is None:
+                    raise MealPredictionUnavailableError(
+                        "Meal prep inventory was not updated"
+                    )
+            except Exception:
+                # The meal and the inventory must describe
+                # the same event. If inventory cannot be
+                # decremented, remove the partial meal.
+                delete_meal = getattr(
+                    self.meals_repo,
+                    "delete",
+                    None,
+                )
+
+                if callable(delete_meal):
+                    try:
+                        delete_meal(
+                            meal_id,
+                            user_id,
+                        )
+                    except Exception:
+                        pass
+
+                raise
 
         result = {
             "confirmed": True,

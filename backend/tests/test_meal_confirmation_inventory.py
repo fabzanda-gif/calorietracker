@@ -12,6 +12,7 @@ from backend.services.meal_confirmation import (
 class FakeMealsRepository:
     def __init__(self):
         self.rows = []
+        self.deleted = []
 
     def list_for_date_compatible(self, *, user_id, log_date):
         return [
@@ -25,6 +26,22 @@ class FakeMealsRepository:
         row = {"id": "meal-1", **payload}
         self.rows.append(row)
         return SimpleNamespace(data=[row])
+
+    def delete(self, meal_id, user_id):
+        self.deleted.append(
+            (meal_id, user_id)
+        )
+
+        self.rows = [
+            row
+            for row in self.rows
+            if not (
+                row["id"] == meal_id
+                and row["user_id"] == user_id
+            )
+        ]
+
+        return True
 
 
 class FakeMealPrepRepository:
@@ -129,3 +146,42 @@ def test_last_portion_finishes_batch():
 
     assert inventory.batch["portions_remaining"] == 0
     assert inventory.batch["status"] == "finished"
+
+
+
+def test_inventory_failure_rolls_back_confirmed_meal():
+    meals = FakeMealsRepository()
+    inventory = FakeMealPrepRepository()
+
+    def fail_update(
+        batch_id,
+        user_id,
+        payload,
+    ):
+        raise RuntimeError(
+            "inventory unavailable"
+        )
+
+    inventory.update = fail_update
+
+    with pytest.raises(
+        RuntimeError,
+        match="inventory unavailable",
+    ):
+        MealConfirmationService(
+            meals,
+            inventory,
+        ).confirm(
+            user_id="user-1",
+            day_date=date(2026, 9, 4),
+            prediction=prediction(),
+        )
+
+    assert meals.rows == []
+    assert meals.deleted == [
+        ("meal-1", "user-1"),
+    ]
+    assert (
+        inventory.batch["portions_remaining"]
+        == 2
+    )
