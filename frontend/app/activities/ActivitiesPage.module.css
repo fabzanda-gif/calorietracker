@@ -2491,10 +2491,8 @@ summary.loggerHeading {
     "summary summary"
     "calendar calendar"
     "activities detail"
-    "activities planner"
-    "activities upload"
-    "activities programs"
-    "activities logger"
+    "planner upload"
+    "programs logger"
     "preview preview";
   gap: 20px;
 }
@@ -2527,6 +2525,10 @@ summary.loggerHeading {
 .detailCard {
   grid-area: detail;
   align-self: start;
+}
+
+.detailCard .detailStats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .plannerSection {
@@ -2682,6 +2684,20 @@ details[open] > summary .expandToggle {
   margin-top: 18px;
 }
 
+.plannerSection .plannerGrid {
+  grid-template-columns: 1fr;
+}
+
+.plannerSection .upcomingCard {
+  grid-template-columns: minmax(92px, 0.35fr) minmax(0, 1fr);
+}
+
+.plannerSection .upcomingActions button,
+.plannerSection .upcomingActions label {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .calendarBody {
   margin-top: 4px;
 }
@@ -2760,5 +2776,20 @@ details[open] > summary .expandToggle {
   .calendarCard .day,
   .calendarCard .emptyDay {
     min-height: 52px;
+  }
+
+  .plannerSection .upcomingCard {
+    grid-template-columns: 1fr;
+  }
+
+  .plannerSection .upcomingActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .plannerSection .upcomingActions > * {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
   }
 }
