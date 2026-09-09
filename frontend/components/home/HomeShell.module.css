@@ -15032,6 +15032,104 @@ details[open] > summary .dailyEntryChevron {
   }
 }
 
+.quickMealChoicesHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.quickMealChoicesHeader > div {
+  display: grid;
+  gap: 2px;
+}
+
+.quickMealChoicesHeader strong {
+  color: #173957;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.quickMealChoicesHeader span {
+  color: #718296;
+  font-size: .65rem;
+  font-weight: 650;
+}
+
+.quickMealChoices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.quickMealChoice {
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(23, 57, 87, .11);
+  border-radius: 12px;
+  background: #fff;
+  color: #173957;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.quickMealChoice:hover,
+.quickMealChoice[data-selected="true"] {
+  border-color: rgba(255, 104, 104, .5);
+  background: #fff7f6;
+}
+
+.quickMealChoice > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.quickMealChoice strong {
+  overflow: hidden;
+  font-size: .7rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickMealChoice small {
+  color: #718296;
+  font-size: .61rem;
+  font-weight: 650;
+}
+
+.quickMealChoice > span:last-child {
+  flex: 0 0 auto;
+  color: #e45f5c;
+  font-weight: 900;
+}
+
+.quickMealChoicesEmpty {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f6f8fa;
+  color: #718296;
+  font-size: .68rem;
+  font-weight: 650;
+}
+
+@media (max-width: 900px) {
+  .quickMealChoices {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 
 /* ==========================================================

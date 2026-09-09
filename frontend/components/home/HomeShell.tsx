@@ -3320,10 +3320,7 @@ export function HomeShell() {
         requested === "breakfast" ||
         requested === "snack"
       ) {
-        return (
-          normalized === "breakfast" ||
-          normalized === "snack"
-        );
+        return normalized === requested;
       }
 
       if (
@@ -3355,6 +3352,27 @@ export function HomeShell() {
         compatibleFamily,
       ),
     );
+  }
+
+  function quickMealAlternatesForSlot(
+    slot: string,
+  ): typeof knownAlternates {
+    const sourcePriority = {
+      history: 0,
+      recipe: 1,
+      meal_prep: 2,
+      pantry: 3,
+      ingredient: 4,
+    } as const;
+
+    return knownAlternates
+      .filter((item) =>
+        quickMealFitsSlot(item, slot),
+      )
+      .sort((left, right) =>
+        sourcePriority[left.source] -
+        sourcePriority[right.source],
+      );
   }
 
 
@@ -6943,153 +6961,54 @@ export function HomeShell() {
                             id={`home-add-meal-${slot}`}
                             className={`${styles.alternateMealForm} ${styles.alternateMealFormActive}`}
                           >
-                            <label>
-                              Cosa hai mangiato?
-                              <select
-                                value=""
-                                onChange={(event) => {
-                                  const selected =
-                                    knownAlternates.find(
-                                      (item) =>
-                                        item.key ===
-                                        event.target.value,
-                                    );
+                            <div>
+                              <div className={styles.quickMealChoicesHeader}>
+                                <div>
+                                  <strong>
+                                    Scelte recenti per {mealLabel(slot).toLocaleLowerCase("it")}
+                                  </strong>
+                                  <span>
+                                    Solo proposte adatte a questo pasto.
+                                  </span>
+                                </div>
+                              </div>
 
-                                  if (!selected) {
-                                    setAlternateSelectedKey(null);
-                                    setAlternateQuantity(1);
-                                    return;
-                                  }
-
-                                  setAlternateSelectedKey(
-                                    selected.key,
-                                  );
-                                  setAlternateQuantity(1);
-
-                                  setAlternateName(
-                                    selected.name,
-                                  );
-                                  setAlternateCalories(
-                                    String(
-                                      Math.round(
-                                        selected.calories,
-                                      ),
-                                    ),
-                                  );
-                                  setAlternateProtein(
-                                    String(
-                                      Math.round(
-                                        selected.protein,
-                                      ),
-                                    ),
-                                  );
-                                  setAlternateCarbs(
-                                    String(
-                                      Math.round(
-                                        selected.carbs,
-                                      ),
-                                    ),
-                                  );
-                                  setAlternateFat(
-                                    String(
-                                      Math.round(
-                                        selected.fat,
-                                      ),
-                                    ),
-                                  );
-                                }}
-                              >
-                                <option value="">
-                                  Scegli da ricette, recenti e alimenti…
-                                </option>
-
-                                {knownAlternates.some(
-                                  (item) =>
-                                    item.source === "recipe" &&
-                                    item.mealType &&
-                                    mealFitsSlot(
-                                      item.mealType,
-                                      slot,
-                                    ),
-                                ) ? (
-                                  <optgroup label="Ricette">
-                                    {knownAlternates
-                                      .filter(
-                                        (item) =>
-                                          item.source ===
-                                            "recipe" &&
-                                          item.mealType &&
-                                          mealFitsSlot(
-                                            item.mealType,
-                                            slot,
-                                          ),
-                                      )
-                                      .map((item) => (
-                                        <option
-                                          key={item.key}
-                                          value={item.key}
-                                        >
-                                          {item.name}
-                                        </option>
-                                      ))}
-                                  </optgroup>
-                                ) : null}
-
-                                {knownAlternates.some(
-                                  (item) =>
-                                    item.source === "history" &&
-                                    item.mealType &&
-                                    mealFitsSlot(
-                                      item.mealType,
-                                      slot,
-                                    ),
-                                ) ? (
-                                  <optgroup label="Pasti recenti">
-                                    {knownAlternates
-                                      .filter(
-                                        (item) =>
-                                          item.source ===
-                                            "history" &&
-                                          item.mealType &&
-                                          mealFitsSlot(
-                                            item.mealType,
-                                            slot,
-                                          ),
-                                      )
-                                      .map((item) => (
-                                        <option
-                                          key={item.key}
-                                          value={item.key}
-                                        >
-                                          {item.name}
-                                        </option>
-                                      ))}
-                                  </optgroup>
-                                ) : null}
-
-                                {knownAlternates.some(
-                                  (item) =>
-                                    item.source ===
-                                    "ingredient",
-                                ) ? (
-                                  <optgroup label="Alimenti">
-                                    {knownAlternates
-                                      .filter(
-                                        (item) =>
-                                          item.source ===
-                                          "ingredient",
-                                      )
-                                      .map((item) => (
-                                        <option
-                                          key={item.key}
-                                          value={item.key}
-                                        >
-                                          {item.name}
-                                        </option>
-                                      ))}
-                                  </optgroup>
-                                ) : null}
-                              </select>
+                              {quickMealAlternatesForSlot(slot).length ? (
+                                <div className={styles.quickMealChoices}>
+                                  {quickMealAlternatesForSlot(slot)
+                                    .slice(0, 6)
+                                    .map((item) => (
+                                      <button
+                                        key={item.key}
+                                        type="button"
+                                        className={styles.quickMealChoice}
+                                        data-selected={
+                                          alternateSelectedKey === item.key
+                                            ? "true"
+                                            : "false"
+                                        }
+                                        onClick={() =>
+                                          selectQuickMealAlternate(item.key)
+                                        }
+                                      >
+                                        <span>
+                                          <strong>{item.name}</strong>
+                                          <small>
+                                            {Math.round(item.calories)} kcal
+                                            {item.protein > 0
+                                              ? ` · ${Math.round(item.protein)} g proteine`
+                                              : ""}
+                                          </small>
+                                        </span>
+                                        <span aria-hidden="true">→</span>
+                                      </button>
+                                    ))}
+                                </div>
+                              ) : (
+                                <p className={styles.quickMealChoicesEmpty}>
+                                  Nessuna scelta recente per questo pasto.
+                                </p>
+                              )}
 
                               {alternateSelectedKey?.startsWith(
                                 "recipe:",
@@ -7184,7 +7103,7 @@ export function HomeShell() {
                                   );
                                 }}
                               />
-                            </label>
+                            </div>
 
                             <div className={styles.alternateMealNumbers}>
                               <label>
