@@ -7,6 +7,8 @@ export interface ConfirmMealResponse {
 
 export interface ConfirmMealRecommendation {
   name: string;
+  source?: string;
+  source_id?: string | null;
   quantity: number | null;
   calories: number;
   protein_g?: number;

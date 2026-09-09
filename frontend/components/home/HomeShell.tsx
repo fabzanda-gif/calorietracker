@@ -3880,6 +3880,12 @@ export function HomeShell() {
               name:
                 nextMealOptions.recommended
                   .candidate.name,
+              source:
+                nextMealOptions.recommended
+                  .candidate.source,
+              source_id:
+                nextMealOptions.recommended
+                  .candidate.source_id,
               quantity:
                 nextMealOptions.recommended
                   .recommended_quantity,
