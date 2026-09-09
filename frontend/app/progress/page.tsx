@@ -435,7 +435,13 @@ function WeightChart({
   );
 }
 
-function HeroWeightChart({ items }: { items: WeightEntry[] }) {
+function HeroWeightChart({
+  items,
+  range,
+}: {
+  items: WeightEntry[];
+  range: RangeKey;
+}) {
   if (items.length < 2) {
     return (
       <div className={styles.heroChartEmpty}>
@@ -459,10 +465,28 @@ function HeroWeightChart({ items }: { items: WeightEntry[] }) {
     .map((value, index) => `${xFor(index)},${yFor(value)}`)
     .join(" ");
 
+  const rangeTitle =
+    range === "30"
+      ? "ultimi 30 giorni"
+      : range === "90"
+        ? "ultimi 90 giorni"
+        : range === "180"
+          ? "ultimi 6 mesi"
+          : "tutto il periodo";
+
+  const rangeStartLabel =
+    range === "30"
+      ? "30 giorni fa"
+      : range === "90"
+        ? "90 giorni fa"
+        : range === "180"
+          ? "6 mesi fa"
+          : formatDate(items[0].date);
+
   return (
     <div className={styles.heroChartWrap}>
       <div className={styles.heroChartTitle}>
-        <span>Andamento peso · ultimi 90 giorni</span>
+        <span>Andamento peso · {rangeTitle}</span>
         <strong>{formatWeight(values[0])} → {formatWeight(values[values.length - 1])} kg</strong>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Trend del peso negli ultimi 90 giorni">
@@ -474,7 +498,10 @@ function HeroWeightChart({ items }: { items: WeightEntry[] }) {
           <circle key={`${item.id}-hero`} cx={xFor(index)} cy={yFor(Number(item.weight))} r="3.5" className={styles.heroTrendPoint} />
         ))}
       </svg>
-      <div className={styles.heroChartDates}><span>90 giorni fa</span><span>Oggi</span></div>
+      <div className={styles.heroChartDates}>
+        <span>{rangeStartLabel}</span>
+        <span>Oggi</span>
+      </div>
     </div>
   );
 }
@@ -1825,7 +1852,10 @@ export default function ProgressPage() {
           </div>
         </div>
 
-        <HeroWeightChart items={visibleItems} />
+        <HeroWeightChart
+          items={visibleItems}
+          range={range}
+        />
 
         <form
           className={styles.weightForm}
