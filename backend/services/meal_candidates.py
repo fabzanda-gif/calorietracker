@@ -6,6 +6,9 @@ from typing import Any
 from backend.services.legacy_meal_events import (
     LegacyMealEventService,
 )
+from backend.services.meal_suggestion_policy import (
+    MealSuggestionPolicy,
+)
 
 
 class MealCandidateService:
@@ -129,7 +132,7 @@ class MealCandidateService:
                 }
             )
 
-        compatible_meal_types = self._compatible_meal_types(meal_type)
+        compatible_meal_types = MealSuggestionPolicy.compatible_meal_types(meal_type)
 
         for recipe in recipes:
             recipe_meal_type = recipe.get("meal_type")
@@ -276,13 +279,6 @@ class MealCandidateService:
             candidates.append(candidate)
 
         return self._deduplicate(candidates)
-
-    @staticmethod
-    def _compatible_meal_types(meal_type: str) -> set[str]:
-        """Lunch and dinner may swap; snacks never leak into main meals."""
-        if meal_type in {"Pranzo", "Cena"}:
-            return {"Pranzo", "Cena"}
-        return {meal_type}
 
     @staticmethod
     def _deduplicate(
