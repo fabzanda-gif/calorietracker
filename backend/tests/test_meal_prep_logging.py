@@ -37,10 +37,16 @@ class FakeMealPrepRepository:
 class FakeMealsRepository:
     def __init__(self):
         self.created = None
+        self.deleted = []
 
     def create(self, payload):
         self.created = payload
         return {"id": "meal-1", **payload}
+
+    def delete(self, meal_id, user_id):
+        self.deleted.append((meal_id, user_id))
+        self.created = None
+        return True
 
 
 def build(remaining=2, status="available"):
@@ -125,3 +131,28 @@ def test_missing_batch_is_rejected():
             meal_date=date(2026, 9, 6),
             meal_type="Pranzo",
         )
+
+def test_inventory_failure_rolls_back_created_meal():
+    service, inventory, meals = build()
+
+    def fail_update(batch_id, user_id, payload):
+        raise RuntimeError("inventory unavailable")
+
+    inventory.update = fail_update
+
+    with pytest.raises(
+        RuntimeError,
+        match="inventory unavailable",
+    ):
+        service.log_portion(
+            user_id="u1",
+            batch_id="batch-1",
+            meal_date=date(2026, 9, 6),
+            meal_type="Pranzo",
+        )
+
+    assert meals.created is None
+    assert meals.deleted == [
+        ("meal-1", "u1"),
+    ]
+    assert inventory.item["portions_remaining"] == 2
