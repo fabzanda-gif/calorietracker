@@ -20,7 +20,6 @@ import {
   getActivitiesForRange,
   getActivityOverview,
   getPlannedActivities,
-  getTrainingPlans,
   createPlannedActivity,
   updatePlannedActivity,
   deletePlannedActivity,
@@ -863,48 +862,33 @@ export default function ActivitiesPage() {
     }
 
     try {
-      const plansResponse =
-        await getTrainingPlans(accessToken);
+      const today = new Date();
+      const planningEnd = new Date(today);
 
-      const visiblePlans =
-        plansResponse.items.filter(
-          (plan) =>
-            plan.status === "active" ||
-            plan.status === "paused",
-        );
-
-      if (!visiblePlans.length) {
-        setTrainingPlanActivities([]);
-        return;
-      }
-
-      const planStart = visiblePlans
-        .map((plan) => plan.start_date)
-        .sort()[0];
-
-      const planEnd = visiblePlans
-        .map((plan) => plan.target_date)
-        .sort()
-        .at(-1);
-
-      if (!planStart || !planEnd) {
-        setTrainingPlanActivities([]);
-        return;
-      }
+      planningEnd.setDate(
+        planningEnd.getDate() + 366,
+      );
 
       const response =
         await getPlannedActivities(
-          planStart,
-          planEnd,
+          isoDate(today),
+          isoDate(planningEnd),
           accessToken,
         );
 
       setTrainingPlanActivities(
-        response.items,
+        response.items.filter(
+          (item) =>
+            item.status === "planned" &&
+            item.scheduled_date >= isoDate(today),
+        ),
       );
-    } catch {
-      // Calendario e attività manuali restano disponibili
-      // anche se il piano completo non può essere caricato.
+    } catch (error) {
+      console.error(
+        "Unable to load upcoming activities",
+        error,
+      );
+
       setTrainingPlanActivities([]);
     }
   }, [accessToken]);
@@ -1045,7 +1029,10 @@ export default function ActivitiesPage() {
       () =>
         sortedPlannedActivities.filter(
           (item) =>
-            item.id !== nextPlannedActivityId,
+            item.id !== nextPlannedActivityId &&
+            item.status === "planned" &&
+            item.scheduled_date >=
+              isoDate(new Date()),
         ),
       [
         sortedPlannedActivities,
