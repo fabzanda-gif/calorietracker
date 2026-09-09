@@ -87,11 +87,26 @@ class DayService:
         self,
         user_id: str,
         day_date: date,
+        metadata: dict[str, Any] | None = None,
     ) -> dict:
         """
         Use the user's weekly schedule as the primary
         prediction source for the day context.
         """
+        day_name = (
+            "monday", "tuesday", "wednesday", "thursday",
+            "friday", "saturday", "sunday",
+        )[day_date.weekday()]
+        stored = (metadata or {}).get("weekly_schedule")
+        if isinstance(stored, dict):
+            value = stored.get(day_name)
+            if value in {"home", "office", "free"}:
+                return {
+                    "value": value,
+                    "state": "predicted",
+                    "source": "profile_weekly_schedule",
+                }
+
         if self.weekly_schedule_repo is None:
             return _unknown_context()
 
@@ -130,7 +145,12 @@ class DayService:
 
         return _unknown_context()
 
-    def build_day(self, user_id: str, day_date: date) -> dict:
+    def build_day(
+        self,
+        user_id: str,
+        day_date: date,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict:
         row = self.daily_logs_repo.get_for_date_compatible(
             user_id=user_id,
             log_date=day_date,
@@ -191,6 +211,7 @@ class DayService:
             context = self._weekly_schedule_context(
                 user_id=user_id,
                 day_date=day_date,
+                metadata=metadata,
             )
 
         # Fall back to historical memory only when the weekly schedule

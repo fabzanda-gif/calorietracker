@@ -73,3 +73,24 @@ def test_monday_uses_day_number_one():
     )
 
     assert result["context"]["value"] == "home"
+
+
+def test_profile_weekly_routine_wins_over_stale_week_override():
+    result = DayService(
+        daily_logs_repo=FakeDailyLogsRepository(),
+        weekly_schedule_repo=FakeWeeklyScheduleRepository(),
+    ).build_day(
+        user_id="user-1",
+        day_date=date(2026, 9, 2),
+        metadata={
+            "weekly_schedule": {
+                "wednesday": "free",
+            }
+        },
+    )
+
+    assert result["context"] == {
+        "value": "free",
+        "state": "predicted",
+        "source": "profile_weekly_schedule",
+    }

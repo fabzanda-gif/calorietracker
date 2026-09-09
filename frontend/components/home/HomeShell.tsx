@@ -619,6 +619,9 @@ export function HomeShell() {
   const [actualActivities, setActualActivities] =
     useState<Activity[]>([]);
 
+  const [plannedActivities, setPlannedActivities] =
+    useState<PlannedActivity[]>([]);
+
   const [
     nextRunningSession,
     setNextRunningSession,
@@ -1739,6 +1742,7 @@ export function HomeShell() {
           setActualActivities(
             activitiesPayload.items,
           );
+          setPlannedActivities(plannedActivitiesPayload.items);
 
           setNextRunningSession(
             plannedActivitiesPayload.items
@@ -2779,6 +2783,7 @@ export function HomeShell() {
     setActualActivities(
       activitiesPayload.items,
     );
+    setPlannedActivities(plannedActivitiesPayload.items);
 
     setNextRunningSession(
       plannedActivitiesPayload.items
@@ -3451,6 +3456,21 @@ export function HomeShell() {
     setQuickAddMode("activity");
   }
 
+  function openSuggestedActivity() {
+    const suggestion =
+      budgetResult?.energy_baseline?.activity_suggestion;
+    if (!suggestion) return;
+
+    setError(null);
+    setQuickActivityName(suggestion.activity_name);
+    setQuickActivityCalories(String(suggestion.burned_calories));
+    setQuickActivityDurationMinutes(
+      suggestion.duration_minutes ? String(suggestion.duration_minutes) : "",
+    );
+    setQuickActivityDistanceKm("");
+    setQuickAddMode("activity");
+  }
+
   async function openQuickAddWeight() {
     setError(null);
 
@@ -3922,6 +3942,20 @@ export function HomeShell() {
     }
   }
 
+  const todayPlannedActivities = plannedActivities.filter(
+    (item) =>
+      item.scheduled_date === todayIso() &&
+      item.status === "planned",
+  );
+  const plannedActivityKcal = Number(
+    budgetResult?.energy_baseline?.planned_activity_kcal ?? 0,
+  );
+  const plannedActivityLevel =
+    budgetResult?.energy_baseline?.planned_activity_level ?? null;
+  const plannedActivitySummary = todayPlannedActivities.length
+    ? `${todayPlannedActivities.map((item) => item.title).join(", ")} · circa ${Math.round(plannedActivityKcal)} kcal già incluse nel bilancio.`
+    : null;
+
   return (
     <>
       <AppNav />
@@ -3995,7 +4029,7 @@ export function HomeShell() {
                   day.context.value,
                 ),
                 normalizeActivityLevel(
-                  day.activity_plan.value,
+                  plannedActivityLevel ?? day.activity_plan.value,
                 ),
                 burnedCalories,
                 actualActivities.length,
@@ -4007,8 +4041,9 @@ export function HomeShell() {
               day.context.value,
             )}
             activityLevel={normalizeActivityLevel(
-              day.activity_plan.value,
+              plannedActivityLevel ?? day.activity_plan.value,
             )}
+            plannedActivitySummary={plannedActivitySummary}
             onDayTypeChange={(value) => {
               void handleDayPlannerChange({
                 day_type: value,
@@ -4020,6 +4055,21 @@ export function HomeShell() {
               });
             }}
           />
+
+          {budgetResult?.energy_baseline?.activity_suggestion ? (
+            <section className={styles.activitySuggestion}>
+              <div>
+                <span>Abitudine riconosciuta</span>
+                <strong>
+                  Hai fatto {budgetResult.energy_baseline.activity_suggestion.activity_name.toLowerCase()} anche oggi?
+                </strong>
+                <p>{budgetResult.energy_baseline.activity_suggestion.reason}</p>
+              </div>
+              <button type="button" onClick={openSuggestedActivity}>
+                Sì, registrala
+              </button>
+            </section>
+          ) : null}
 
           {dayPlannerMessage ? (
             <p className={styles.muted}>

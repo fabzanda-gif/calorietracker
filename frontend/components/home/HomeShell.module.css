@@ -15502,4 +15502,49 @@ details[open] > summary .dailyEntryChevron {
     white-space: normal;
   }
 }
+.activitySuggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: -6px 0 24px;
+  padding: 16px 18px;
+  border: 1px solid #cfe5d7;
+  border-radius: 16px;
+  background: #f3faf6;
+  color: #102846;
+}
 
+.activitySuggestion div {
+  display: grid;
+  gap: 3px;
+}
+
+.activitySuggestion span {
+  color: #288a57;
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.activitySuggestion strong { font-size: .95rem; }
+.activitySuggestion p { margin: 0; color: #66776d; font-size: .78rem; }
+.activitySuggestion button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 11px;
+  background: #102846;
+  color: #fff;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .activitySuggestion { align-items: stretch; flex-direction: column; }
+  .activitySuggestion button { width: 100%; }
+}

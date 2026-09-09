@@ -297,6 +297,7 @@ def _build_day(
     daily_logs_repo: DailyLogsRepository,
     meals_repo: MealsRepository,
     weekly_schedule_repo: WeeklyScheduleRepository,
+    metadata: dict | None = None,
 ) -> dict:
     return DayService(
         daily_logs_repo=daily_logs_repo,
@@ -308,6 +309,7 @@ def _build_day(
     ).build_day(
         user_id=user_id,
         day_date=day_date,
+        metadata=metadata,
     )
 
 
@@ -319,6 +321,7 @@ def _build_budget(
     activities_repo: ActivitiesRepository,
     daily_logs_repo: DailyLogsRepository,
     weight_repo: WeightRepository,
+    planned_activities_repo: PlannedActivitiesRepository | None = None,
 ) -> dict:
     latest_weight = weight_repo.latest(current_user.id)
     current_weight = (
@@ -331,6 +334,7 @@ def _build_budget(
         meals_repo=meals_repo,
         activities_repo=activities_repo,
         daily_logs_repo=daily_logs_repo,
+        planned_activities_repo=planned_activities_repo,
     ).build(
         user_id=current_user.id,
         day_date=day_date,
@@ -436,6 +440,9 @@ def get_day_budget(
     weight_repo: WeightRepository = Depends(
         get_weight_repository
     ),
+    planned_activities_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
 ):
     try:
         return _build_budget(
@@ -445,6 +452,7 @@ def get_day_budget(
             activities_repo=activities_repo,
             daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
+            planned_activities_repo=planned_activities_repo,
         )
     except RepositoryError as exc:
         raise HTTPException(
@@ -511,6 +519,7 @@ def get_ranked_meal_options(
                 daily_logs_repo=daily_logs_repo,
                 meals_repo=meals_repo,
                 weekly_schedule_repo=weekly_schedule_repo,
+                metadata=current_user.metadata,
             )
 
             budget_future = executor.submit(
@@ -521,6 +530,7 @@ def get_ranked_meal_options(
                 activities_repo=activities_repo,
                 daily_logs_repo=daily_logs_repo,
                 weight_repo=weight_repo,
+                planned_activities_repo=planned_activities_repo,
             )
 
             day = day_future.result()
@@ -881,6 +891,9 @@ def get_meal_decision(
     weekly_schedule_repo: WeeklyScheduleRepository = Depends(
         get_weekly_schedule_repository
     ),
+    planned_activities_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
 ):
     meal_type = _validate_slot(meal_slot)
 
@@ -891,6 +904,7 @@ def get_meal_decision(
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
             weekly_schedule_repo=weekly_schedule_repo,
+            metadata=current_user.metadata,
         )
 
         budget_result = _build_budget(
@@ -900,6 +914,7 @@ def get_meal_decision(
             activities_repo=activities_repo,
             daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
+            planned_activities_repo=planned_activities_repo,
         )
 
         available_kcal = None
@@ -953,6 +968,7 @@ def confirm_meal_prediction(
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
             weekly_schedule_repo=weekly_schedule_repo,
+            metadata=current_user.metadata,
         )
 
         prediction = day["meals"][meal_slot]
@@ -1068,6 +1084,9 @@ def get_day_briefing(
     briefing_repo: DayBriefingsRepository = Depends(
         get_day_briefings_repository
     ),
+    planned_activities_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
 ):
     try:
         day = _build_day(
@@ -1076,6 +1095,7 @@ def get_day_briefing(
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
             weekly_schedule_repo=weekly_schedule_repo,
+            metadata=current_user.metadata,
         )
         budget_result = _build_budget(
             current_user=current_user,
@@ -1084,6 +1104,7 @@ def get_day_briefing(
             activities_repo=activities_repo,
             daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
+            planned_activities_repo=planned_activities_repo,
         )
     except RepositoryError as exc:
         raise HTTPException(
@@ -1155,7 +1176,10 @@ def get_day_briefing(
         "daily_context": daily_context,
         "day_type": day.get("context", {}).get("value"),
         "activity_level": (
-            day.get("activity_plan", {}).get("value")
+            budget_result.get("energy_baseline", {}).get(
+                "planned_activity_level"
+            )
+            or day.get("activity_plan", {}).get("value")
         ),
         "meal_count": int(
             actual.get("meal_count", 0) or 0
@@ -1324,6 +1348,7 @@ def get_day(
             daily_logs_repo=daily_logs_repo,
             meals_repo=meals_repo,
             weekly_schedule_repo=weekly_schedule_repo,
+            metadata=current_user.metadata,
         )
     except RepositoryError as exc:
         raise HTTPException(

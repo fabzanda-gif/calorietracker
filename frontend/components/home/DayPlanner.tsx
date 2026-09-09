@@ -22,6 +22,7 @@ type Props = {
   onActivityLevelChange: (
     value: ActivityLevel,
   ) => void;
+  plannedActivitySummary?: string | null;
 };
 
 const dayOptions: Array<{
@@ -84,6 +85,7 @@ export function DayPlanner({
   activityLevel,
   onDayTypeChange,
   onActivityLevelChange,
+  plannedActivitySummary = null,
 }: Props) {
   const [editing, setEditing] =
     useState(false);
@@ -150,6 +152,12 @@ export function DayPlanner({
             </div>
           </div>
 
+          {plannedActivitySummary ? (
+            <div className={styles.plannedActivityNotice}>
+              <strong>Attività calcolata dal programma</strong>
+              <span>{plannedActivitySummary}</span>
+            </div>
+          ) : (
           <div className={styles.group}>
             <span className={styles.label}>
               Attività prevista
@@ -183,6 +191,7 @@ export function DayPlanner({
               )}
             </div>
           </div>
+          )}
         </div>
       ) : null}
     </section>

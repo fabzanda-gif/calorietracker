@@ -7,11 +7,14 @@ from typing import Any, Mapping
 from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.meals import MealsRepository
+from backend.repositories.planned_activities import PlannedActivitiesRepository
 from backend.services.budget import BudgetInput, BudgetService
+from backend.services.activity_suggestion import learn_activity_suggestion
 from backend.services.day_metrics import DayMetricsService
 from backend.services.day_history import DayHistoryService
 from backend.services.memory import MemoryService
 from backend.services.profile_goal import ProfileGoalService
+from backend.services.planned_activity_energy import summarize_planned_activity_energy
 
 
 class DayBudgetService:
@@ -34,6 +37,7 @@ class DayBudgetService:
         meals_repo: MealsRepository,
         activities_repo: ActivitiesRepository,
         daily_logs_repo: DailyLogsRepository,
+        planned_activities_repo: PlannedActivitiesRepository | None = None,
         *,
         metrics_service: DayMetricsService | None = None,
         history_service: DayHistoryService | None = None,
@@ -49,6 +53,8 @@ class DayBudgetService:
             activities_repo=activities_repo,
         )
         self.daily_logs_repo = daily_logs_repo
+        self.activities_repo = activities_repo
+        self.planned_activities_repo = planned_activities_repo
         self.memory_service = MemoryService(daily_logs_repo)
         self.profile_goal_service = (
             profile_goal_service or ProfileGoalService()
@@ -132,7 +138,9 @@ class DayBudgetService:
     ) -> dict:
         # These reads are independent and I/O-bound.
         # Execute them concurrently so Supabase round-trips overlap.
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        suggestion_start = day_date - timedelta(days=56)
+
+        with ThreadPoolExecutor(max_workers=7) as executor:
             metrics_future = executor.submit(
                 self.metrics_service.for_day,
                 user_id=user_id,
@@ -152,9 +160,46 @@ class DayBudgetService:
                 day_date=day_date,
             )
 
+            planned_future = (
+                executor.submit(
+                    self.planned_activities_repo.list_range,
+                    user_id,
+                    day_date,
+                    day_date,
+                )
+                if self.planned_activities_repo is not None
+                else None
+            )
+
+            suggestion_activities_future = executor.submit(
+                self.activities_repo.list_date_range,
+                user_id,
+                suggestion_start,
+                day_date - timedelta(days=1),
+            )
+            suggestion_logs_future = executor.submit(
+                self.daily_logs_repo.list_date_range,
+                user_id,
+                suggestion_start,
+                day_date - timedelta(days=1),
+            )
+            today_activities_future = executor.submit(
+                self.activities_repo.list_for_date,
+                user_id,
+                day_date,
+            )
+
             metrics = metrics_future.result()
             activity_history = activity_history_future.result()
             activity_level = activity_level_future.result()
+            planned_activities = (
+                planned_future.result()
+                if planned_future is not None
+                else []
+            )
+            suggestion_activities = suggestion_activities_future.result()
+            suggestion_logs = suggestion_logs_future.result()
+            today_activities = today_activities_future.result()
 
         profile = self.profile_goal_service.build(
             metadata,
@@ -179,6 +224,33 @@ class DayBudgetService:
             activity_level
         )
 
+        planned_energy = summarize_planned_activity_energy(
+            planned_activities,
+            weight_kg=current_weight,
+        )
+
+        today_row = self.daily_logs_repo.get_for_date_compatible(
+            user_id=user_id,
+            log_date=day_date,
+        ) or {}
+        schedule = metadata.get("weekly_schedule")
+        day_names = (
+            "monday", "tuesday", "wednesday", "thursday",
+            "friday", "saturday", "sunday",
+        )
+        day_context = today_row.get("day_type")
+        if not day_context and isinstance(schedule, Mapping):
+            day_context = schedule.get(day_names[day_date.weekday()])
+
+        activity_suggestion = learn_activity_suggestion(
+            day_date=day_date,
+            day_context=str(day_context) if day_context else None,
+            activities=suggestion_activities,
+            daily_logs=suggestion_logs,
+            today_activities=today_activities,
+            planned_activities=planned_activities,
+        )
+
         logged_meal_types = {
             str(value).strip().casefold()
             for value in metrics.get("logged_meal_types", [])
@@ -198,6 +270,7 @@ class DayBudgetService:
                 activity_kcal=(
                     average_activity_kcal
                     + activity_buffer_kcal
+                    + planned_energy["estimated_kcal"]
                 ),
                 baseline_activity_factor=1.0,
                 consumed_kcal=metrics["consumed_kcal"],
@@ -223,7 +296,13 @@ class DayBudgetService:
                 "activity_kcal_for_budget": (
                     average_activity_kcal
                     + activity_buffer_kcal
+                    + planned_energy["estimated_kcal"]
                 ),
+                "planned_activity_kcal": planned_energy["estimated_kcal"],
+                "planned_activity_count": planned_energy["count"],
+                "planned_activity_level": planned_energy["activity_level"],
+                "planned_activities": planned_energy["items"],
+                "activity_suggestion": activity_suggestion,
                 "baseline_activity_factor": 1.0,
                 "history": activity_history,
             },

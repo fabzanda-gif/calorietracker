@@ -88,6 +88,13 @@ function contextLabel(
   }[context];
 }
 
+function scheduleContext(value: unknown): WeeklyScheduleContext {
+  if (value === "office" || value === "free") {
+    return value;
+  }
+  return "home";
+}
+
 const EMPTY_FORM: FormState = {
   name: "",
   gender: "",
@@ -250,33 +257,19 @@ export default function ProfilePage() {
           typeof storedSchedule === "object"
             ? {
                 monday:
-                  (storedSchedule as Record<string, string>).monday === "office"
-                    ? "office"
-                    : "home",
+                  scheduleContext((storedSchedule as Record<string, string>).monday),
                 tuesday:
-                  (storedSchedule as Record<string, string>).tuesday === "office"
-                    ? "office"
-                    : "home",
+                  scheduleContext((storedSchedule as Record<string, string>).tuesday),
                 wednesday:
-                  (storedSchedule as Record<string, string>).wednesday === "office"
-                    ? "office"
-                    : "home",
+                  scheduleContext((storedSchedule as Record<string, string>).wednesday),
                 thursday:
-                  (storedSchedule as Record<string, string>).thursday === "office"
-                    ? "office"
-                    : "home",
+                  scheduleContext((storedSchedule as Record<string, string>).thursday),
                 friday:
-                  (storedSchedule as Record<string, string>).friday === "office"
-                    ? "office"
-                    : "home",
+                  scheduleContext((storedSchedule as Record<string, string>).friday),
                 saturday:
-                  (storedSchedule as Record<string, string>).saturday === "office"
-                    ? "office"
-                    : "home",
+                  scheduleContext((storedSchedule as Record<string, string>).saturday),
                 sunday:
-                  (storedSchedule as Record<string, string>).sunday === "office"
-                    ? "office"
-                    : "home",
+                  scheduleContext((storedSchedule as Record<string, string>).sunday),
               }
             : EMPTY_FORM.weekly_schedule;
 
@@ -751,11 +744,21 @@ export default function ProfilePage() {
     };
 
     try {
-      const response =
-        await updateProfile(
-          accessToken,
-          payload,
-        );
+      const weekStart = currentWeekStart || getCurrentWeekStart();
+      const [, weeklyResponse] = await Promise.all([
+        updateProfile(accessToken, payload),
+        updateWeeklySchedule(accessToken, {
+          week_start: weekStart,
+          days: WEEK_DAYS.map((day) => ({
+            day_of_week: day.number,
+            context: form.weekly_schedule[day.key],
+          })),
+        }),
+      ]);
+
+      setCurrentWeekStart(weeklyResponse.week_start);
+      setCurrentWeekSchedule(weeklyResponse.days);
+      setCurrentWeekOverrides(weeklyResponse.overrides);
 
 
 

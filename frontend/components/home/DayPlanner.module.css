@@ -143,6 +143,25 @@
   }
 }
 
+.plannedActivityNotice {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #bfe3ce;
+  border-radius: 13px;
+  background: #f1faf5;
+  color: #172f4d;
+}
+
+.plannedActivityNotice strong {
+  font-size: 0.82rem;
+}
+
+.plannedActivityNotice span {
+  color: #5d7167;
+  font-size: 0.78rem;
+}
+
 
 /* ============================================================
    HOME REDESIGN — DAY PLANNER INLINE

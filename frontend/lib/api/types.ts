@@ -85,6 +85,30 @@ export interface DayBudgetResponse {
   budget: DayBudget | null;
   actual: Record<string, unknown>;
   profile: Record<string, unknown>;
+  energy_baseline?: {
+    average_activity_kcal_7d?: number;
+    activity_level?: string | null;
+    activity_buffer_kcal?: number;
+    activity_kcal_for_budget?: number;
+    planned_activity_kcal?: number;
+    planned_activity_count?: number;
+    planned_activity_level?: "moderate" | "high" | null;
+    planned_activities?: Array<{
+      id?: string | null;
+      title?: string | null;
+      activity_type?: string | null;
+      duration_minutes?: number | null;
+      distance_meters?: number | null;
+      estimated_kcal: number;
+    }>;
+    activity_suggestion?: {
+      activity_name: string;
+      burned_calories: number;
+      duration_minutes?: number | null;
+      observations: number;
+      reason: string;
+    } | null;
+  };
 }
 
 export type DecisionMode =

@@ -44,12 +44,21 @@ class FakeDailyLogsRepository:
         return self.history
 
 
+class FakePlannedActivitiesRepository:
+    def __init__(self, rows=None):
+        self.rows = rows or []
+
+    def list_range(self, user_id, start_date, end_date):
+        return self.rows
+
+
 def service(
     meals=None,
     activities=None,
     history_activities=None,
     daily_log=None,
     daily_log_history=None,
+    planned_activities=None,
 ):
     return DayBudgetService(
         meals_repo=FakeMealsRepository(meals or []),
@@ -60,6 +69,9 @@ def service(
         daily_logs_repo=FakeDailyLogsRepository(
             today=daily_log,
             history=daily_log_history,
+        ),
+        planned_activities_repo=FakePlannedActivitiesRepository(
+            planned_activities,
         ),
     )
 
@@ -428,3 +440,27 @@ def test_today_activity_does_not_change_today_budget():
         == before["budget"]["daily_budget_kcal"]
     )
 
+
+def test_planned_run_is_included_from_the_start_of_the_day():
+    result = service(
+        planned_activities=[
+            {
+                "id": "run-1",
+                "status": "planned",
+                "title": "Corsa 5 km",
+                "activity_type": "Corsa",
+                "distance_meters": 5000,
+                "duration_minutes": 32,
+            }
+        ],
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={**BASE_META, "goal_mode": "maintenance"},
+        current_weight=80,
+    )
+
+    baseline = result["energy_baseline"]
+    assert baseline["planned_activity_kcal"] == 400
+    assert baseline["planned_activity_level"] == "moderate"
+    assert result["budget"]["maintenance_kcal"] == result["profile"]["bmr"] + 400
