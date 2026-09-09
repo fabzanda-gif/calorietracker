@@ -578,7 +578,7 @@ export default function ActivitiesPage() {
     () => new Date(),
   );
   const [calendarView, setCalendarView] =
-    useState<"weekly" | "monthly">("monthly");
+    useState<"weekly" | "monthly">("weekly");
   const [calendarExpanded, setCalendarExpanded] =
     useState(true);
   const [activities, setActivities] = useState<
@@ -1907,8 +1907,7 @@ export default function ActivitiesPage() {
           </div>
         </section>
 
-        <div className={styles.topGrid}>
-          <section className={`${styles.card} ${styles.calendarCard}`}>
+        <section className={`${styles.card} ${styles.calendarCard}`}>
             <div className={styles.cardHeading}>
               <div>
                 <p className={styles.eyebrow}>
@@ -2187,101 +2186,105 @@ export default function ActivitiesPage() {
             ) : null}
           </section>
 
-          <details className={`${styles.uploadCard} ${styles.utilityCard}`}>
-            <summary className={styles.utilitySummary}>
+
+        
+
+        
+
+
+        <div className={styles.activitiesColumns}>
+          <div className={styles.activitiesMainColumn}>
+<section className={styles.card}>
+            <div className={styles.cardHeading}>
               <div>
-              <p className={styles.eyebrow}>
-                Importa
-              </p>
-              <h2>Carica un GPX</h2>
-              <p>
-                Percorso, durata, cadenza e frequenza
-                cardiaca vengono letti dal file.
-              </p>
+                <p className={styles.eyebrow}>
+                  {selectedDate
+                    ? new Date(
+                        `${selectedDate}T00:00:00`,
+                      ).toLocaleDateString(
+                        "it-IT",
+                        {
+                          day: "numeric",
+                          month: "long",
+                        },
+                      )
+                    : "Mese"}
+                </p>
+                <h2>Attività registrate</h2>
               </div>
-              <span className={styles.expandToggle} aria-hidden="true" />
-            </summary>
 
-            <div className={styles.utilityBody}>
-            <label className={styles.dropZone}>
-              <input
-                type="file"
-                accept=".gpx,application/gpx+xml"
-                onChange={(event) => {
-                  void chooseGpx(
-                    event.target.files?.[0] ?? null,
-                  );
-                  event.currentTarget.value = "";
-                }}
-              />
-              <span className={styles.uploadIcon}>
-                ↑
-              </span>
-              <strong>
-                {previewing
-                  ? "Analizzo il percorso…"
-                  : "Scegli file GPX"}
-              </strong>
-              <small>Massimo 5 MB</small>
-            </label>
-
-            {gpxFile ? (
-              <p className={styles.fileName}>
-                {gpxFile.name}
-              </p>
-            ) : null}
-            </div>
-          </details>
-        </div>
-
-
-        <details
-          className={styles.trainingPrograms}
-        >
-          <summary
-            className={
-              styles.trainingProgramsSummary
-            }
-          >
-            <div>
-              <p className={styles.eyebrow}>
-                Programmi
-              </p>
-
-              <strong>
-                Programmi di allenamento
-              </strong>
-
-              <span>
-                Corsa e palestra in un unico posto.
-              </span>
+              {selectedDate ? (
+                <button
+                  type="button"
+                  className={styles.showMonthButton}
+                  onClick={() => {
+                    setSelectedDate("");
+                    setSelectedActivity(
+                      trainingActivities[0] ?? null,
+                    );
+                  }}
+                >
+                  Mostra tutto il mese
+                </button>
+              ) : null}
             </div>
 
-            <span
-              className={
-                styles.expandToggle
-              }
-              aria-hidden="true"
-            />
-          </summary>
+            <div className={styles.activityList}>
+              {visibleActivities.length ? (
+                visibleActivities.map((activity) => (
+                  <button
+                    type="button"
+                    key={String(activity.id)}
+                    className={`${styles.activityRow} ${
+                      detail?.id === activity.id
+                        ? styles.activityRowActive
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setSelectedActivity(activity)
+                    }
+                  >
+                    <span
+                      className={styles.activityMark}
+                      aria-hidden="true"
+                    >
+                      {activityIcon(activity)}
+                    </span>
 
-          <div
-            className={
-              styles.trainingProgramsBody
-            }
-          >
-            <RunningPlanBuilder
-              onCreated={() => {
-                void loadMonth();
-              }}
-            />
+                    <span className={styles.activityInfo}>
+                      <strong>
+                        {activity.activity_name}
+                      </strong>
+                      <small>
+                        {formatActivityDate(activity.date)} · {activity.activity_type ??
+                          (activity.source === "gpx"
+                            ? "Attività GPX"
+                            : "Attività manuale")}
+                      </small>
+                    </span>
 
-            <StrengthPlanPanel />
-          </div>
-        </details>
+                    <span className={styles.activityValue}>
+                      {activity.distance_meters
+                        ? formatDistance(
+                            activity.distance_meters,
+                          )
+                        : `${activity.burned_calories} kcal`}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className={styles.emptyList}>
+                  {selectedDate
+                    ? "Nessuna attività registrata in questo giorno."
+                    : "Nessuna attività registrata in questo mese."}
+                </div>
+              )}
+            </div>
+          </section>
 
-        <details
+<details
           className={`${styles.plannerSection} ${styles.plannerCollapsible}`}
+          open
         >
           <summary className={styles.plannerHeading}>
             <div>
@@ -3275,7 +3278,12 @@ export default function ActivitiesPage() {
                                   );
                                 }}
                               >
-                                Completata
+                                {item.id === nextPlannedActivityId &&
+                                item.activity_type
+                                  .trim()
+                                  .toLocaleLowerCase("it-IT") === "corsa"
+                                  ? "✓ Conferma corsa"
+                                  : "Completata"}
                               </button>
 
                               {item.activity_type
@@ -3377,17 +3385,229 @@ export default function ActivitiesPage() {
           </div>
         </details>
 
-        {error ? (
-          <div className={styles.error}>{error}</div>
-        ) : null}
+<details
+          className={styles.trainingPrograms}
+        >
+          <summary
+            className={
+              styles.trainingProgramsSummary
+            }
+          >
+            <div>
+              <p className={styles.eyebrow}>
+                Programmi
+              </p>
 
-        {importMessage ? (
-          <div className={styles.success}>
-            {importMessage}
+              <strong>
+                Programmi di allenamento
+              </strong>
+
+              <span>
+                Corsa e palestra in un unico posto.
+              </span>
+            </div>
+
+            <span
+              className={
+                styles.expandToggle
+              }
+              aria-hidden="true"
+            />
+          </summary>
+
+          <div
+            className={
+              styles.trainingProgramsBody
+            }
+          >
+            <RunningPlanBuilder
+              onCreated={() => {
+                void loadMonth();
+              }}
+            />
+
+            <StrengthPlanPanel />
           </div>
-        ) : null}
+        </details>
+          </div>
 
-        <details className={styles.loggerCard}>
+          <aside className={styles.activitiesSideColumn}>
+<section className={styles.detailCard}>
+            {detail ? (
+              <>
+                <div className={styles.cardHeading}>
+                  <div>
+                    <p className={styles.eyebrow}>
+                      Dettaglio
+                    </p>
+                    <h2>{detail.activity_name}</h2>
+                  </div>
+
+                  <div className={styles.detailActions}>
+                    <span className={styles.gpxBadge}>{detail.source === "gpx" ? "GPX" : "Manuale"}</span>
+                    <button
+                      type="button"
+                      className={styles.deleteButton}
+                      disabled={deletingId === detail.id}
+                      onClick={() => void removeActivity(detail)}
+                    >
+                      {deletingId === detail.id ? "Elimino…" : "Elimina"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.detailStats}>
+                  <div>
+                    <span>Data</span>
+                    <strong>{formatActivityDate(detail.date)}</strong>
+                  </div>
+                  <div>
+                    <span>Distanza</span>
+                    <strong>
+                      {formatDistance(
+                        detail.distance_meters,
+                      )}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Durata</span>
+                    <strong>
+                      {formatDuration(
+                        detail.duration_seconds,
+                      )}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Calorie</span>
+                    <strong>
+                      {detail.burned_calories} kcal
+                    </strong>
+                  </div>
+                </div>
+
+                <div
+                  className={
+                    styles.activityAiComment
+                  }
+                >
+                  <div
+                    className={
+                      styles.activityAiCommentHeader
+                    }
+                  >
+                    <span
+                      className={
+                        styles.activityAiMark
+                      }
+                      aria-hidden="true"
+                    >
+                      AI
+                    </span>
+                    <div>
+                      <span>
+                        SanoSync AI
+                      </span>
+                      <strong>
+                        {zero
+                          ? "Il verdetto"
+                          : "Commento attività"}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <p>
+                    {activityCommentLoading &&
+                    !activityComment
+                      ? zero
+                        ? "Sto cercando qualcosa da dire. Non abituarti."
+                        : "Analizzo questa attività…"
+                      : activityComment ??
+                        (zero
+                          ? "Attività registrata. Le prove esistono."
+                          : "Attività registrata. La continuità parte anche da qui.")}
+                  </p>
+                </div>
+
+                <ActivityMap
+                  points={normalizedArray<ActivityRoutePoint>(detail.route_points)}
+                  activityName={detail.activity_name}
+                  compact
+                />
+
+                <div className={styles.charts}>
+                  <MetricChart
+                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
+                    metric="cadence"
+                    title="Cadenza"
+                    unit="spm"
+                  />
+                  <MetricChart
+                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
+                    metric="heart_rate"
+                    title="Frequenza cardiaca"
+                    unit="bpm"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className={styles.emptyDetail}>
+                <strong>
+                  Seleziona un’attività
+                </strong>
+                <span>
+                  Qui vedrai percorso e metriche del GPX.
+                </span>
+              </div>
+            )}
+          </section>
+
+<details className={`${styles.uploadCard} ${styles.utilityCard}`}>
+            <summary className={styles.utilitySummary}>
+              <div>
+              <p className={styles.eyebrow}>
+                Importa
+              </p>
+              <h2>Carica un GPX</h2>
+              <p>
+                Percorso, durata, cadenza e frequenza
+                cardiaca vengono letti dal file.
+              </p>
+              </div>
+              <span className={styles.expandToggle} aria-hidden="true" />
+            </summary>
+
+            <div className={styles.utilityBody}>
+            <label className={styles.dropZone}>
+              <input
+                type="file"
+                accept=".gpx,application/gpx+xml"
+                onChange={(event) => {
+                  void chooseGpx(
+                    event.target.files?.[0] ?? null,
+                  );
+                  event.currentTarget.value = "";
+                }}
+              />
+              <span className={styles.uploadIcon}>
+                ↑
+              </span>
+              <strong>
+                {previewing
+                  ? "Analizzo il percorso…"
+                  : "Scegli file GPX"}
+              </strong>
+              <small>Massimo 5 MB</small>
+            </label>
+
+            {gpxFile ? (
+              <p className={styles.fileName}>
+                {gpxFile.name}
+              </p>
+            ) : null}
+            </div>
+          </details>
+
+<details className={styles.loggerCard}>
           <summary className={styles.loggerHeading}>
             <span>
               <span className={styles.eyebrow}>Registra</span>
@@ -3416,6 +3636,20 @@ export default function ActivitiesPage() {
             }}
           />
         </details>
+          </aside>
+        </div>
+
+        {error ? (
+          <div className={styles.error}>{error}</div>
+        ) : null}
+
+        {importMessage ? (
+          <div className={styles.success}>
+            {importMessage}
+          </div>
+        ) : null}
+
+        
 
         {gpxPreview ? (
           <section className={styles.previewCard}>
@@ -3549,224 +3783,7 @@ export default function ActivitiesPage() {
           </section>
         ) : null}
 
-        <div className={styles.contentGrid}>
-          <section className={styles.card}>
-            <div className={styles.cardHeading}>
-              <div>
-                <p className={styles.eyebrow}>
-                  {selectedDate
-                    ? new Date(
-                        `${selectedDate}T00:00:00`,
-                      ).toLocaleDateString(
-                        "it-IT",
-                        {
-                          day: "numeric",
-                          month: "long",
-                        },
-                      )
-                    : "Mese"}
-                </p>
-                <h2>Attività registrate</h2>
-              </div>
-
-              {selectedDate ? (
-                <button
-                  type="button"
-                  className={styles.showMonthButton}
-                  onClick={() => {
-                    setSelectedDate("");
-                    setSelectedActivity(
-                      trainingActivities[0] ?? null,
-                    );
-                  }}
-                >
-                  Mostra tutto il mese
-                </button>
-              ) : null}
-            </div>
-
-            <div className={styles.activityList}>
-              {visibleActivities.length ? (
-                visibleActivities.map((activity) => (
-                  <button
-                    type="button"
-                    key={String(activity.id)}
-                    className={`${styles.activityRow} ${
-                      detail?.id === activity.id
-                        ? styles.activityRowActive
-                        : ""
-                    }`}
-                    onClick={() =>
-                      setSelectedActivity(activity)
-                    }
-                  >
-                    <span
-                      className={styles.activityMark}
-                      aria-hidden="true"
-                    >
-                      {activityIcon(activity)}
-                    </span>
-
-                    <span className={styles.activityInfo}>
-                      <strong>
-                        {activity.activity_name}
-                      </strong>
-                      <small>
-                        {formatActivityDate(activity.date)} · {activity.activity_type ??
-                          (activity.source === "gpx"
-                            ? "Attività GPX"
-                            : "Attività manuale")}
-                      </small>
-                    </span>
-
-                    <span className={styles.activityValue}>
-                      {activity.distance_meters
-                        ? formatDistance(
-                            activity.distance_meters,
-                          )
-                        : `${activity.burned_calories} kcal`}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <div className={styles.emptyList}>
-                  {selectedDate
-                    ? "Nessuna attività registrata in questo giorno."
-                    : "Nessuna attività registrata in questo mese."}
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className={styles.detailCard}>
-            {detail ? (
-              <>
-                <div className={styles.cardHeading}>
-                  <div>
-                    <p className={styles.eyebrow}>
-                      Dettaglio
-                    </p>
-                    <h2>{detail.activity_name}</h2>
-                  </div>
-
-                  <div className={styles.detailActions}>
-                    <span className={styles.gpxBadge}>{detail.source === "gpx" ? "GPX" : "Manuale"}</span>
-                    <button
-                      type="button"
-                      className={styles.deleteButton}
-                      disabled={deletingId === detail.id}
-                      onClick={() => void removeActivity(detail)}
-                    >
-                      {deletingId === detail.id ? "Elimino…" : "Elimina"}
-                    </button>
-                  </div>
-                </div>
-
-                <div className={styles.detailStats}>
-                  <div>
-                    <span>Data</span>
-                    <strong>{formatActivityDate(detail.date)}</strong>
-                  </div>
-                  <div>
-                    <span>Distanza</span>
-                    <strong>
-                      {formatDistance(
-                        detail.distance_meters,
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Durata</span>
-                    <strong>
-                      {formatDuration(
-                        detail.duration_seconds,
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Calorie</span>
-                    <strong>
-                      {detail.burned_calories} kcal
-                    </strong>
-                  </div>
-                </div>
-
-                <div
-                  className={
-                    styles.activityAiComment
-                  }
-                >
-                  <div
-                    className={
-                      styles.activityAiCommentHeader
-                    }
-                  >
-                    <span
-                      className={
-                        styles.activityAiMark
-                      }
-                      aria-hidden="true"
-                    >
-                      AI
-                    </span>
-                    <div>
-                      <span>
-                        SanoSync AI
-                      </span>
-                      <strong>
-                        {zero
-                          ? "Il verdetto"
-                          : "Commento attività"}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <p>
-                    {activityCommentLoading &&
-                    !activityComment
-                      ? zero
-                        ? "Sto cercando qualcosa da dire. Non abituarti."
-                        : "Analizzo questa attività…"
-                      : activityComment ??
-                        (zero
-                          ? "Attività registrata. Le prove esistono."
-                          : "Attività registrata. La continuità parte anche da qui.")}
-                  </p>
-                </div>
-
-                <ActivityMap
-                  points={normalizedArray<ActivityRoutePoint>(detail.route_points)}
-                  activityName={detail.activity_name}
-                  compact
-                />
-
-                <div className={styles.charts}>
-                  <MetricChart
-                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
-                    metric="cadence"
-                    title="Cadenza"
-                    unit="spm"
-                  />
-                  <MetricChart
-                    points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
-                    metric="heart_rate"
-                    title="Frequenza cardiaca"
-                    unit="bpm"
-                  />
-                </div>
-              </>
-            ) : (
-              <div className={styles.emptyDetail}>
-                <strong>
-                  Seleziona un’attività
-                </strong>
-                <span>
-                  Qui vedrai percorso e metriche del GPX.
-                </span>
-              </div>
-            )}
-          </section>
-        </div>
+        
       </main>
     </>
   );
