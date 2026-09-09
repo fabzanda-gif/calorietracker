@@ -11,6 +11,10 @@ class MealPrepConsistencyError(RuntimeError):
     """Meal and inventory could not be kept consistent."""
 
 
+class MealPrepPortionConflictError(MealPrepConsistencyError):
+    """The inventory changed before the portion could be consumed."""
+
+
 @dataclass(frozen=True)
 class MealPrepConsumptionResult:
     meal: dict[str, Any]
@@ -100,7 +104,7 @@ class MealPrepConsumptionService:
                 )
 
             if inventory is None:
-                raise MealPrepConsistencyError(
+                raise MealPrepPortionConflictError(
                     "Meal prep portion was already consumed"
                 )
         except Exception:
