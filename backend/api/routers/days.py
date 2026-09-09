@@ -77,6 +77,9 @@ from backend.services.future_training_nutrition import (
     FutureTrainingNutritionService,
 )
 from backend.services.meal_candidates import MealCandidateService
+from backend.services.meal_primary_priority import (
+    MealPrimaryPriorityService,
+)
 from backend.services.meal_confirmation import (
     MealAlreadyLoggedError,
     MealConfirmationService,
@@ -196,87 +199,6 @@ def _validate_slot(meal_slot: str) -> str:
             detail="Unknown meal slot",
         )
     return MEAL_SLOT_TO_TYPE[meal_slot]
-
-
-def _is_home_day_context(value: object) -> bool:
-    normalized = " ".join(
-        str(value or "")
-        .strip()
-        .casefold()
-        .replace("_", " ")
-        .split()
-    )
-
-    return normalized in {
-        "home",
-        "casa",
-        "wfh",
-        "work from home",
-        "lavoro da casa",
-    }
-
-
-def _inventory_expiry_key(candidate: dict) -> tuple[int, str]:
-    expires_at = candidate.get("expires_at")
-
-    if expires_at:
-        return (0, str(expires_at))
-
-    return (1, "")
-
-
-def _deterministic_primary_recommendation(
-    *,
-    meal_slot: str,
-    day_context: object,
-    mode: str,
-    candidates: list[dict],
-    fallback: dict | None,
-) -> dict | None:
-    """
-    Apply simple explainable meal priorities before the general replanner.
-
-    Baseline rules:
-    - auto + home breakfast -> recurring routine first;
-    - auto + lunch -> available meal-prep first;
-    - everything else -> existing replanning result.
-
-    Candidate generation remains responsible for inventory validity
-    (available status, remaining portions and expiry).
-    """
-    if str(mode or "").strip().casefold() != "auto":
-        return fallback
-
-    if (
-        meal_slot == "breakfast"
-        and _is_home_day_context(day_context)
-    ):
-        routine = next(
-            (
-                candidate
-                for candidate in candidates
-                if candidate.get("source") == "routine"
-            ),
-            None,
-        )
-
-        if routine is not None:
-            return routine
-
-    if meal_slot == "lunch":
-        inventory = [
-            candidate
-            for candidate in candidates
-            if candidate.get("source") == "meal_prep"
-        ]
-
-        if inventory:
-            return min(
-                inventory,
-                key=_inventory_expiry_key,
-            )
-
-    return fallback
 
 
 def _meal_memory(
@@ -809,7 +731,7 @@ def get_ranked_meal_options(
             max_main_meal_kcal=max_main_meal_kcal,
         )
 
-        priority_candidate = _deterministic_primary_recommendation(
+        priority_candidate = MealPrimaryPriorityService().choose(
             meal_slot=meal_slot,
             day_context=day.get("context", {}).get("value"),
             mode=mode_result["mode"],
