@@ -15646,3 +15646,24 @@ details[open] > summary .dailyEntryChevron {
   .activitySuggestion { align-items: stretch; flex-direction: column; }
   .activitySuggestion button { width: 100%; }
 }
+
+
+/* ==========================================================
+   MOBILE HOME ORDER
+   Hero -> Resoconto giornaliero -> resto dashboard
+   ========================================================== */
+
+@media (max-width: 767px) {
+  .desktopHomeGrid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .desktopHomeGrid .mealsSection {
+    order: -50 !important;
+  }
+
+  .desktopHomeGrid .conversationCard {
+    order: -40 !important;
+  }
+}
