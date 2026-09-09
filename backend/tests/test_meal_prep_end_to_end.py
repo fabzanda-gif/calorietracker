@@ -8,8 +8,11 @@ from backend.api.dependencies import (
     get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
+    get_ingredients_repository,
+    get_meal_ingredients_repository,
     get_meal_prep_repository,
     get_meals_repository,
+    get_pantry_repository,
     get_weight_repository,
 )
 from backend.api.main import app
@@ -95,6 +98,19 @@ class StatefulMealsRepository:
         self.logged.append(item)
         return item
 
+    def create_compatible(self, payload):
+        return self.create(payload)
+
+    def delete(self, meal_id, user_id):
+        self.logged = [
+            item
+            for item in self.logged
+            if not (
+                item["id"] == meal_id
+                and item["user_id"] == user_id
+            )
+        ]
+
 
 class FakeDailyLogsRepository:
     def get_for_date_compatible(self, user_id, log_date):
@@ -129,6 +145,79 @@ class FakeActivitiesRepository:
         return []
 
 
+class StatefulPantryRepository:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.item = {
+            "id": "pantry-1",
+            "user_id": "authenticated-user",
+            "ingredient_id": "ingredient-1",
+            "quantity": 400.0,
+            "quantity_mode": "weight",
+            "unit": "g",
+        }
+
+    def get_by_id(self, item_id, user_id):
+        if (
+            self.item is not None
+            and item_id == self.item["id"]
+            and user_id == self.item["user_id"]
+        ):
+            return self.item
+        return None
+
+    def update(self, item_id, user_id, payload):
+        item = self.get_by_id(item_id, user_id)
+        if item is None:
+            return None
+        item.update(payload)
+        return item
+
+    def delete(self, item_id, user_id):
+        if self.get_by_id(item_id, user_id):
+            self.item = None
+
+
+class FakeIngredientsRepository:
+    def get_by_id(self, ingredient_id, user_id):
+        if ingredient_id != "ingredient-1":
+            return None
+        return {
+            "id": "ingredient-1",
+            "user_id": user_id,
+            "name": "Lasagna funghi",
+            "calories_per_100g": 187,
+            "protein_per_100g": 10.5,
+            "carbs_per_100g": 18,
+            "fat_per_100g": 8.5,
+        }
+
+
+class StatefulMealIngredientsRepository:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.items = []
+
+    def create(self, payload):
+        item = {
+            "id": f"component-{len(self.items) + 1}",
+            **payload,
+        }
+        self.items.append(item)
+        return item
+
+    def delete_for_meal(self, meal_id):
+        self.items = [
+            item
+            for item in self.items
+            if item["meal_id"] != meal_id
+        ]
+
+
 class FakeWeightRepository:
     def latest(self, user_id):
         return {
@@ -140,6 +229,8 @@ class FakeWeightRepository:
 
 inventory = StatefulMealPrepRepository()
 meals = StatefulMealsRepository()
+pantry = StatefulPantryRepository()
+meal_ingredients = StatefulMealIngredientsRepository()
 
 
 def override_current_user():
@@ -161,6 +252,8 @@ def override_current_user():
 def overrides():
     inventory.reset()
     meals.reset()
+    pantry.reset()
+    meal_ingredients.reset()
 
     app.dependency_overrides[get_current_user] = (
         override_current_user
@@ -179,6 +272,15 @@ def overrides():
     )
     app.dependency_overrides[get_meal_prep_repository] = (
         lambda: inventory
+    )
+    app.dependency_overrides[get_pantry_repository] = (
+        lambda: pantry
+    )
+    app.dependency_overrides[get_ingredients_repository] = (
+        lambda: FakeIngredientsRepository()
+    )
+    app.dependency_overrides[get_meal_ingredients_repository] = (
+        lambda: meal_ingredients
     )
 
     yield
@@ -307,3 +409,63 @@ def test_meal_prep_log_uses_one_source_of_truth():
 
     # Budget reads the real meal; it does not create a second copy.
     assert len(meals.logged) == 1
+
+
+
+def test_pantry_log_consumes_inventory_and_updates_budget():
+    budget_before = client.get(
+        "/days/2026-09-01/budget"
+    )
+    assert budget_before.status_code == 200
+    available_before = (
+        budget_before.json()["budget"]["available_kcal"]
+    )
+
+    logged = client.post(
+        "/meals/pantry-log",
+        json={
+            "date": "2026-09-01",
+            "meal_type": "Pranzo",
+            "pantry_item_id": "pantry-1",
+            "quantity_g": 200,
+        },
+    )
+
+    assert logged.status_code == 201
+    payload = logged.json()
+    assert payload["meal"]["name"] == "Lasagna funghi"
+    assert payload["meal"]["calories"] == 374
+    assert payload["meal"]["protein"] == 21
+    assert payload["inventory"]["quantity"] == 200
+    assert payload["consumed_grams"] == 200
+    assert len(meal_ingredients.items) == 1
+
+    budget_after = client.get(
+        "/days/2026-09-01/budget"
+    )
+    assert budget_after.status_code == 200
+    budget = budget_after.json()
+
+    assert budget["actual"]["meal_count"] == 1
+    assert budget["actual"]["consumed_kcal"] == 374
+    assert budget["actual"]["protein_consumed_g"] == 21
+    assert budget["budget"]["available_kcal"] == (
+        available_before - 374
+    )
+
+
+def test_pantry_log_rejects_unavailable_quantity_without_side_effects():
+    response = client.post(
+        "/meals/pantry-log",
+        json={
+            "date": "2026-09-01",
+            "meal_type": "Cena",
+            "pantry_item_id": "pantry-1",
+            "quantity_g": 450,
+        },
+    )
+
+    assert response.status_code == 409
+    assert pantry.item["quantity"] == 400
+    assert meals.logged == []
+    assert meal_ingredients.items == []
