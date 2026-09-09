@@ -1,0 +1,1094 @@
+From a677c2ffc45d74e34b84346f4eddbe2004948edf Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 9 Sep 2026 08:45:44 +0200
+Subject: [PATCH] Use routines and planned training in daily forecasts
+
+---
+ backend/api/routers/days.py                   | 27 +++++-
+ backend/services/activity_suggestion.py       | 91 +++++++++++++++++++
+ backend/services/day.py                       | 23 ++++-
+ backend/services/day_budget.py                | 81 ++++++++++++++++-
+ backend/services/planned_activity_energy.py   | 64 +++++++++++++
+ backend/tests/test_activity_suggestion.py     | 48 ++++++++++
+ backend/tests/test_day_budget.py              | 36 ++++++++
+ backend/tests/test_day_weekly_schedule.py     | 21 +++++
+ backend/tests/test_planned_activity_energy.py | 30 ++++++
+ frontend/app/profile/page.tsx                 | 55 +++++------
+ .../components/home/DayPlanner.module.css     | 19 ++++
+ frontend/components/home/DayPlanner.tsx       |  9 ++
+ frontend/components/home/HomeShell.module.css | 45 +++++++++
+ frontend/components/home/HomeShell.tsx        | 54 ++++++++++-
+ frontend/lib/api/types.ts                     | 24 +++++
+ 15 files changed, 596 insertions(+), 31 deletions(-)
+ create mode 100644 backend/services/activity_suggestion.py
+ create mode 100644 backend/services/planned_activity_energy.py
+ create mode 100644 backend/tests/test_activity_suggestion.py
+ create mode 100644 backend/tests/test_planned_activity_energy.py
+
+diff --git a/backend/api/routers/days.py b/backend/api/routers/days.py
+index 6b80721..8d119da 100644
+--- a/backend/api/routers/days.py
++++ b/backend/api/routers/days.py
+@@ -297,6 +297,7 @@ def _build_day(
+     daily_logs_repo: DailyLogsRepository,
+     meals_repo: MealsRepository,
+     weekly_schedule_repo: WeeklyScheduleRepository,
++    metadata: dict | None = None,
+ ) -> dict:
+     return DayService(
+         daily_logs_repo=daily_logs_repo,
+@@ -308,6 +309,7 @@ def _build_day(
+     ).build_day(
+         user_id=user_id,
+         day_date=day_date,
++        metadata=metadata,
+     )
+ 
+ 
+@@ -319,6 +321,7 @@ def _build_budget(
+     activities_repo: ActivitiesRepository,
+     daily_logs_repo: DailyLogsRepository,
+     weight_repo: WeightRepository,
++    planned_activities_repo: PlannedActivitiesRepository | None = None,
+ ) -> dict:
+     latest_weight = weight_repo.latest(current_user.id)
+     current_weight = (
+@@ -331,6 +334,7 @@ def _build_budget(
+         meals_repo=meals_repo,
+         activities_repo=activities_repo,
+         daily_logs_repo=daily_logs_repo,
++        planned_activities_repo=planned_activities_repo,
+     ).build(
+         user_id=current_user.id,
+         day_date=day_date,
+@@ -436,6 +440,9 @@ def get_day_budget(
+     weight_repo: WeightRepository = Depends(
+         get_weight_repository
+     ),
++    planned_activities_repo: PlannedActivitiesRepository = Depends(
++        get_planned_activities_repository
++    ),
+ ):
+     try:
+         return _build_budget(
+@@ -445,6 +452,7 @@ def get_day_budget(
+             activities_repo=activities_repo,
+             daily_logs_repo=daily_logs_repo,
+             weight_repo=weight_repo,
++            planned_activities_repo=planned_activities_repo,
+         )
+     except RepositoryError as exc:
+         raise HTTPException(
+@@ -511,6 +519,7 @@ def get_ranked_meal_options(
+                 daily_logs_repo=daily_logs_repo,
+                 meals_repo=meals_repo,
+                 weekly_schedule_repo=weekly_schedule_repo,
++                metadata=current_user.metadata,
+             )
+ 
+             budget_future = executor.submit(
+@@ -521,6 +530,7 @@ def get_ranked_meal_options(
+                 activities_repo=activities_repo,
+                 daily_logs_repo=daily_logs_repo,
+                 weight_repo=weight_repo,
++                planned_activities_repo=planned_activities_repo,
+             )
+ 
+             day = day_future.result()
+@@ -881,6 +891,9 @@ def get_meal_decision(
+     weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+         get_weekly_schedule_repository
+     ),
++    planned_activities_repo: PlannedActivitiesRepository = Depends(
++        get_planned_activities_repository
++    ),
+ ):
+     meal_type = _validate_slot(meal_slot)
+ 
+@@ -891,6 +904,7 @@ def get_meal_decision(
+             daily_logs_repo=daily_logs_repo,
+             meals_repo=meals_repo,
+             weekly_schedule_repo=weekly_schedule_repo,
++            metadata=current_user.metadata,
+         )
+ 
+         budget_result = _build_budget(
+@@ -900,6 +914,7 @@ def get_meal_decision(
+             activities_repo=activities_repo,
+             daily_logs_repo=daily_logs_repo,
+             weight_repo=weight_repo,
++            planned_activities_repo=planned_activities_repo,
+         )
+ 
+         available_kcal = None
+@@ -953,6 +968,7 @@ def confirm_meal_prediction(
+             daily_logs_repo=daily_logs_repo,
+             meals_repo=meals_repo,
+             weekly_schedule_repo=weekly_schedule_repo,
++            metadata=current_user.metadata,
+         )
+ 
+         prediction = day["meals"][meal_slot]
+@@ -1068,6 +1084,9 @@ def get_day_briefing(
+     briefing_repo: DayBriefingsRepository = Depends(
+         get_day_briefings_repository
+     ),
++    planned_activities_repo: PlannedActivitiesRepository = Depends(
++        get_planned_activities_repository
++    ),
+ ):
+     try:
+         day = _build_day(
+@@ -1076,6 +1095,7 @@ def get_day_briefing(
+             daily_logs_repo=daily_logs_repo,
+             meals_repo=meals_repo,
+             weekly_schedule_repo=weekly_schedule_repo,
++            metadata=current_user.metadata,
+         )
+         budget_result = _build_budget(
+             current_user=current_user,
+@@ -1084,6 +1104,7 @@ def get_day_briefing(
+             activities_repo=activities_repo,
+             daily_logs_repo=daily_logs_repo,
+             weight_repo=weight_repo,
++            planned_activities_repo=planned_activities_repo,
+         )
+     except RepositoryError as exc:
+         raise HTTPException(
+@@ -1155,7 +1176,10 @@ def get_day_briefing(
+         "daily_context": daily_context,
+         "day_type": day.get("context", {}).get("value"),
+         "activity_level": (
+-            day.get("activity_plan", {}).get("value")
++            budget_result.get("energy_baseline", {}).get(
++                "planned_activity_level"
++            )
++            or day.get("activity_plan", {}).get("value")
+         ),
+         "meal_count": int(
+             actual.get("meal_count", 0) or 0
+@@ -1324,6 +1348,7 @@ def get_day(
+             daily_logs_repo=daily_logs_repo,
+             meals_repo=meals_repo,
+             weekly_schedule_repo=weekly_schedule_repo,
++            metadata=current_user.metadata,
+         )
+     except RepositoryError as exc:
+         raise HTTPException(
+diff --git a/backend/services/activity_suggestion.py b/backend/services/activity_suggestion.py
+new file mode 100644
+index 0000000..6191770
+--- /dev/null
++++ b/backend/services/activity_suggestion.py
+@@ -0,0 +1,91 @@
++from __future__ import annotations
++
++from collections import defaultdict
++from datetime import date
++from typing import Any, Iterable
++
++
++def _day_type(value: Any) -> str | None:
++    normalized = str(value or "").strip().casefold()
++    if normalized in {"office", "ufficio"}:
++        return "office"
++    if normalized in {"home", "casa", "wfh"}:
++        return "home"
++    if normalized in {"free", "libero", "rest", "riposo"}:
++        return "free"
++    return None
++
++
++def _activity_name(value: Any) -> str:
++    raw = " ".join(str(value or "").strip().split())
++    normalized = raw.casefold()
++    if "elettric" in normalized or "e-bike" in normalized or "ebike" in normalized:
++        return "Bici elettrica"
++    if "bici" in normalized or "biciclett" in normalized or "cycling" in normalized:
++        return "Bicicletta"
++    if "padel" in normalized:
++        return "Padel"
++    if "cors" in normalized or "running" in normalized:
++        return "Corsa"
++    return raw
++
++
++def learn_activity_suggestion(
++    *,
++    day_date: date,
++    day_context: str | None,
++    activities: Iterable[dict[str, Any]],
++    daily_logs: Iterable[dict[str, Any]],
++    today_activities: Iterable[dict[str, Any]],
++    planned_activities: Iterable[dict[str, Any]],
++) -> dict[str, Any] | None:
++    """Suggest a recurring activity only after at least three matching days."""
++    context = _day_type(day_context)
++    context_by_date = {
++        str(row.get("date")): _day_type(row.get("day_type"))
++        for row in daily_logs
++        if row.get("date") is not None
++    }
++    already_present = {
++        _activity_name(item.get("activity_name") or item.get("title"))
++        for item in [*today_activities, *planned_activities]
++    }
++    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
++
++    for item in activities:
++        name = _activity_name(item.get("activity_name"))
++        if not name or name.casefold() in {"passi", "steps"}:
++            continue
++        try:
++            item_date = date.fromisoformat(str(item.get("date")))
++        except (TypeError, ValueError):
++            continue
++        same_context = context is not None and context_by_date.get(str(item_date)) == context
++        if not same_context and item_date.weekday() != day_date.weekday():
++            continue
++        grouped[name].append(item)
++
++    candidates = [
++        (name, rows)
++        for name, rows in grouped.items()
++        if len({str(row.get("date")) for row in rows}) >= 3
++        and name not in already_present
++    ]
++    if not candidates:
++        return None
++
++    name, rows = max(candidates, key=lambda item: len(item[1]))
++    observations = len({str(row.get("date")) for row in rows})
++    calories = round(sum(float(row.get("burned_calories") or 0) for row in rows) / len(rows))
++    durations = [float(row.get("duration_seconds") or 0) for row in rows if float(row.get("duration_seconds") or 0) > 0]
++    duration_minutes = round(sum(durations) / len(durations) / 60) if durations else None
++
++    return {
++        "activity_name": name,
++        "burned_calories": max(0, calories),
++        "duration_minutes": duration_minutes,
++        "observations": observations,
++        "reason": (
++            f"Nei giorni {context or 'simili'} registri spesso questa attività."
++        ),
++    }
+diff --git a/backend/services/day.py b/backend/services/day.py
+index 6907878..611239b 100644
+--- a/backend/services/day.py
++++ b/backend/services/day.py
+@@ -87,11 +87,26 @@ class DayService:
+         self,
+         user_id: str,
+         day_date: date,
++        metadata: dict[str, Any] | None = None,
+     ) -> dict:
+         """
+         Use the user's weekly schedule as the primary
+         prediction source for the day context.
+         """
++        day_name = (
++            "monday", "tuesday", "wednesday", "thursday",
++            "friday", "saturday", "sunday",
++        )[day_date.weekday()]
++        stored = (metadata or {}).get("weekly_schedule")
++        if isinstance(stored, dict):
++            value = stored.get(day_name)
++            if value in {"home", "office", "free"}:
++                return {
++                    "value": value,
++                    "state": "predicted",
++                    "source": "profile_weekly_schedule",
++                }
++
+         if self.weekly_schedule_repo is None:
+             return _unknown_context()
+ 
+@@ -130,7 +145,12 @@ class DayService:
+ 
+         return _unknown_context()
+ 
+-    def build_day(self, user_id: str, day_date: date) -> dict:
++    def build_day(
++        self,
++        user_id: str,
++        day_date: date,
++        metadata: dict[str, Any] | None = None,
++    ) -> dict:
+         row = self.daily_logs_repo.get_for_date_compatible(
+             user_id=user_id,
+             log_date=day_date,
+@@ -191,6 +211,7 @@ class DayService:
+             context = self._weekly_schedule_context(
+                 user_id=user_id,
+                 day_date=day_date,
++                metadata=metadata,
+             )
+ 
+         # Fall back to historical memory only when the weekly schedule
+diff --git a/backend/services/day_budget.py b/backend/services/day_budget.py
+index 6cb1298..00461f0 100644
+--- a/backend/services/day_budget.py
++++ b/backend/services/day_budget.py
+@@ -7,11 +7,14 @@ from typing import Any, Mapping
+ from backend.repositories.activities import ActivitiesRepository
+ from backend.repositories.daily_logs import DailyLogsRepository
+ from backend.repositories.meals import MealsRepository
++from backend.repositories.planned_activities import PlannedActivitiesRepository
+ from backend.services.budget import BudgetInput, BudgetService
++from backend.services.activity_suggestion import learn_activity_suggestion
+ from backend.services.day_metrics import DayMetricsService
+ from backend.services.day_history import DayHistoryService
+ from backend.services.memory import MemoryService
+ from backend.services.profile_goal import ProfileGoalService
++from backend.services.planned_activity_energy import summarize_planned_activity_energy
+ 
+ 
+ class DayBudgetService:
+@@ -34,6 +37,7 @@ class DayBudgetService:
+         meals_repo: MealsRepository,
+         activities_repo: ActivitiesRepository,
+         daily_logs_repo: DailyLogsRepository,
++        planned_activities_repo: PlannedActivitiesRepository | None = None,
+         *,
+         metrics_service: DayMetricsService | None = None,
+         history_service: DayHistoryService | None = None,
+@@ -49,6 +53,8 @@ class DayBudgetService:
+             activities_repo=activities_repo,
+         )
+         self.daily_logs_repo = daily_logs_repo
++        self.activities_repo = activities_repo
++        self.planned_activities_repo = planned_activities_repo
+         self.memory_service = MemoryService(daily_logs_repo)
+         self.profile_goal_service = (
+             profile_goal_service or ProfileGoalService()
+@@ -132,7 +138,9 @@ class DayBudgetService:
+     ) -> dict:
+         # These reads are independent and I/O-bound.
+         # Execute them concurrently so Supabase round-trips overlap.
+-        with ThreadPoolExecutor(max_workers=3) as executor:
++        suggestion_start = day_date - timedelta(days=56)
++
++        with ThreadPoolExecutor(max_workers=7) as executor:
+             metrics_future = executor.submit(
+                 self.metrics_service.for_day,
+                 user_id=user_id,
+@@ -152,9 +160,46 @@ class DayBudgetService:
+                 day_date=day_date,
+             )
+ 
++            planned_future = (
++                executor.submit(
++                    self.planned_activities_repo.list_range,
++                    user_id,
++                    day_date,
++                    day_date,
++                )
++                if self.planned_activities_repo is not None
++                else None
++            )
++
++            suggestion_activities_future = executor.submit(
++                self.activities_repo.list_date_range,
++                user_id,
++                suggestion_start,
++                day_date - timedelta(days=1),
++            )
++            suggestion_logs_future = executor.submit(
++                self.daily_logs_repo.list_date_range,
++                user_id,
++                suggestion_start,
++                day_date - timedelta(days=1),
++            )
++            today_activities_future = executor.submit(
++                self.activities_repo.list_for_date,
++                user_id,
++                day_date,
++            )
++
+             metrics = metrics_future.result()
+             activity_history = activity_history_future.result()
+             activity_level = activity_level_future.result()
++            planned_activities = (
++                planned_future.result()
++                if planned_future is not None
++                else []
++            )
++            suggestion_activities = suggestion_activities_future.result()
++            suggestion_logs = suggestion_logs_future.result()
++            today_activities = today_activities_future.result()
+ 
+         profile = self.profile_goal_service.build(
+             metadata,
+@@ -179,6 +224,33 @@ class DayBudgetService:
+             activity_level
+         )
+ 
++        planned_energy = summarize_planned_activity_energy(
++            planned_activities,
++            weight_kg=current_weight,
++        )
++
++        today_row = self.daily_logs_repo.get_for_date_compatible(
++            user_id=user_id,
++            log_date=day_date,
++        ) or {}
++        schedule = metadata.get("weekly_schedule")
++        day_names = (
++            "monday", "tuesday", "wednesday", "thursday",
++            "friday", "saturday", "sunday",
++        )
++        day_context = today_row.get("day_type")
++        if not day_context and isinstance(schedule, Mapping):
++            day_context = schedule.get(day_names[day_date.weekday()])
++
++        activity_suggestion = learn_activity_suggestion(
++            day_date=day_date,
++            day_context=str(day_context) if day_context else None,
++            activities=suggestion_activities,
++            daily_logs=suggestion_logs,
++            today_activities=today_activities,
++            planned_activities=planned_activities,
++        )
++
+         logged_meal_types = {
+             str(value).strip().casefold()
+             for value in metrics.get("logged_meal_types", [])
+@@ -198,6 +270,7 @@ class DayBudgetService:
+                 activity_kcal=(
+                     average_activity_kcal
+                     + activity_buffer_kcal
++                    + planned_energy["estimated_kcal"]
+                 ),
+                 baseline_activity_factor=1.0,
+                 consumed_kcal=metrics["consumed_kcal"],
+@@ -223,7 +296,13 @@ class DayBudgetService:
+                 "activity_kcal_for_budget": (
+                     average_activity_kcal
+                     + activity_buffer_kcal
++                    + planned_energy["estimated_kcal"]
+                 ),
++                "planned_activity_kcal": planned_energy["estimated_kcal"],
++                "planned_activity_count": planned_energy["count"],
++                "planned_activity_level": planned_energy["activity_level"],
++                "planned_activities": planned_energy["items"],
++                "activity_suggestion": activity_suggestion,
+                 "baseline_activity_factor": 1.0,
+                 "history": activity_history,
+             },
+diff --git a/backend/services/planned_activity_energy.py b/backend/services/planned_activity_energy.py
+new file mode 100644
+index 0000000..74175c6
+--- /dev/null
++++ b/backend/services/planned_activity_energy.py
+@@ -0,0 +1,64 @@
++from __future__ import annotations
++
++from typing import Any, Iterable
++
++from backend.services.activity_movement import estimated_gpx_calories
++
++
++def estimate_planned_activity_kcal(
++    activity: dict[str, Any],
++    *,
++    weight_kg: float | None,
++) -> int:
++    """Return a deterministic, conservative estimate for a planned session."""
++    return max(
++        0,
++        estimated_gpx_calories(
++            activity_type=activity.get("activity_type"),
++            duration_seconds=float(activity.get("duration_minutes") or 0) * 60,
++            distance_meters=activity.get("distance_meters"),
++            weight_kg=weight_kg,
++        ),
++    )
++
++
++def summarize_planned_activity_energy(
++    activities: Iterable[dict[str, Any]],
++    *,
++    weight_kg: float | None,
++) -> dict[str, Any]:
++    planned = [
++        item
++        for item in activities
++        if str(item.get("status") or "planned").strip().casefold()
++        == "planned"
++    ]
++    estimates = [
++        estimate_planned_activity_kcal(item, weight_kg=weight_kg)
++        for item in planned
++    ]
++    total = sum(estimates)
++
++    if total >= 600:
++        level = "high"
++    elif total > 0:
++        level = "moderate"
++    else:
++        level = None
++
++    return {
++        "count": len(planned),
++        "estimated_kcal": total,
++        "activity_level": level,
++        "items": [
++            {
++                "id": item.get("id"),
++                "title": item.get("title"),
++                "activity_type": item.get("activity_type"),
++                "duration_minutes": item.get("duration_minutes"),
++                "distance_meters": item.get("distance_meters"),
++                "estimated_kcal": estimate,
++            }
++            for item, estimate in zip(planned, estimates)
++        ],
++    }
+diff --git a/backend/tests/test_activity_suggestion.py b/backend/tests/test_activity_suggestion.py
+new file mode 100644
+index 0000000..bb2d4fa
+--- /dev/null
++++ b/backend/tests/test_activity_suggestion.py
+@@ -0,0 +1,48 @@
++from datetime import date
++
++from backend.services.activity_suggestion import learn_activity_suggestion
++
++
++def test_suggests_recurring_office_bike_when_not_logged():
++    activities = [
++        {
++            "date": f"2026-08-{day:02d}",
++            "activity_name": "Bici",
++            "burned_calories": 70,
++            "duration_seconds": 600,
++        }
++        for day in (4, 11, 18)
++    ]
++    logs = [
++        {"date": item["date"], "day_type": "office"}
++        for item in activities
++    ]
++
++    result = learn_activity_suggestion(
++        day_date=date(2026, 9, 8),
++        day_context="office",
++        activities=activities,
++        daily_logs=logs,
++        today_activities=[],
++        planned_activities=[],
++    )
++
++    assert result is not None
++    assert result["activity_name"] == "Bicicletta"
++    assert result["duration_minutes"] == 10
++
++
++def test_does_not_suggest_activity_already_logged():
++    repeated = [
++        {"date": f"2026-08-{day:02d}", "activity_name": "Bici"}
++        for day in (4, 11, 18)
++    ]
++    result = learn_activity_suggestion(
++        day_date=date(2026, 9, 8),
++        day_context=None,
++        activities=repeated,
++        daily_logs=[],
++        today_activities=[{"activity_name": "Bicicletta"}],
++        planned_activities=[],
++    )
++    assert result is None
+diff --git a/backend/tests/test_day_budget.py b/backend/tests/test_day_budget.py
+index 454d488..9338e8e 100644
+--- a/backend/tests/test_day_budget.py
++++ b/backend/tests/test_day_budget.py
+@@ -44,12 +44,21 @@ class FakeDailyLogsRepository:
+         return self.history
+ 
+ 
++class FakePlannedActivitiesRepository:
++    def __init__(self, rows=None):
++        self.rows = rows or []
++
++    def list_range(self, user_id, start_date, end_date):
++        return self.rows
++
++
+ def service(
+     meals=None,
+     activities=None,
+     history_activities=None,
+     daily_log=None,
+     daily_log_history=None,
++    planned_activities=None,
+ ):
+     return DayBudgetService(
+         meals_repo=FakeMealsRepository(meals or []),
+@@ -61,6 +70,9 @@ def service(
+             today=daily_log,
+             history=daily_log_history,
+         ),
++        planned_activities_repo=FakePlannedActivitiesRepository(
++            planned_activities,
++        ),
+     )
+ 
+ 
+@@ -428,3 +440,27 @@ def test_today_activity_does_not_change_today_budget():
+         == before["budget"]["daily_budget_kcal"]
+     )
+ 
++
++def test_planned_run_is_included_from_the_start_of_the_day():
++    result = service(
++        planned_activities=[
++            {
++                "id": "run-1",
++                "status": "planned",
++                "title": "Corsa 5 km",
++                "activity_type": "Corsa",
++                "distance_meters": 5000,
++                "duration_minutes": 32,
++            }
++        ],
++    ).build(
++        user_id="u1",
++        day_date=DAY,
++        metadata={**BASE_META, "goal_mode": "maintenance"},
++        current_weight=80,
++    )
++
++    baseline = result["energy_baseline"]
++    assert baseline["planned_activity_kcal"] == 400
++    assert baseline["planned_activity_level"] == "moderate"
++    assert result["budget"]["maintenance_kcal"] == result["profile"]["bmr"] + 400
+diff --git a/backend/tests/test_day_weekly_schedule.py b/backend/tests/test_day_weekly_schedule.py
+index 2f6e014..921a5fb 100644
+--- a/backend/tests/test_day_weekly_schedule.py
++++ b/backend/tests/test_day_weekly_schedule.py
+@@ -73,3 +73,24 @@ def test_monday_uses_day_number_one():
+     )
+ 
+     assert result["context"]["value"] == "home"
++
++
++def test_profile_weekly_routine_wins_over_stale_week_override():
++    result = DayService(
++        daily_logs_repo=FakeDailyLogsRepository(),
++        weekly_schedule_repo=FakeWeeklyScheduleRepository(),
++    ).build_day(
++        user_id="user-1",
++        day_date=date(2026, 9, 2),
++        metadata={
++            "weekly_schedule": {
++                "wednesday": "free",
++            }
++        },
++    )
++
++    assert result["context"] == {
++        "value": "free",
++        "state": "predicted",
++        "source": "profile_weekly_schedule",
++    }
+diff --git a/backend/tests/test_planned_activity_energy.py b/backend/tests/test_planned_activity_energy.py
+new file mode 100644
+index 0000000..99084cd
+--- /dev/null
++++ b/backend/tests/test_planned_activity_energy.py
+@@ -0,0 +1,30 @@
++from backend.services.planned_activity_energy import summarize_planned_activity_energy
++
++
++def test_planned_run_uses_weight_and_distance():
++    result = summarize_planned_activity_energy(
++        [{
++            "id": "run-1",
++            "status": "planned",
++            "title": "5 km facili",
++            "activity_type": "Corsa",
++            "distance_meters": 5000,
++            "duration_minutes": 30,
++        }],
++        weight_kg=80,
++    )
++
++    assert result["estimated_kcal"] == 400
++    assert result["activity_level"] == "moderate"
++
++
++def test_skipped_sessions_do_not_change_the_budget():
++    result = summarize_planned_activity_energy(
++        [{
++            "status": "skipped",
++            "activity_type": "Corsa",
++            "distance_meters": 5000,
++        }],
++        weight_kg=80,
++    )
++    assert result["estimated_kcal"] == 0
+diff --git a/frontend/app/profile/page.tsx b/frontend/app/profile/page.tsx
+index 17acf95..546e295 100644
+--- a/frontend/app/profile/page.tsx
++++ b/frontend/app/profile/page.tsx
+@@ -88,6 +88,13 @@ function contextLabel(
+   }[context];
+ }
+ 
++function scheduleContext(value: unknown): WeeklyScheduleContext {
++  if (value === "office" || value === "free") {
++    return value;
++  }
++  return "home";
++}
++
+ const EMPTY_FORM: FormState = {
+   name: "",
+   gender: "",
+@@ -250,33 +257,19 @@ export default function ProfilePage() {
+           typeof storedSchedule === "object"
+             ? {
+                 monday:
+-                  (storedSchedule as Record<string, string>).monday === "office"
+-                    ? "office"
+-                    : "home",
++                  scheduleContext((storedSchedule as Record<string, string>).monday),
+                 tuesday:
+-                  (storedSchedule as Record<string, string>).tuesday === "office"
+-                    ? "office"
+-                    : "home",
++                  scheduleContext((storedSchedule as Record<string, string>).tuesday),
+                 wednesday:
+-                  (storedSchedule as Record<string, string>).wednesday === "office"
+-                    ? "office"
+-                    : "home",
++                  scheduleContext((storedSchedule as Record<string, string>).wednesday),
+                 thursday:
+-                  (storedSchedule as Record<string, string>).thursday === "office"
+-                    ? "office"
+-                    : "home",
++                  scheduleContext((storedSchedule as Record<string, string>).thursday),
+                 friday:
+-                  (storedSchedule as Record<string, string>).friday === "office"
+-                    ? "office"
+-                    : "home",
++                  scheduleContext((storedSchedule as Record<string, string>).friday),
+                 saturday:
+-                  (storedSchedule as Record<string, string>).saturday === "office"
+-                    ? "office"
+-                    : "home",
++                  scheduleContext((storedSchedule as Record<string, string>).saturday),
+                 sunday:
+-                  (storedSchedule as Record<string, string>).sunday === "office"
+-                    ? "office"
+-                    : "home",
++                  scheduleContext((storedSchedule as Record<string, string>).sunday),
+               }
+             : EMPTY_FORM.weekly_schedule;
+ 
+@@ -751,11 +744,21 @@ export default function ProfilePage() {
+     };
+ 
+     try {
+-      const response =
+-        await updateProfile(
+-          accessToken,
+-          payload,
+-        );
++      const weekStart = currentWeekStart || getCurrentWeekStart();
++      const [, weeklyResponse] = await Promise.all([
++        updateProfile(accessToken, payload),
++        updateWeeklySchedule(accessToken, {
++          week_start: weekStart,
++          days: WEEK_DAYS.map((day) => ({
++            day_of_week: day.number,
++            context: form.weekly_schedule[day.key],
++          })),
++        }),
++      ]);
++
++      setCurrentWeekStart(weeklyResponse.week_start);
++      setCurrentWeekSchedule(weeklyResponse.days);
++      setCurrentWeekOverrides(weeklyResponse.overrides);
+ 
+ 
+ 
+diff --git a/frontend/components/home/DayPlanner.module.css b/frontend/components/home/DayPlanner.module.css
+index 346af4d..03debb5 100644
+--- a/frontend/components/home/DayPlanner.module.css
++++ b/frontend/components/home/DayPlanner.module.css
+@@ -143,6 +143,25 @@
+   }
+ }
+ 
++.plannedActivityNotice {
++  display: grid;
++  gap: 4px;
++  padding: 14px 16px;
++  border: 1px solid #bfe3ce;
++  border-radius: 13px;
++  background: #f1faf5;
++  color: #172f4d;
++}
++
++.plannedActivityNotice strong {
++  font-size: 0.82rem;
++}
++
++.plannedActivityNotice span {
++  color: #5d7167;
++  font-size: 0.78rem;
++}
++
+ 
+ /* ============================================================
+    HOME REDESIGN — DAY PLANNER INLINE
+diff --git a/frontend/components/home/DayPlanner.tsx b/frontend/components/home/DayPlanner.tsx
+index a13ad95..01423f6 100644
+--- a/frontend/components/home/DayPlanner.tsx
++++ b/frontend/components/home/DayPlanner.tsx
+@@ -22,6 +22,7 @@ type Props = {
+   onActivityLevelChange: (
+     value: ActivityLevel,
+   ) => void;
++  plannedActivitySummary?: string | null;
+ };
+ 
+ const dayOptions: Array<{
+@@ -84,6 +85,7 @@ export function DayPlanner({
+   activityLevel,
+   onDayTypeChange,
+   onActivityLevelChange,
++  plannedActivitySummary = null,
+ }: Props) {
+   const [editing, setEditing] =
+     useState(false);
+@@ -150,6 +152,12 @@ export function DayPlanner({
+             </div>
+           </div>
+ 
++          {plannedActivitySummary ? (
++            <div className={styles.plannedActivityNotice}>
++              <strong>Attività calcolata dal programma</strong>
++              <span>{plannedActivitySummary}</span>
++            </div>
++          ) : (
+           <div className={styles.group}>
+             <span className={styles.label}>
+               Attività prevista
+@@ -183,6 +191,7 @@ export function DayPlanner({
+               )}
+             </div>
+           </div>
++          )}
+         </div>
+       ) : null}
+     </section>
+diff --git a/frontend/components/home/HomeShell.module.css b/frontend/components/home/HomeShell.module.css
+index a7e1378..caf8117 100644
+--- a/frontend/components/home/HomeShell.module.css
++++ b/frontend/components/home/HomeShell.module.css
+@@ -15502,4 +15502,49 @@ details[open] > summary .dailyEntryChevron {
+     white-space: normal;
+   }
+ }
++.activitySuggestion {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 18px;
++  margin: -6px 0 24px;
++  padding: 16px 18px;
++  border: 1px solid #cfe5d7;
++  border-radius: 16px;
++  background: #f3faf6;
++  color: #102846;
++}
+ 
++.activitySuggestion div {
++  display: grid;
++  gap: 3px;
++}
++
++.activitySuggestion span {
++  color: #288a57;
++  font-size: .68rem;
++  font-weight: 850;
++  letter-spacing: .11em;
++  text-transform: uppercase;
++}
++
++.activitySuggestion strong { font-size: .95rem; }
++.activitySuggestion p { margin: 0; color: #66776d; font-size: .78rem; }
++.activitySuggestion button {
++  flex: 0 0 auto;
++  min-height: 40px;
++  padding: 0 15px;
++  border: 0;
++  border-radius: 11px;
++  background: #102846;
++  color: #fff;
++  font: inherit;
++  font-size: .78rem;
++  font-weight: 800;
++  cursor: pointer;
++}
++
++@media (max-width: 700px) {
++  .activitySuggestion { align-items: stretch; flex-direction: column; }
++  .activitySuggestion button { width: 100%; }
++}
+diff --git a/frontend/components/home/HomeShell.tsx b/frontend/components/home/HomeShell.tsx
+index e2c72ee..4aebede 100644
+--- a/frontend/components/home/HomeShell.tsx
++++ b/frontend/components/home/HomeShell.tsx
+@@ -619,6 +619,9 @@ export function HomeShell() {
+   const [actualActivities, setActualActivities] =
+     useState<Activity[]>([]);
+ 
++  const [plannedActivities, setPlannedActivities] =
++    useState<PlannedActivity[]>([]);
++
+   const [
+     nextRunningSession,
+     setNextRunningSession,
+@@ -1739,6 +1742,7 @@ export function HomeShell() {
+           setActualActivities(
+             activitiesPayload.items,
+           );
++          setPlannedActivities(plannedActivitiesPayload.items);
+ 
+           setNextRunningSession(
+             plannedActivitiesPayload.items
+@@ -2779,6 +2783,7 @@ export function HomeShell() {
+     setActualActivities(
+       activitiesPayload.items,
+     );
++    setPlannedActivities(plannedActivitiesPayload.items);
+ 
+     setNextRunningSession(
+       plannedActivitiesPayload.items
+@@ -3451,6 +3456,21 @@ export function HomeShell() {
+     setQuickAddMode("activity");
+   }
+ 
++  function openSuggestedActivity() {
++    const suggestion =
++      budgetResult?.energy_baseline?.activity_suggestion;
++    if (!suggestion) return;
++
++    setError(null);
++    setQuickActivityName(suggestion.activity_name);
++    setQuickActivityCalories(String(suggestion.burned_calories));
++    setQuickActivityDurationMinutes(
++      suggestion.duration_minutes ? String(suggestion.duration_minutes) : "",
++    );
++    setQuickActivityDistanceKm("");
++    setQuickAddMode("activity");
++  }
++
+   async function openQuickAddWeight() {
+     setError(null);
+ 
+@@ -3922,6 +3942,20 @@ export function HomeShell() {
+     }
+   }
+ 
++  const todayPlannedActivities = plannedActivities.filter(
++    (item) =>
++      item.scheduled_date === todayIso() &&
++      item.status === "planned",
++  );
++  const plannedActivityKcal = Number(
++    budgetResult?.energy_baseline?.planned_activity_kcal ?? 0,
++  );
++  const plannedActivityLevel =
++    budgetResult?.energy_baseline?.planned_activity_level ?? null;
++  const plannedActivitySummary = todayPlannedActivities.length
++    ? `${todayPlannedActivities.map((item) => item.title).join(", ")} · circa ${Math.round(plannedActivityKcal)} kcal già incluse nel bilancio.`
++    : null;
++
+   return (
+     <>
+       <AppNav />
+@@ -3995,7 +4029,7 @@ export function HomeShell() {
+                   day.context.value,
+                 ),
+                 normalizeActivityLevel(
+-                  day.activity_plan.value,
++                  plannedActivityLevel ?? day.activity_plan.value,
+                 ),
+                 burnedCalories,
+                 actualActivities.length,
+@@ -4007,8 +4041,9 @@ export function HomeShell() {
+               day.context.value,
+             )}
+             activityLevel={normalizeActivityLevel(
+-              day.activity_plan.value,
++              plannedActivityLevel ?? day.activity_plan.value,
+             )}
++            plannedActivitySummary={plannedActivitySummary}
+             onDayTypeChange={(value) => {
+               void handleDayPlannerChange({
+                 day_type: value,
+@@ -4021,6 +4056,21 @@ export function HomeShell() {
+             }}
+           />
+ 
++          {budgetResult?.energy_baseline?.activity_suggestion ? (
++            <section className={styles.activitySuggestion}>
++              <div>
++                <span>Abitudine riconosciuta</span>
++                <strong>
++                  Hai fatto {budgetResult.energy_baseline.activity_suggestion.activity_name.toLowerCase()} anche oggi?
++                </strong>
++                <p>{budgetResult.energy_baseline.activity_suggestion.reason}</p>
++              </div>
++              <button type="button" onClick={openSuggestedActivity}>
++                Sì, registrala
++              </button>
++            </section>
++          ) : null}
++
+           {dayPlannerMessage ? (
+             <p className={styles.muted}>
+               {dayPlannerSaving
+diff --git a/frontend/lib/api/types.ts b/frontend/lib/api/types.ts
+index 3119fd8..0046f3d 100644
+--- a/frontend/lib/api/types.ts
++++ b/frontend/lib/api/types.ts
+@@ -85,6 +85,30 @@ export interface DayBudgetResponse {
+   budget: DayBudget | null;
+   actual: Record<string, unknown>;
+   profile: Record<string, unknown>;
++  energy_baseline?: {
++    average_activity_kcal_7d?: number;
++    activity_level?: string | null;
++    activity_buffer_kcal?: number;
++    activity_kcal_for_budget?: number;
++    planned_activity_kcal?: number;
++    planned_activity_count?: number;
++    planned_activity_level?: "moderate" | "high" | null;
++    planned_activities?: Array<{
++      id?: string | null;
++      title?: string | null;
++      activity_type?: string | null;
++      duration_minutes?: number | null;
++      distance_meters?: number | null;
++      estimated_kcal: number;
++    }>;
++    activity_suggestion?: {
++      activity_name: string;
++      burned_calories: number;
++      duration_minutes?: number | null;
++      observations: number;
++      reason: string;
++    } | null;
++  };
+ }
+ 
+ export type DecisionMode =
+-- 
+2.51.1
+
