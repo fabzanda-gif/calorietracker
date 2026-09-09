@@ -1897,10 +1897,27 @@ export function HomeShell() {
     ? normalizeDayType(day.context.value)
     : null;
 
-  const dayBriefingBody =
+  const rawDayBriefingBody =
     dayBriefing
       ?.replace(/^[^!]+!\s*/, "")
       .trim() || null;
+
+  const dayBriefingBody =
+    rawDayBriefingBody && briefingMoment() !== "evening"
+      ? rawDayBriefingBody
+          .replace(
+            /Sei rimasto nel target\./gi,
+            "Fin qui sei nel target.",
+          )
+          .replace(
+            /Hai chiuso la giornata nel target\./gi,
+            "Fin qui sei nel target.",
+          )
+          .replace(
+            /Evento raro, ma documentato\./gi,
+            "Vediamo come prosegue.",
+          )
+      : rawDayBriefingBody;
 
   const historicalProfile =
     currentDayType && dayHistory
