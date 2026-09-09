@@ -7,6 +7,7 @@ from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.services.meal_prep_consumption import (
     MealPrepConsumptionService,
+    MealPrepPortionConflictError,
 )
 
 
@@ -99,15 +100,20 @@ class MealPrepLoggingService:
             "category": "meal_prep",
         }
 
-        consumption = MealPrepConsumptionService(
-            meal_prep_repo=self.meal_prep_repo,
-            meals_repo=self.meals_repo,
-        ).create_and_consume(
-            user_id=user_id,
-            batch_id=batch_id,
-            batch=batch,
-            meal_payload=payload,
-        )
+        try:
+            consumption = MealPrepConsumptionService(
+                meal_prep_repo=self.meal_prep_repo,
+                meals_repo=self.meals_repo,
+            ).create_and_consume(
+                user_id=user_id,
+                batch_id=batch_id,
+                batch=batch,
+                meal_payload=payload,
+            )
+        except MealPrepPortionConflictError as exc:
+            raise MealPrepBatchUnavailableError(
+                "Meal prep batch is no longer available"
+            ) from exc
 
         return {
             "logged": True,
