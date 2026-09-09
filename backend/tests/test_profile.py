@@ -135,3 +135,41 @@ def test_delete_account_uses_service_role_for_current_user(monkeypatch):
         "apikey": "service-secret",
         "Authorization": "Bearer service-secret",
     }
+
+
+
+def test_delete_account_never_targets_effective_demo_source(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        ok = True
+        status_code = 200
+
+    def fake_delete(url, headers, timeout):
+        captured["url"] = url
+        return FakeResponse()
+
+    monkeypatch.setattr(profile.requests, "delete", fake_delete)
+    monkeypatch.setenv(
+        "SUPABASE_URL",
+        "https://example.supabase.co",
+    )
+    monkeypatch.setenv(
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "service-secret",
+    )
+
+    user = dependencies.CurrentUser(
+        id="source-user",
+        authenticated_id="authenticated-user",
+        access_token="user-token",
+        metadata={},
+    )
+
+    result = profile.delete_account(user)
+
+    assert result == {"deleted": True}
+    assert captured["url"].endswith(
+        "/auth/v1/admin/users/authenticated-user"
+    )
+    assert "source-user" not in captured["url"]
