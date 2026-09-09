@@ -80,14 +80,28 @@ class MealPrepConsumptionService:
         }
 
         try:
-            inventory = self.meal_prep_repo.update(
-                batch_id,
-                user_id,
-                update,
+            consume_portion = getattr(
+                self.meal_prep_repo,
+                "consume_portion",
+                None,
             )
+
+            if callable(consume_portion):
+                inventory = consume_portion(
+                    batch_id,
+                    user_id,
+                    expected_remaining=remaining,
+                )
+            else:
+                inventory = self.meal_prep_repo.update(
+                    batch_id,
+                    user_id,
+                    update,
+                )
+
             if inventory is None:
                 raise MealPrepConsistencyError(
-                    "Meal prep inventory was not updated"
+                    "Meal prep portion was already consumed"
                 )
         except Exception:
             delete_meal = getattr(
