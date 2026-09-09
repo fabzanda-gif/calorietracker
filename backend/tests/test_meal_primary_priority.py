@@ -1,5 +1,5 @@
-from backend.api.routers.days import (
-    _deterministic_primary_recommendation,
+from backend.services.meal_primary_priority import (
+    MealPrimaryPriorityService,
 )
 
 
@@ -25,7 +25,7 @@ def test_home_breakfast_prefers_recurring_routine():
         "2026-09-05",
     )
 
-    result = _deterministic_primary_recommendation(
+    result = MealPrimaryPriorityService().choose(
         meal_slot="breakfast",
         day_context="Casa",
         mode="auto",
@@ -40,7 +40,7 @@ def test_free_day_is_not_treated_as_home_priority():
     fallback = candidate("recipe", "Fallback")
     routine = candidate("routine", "Yogurt e avena")
 
-    result = _deterministic_primary_recommendation(
+    result = MealPrimaryPriorityService().choose(
         meal_slot="breakfast",
         day_context="Libero",
         mode="auto",
@@ -60,7 +60,7 @@ def test_lunch_prefers_available_meal_prep():
         "2026-09-06",
     )
 
-    result = _deterministic_primary_recommendation(
+    result = MealPrimaryPriorityService().choose(
         meal_slot="lunch",
         day_context="Ufficio",
         mode="auto",
@@ -84,7 +84,7 @@ def test_lunch_uses_nearest_inventory_expiry():
     )
     fallback = candidate("routine", "Pasta abituale")
 
-    result = _deterministic_primary_recommendation(
+    result = MealPrimaryPriorityService().choose(
         meal_slot="lunch",
         day_context="Casa",
         mode="auto",
@@ -103,7 +103,7 @@ def test_non_auto_mode_keeps_existing_replanner_result():
         "2026-09-05",
     )
 
-    result = _deterministic_primary_recommendation(
+    result = MealPrimaryPriorityService().choose(
         meal_slot="lunch",
         day_context="Casa",
         mode="order",
@@ -122,7 +122,7 @@ def test_dinner_keeps_existing_replanner_result():
         "2026-09-05",
     )
 
-    result = _deterministic_primary_recommendation(
+    result = MealPrimaryPriorityService().choose(
         meal_slot="dinner",
         day_context="Casa",
         mode="auto",
