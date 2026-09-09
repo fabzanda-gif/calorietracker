@@ -17,7 +17,7 @@ from backend.api.dependencies import (
     get_day_briefings_repository,
     get_optional_decision_selections_repository,
     get_meal_prep_repository,
-    get_planned_activities_repository,
+    get_optional_planned_activities_repository,
     get_strength_plans_repository,
     get_strength_workouts_repository,
     get_meals_repository,
@@ -440,8 +440,8 @@ def get_day_budget(
     weight_repo: WeightRepository = Depends(
         get_weight_repository
     ),
-    planned_activities_repo: PlannedActivitiesRepository = Depends(
-        get_planned_activities_repository
+    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
+        get_optional_planned_activities_repository
     ),
 ):
     try:
@@ -482,8 +482,8 @@ def get_ranked_meal_options(
     meal_prep_repo: MealPrepRepository = Depends(
         get_meal_prep_repository
     ),
-    planned_activities_repo: PlannedActivitiesRepository = Depends(
-        get_planned_activities_repository
+    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
+        get_optional_planned_activities_repository
     ),
     strength_plans_repo: StrengthPlansRepository = Depends(
         get_strength_plans_repository
@@ -891,8 +891,8 @@ def get_meal_decision(
     weekly_schedule_repo: WeeklyScheduleRepository = Depends(
         get_weekly_schedule_repository
     ),
-    planned_activities_repo: PlannedActivitiesRepository = Depends(
-        get_planned_activities_repository
+    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
+        get_optional_planned_activities_repository
     ),
 ):
     meal_type = _validate_slot(meal_slot)
@@ -1084,8 +1084,8 @@ def get_day_briefing(
     briefing_repo: DayBriefingsRepository = Depends(
         get_day_briefings_repository
     ),
-    planned_activities_repo: PlannedActivitiesRepository = Depends(
-        get_planned_activities_repository
+    planned_activities_repo: PlannedActivitiesRepository | None = Depends(
+        get_optional_planned_activities_repository
     ),
 ):
     try:

@@ -348,6 +348,24 @@ def get_planned_activities_repository(
     return PlannedActivitiesRepository(supabase)
 
 
+def get_optional_planned_activities_repository(
+    supabase: Client | None = Depends(
+        get_authenticated_supabase
+    ),
+) -> PlannedActivitiesRepository | None:
+    """Best-effort planned activity access for day forecasts.
+
+    Forecast endpoints can still calculate their core budget when an older
+    test fixture or a partially configured environment has no authenticated
+    Supabase client. Activity-management endpoints deliberately keep using
+    the strict dependency above.
+    """
+    if supabase is None:
+        return None
+
+    return PlannedActivitiesRepository(supabase)
+
+
 def get_training_plans_repository(
     supabase: Client = Depends(get_authenticated_supabase),
 ) -> TrainingPlansRepository:

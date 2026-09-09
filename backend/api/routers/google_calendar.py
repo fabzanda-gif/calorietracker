@@ -116,6 +116,9 @@ def get_google_calendar_authorization(
 @router.post("/exchange")
 def exchange_google_calendar_code(
     body: GoogleCalendarExchangeRequest,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
     repo: GoogleCalendarConnectionsRepository = Depends(
         get_google_calendar_connections_repository
     ),
@@ -128,6 +131,11 @@ def exchange_google_calendar_code(
         user_id = service.get_state_user_id(
             body.state
         )
+
+        if user_id != current_user.id:
+            raise GoogleCalendarOAuthError(
+                "Google Calendar authorization belongs to a different user."
+            )
 
         tokens = service.exchange_code(
             body.code
