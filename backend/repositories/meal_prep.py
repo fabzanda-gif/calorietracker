@@ -99,3 +99,51 @@ class MealPrepRepository(BaseRepository):
             raise RepositoryError(
                 f"Unable to update meal prep batch: {exc}"
             ) from exc
+
+    def consume_portion(
+        self,
+        batch_id: Any,
+        user_id: str,
+        *,
+        expected_remaining: int,
+    ) -> dict | None:
+        """
+        Decrement a portion only when the batch still has the quantity
+        observed by the caller.
+
+        The conditional update prevents two concurrent requests from
+        consuming the same last portion.
+        """
+        if expected_remaining <= 0:
+            return None
+
+        new_remaining = expected_remaining - 1
+        payload = {
+            "portions_remaining": new_remaining,
+            "status": (
+                "finished"
+                if new_remaining == 0
+                else "available"
+            ),
+        }
+
+        try:
+            response = (
+                self.table
+                .update(payload)
+                .eq("id", batch_id)
+                .eq("user_id", user_id)
+                .eq("status", "available")
+                .eq(
+                    "portions_remaining",
+                    expected_remaining,
+                )
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to consume meal prep portion: {exc}"
+            ) from exc
+
