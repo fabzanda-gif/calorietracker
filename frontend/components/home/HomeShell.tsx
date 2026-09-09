@@ -762,6 +762,23 @@ export function HomeShell() {
     };
   }, [knownAlternates]);
 
+  const pantryHomeTotalItems =
+    knownAlternates.filter(
+      (item) => item.source === "pantry",
+    ).length;
+
+  const pantryHomeCookedPortions =
+    knownAlternates
+      .filter(
+        (item) => item.source === "meal_prep",
+      )
+      .reduce(
+        (total, item) =>
+          total +
+          Number(item.mealPrepRemaining ?? 0),
+        0,
+      );
+
   const recommendedMealType = useMemo(
     () =>
       nextMealType(
@@ -5967,31 +5984,30 @@ export function HomeShell() {
                 <strong>Dispensa</strong>
 
                 <span>
-                  {pantryHomeSummary.breakfastSnack > 0
-                    ? `${pantryHomeSummary.breakfastSnack} ${
-                        pantryHomeSummary.breakfastSnack === 1
+                  {pantryHomeTotalItems > 0 &&
+                  pantryHomeCookedPortions > 0
+                    ? `${pantryHomeTotalItems} ${
+                        pantryHomeTotalItems === 1
                           ? "alimento"
                           : "alimenti"
-                      } per colazione/snack`
-                    : "Nessun alimento per colazione/snack"}
-
-                  {" · "}
-
-                  {pantryHomeSummary.lunchDinner > 0
-                    ? `${pantryHomeSummary.lunchDinner} ${
-                        pantryHomeSummary.lunchDinner === 1
-                          ? "alimento"
-                          : "alimenti"
-                      } per pranzo/cena`
-                    : "nessun alimento per pranzo/cena"}
-
-                  {pantryCookableRecipeCount > 0
-                    ? ` · ${
-                        pantryCookableRecipeCount === 1
-                          ? "1 ricetta pronta"
-                          : `${pantryCookableRecipeCount} ricette pronte`
+                      } · ${pantryHomeCookedPortions} ${
+                        pantryHomeCookedPortions === 1
+                          ? "porzione pronta"
+                          : "porzioni pronte"
                       }`
-                    : ""}
+                    : pantryHomeTotalItems > 0
+                      ? `${pantryHomeTotalItems} ${
+                          pantryHomeTotalItems === 1
+                            ? "alimento disponibile"
+                            : "alimenti disponibili"
+                        }`
+                      : pantryHomeCookedPortions > 0
+                        ? `${pantryHomeCookedPortions} ${
+                            pantryHomeCookedPortions === 1
+                              ? "porzione pronta"
+                              : "porzioni pronte"
+                          }`
+                        : "Dispensa vuota"}
                 </span>
               </span>
 
