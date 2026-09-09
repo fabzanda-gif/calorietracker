@@ -2,9 +2,6 @@ from datetime import date
 
 import pytest
 
-from backend.services.meal_prep_consumption import (
-    MealPrepConsistencyError,
-)
 from backend.services.meal_prep_logging import (
     MealPrepBatchNotFoundError,
     MealPrepBatchUnavailableError,
@@ -174,8 +171,8 @@ def test_concurrent_consumption_rolls_back_losing_meal():
     inventory.consume_portion = lose_race
 
     with pytest.raises(
-        MealPrepConsistencyError,
-        match="already consumed",
+        MealPrepBatchUnavailableError,
+        match="no longer available",
     ):
         service.log_portion(
             user_id="u1",
