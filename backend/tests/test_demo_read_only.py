@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.api import dependencies
@@ -62,7 +63,20 @@ def test_regular_identity_is_unchanged(monkeypatch):
     assert read_only is False
 
 
-def test_demo_mutations_are_blocked_before_routes(monkeypatch):
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("POST", "/meals"),
+        ("PUT", "/profile"),
+        ("PATCH", "/daily-logs/2026-09-09"),
+        ("DELETE", "/profile/account"),
+    ],
+)
+def test_demo_mutations_are_blocked_before_routes(
+    monkeypatch,
+    method,
+    path,
+):
     monkeypatch.setenv(
         "DEMO_ACCOUNT_USER_ID",
         "demo-user",
@@ -83,8 +97,9 @@ def test_demo_mutations_are_blocked_before_routes(monkeypatch):
         ),
     )
 
-    response = client.post(
-        "/meals",
+    response = client.request(
+        method,
+        path,
         headers={
             "Authorization": "Bearer demo-token",
         },
