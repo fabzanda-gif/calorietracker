@@ -14,6 +14,7 @@ import type {
 } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase/client";
+import { notifyLogin } from "@/lib/api/authEvents";
 
 interface AuthContextValue {
   session: Session | null;
@@ -69,13 +70,27 @@ export function AuthProvider({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
+      (event, nextSession) => {
         if (!active) {
           return;
         }
 
         setSession(nextSession);
         setLoading(false);
+
+        if (
+          event === "SIGNED_IN" &&
+          nextSession?.access_token
+        ) {
+          void notifyLogin(
+            nextSession.access_token,
+          ).catch((error) => {
+            console.error(
+              "Unable to send login notification",
+              error,
+            );
+          });
+        }
       },
     );
 
