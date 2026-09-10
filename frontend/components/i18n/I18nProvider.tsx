@@ -16,6 +16,8 @@ const STORAGE_KEY = "sanosync-language";
 const messages = {
   it: {
     today: "Oggi",
+    breakfast: "Colazione",
+    privacyPolicy: "Privacy Policy",
     activities: "Attività",
     progress: "Progressi",
     recipes: "Ricette",
@@ -128,6 +130,8 @@ const messages = {
   },
   en: {
     today: "Today",
+    breakfast: "Breakfast",
+    privacyPolicy: "Privacy Policy",
     activities: "Activities",
     progress: "Progress",
     recipes: "Recipes",
@@ -240,6 +244,8 @@ const messages = {
   },
   nl: {
     today: "Vandaag",
+    breakfast: "Ontbijt",
+    privacyPolicy: "Privacybeleid",
     activities: "Activiteiten",
     progress: "Voortgang",
     recipes: "Recepten",
