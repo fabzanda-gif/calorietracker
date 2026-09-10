@@ -6,6 +6,8 @@ import {
 } from "react";
 
 import { AppNav } from "@/components/navigation/AppNav";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   getProfile,
@@ -169,6 +171,7 @@ export default function ProfilePage() {
     accessToken,
     signOut,
   } = useAuth();
+  const { setLocale, t } = useI18n();
 
   const [form, setForm] =
     useState<FormState>(EMPTY_FORM);
@@ -273,6 +276,10 @@ export default function ProfilePage() {
               }
             : EMPTY_FORM.weekly_schedule;
 
+        const profileLanguage =
+          metadata.language === "en" ? "en" : "it";
+        setLocale(profileLanguage);
+
         setForm({
           name:
             firstNameValue(
@@ -303,9 +310,7 @@ export default function ProfilePage() {
             metadata.protein_goal_enabled === true,
           protein_goal_g:
             numberString(metadata.protein_goal_g),
-          language:
-            stringValue(metadata.language) ||
-            "it",
+          language: profileLanguage,
           city:
             stringValue(metadata.city),
           office_lunch:
@@ -1088,26 +1093,6 @@ export default function ProfilePage() {
               </div>
 
               <div className={styles.grid}>
-                <label>
-                  <span>Lingua</span>
-                  <select
-                    value={form.language}
-                    onChange={(event) =>
-                      updateField(
-                        "language",
-                        event.target.value,
-                      )
-                    }
-                  >
-                    <option value="it">
-                      Italiano
-                    </option>
-                    <option value="en">
-                      English
-                    </option>
-                  </select>
-                </label>
-
                 <label className={styles.checkbox}>
                   <input
                     type="checkbox"
@@ -1123,6 +1108,21 @@ export default function ProfilePage() {
                     Pranzo abitualmente in ufficio
                   </span>
                 </label>
+              </div>
+            </section>
+
+            <section className={styles.card}>
+              <div className={styles.languageRow}>
+                <div className={styles.sectionHeader}>
+                  <h2>{t("language")}</h2>
+                  <p>{t("languageHelp")}</p>
+                </div>
+                <LanguageSwitcher
+                  variant="profile"
+                  onChange={(language) =>
+                    updateField("language", language)
+                  }
+                />
               </div>
             </section>
 
