@@ -157,6 +157,27 @@ const copy = {
     saving: "Opslaan…",
     addActivity: "Activiteit toevoegen",
   },
+  fr: {
+    steps: "Pas", bike: "Vélo", ebike: "Vélo électrique", run: "Course",
+    padel: "Padel", gym: "Salle de sport", other: "Autre",
+    wholeSteps: "Saisissez un nombre entier de pas supérieur à zéro.",
+    bikeMetric: "Saisissez au moins une durée ou une distance.",
+    runDistance: "Saisissez la distance parcourue en kilomètres.",
+    runPace: "Saisissez l’allure moyenne au format mm:ss.",
+    padelDuration: "Saisissez la durée du match.",
+    sportNameRequired: "Saisissez le nom du sport.",
+    caloriesRequired: "Saisissez un nombre de kcal valide.",
+    saveFailed: "Impossible d’enregistrer l’activité.",
+    activityType: "Type d’activité", bikeHint: "minutes ou km",
+    runHint: "km et allure moyenne", otherHint: "kcal", otherSports: "Autres sports",
+    stepCount: "Nombre de pas *", sportName: "Nom du sport *", sportExample: "Ex. Tennis",
+    duration: "Durée (min)", distance: "Distance (km)",
+    averagePace: "Allure moyenne (min/km) *", estimatedCalories: "Kcal estimées",
+    calories: "Kcal *", stepsHelper: "Calculées automatiquement à partir du nombre de pas.",
+    caloriesHelper: "Calculées automatiquement lorsque possible ; vous pouvez les modifier.",
+    validData: "✓ Données valides", cancel: "Annuler", saving: "Enregistrement…",
+    addActivity: "Ajouter l’activité",
+  },
 } as const;
 
 function numberValue(value: string): number {
