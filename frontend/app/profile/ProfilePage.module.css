@@ -379,3 +379,22 @@
 .logoutButton:hover {
   background: #e95250;
 }
+
+.languageRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.languageRow .sectionHeader {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .languageRow {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 18px;
+  }
+}
