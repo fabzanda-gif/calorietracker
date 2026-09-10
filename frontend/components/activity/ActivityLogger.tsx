@@ -12,6 +12,7 @@ import {
   type ActivityMovementSummary,
 } from "@/lib/api/activities";
 import { updateDailyLog } from "@/lib/api/day";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import styles from "./ActivityLogger.module.css";
 
@@ -139,6 +140,13 @@ const ACTIVITY_OPTIONS = [
   },
 ];
 
+const LOGGER_COPY = {
+  it: { extra: "Allenamento extra", logActivity: "Registra attività", activityDate: "Data dell’attività", pastHint: "Puoi registrare anche un’attività passata.", activity: "Attività", minutes: "Durata in minuti", burned: "Calorie bruciate", suggestion: "Suggerimento", editable: "modificabile", logging: "Registrazione…", logWorkout: "Registra allenamento", dailyMovement: "Movimento quotidiano", dailySteps: "Passi della giornata", totalDetected: "Passi totali rilevati", stepsExample: "Es. 12000", updating: "Aggiornamento…", updateSteps: "Aggiorna passi", totalSteps: "Passi totali", included: "Inclusi negli allenamenti", netSteps: "Passi netti quotidiani", invalidName: "Inserisci il nome dell’attività.", invalidDuration: "Inserisci una durata valida.", invalidCalories: "Inserisci calorie valide.", saveFailed: "Non riesco a registrare l’attività.", invalidSteps: "Inserisci un numero di passi valido.", stepsUpdated: "Passi aggiornati.", stepsFailed: "Non riesco ad aggiornare i passi.", saved: "registrato.", labels: ["🎾 Padel", "🚴 Bici", "⚡ E-bike", "🏃 Corsa", "🚶 Camminata", "🏊 Nuoto", "🏃 Ellittica", "🚣 Canottaggio", "🏋️ Palestra / pesi", "💪 Circuit training", "🎾 Tennis", "⚽ Calcio", "🏀 Basket", "🥾 Escursionismo", "🧘 Yoga", "🧘 Pilates", "➕ Altra attività"] },
+  en: { extra: "Extra workout", logActivity: "Log activity", activityDate: "Activity date", pastHint: "You can also log a past activity.", activity: "Activity", minutes: "Duration in minutes", burned: "Calories burned", suggestion: "Suggestion", editable: "editable", logging: "Logging…", logWorkout: "Log workout", dailyMovement: "Daily movement", dailySteps: "Daily steps", totalDetected: "Total steps detected", stepsExample: "E.g. 12000", updating: "Updating…", updateSteps: "Update steps", totalSteps: "Total steps", included: "Included in workouts", netSteps: "Net daily steps", invalidName: "Enter an activity name.", invalidDuration: "Enter a valid duration.", invalidCalories: "Enter valid calories.", saveFailed: "Unable to log the activity.", invalidSteps: "Enter a valid number of steps.", stepsUpdated: "Steps updated.", stepsFailed: "Unable to update steps.", saved: "logged.", labels: ["🎾 Padel", "🚴 Cycling", "⚡ E-bike", "🏃 Running", "🚶 Walking", "🏊 Swimming", "🏃 Elliptical", "🚣 Rowing", "🏋️ Gym / weights", "💪 Circuit training", "🎾 Tennis", "⚽ Football", "🏀 Basketball", "🥾 Hiking", "🧘 Yoga", "🧘 Pilates", "➕ Other activity"] },
+  nl: { extra: "Extra training", logActivity: "Activiteit registreren", activityDate: "Datum van activiteit", pastHint: "Je kunt ook een eerdere activiteit registreren.", activity: "Activiteit", minutes: "Duur in minuten", burned: "Verbrande calorieën", suggestion: "Suggestie", editable: "aanpasbaar", logging: "Registreren…", logWorkout: "Training registreren", dailyMovement: "Dagelijkse beweging", dailySteps: "Stappen van vandaag", totalDetected: "Totaal gedetecteerde stappen", stepsExample: "Bijv. 12000", updating: "Bijwerken…", updateSteps: "Stappen bijwerken", totalSteps: "Totaal stappen", included: "Inbegrepen in trainingen", netSteps: "Netto dagelijkse stappen", invalidName: "Voer een activiteit in.", invalidDuration: "Voer een geldige duur in.", invalidCalories: "Voer geldige calorieën in.", saveFailed: "De activiteit kon niet worden geregistreerd.", invalidSteps: "Voer een geldig aantal stappen in.", stepsUpdated: "Stappen bijgewerkt.", stepsFailed: "De stappen konden niet worden bijgewerkt.", saved: "geregistreerd.", labels: ["🎾 Padel", "🚴 Fietsen", "⚡ E-bike", "🏃 Hardlopen", "🚶 Wandelen", "🏊 Zwemmen", "🏃 Crosstrainer", "🚣 Roeien", "🏋️ Sportschool / gewichten", "💪 Circuittraining", "🎾 Tennis", "⚽ Voetbal", "🏀 Basketbal", "🥾 Hiken", "🧘 Yoga", "🧘 Pilates", "➕ Andere activiteit"] },
+  fr: { extra: "Entraînement supplémentaire", logActivity: "Enregistrer une activité", activityDate: "Date de l’activité", pastHint: "Vous pouvez aussi enregistrer une activité passée.", activity: "Activité", minutes: "Durée en minutes", burned: "Calories brûlées", suggestion: "Suggestion", editable: "modifiable", logging: "Enregistrement…", logWorkout: "Enregistrer l’entraînement", dailyMovement: "Mouvement quotidien", dailySteps: "Pas de la journée", totalDetected: "Nombre total de pas détectés", stepsExample: "Ex. 12000", updating: "Mise à jour…", updateSteps: "Mettre à jour les pas", totalSteps: "Nombre total de pas", included: "Inclus dans les entraînements", netSteps: "Pas quotidiens nets", invalidName: "Saisissez le nom de l’activité.", invalidDuration: "Saisissez une durée valide.", invalidCalories: "Saisissez des calories valides.", saveFailed: "Impossible d’enregistrer l’activité.", invalidSteps: "Saisissez un nombre de pas valide.", stepsUpdated: "Pas mis à jour.", stepsFailed: "Impossible de mettre à jour les pas.", saved: "enregistré.", labels: ["🎾 Padel", "🚴 Vélo", "⚡ Vélo électrique", "🏃 Course", "🚶 Marche", "🏊 Natation", "🏃 Vélo elliptique", "🚣 Aviron", "🏋️ Salle / musculation", "💪 Circuit training", "🎾 Tennis", "⚽ Football", "🏀 Basket", "🥾 Randonnée", "🧘 Yoga", "🧘 Pilates", "➕ Autre activité"] },
+} as const;
+
 function suggestedCalories(
   activityType: string,
   minutes: number,
@@ -154,9 +162,9 @@ function suggestedCalories(
   );
 }
 
-function formatNumber(value: number): string {
+function formatNumber(value: number, locale: string): string {
   return Math.round(value).toLocaleString(
-    "it-IT",
+    locale,
   );
 }
 
@@ -167,6 +175,9 @@ export function ActivityLogger({
   showMovement = false,
   compact = false,
 }: ActivityLoggerProps) {
+  const { locale } = useI18n();
+  const copy = LOGGER_COPY[locale];
+  const numberLocale = locale === "it" ? "it-IT" : locale === "nl" ? "nl-NL" : locale === "fr" ? "fr-FR" : "en-GB";
   const [logDate, setLogDate] = useState(date);
   const [activityType, setActivityType] =
     useState("Padel");
@@ -270,7 +281,7 @@ export function ActivityLogger({
     const name = activityType;
 
     if (!name) {
-      setError("Inserisci il nome dell’attività.");
+      setError(copy.invalidName);
       return;
     }
 
@@ -278,7 +289,7 @@ export function ActivityLogger({
       !Number.isFinite(minutes) ||
       minutes <= 0
     ) {
-      setError("Inserisci una durata valida.");
+      setError(copy.invalidDuration);
       return;
     }
 
@@ -286,7 +297,7 @@ export function ActivityLogger({
       !Number.isFinite(burned) ||
       burned < 0
     ) {
-      setError("Inserisci calorie valide.");
+      setError(copy.invalidCalories);
       return;
     }
 
@@ -312,13 +323,13 @@ export function ActivityLogger({
         setMovement(response.movement);
       }
 
-      setMessage(`${name} registrato.`);
+      setMessage(`${copy.labels[ACTIVITY_OPTIONS.findIndex((option) => option.value === name)]?.replace(/^\S+\s/, "") ?? name} ${copy.saved}`);
       await onSaved(logDate);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Non riesco a registrare l’attività.",
+          : copy.saveFailed,
       );
     } finally {
       setSavingActivity(false);
@@ -337,7 +348,7 @@ export function ActivityLogger({
       totalSteps < 0
     ) {
       setError(
-        "Inserisci un numero di passi valido.",
+        copy.invalidSteps,
       );
       return;
     }
@@ -372,13 +383,13 @@ export function ActivityLogger({
         );
       }
 
-      setMessage("Passi aggiornati.");
+      setMessage(copy.stepsUpdated);
       await onSaved(logDate);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Non riesco ad aggiornare i passi.",
+          : copy.stepsFailed,
       );
     } finally {
       setSavingSteps(false);
@@ -394,13 +405,13 @@ export function ActivityLogger({
       <section className={styles.activityPanel}>
         <div className={styles.panelHeading}>
           <div>
-            <span>Allenamento extra</span>
-            <h3>Registra attività</h3>
+            <span>{copy.extra}</span>
+            <h3>{copy.logActivity}</h3>
           </div>
         </div>
 
         <label className={styles.dateInput}>
-          <span>Data dell’attività</span>
+          <span>{copy.activityDate}</span>
           <input
             type="date"
             value={logDate}
@@ -411,13 +422,13 @@ export function ActivityLogger({
             }}
           />
           <small>
-            Puoi registrare anche un’attività passata.
+            {copy.pastHint}
           </small>
         </label>
 
         <div className={styles.formGrid}>
           <label>
-            <span>Attività</span>
+            <span>{copy.activity}</span>
             <select
               value={activityType}
               onChange={(event) => {
@@ -429,19 +440,19 @@ export function ActivityLogger({
                 setError(null);
               }}
             >
-              {ACTIVITY_OPTIONS.map((option) => (
+              {ACTIVITY_OPTIONS.map((option, index) => (
                 <option
                   key={option.value}
                   value={option.value}
                 >
-                  {option.label}
+                  {copy.labels[index]}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            <span>Durata in minuti</span>
+            <span>{copy.minutes}</span>
             <input
               type="number"
               min="1"
@@ -456,7 +467,7 @@ export function ActivityLogger({
           </label>
 
           <label>
-            <span>Calorie bruciate</span>
+            <span>{copy.burned}</span>
             <input
               type="number"
               min="0"
@@ -467,8 +478,7 @@ export function ActivityLogger({
               }}
             />
             <small>
-              Suggerimento: {automaticCalories} kcal,
-              modificabile.
+              {copy.suggestion}: {automaticCalories} kcal, {copy.editable}.
             </small>
           </label>
         </div>
@@ -482,8 +492,8 @@ export function ActivityLogger({
           }}
         >
           {savingActivity
-            ? "Registrazione…"
-            : "Registra allenamento"}
+            ? copy.logging
+            : copy.logWorkout}
         </button>
       </section>
 
@@ -491,19 +501,19 @@ export function ActivityLogger({
         <section className={styles.movementPanel}>
           <div className={styles.panelHeading}>
             <div>
-              <span>Movimento quotidiano</span>
-              <h3>Passi della giornata</h3>
+              <span>{copy.dailyMovement}</span>
+              <h3>{copy.dailySteps}</h3>
             </div>
           </div>
 
           <label className={styles.stepsInput}>
-            <span>Passi totali rilevati</span>
+            <span>{copy.totalDetected}</span>
             <input
               type="number"
               min="0"
               step="100"
               value={steps}
-              placeholder="Es. 12000"
+              placeholder={copy.stepsExample}
               onChange={(event) =>
                 setSteps(event.target.value)
               }
@@ -521,41 +531,41 @@ export function ActivityLogger({
             }}
           >
             {savingSteps
-              ? "Aggiornamento…"
-              : "Aggiorna passi"}
+              ? copy.updating
+              : copy.updateSteps}
           </button>
 
           {movement ? (
             <div className={styles.movementStats}>
               <div>
-                <span>Passi totali</span>
+                <span>{copy.totalSteps}</span>
                 <strong>
                   {formatNumber(
-                    movement.total_steps,
+                    movement.total_steps, numberLocale,
                   )}
                 </strong>
               </div>
 
               <div>
-                <span>Inclusi negli allenamenti</span>
+                <span>{copy.included}</span>
                 <strong>
                   −
                   {formatNumber(
-                    movement.applied_step_offset,
+                    movement.applied_step_offset, numberLocale,
                   )}
                 </strong>
               </div>
 
               <div className={styles.netSteps}>
-                <span>Passi netti quotidiani</span>
+                <span>{copy.netSteps}</span>
                 <strong>
                   {formatNumber(
-                    movement.net_daily_steps,
+                    movement.net_daily_steps, numberLocale,
                   )}
                 </strong>
                 <small>
                   {formatNumber(
-                    movement.step_calories,
+                    movement.step_calories, numberLocale,
                   )}{" "}
                   kcal
                 </small>
