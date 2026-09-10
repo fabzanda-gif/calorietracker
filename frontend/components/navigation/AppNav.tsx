@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { getProfile } from "@/lib/api/profile";
 
 import styles from "./AppNav.module.css";
@@ -66,6 +68,7 @@ function isActive(pathname: string, href: string): boolean {
 export function AppNav() {
   const pathname = usePathname();
   const { user, accessToken, signOut } = useAuth();
+  const { t } = useI18n();
   const [readOnlyDemo, setReadOnlyDemo] =
     useState(false);
   const {
@@ -126,6 +129,14 @@ export function AppNav() {
     };
   }, [accessToken]);
 
+  const navLabel = (href: string) => {
+    if (href === "/") return t("today");
+    if (href === "/activities") return t("activities");
+    if (href === "/progress") return t("progress");
+    if (href === "/recipes") return t("recipes");
+    return t("profile");
+  };
+
   return (
     <>
       {readOnlyDemo ? (
@@ -133,9 +144,11 @@ export function AppNav() {
           className={styles.demoBanner}
           role="status"
         >
-          Modalità demo · dati reali in sola lettura
+          {t("demoMode")}
         </div>
       ) : null}
+
+      {pathname === "/" ? <LanguageSwitcher /> : null}
 
       <div
         className={styles.globalExperienceSwitch}
@@ -172,7 +185,7 @@ export function AppNav() {
             ? `${styles.desktopNav} ${styles.desktopNavZero}`
             : styles.desktopNav
         }
-        aria-label="Navigazione principale"
+        aria-label={t("primaryNavigation")}
       >
         <div className={styles.brandBlock}>
           <img
@@ -195,7 +208,7 @@ export function AppNav() {
             const active = isActive(pathname, item.href);
 
             return (
-              <div key={item.label}>
+              <div key={item.href}>
                 {item.href === "#" ? (
                   <button
                     type="button"
@@ -208,7 +221,7 @@ export function AppNav() {
                     >
                       {item.icon}
                     </span>
-                    <span>{item.label}</span>
+                    <span>{navLabel(item.href)}</span>
                   </button>
                 ) : (
                   <Link
@@ -226,7 +239,7 @@ export function AppNav() {
                     >
                       {item.icon}
                     </span>
-                    <span>{item.label}</span>
+                    <span>{navLabel(item.href)}</span>
                   </Link>
                 )}
               </div>
@@ -238,7 +251,7 @@ export function AppNav() {
           <Link
             href="/profile"
             className={styles.profileCard}
-            aria-label="Apri il profilo"
+            aria-label={t("openProfile")}
           >
             <span className={styles.profileAvatar}>
               {avatarUrl ? (
@@ -255,7 +268,7 @@ export function AppNav() {
             <span className={styles.profileDetails}>
               <strong>{displayName}</strong>
               <small>
-                {user?.email ?? "Gestisci il profilo"}
+                {user?.email ?? t("manageProfile")}
               </small>
             </span>
 
@@ -274,7 +287,7 @@ export function AppNav() {
               void signOut();
             }}
           >
-            Esci
+            {t("signOut")}
           </button>
         </div>
       </aside>
@@ -285,7 +298,7 @@ export function AppNav() {
             ? `${styles.mobileNav} ${styles.mobileNavZero}`
             : styles.mobileNav
         }
-        aria-label="Navigazione principale"
+        aria-label={t("primaryNavigation")}
       >
         {MOBILE_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
@@ -310,7 +323,7 @@ export function AppNav() {
                 {item.icon}
               </span>
 
-              <span>{item.label}</span>
+              <span>{navLabel(item.href)}</span>
             </Link>
           );
         })}
