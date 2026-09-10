@@ -305,10 +305,6 @@ function mealFitsSlot(candidate: string, selected: string): boolean {
   return false;
 }
 
-function legacyRoundNumber(value: number): string {
-  return Math.round(value).toLocaleString("it-IT");
-}
-
 function optionLensLabel(
   option: RankedMealOption,
 ): string {
@@ -1811,7 +1807,7 @@ export function HomeShell() {
                   item.activity_type
                     .trim()
                     .toLocaleLowerCase(
-                      "it-IT",
+                      currentLocaleCode,
                     ) === "corsa",
               )
               .sort(
@@ -2206,7 +2202,7 @@ export function HomeShell() {
         iso,
         shortLabel:
           date
-            .toLocaleDateString("it-IT", {
+            .toLocaleDateString(currentLocaleCode, {
               weekday: "short",
             })
             .replace(".", "")
@@ -2431,7 +2427,7 @@ export function HomeShell() {
     const startingText =
       conversationText.trim();
 
-    recognition.lang = "it-IT";
+    recognition.lang = currentLocaleCode;
     recognition.continuous = false;
     recognition.interimResults = true;
 
@@ -2925,7 +2921,7 @@ export function HomeShell() {
             item.activity_type
               .trim()
               .toLocaleLowerCase(
-                "it-IT",
+                currentLocaleCode,
               ) === "corsa",
         )
         .sort(
@@ -4238,7 +4234,7 @@ export function HomeShell() {
                         .distance_meters /
                       1000
                     ).toLocaleString(
-                      "it-IT",
+                      currentLocaleCode,
                       {
                         maximumFractionDigits:
                           2,
@@ -5013,7 +5009,7 @@ export function HomeShell() {
                                           action.distance_meters /
                                           1000
                                         ).toLocaleString(
-                                          "it-IT",
+                                          currentLocaleCode,
                                           {
                                             maximumFractionDigits:
                                               2,
@@ -5058,7 +5054,7 @@ export function HomeShell() {
                               : `${Number(
                                   action.weight_kg,
                                 ).toLocaleString(
-                                  "it-IT",
+                                  currentLocaleCode,
                                   {
                                     maximumFractionDigits:
                                       1,
@@ -6002,7 +5998,7 @@ export function HomeShell() {
                           {activity.distance_meters
                             ? ` · ${(
                                 activity.distance_meters / 1000
-                              ).toLocaleString("it-IT", {
+                              ).toLocaleString(currentLocaleCode, {
                                 maximumFractionDigits: 2,
                               })} km`
                             : ""}
@@ -7557,7 +7553,7 @@ export function HomeShell() {
                     <strong>
                       {latestWeight != null
                         ? `${latestWeight.toLocaleString(
-                            "it-IT",
+                            currentLocaleCode,
                             {
                               maximumFractionDigits: 1,
                             },
@@ -7584,7 +7580,7 @@ export function HomeShell() {
                         ? `Modifica il peso del ${new Date(
                             `${weightQuickAddEditingEntry.date}T00:00:00`,
                           ).toLocaleDateString(
-                            "it-IT",
+                            currentLocaleCode,
                             {
                               day: "numeric",
                               month: "short",
@@ -7707,7 +7703,7 @@ export function HomeShell() {
                                 {new Date(
                                   `${entry.date}T00:00:00`,
                                 ).toLocaleDateString(
-                                  "it-IT",
+                                  currentLocaleCode,
                                   {
                                     day: "numeric",
                                     month: "short",
@@ -7719,7 +7715,7 @@ export function HomeShell() {
                                 {Number(
                                   entry.weight,
                                 ).toLocaleString(
-                                  "it-IT",
+                                  currentLocaleCode,
                                   {
                                     maximumFractionDigits: 1,
                                   },
