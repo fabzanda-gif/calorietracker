@@ -12,6 +12,7 @@ const OPTIONS: Array<{
 }> = [
   { locale: "it", flag: "🇮🇹", label: "Italiano" },
   { locale: "en", flag: "🇬🇧", label: "English" },
+  { locale: "nl", flag: "🇳🇱", label: "Nederlands" },
 ];
 
 export function LanguageSwitcher({
@@ -57,7 +58,13 @@ export function LanguageSwitcher({
       <button
         type="button"
         className={styles.compactButton}
-        aria-label={locale === "it" ? "Cambia lingua" : "Change language"}
+        aria-label={
+          locale === "it"
+            ? "Cambia lingua"
+            : locale === "nl"
+              ? "Taal wijzigen"
+              : "Change language"
+        }
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
