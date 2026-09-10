@@ -1003,6 +1003,10 @@ def get_day_briefing(
         ge=0,
         le=23,
     ),
+    language: str = Query(
+        default="it",
+        pattern="^(it|en|nl|fr)$",
+    ),
     current_user: CurrentUser = Depends(get_current_user),
     daily_logs_repo: DailyLogsRepository = Depends(
         get_daily_logs_repository
@@ -1105,6 +1109,7 @@ def get_day_briefing(
         )
 
     payload = {
+        "language": language,
         "first_name": first_name,
         "moment": moment,
         "daily_context": daily_context,
@@ -1178,6 +1183,7 @@ def get_day_briefing(
         current_user.id,
         str(day_date),
         mode,
+        language,
         moment,
         payload["day_type"],
         payload["activity_level"],
