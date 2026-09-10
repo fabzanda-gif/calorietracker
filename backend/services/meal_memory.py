@@ -128,13 +128,33 @@ class MealMemoryService:
             == day_date.weekday()
         ]
 
-        # An explicit day context is a hard boundary: an office day
-        # must never inherit a home routine (and vice versa). Within an
-        # unknown context, progressively fall back from weekday to recent
-        # history so two coherent logs can already produce a prediction.
+        unclassified_candidates = [
+            item
+            for item in history
+            if not self._context_family(
+                item.get("day_context")
+            )
+        ]
+        unclassified_weekday_candidates = [
+            item
+            for item in unclassified_candidates
+            if item["date"].weekday()
+            == day_date.weekday()
+        ]
+
+        # Prefer evidence from the selected context. Legacy meals may not
+        # have a day context, so use those only when no matching contextual
+        # evidence exists. Explicitly conflicting contexts remain excluded.
         if day_context is not None:
-            candidates = context_candidates
-            evidence_scope = "context"
+            if context_candidates:
+                candidates = context_candidates
+                evidence_scope = "context"
+            elif len(unclassified_weekday_candidates) >= 2:
+                candidates = unclassified_weekday_candidates
+                evidence_scope = "unclassified_weekday"
+            else:
+                candidates = unclassified_candidates
+                evidence_scope = "unclassified_recent"
         elif len(weekday_candidates) >= 2:
             candidates = weekday_candidates
             evidence_scope = "weekday"
@@ -301,6 +321,16 @@ class MealMemoryService:
 
         if normalized in home_contexts:
             return "home"
+
+        office_contexts = {
+            "office",
+            "ufficio",
+            "lavoro in ufficio",
+            "giornata in ufficio",
+        }
+
+        if normalized in office_contexts:
+            return "office"
 
         return normalized
 
