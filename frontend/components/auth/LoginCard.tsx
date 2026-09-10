@@ -20,8 +20,10 @@ function GoogleIcon() {
 }
 
 function ProductPreview() {
+  const { t } = useI18n();
+
   return (
-    <div className={styles.preview} aria-label="Anteprima della Home SanoSync">
+    <div className={styles.preview} aria-label={t("previewHomeLabel")}>
       <aside className={styles.previewNav}>
         <Image
           src="/assets/LogoCoral.png"
@@ -30,61 +32,61 @@ function ProductPreview() {
           height={81}
           aria-hidden="true"
         />
-        <span className={styles.previewNavActive}>⌂ <b>Oggi</b></span>
-        <span>⌁ <b>Attività</b></span>
-        <span>↗ <b>Progressi</b></span>
-        <span>◇ <b>Ricette</b></span>
+        <span className={styles.previewNavActive}>⌂ <b>{t("today")}</b></span>
+        <span>⌁ <b>{t("activities")}</b></span>
+        <span>↗ <b>{t("progress")}</b></span>
+        <span>◇ <b>{t("recipes")}</b></span>
       </aside>
 
       <div className={styles.previewContent}>
         <div className={styles.previewGreeting}>
           <div>
-            <strong>Buongiorno, Fabio <span aria-hidden="true">👋</span></strong>
-            <small>La tua giornata è pronta. Il piano si adatta a ciò che succede.</small>
+            <strong>{t("previewGreeting")} <span aria-hidden="true">👋</span></strong>
+            <small>{t("previewDayReady")}</small>
           </div>
           <span className={styles.previewMode}>Standard</span>
         </div>
 
         <div className={styles.previewHabit}>
           <div>
-            <small>ABITUDINE RICONOSCIUTA</small>
-            <strong>Sei andato in ufficio in bicicletta anche oggi?</strong>
+            <small>{t("recognizedHabit")}</small>
+            <strong>{t("bikeOfficeQuestion")}</strong>
           </div>
-          <span>Sì, registrala</span>
+          <span>{t("yesLogIt")}</span>
         </div>
 
         <div className={styles.previewPlan}>
           <div className={styles.previewPlanTitle}>
-            <small>IL TUO PIANO DI OGGI</small>
-            <strong>Quanto posso ancora mangiare oggi?</strong>
+            <small>{t("todayPlan")}</small>
+            <strong>{t("remainingQuestion")}</strong>
           </div>
           <div>
-            <span>Consumate oggi</span>
+            <span>{t("consumedToday")}</span>
             <strong>0 <small>kcal</small></strong>
           </div>
           <div>
-            <span>Puoi ancora mangiare</span>
+            <span>{t("canStillEat")}</span>
             <strong>2.305 <small>kcal</small></strong>
           </div>
-          <p><i aria-hidden="true">◎</i> Il piano è pronto e si adatterà alla giornata.</p>
+          <p><i aria-hidden="true">◎</i> {t("planReady")}</p>
         </div>
 
         <div className={styles.previewColumns}>
           <div className={styles.previewSummary}>
             <div className={styles.previewCardTitle}>
-              <strong>▤ Resoconto giornaliero</strong>
-              <span>＋ Aggiungi</span>
+              <strong>▤ {t("dailySummary")}</strong>
+              <span>＋ {t("add")}</span>
             </div>
-            <p><b>🧺 Dispensa</b><small>2 alimenti disponibili</small></p>
-            <p><b>☕ Colazione</b><small>Colazione Casa · 235 kcal</small></p>
+            <p><b>🧺 {t("pantry")}</b><small>{t("availableItems")}</small></p>
+            <p><b>☕ {t("today") === "Oggi" ? "Colazione" : t("today") === "Vandaag" ? "Ontbijt" : "Breakfast"}</b><small>{t("homeBreakfast")}</small></p>
           </div>
           <div className={styles.previewAi}>
             <div className={styles.previewCardTitle}>
               <strong>✦ SanoSync AI</strong>
-              <span>Tutto in un input</span>
+              <span>{t("allInOneInput")}</span>
             </div>
-            <p>Racconta la tua giornata, penso io al resto.</p>
-            <div>Scrivi cosa hai mangiato o fatto…</div>
+            <p>{t("aiIntro")}</p>
+            <div>{t("aiPlaceholder")}</div>
           </div>
         </div>
       </div>
@@ -162,7 +164,7 @@ export function LoginCard() {
             priority
           />
         </a>
-        <nav aria-label="Link legali">
+        <nav aria-label={t("legalNavigation")}>
           <Link href="/privacy">Privacy</Link><Link href="/terms">Termini</Link>
         </nav>
       </header>
@@ -170,17 +172,17 @@ export function LoginCard() {
       <div className={styles.shell}>
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}>LA TUA GIORNATA, SOTTO CONTROLLO</p>
-            <h1>Tutto ciò che ti serve. Senza doverlo cercare.</h1>
+            <p className={styles.eyebrow}>{t("landingEyebrow")}</p>
+            <h1>{t("landingTitle")}</h1>
             <p className={styles.intro}>
-              SanoSync collega pasti, dispensa, allenamenti e progressi per anticipare ciò che ti serve e rendere ogni registrazione più semplice.
+              {t("landingIntro")}
             </p>
           </div>
           <ProductPreview />
           <div className={styles.benefits}>
-            <span><i aria-hidden="true">◎</i>Piano predittivo</span>
-            <span><i aria-hidden="true">✦</i>Tutto connesso</span>
-            <span><i aria-hidden="true">↗</i>Logging immediato</span>
+            <span><i aria-hidden="true">◎</i>{t("predictivePlan")}</span>
+            <span><i aria-hidden="true">✦</i>{t("everythingConnected")}</span>
+            <span><i aria-hidden="true">↗</i>{t("instantLogging")}</span>
           </div>
         </section>
 
@@ -208,7 +210,7 @@ export function LoginCard() {
           <form className={styles.form} onSubmit={handleSubmit}>
             <label className={styles.field}>
               <span>{t("email")}</span>
-              <input type="email" autoComplete="email" placeholder="nome@esempio.com" required value={email} onChange={(event) => setEmail(event.target.value)} />
+              <input type="email" autoComplete="email" placeholder={t("emailPlaceholder")} required value={email} onChange={(event) => setEmail(event.target.value)} />
             </label>
             <label className={styles.field}>
               <span>{t("password")}</span>
