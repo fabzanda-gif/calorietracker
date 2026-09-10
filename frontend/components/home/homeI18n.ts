@@ -134,9 +134,18 @@ export const HOME_COPY = {
     dailySummaryIntro: "Pasti e attività, tutto in un unico elenco.",
     summaryDate: "Data del resoconto giornaliero",
     previousDay: "Giorno precedente",
+    nextDay: "Giorno successivo",
     chooseSummaryDate: "Scegli la data del resoconto",
     add: "Aggiungi",
     readyPortions: "porzioni pronte",
+    pantrySummary: (items: number, cooked: number) =>
+      items > 0 && cooked > 0
+        ? `${items} ${items === 1 ? "alimento" : "alimenti"} · ${cooked} ${cooked === 1 ? "porzione pronta" : "porzioni pronte"}`
+        : items > 0
+          ? `${items} ${items === 1 ? "alimento disponibile" : "alimenti disponibili"}`
+          : cooked > 0
+            ? `${cooked} ${cooked === 1 ? "porzione pronta" : "porzioni pronte"}`
+            : "Dispensa vuota",
     emptyPantry: "Dispensa vuota",
     openPantry: "Apri dispensa",
     todayActivity: "Attività di oggi",
@@ -164,6 +173,8 @@ export const HOME_COPY = {
     dinnerIdeas: "Tre idee per cena",
     moreUsefulAlternatives: "Inizierà a proporti alternative più utili.",
     dayWeekFocus: "Focus della giornata e settimana",
+    dailyFocus: "Focus della giornata",
+    realTime: "In tempo reale",
     today: "Oggi",
     todayReferences: "Dove sei rispetto ai riferimenti di oggi.",
     logged: "registrati",
@@ -325,9 +336,18 @@ export const HOME_COPY = {
     dailySummaryIntro: "Meals and activities in one list.",
     summaryDate: "Daily summary date",
     previousDay: "Previous day",
+    nextDay: "Next day",
     chooseSummaryDate: "Choose summary date",
     add: "Add",
     readyPortions: "prepared portions",
+    pantrySummary: (items: number, cooked: number) =>
+      items > 0 && cooked > 0
+        ? `${items} ${items === 1 ? "food" : "foods"} · ${cooked} prepared ${cooked === 1 ? "portion" : "portions"}`
+        : items > 0
+          ? `${items} ${items === 1 ? "food available" : "foods available"}`
+          : cooked > 0
+            ? `${cooked} prepared ${cooked === 1 ? "portion" : "portions"}`
+            : "Empty pantry",
     emptyPantry: "Empty pantry",
     openPantry: "Open pantry",
     todayActivity: "Today’s activity",
@@ -355,6 +375,8 @@ export const HOME_COPY = {
     dinnerIdeas: "Three dinner ideas",
     moreUsefulAlternatives: "It will start suggesting more useful alternatives.",
     dayWeekFocus: "Day and week focus",
+    dailyFocus: "Today’s focus",
+    realTime: "Live",
     today: "Today",
     todayReferences: "Where you stand against today’s reference values.",
     logged: "logged",
@@ -516,9 +538,18 @@ export const HOME_COPY = {
     dailySummaryIntro: "Maaltijden en activiteiten in één lijst.",
     summaryDate: "Datum van het dagoverzicht",
     previousDay: "Vorige dag",
+    nextDay: "Volgende dag",
     chooseSummaryDate: "Kies de datum van het overzicht",
     add: "Toevoegen",
     readyPortions: "bereide porties",
+    pantrySummary: (items: number, cooked: number) =>
+      items > 0 && cooked > 0
+        ? `${items} ${items === 1 ? "product" : "producten"} · ${cooked} bereide ${cooked === 1 ? "portie" : "porties"}`
+        : items > 0
+          ? `${items} ${items === 1 ? "product beschikbaar" : "producten beschikbaar"}`
+          : cooked > 0
+            ? `${cooked} bereide ${cooked === 1 ? "portie" : "porties"}`
+            : "Lege voorraad",
     emptyPantry: "Lege voorraad",
     openPantry: "Voorraad openen",
     todayActivity: "Activiteit van vandaag",
@@ -546,6 +577,8 @@ export const HOME_COPY = {
     dinnerIdeas: "Drie ideeën voor het avondeten",
     moreUsefulAlternatives: "Er worden steeds nuttigere alternatieven voorgesteld.",
     dayWeekFocus: "Focus van vandaag en deze week",
+    dailyFocus: "Focus van vandaag",
+    realTime: "Live",
     today: "Vandaag",
     todayReferences: "Waar je staat ten opzichte van de waarden voor vandaag.",
     logged: "geregistreerd",
