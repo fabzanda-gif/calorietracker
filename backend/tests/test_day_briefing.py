@@ -59,6 +59,24 @@ def test_zero_fallback_uses_distinct_tone():
     assert "bravo" not in message.lower()
 
 
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [
+        ("en", "Good evening Fabio!"),
+        ("nl", "Goedenavond Fabio!"),
+        ("fr", "Bonsoir Fabio!"),
+    ],
+)
+def test_fallback_uses_requested_language(language, expected):
+    message = fallback_day_briefing(
+        {**_payload(), "language": language},
+        mode="standard",
+    )
+
+    assert message.startswith(expected)
+    assert "giornata" not in message.casefold()
+
+
 def test_ai_generator_uses_structured_output():
     parsed = SimpleNamespace(
         message=(
@@ -105,6 +123,47 @@ def test_ai_generator_uses_structured_output():
         .__name__
         == "DayBriefingOutput"
     )
+
+
+def test_ai_generator_requires_requested_language():
+    parsed = SimpleNamespace(
+        message=(
+            "Bon après-midi Fabio ! La journée avance bien. "
+            "Continue comme ça !"
+        )
+    )
+    completion = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(parsed=parsed),
+            )
+        ]
+    )
+    parse_calls = []
+
+    class FakeParse:
+        def parse(self, **kwargs):
+            parse_calls.append(kwargs)
+            return completion
+
+    client = SimpleNamespace(
+        beta=SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=FakeParse(),
+            )
+        )
+    )
+
+    DayBriefingService(
+        api_key="test",
+        client=client,
+    ).generate(
+        {**_payload(), "language": "fr"},
+        mode="standard",
+    )
+
+    system_prompt = parse_calls[0]["messages"][0]["content"]
+    assert "exclusivement en français" in system_prompt
 
 
 
