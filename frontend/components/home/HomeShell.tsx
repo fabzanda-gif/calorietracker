@@ -1869,6 +1869,7 @@ export function HomeShell() {
               briefingMoment(),
               experienceMode,
               briefingHour,
+              locale,
               accessToken,
             ),
           ).then((payload) => {
@@ -1921,7 +1922,7 @@ export function HomeShell() {
     return () => {
       active = false;
     };
-  }, [accessToken, experienceMode, briefingHour]);
+  }, [accessToken, experienceMode, briefingHour, locale]);
 
   const budget =
     budgetResult?.budget ?? null;
@@ -4136,6 +4137,7 @@ export function HomeShell() {
                 historicalProfile?.average_burned_calories ?? null,
                 historicalProfile?.days ?? 0,
               ),
+              locale,
             )}
             dayType={normalizeDayType(
               day.context.value,
