@@ -38,9 +38,7 @@ def predict(meals, day_logs=None, *, context=None):
 def test_no_history_is_unknown():
     result = predict([])
 
-    assert result["state"] == "predicted"
-    assert result["value"] == "Colazione Casa"
-    assert result["confidence_level"] == "low"
+    assert result["state"] == "unknown"
     assert result["value"] is None
     assert result["estimated_carbs_g"] is None
     assert result["estimated_fat_g"] is None
@@ -159,7 +157,9 @@ def test_context_without_enough_evidence_falls_back_to_recent_history():
         context="Ufficio",
     )
 
-    assert result["state"] == "unknown"
+    assert result["state"] == "predicted"
+    assert result["value"] == "Colazione Casa"
+    assert result["confidence_level"] == "low"
 
 
 def test_estimated_nutrition_uses_matching_routine_average():
