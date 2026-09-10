@@ -64,7 +64,7 @@ const copy = {
     padelDuration: "Inserisci la durata della partita.",
     sportNameRequired: "Inserisci il nome dello sport.",
     caloriesRequired: "Inserisci delle kcal valide.",
-    saveFailed: text.saveFailed,
+    saveFailed: "Impossibile registrare l’attività.",
     activityType: "Tipo di attività",
     bikeHint: "minuti o km",
     runHint: "km e passo medio",
