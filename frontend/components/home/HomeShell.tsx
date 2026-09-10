@@ -2127,7 +2127,8 @@ export function HomeShell() {
 
   const dailyFocusItems = [
     {
-      label: "Calorie",
+      label: homeCopy.calories,
+      color: "#ff6868",
       icon: "🔥",
       consumed: Number(
         budget?.consumed_kcal ?? 0,
@@ -2139,7 +2140,8 @@ export function HomeShell() {
       progress: budgetProgress,
     },
     {
-      label: "Proteine",
+      label: homeCopy.proteins,
+      color: "#63cf91",
       icon: "💪",
       consumed: Number(
         budget?.protein_consumed_g ?? 0,
@@ -2151,7 +2153,8 @@ export function HomeShell() {
       progress: proteinProgress,
     },
     {
-      label: "Carboidrati",
+      label: homeCopy.carbs,
+      color: "#69a9ff",
       icon: "🌾",
       consumed: carbsConsumed,
       target: carbsTarget,
@@ -2162,7 +2165,8 @@ export function HomeShell() {
       ),
     },
     {
-      label: "Grassi",
+      label: homeCopy.fats,
+      color: "#f4bb42",
       icon: "🥑",
       consumed: fatConsumed,
       target: fatTarget,
@@ -6437,18 +6441,10 @@ export function HomeShell() {
                                   )
                                 }
                               >
-                                <option value="Colazione">
-                                  Colazione
-                                </option>
-                                <option value="Pranzo">
-                                  Pranzo
-                                </option>
-                                <option value="Snack">
-                                  Snack
-                                </option>
-                                <option value="Cena">
-                                  Cena
-                                </option>
+                                <option value="Colazione">{homeCopy.breakfast}</option>
+                                <option value="Pranzo">{homeCopy.lunch}</option>
+                                <option value="Snack">{homeCopy.snack}</option>
+                                <option value="Cena">{homeCopy.dinner}</option>
                               </select>
                             </label>
 
@@ -6457,7 +6453,7 @@ export function HomeShell() {
                                 <label>
                                   <span>
                                     {simpleMealEdit.is_per_100g
-                                      ? "Grammi"
+                                      ? homeCopy.grams
                                       : homeCopy.portions}
                                   </span>
 
@@ -7397,7 +7393,7 @@ export function HomeShell() {
                       <div
                         className={styles.dailyFocusStat}
                         role="img"
-                        aria-label={`${item.label}: ${Math.round(item.consumed)} ${item.unit} registrati`}
+                        aria-label={`${item.label}: ${Math.round(item.consumed)} ${item.unit} ${homeCopy.logged}`}
                       >
                         <span
                           className={styles.dailyFocusMetricIcon}
@@ -7437,7 +7433,7 @@ export function HomeShell() {
                           )} ${item.unit}`
                         : `${Math.round(
                             item.consumed,
-                          )} ${item.unit} registrati`}
+                          )} ${item.unit} ${homeCopy.logged}`}
                     </span>
                   </div>
                 ))}
