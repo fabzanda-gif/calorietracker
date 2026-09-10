@@ -78,7 +78,7 @@ function ProductPreview() {
               <span>＋ {t("add")}</span>
             </div>
             <p><b>🧺 {t("pantry")}</b><small>{t("availableItems")}</small></p>
-            <p><b>☕ {t("today") === "Oggi" ? "Colazione" : t("today") === "Vandaag" ? "Ontbijt" : "Breakfast"}</b><small>{t("homeBreakfast")}</small></p>
+            <p><b>☕ {t("breakfast")}</b><small>{t("homeBreakfast")}</small></p>
           </div>
           <div className={styles.previewAi}>
             <div className={styles.previewCardTitle}>
@@ -165,7 +165,7 @@ export function LoginCard() {
           />
         </a>
         <nav aria-label={t("legalNavigation")}>
-          <Link href="/privacy">Privacy</Link><Link href="/terms">Termini</Link>
+          <Link href="/privacy">{t("privacyPolicy")}</Link><Link href="/terms">{t("terms")}</Link>
         </nav>
       </header>
 
@@ -222,7 +222,7 @@ export function LoginCard() {
                 <span>
                   {t("consentPrefix")} <Link href="/terms">{t("terms")}</Link>
                   {" "}{t("consentMiddle")}
-                  {" "}<Link href="/privacy">Privacy Policy</Link>.
+                  {" "}<Link href="/privacy">{t("privacyPolicy")}</Link>.
                 </span>
               </label>
             ) : null}
@@ -252,7 +252,7 @@ export function LoginCard() {
             {t("privacyNote")}
           </p>
           <footer className={styles.legalFooter}>
-            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/privacy">{t("privacyPolicy")}</Link>
             <span aria-hidden="true">·</span>
             <Link href="/terms">{t("terms")}</Link>
           </footer>
