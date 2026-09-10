@@ -62,6 +62,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright package
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.1
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -73,10 +76,8 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
         run: npm run build
 
-      - name: Install Playwright
-        run: |
-          npm install --no-save --package-lock=false @playwright/test@1.55.1
-          npx playwright install --with-deps chromium
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
 
       - name: Run browser checks
         env:
