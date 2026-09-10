@@ -198,7 +198,7 @@ export function WelcomeJourney({
             </div>
             <p className={styles.consent}>
               {t("consentContinue")}
-              {" "}<Link href="/privacy">Privacy Policy</Link> {t("consentAnd")}
+              {" "}<Link href="/privacy">{t("privacyPolicy")}</Link> {t("consentAnd")}
               {" "}<Link href="/terms">{t("terms")}</Link>.
             </p>
           </form>
