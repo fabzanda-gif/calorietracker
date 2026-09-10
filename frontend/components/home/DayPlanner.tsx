@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { useI18n } from "@/components/i18n/I18nProvider";
+
 import styles from "./DayPlanner.module.css";
 
 export type DayType =
@@ -27,39 +29,91 @@ type Props = {
 
 const dayOptions: Array<{
   value: DayType;
-  label: string;
+  label: "office" | "home" | "free";
 }> = [
   {
     value: "office",
-    label: "Ufficio",
+    label: "office",
   },
   {
     value: "home",
-    label: "Lavoro da casa",
+    label: "home",
   },
   {
     value: "free",
-    label: "Giornata libera",
+    label: "free",
   },
 ];
 
 const activityOptions: Array<{
   value: ActivityLevel;
-  label: string;
+  label: "low" | "moderate" | "high";
 }> = [
   {
     value: "low",
-    label: "Poco attiva",
+    label: "low",
   },
   {
     value: "moderate",
-    label: "Moderatamente attiva",
+    label: "moderate",
   },
   {
     value: "high",
-    label: "Molto attiva",
+    label: "high",
   },
 ];
+
+
+const copy = {
+  it: {
+    office: "Ufficio",
+    home: "Lavoro da casa",
+    free: "Giornata libera",
+    low: "Poco attiva",
+    moderate: "Moderatamente attiva",
+    high: "Molto attiva",
+    program: "Il tuo programma di oggi",
+    description:
+      "Una proposta basata sul tuo programma e sulle tue abitudini.",
+    close: "Chiudi",
+    edit: "Modifica",
+    day: "Giornata",
+    planned: "Attività calcolata dal programma",
+    expectedActivity: "Attività prevista",
+  },
+  en: {
+    office: "Office",
+    home: "Working from home",
+    free: "Day off",
+    low: "Lightly active",
+    moderate: "Moderately active",
+    high: "Very active",
+    program: "Your plan for today",
+    description:
+      "A suggestion based on your schedule and habits.",
+    close: "Close",
+    edit: "Edit",
+    day: "Day",
+    planned: "Activity calculated from your training plan",
+    expectedActivity: "Expected activity",
+  },
+  nl: {
+    office: "Kantoor",
+    home: "Thuiswerken",
+    free: "Vrije dag",
+    low: "Licht actief",
+    moderate: "Redelijk actief",
+    high: "Zeer actief",
+    program: "Jouw programma voor vandaag",
+    description:
+      "Een voorstel op basis van je planning en gewoonten.",
+    close: "Sluiten",
+    edit: "Wijzigen",
+    day: "Dag",
+    planned: "Activiteit berekend op basis van je trainingsplan",
+    expectedActivity: "Verwachte activiteit",
+  },
+} as const;
 
 function dayLabel(value: DayType): string {
   return {
@@ -87,6 +141,8 @@ export function DayPlanner({
   onActivityLevelChange,
   plannedActivitySummary = null,
 }: Props) {
+  const { locale } = useI18n();
+  const text = copy[locale];
   const [editing, setEditing] =
     useState(false);
 
@@ -95,7 +151,7 @@ export function DayPlanner({
       <div className={styles.summary}>
         <div className={styles.summaryText}>
           <p className={styles.kicker}>
-            Il tuo programma di oggi
+            {text.program}
           </p>
 
           <p className={styles.message}>
@@ -103,8 +159,7 @@ export function DayPlanner({
           </p>
 
           <p className={styles.description}>
-            Una proposta basata sul tuo programma
-            e sulle tue abitudini.
+            {text.description}
           </p>
         </div>
 
@@ -116,7 +171,7 @@ export function DayPlanner({
           }
           aria-expanded={editing}
         >
-          {editing ? "Chiudi" : "Modifica"}
+          {editing ? text.close : text.edit}
         </button>
       </div>
 
@@ -124,7 +179,7 @@ export function DayPlanner({
         <div className={styles.editor}>
           <div className={styles.group}>
             <span className={styles.label}>
-              Giornata
+              {text.day}
             </span>
 
             <div className={styles.options}>
@@ -146,7 +201,7 @@ export function DayPlanner({
                     dayType === option.value
                   }
                 >
-                  {option.label}
+                  {text[option.label]}
                 </button>
               ))}
             </div>
@@ -154,13 +209,13 @@ export function DayPlanner({
 
           {plannedActivitySummary ? (
             <div className={styles.plannedActivityNotice}>
-              <strong>Attività calcolata dal programma</strong>
+              <strong>{text.planned}</strong>
               <span>{plannedActivitySummary}</span>
             </div>
           ) : (
           <div className={styles.group}>
             <span className={styles.label}>
-              Attività prevista
+              {text.expectedActivity}
             </span>
 
             <div className={styles.options}>
