@@ -116,12 +116,14 @@ export function getDayBriefing(
   moment: DayBriefingMoment,
   mode: DayBriefingMode = "standard",
   hour: number = new Date().getHours(),
+  language: "it" | "en" | "nl" | "fr" = "it",
   accessToken?: string | null,
 ): Promise<DayBriefingResponse> {
   const query = new URLSearchParams({
     moment,
     mode,
     hour: String(hour),
+    language,
   });
 
   return apiRequest<DayBriefingResponse>(
