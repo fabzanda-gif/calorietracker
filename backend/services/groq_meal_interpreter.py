@@ -106,7 +106,7 @@ class GroqMealInterpreter:
                     },
                 ],
                 response_format=GroqMealInterpretation,
-                reasoning_effort="none",
+                reasoning_effort="low",
                 max_completion_tokens=1200,
             )
         except Exception as exc:
