@@ -11,6 +11,7 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import {
   createWeight,
   getWeightHistory,
@@ -23,6 +24,14 @@ import {
 } from "@/lib/api/progress";
 
 import styles from "./ProgressPage.module.css";
+import { progressCopy, progressLocale } from "./progressI18n";
+
+const insightCopy = {
+  it: { weight: "Peso", weightDown: (value: string) => `Peso in calo di ${value} kg`, weightUp: (value: string) => `Peso in aumento di ${value} kg`, weightBody: "Variazione tra la prima e l’ultima misurazione del periodo selezionato.", budget: "Budget", within: (a: number, b: number) => `${a} giorni su ${b} entro budget`, over: (a: number, b: number) => `${a} giorni su ${b} sopra budget`, budgetGood: (p: number) => `Nel ${p}% dei giorni con un budget disponibile sei rimasto entro il valore calcolato da SanoSync.`, budgetOther: (p: number) => `Sei rimasto entro budget nel ${p}% dei giorni per cui era disponibile un confronto.`, mealLabels: ["colazione", "pranzo", "cena", "altri pasti"], distribution: "Distribuzione", mealTitle: (label: string, p: number) => `${label === "cena" ? "La cena" : label === "pranzo" ? "Il pranzo" : label === "colazione" ? "La colazione" : "Gli altri pasti"} concentra il ${p}% delle calorie`, mealBody: "È il momento della giornata che pesa maggiormente sulla distribuzione calorica del periodo selezionato.", protein: "Proteine", proteinTitle: (value: string) => `${value} g di proteine al giorno`, proteinBody: "Media giornaliera calcolata sui giorni registrati nel periodo nutrizionale selezionato.", activity: "Attività", activityTitle: (days: number) => `${days} ${days === 1 ? "giorno attivo" : "giorni attivi"} nel periodo`, activityBody: (total: string, average: string) => `${total} kcal registrate complessivamente · ${average} kcal per giorno attivo.` },
+  en: { weight: "Weight", weightDown: (value: string) => `Weight down ${value} kg`, weightUp: (value: string) => `Weight up ${value} kg`, weightBody: "Change between the first and last measurement in the selected period.", budget: "Budget", within: (a: number, b: number) => `${a} of ${b} days within budget`, over: (a: number, b: number) => `${a} of ${b} days over budget`, budgetGood: (p: number) => `You stayed within SanoSync's calculated budget on ${p}% of comparable days.`, budgetOther: (p: number) => `You stayed within budget on ${p}% of days where a comparison was available.`, mealLabels: ["breakfast", "lunch", "dinner", "other meals"], distribution: "Distribution", mealTitle: (label: string, p: number) => `${label.charAt(0).toUpperCase()}${label.slice(1)} accounts for ${p}% of calories`, mealBody: "This is the part of the day with the greatest weight in the selected period's calorie distribution.", protein: "Protein", proteinTitle: (value: string) => `${value} g of protein per day`, proteinBody: "Daily average across logged days in the selected nutrition period.", activity: "Activity", activityTitle: (days: number) => `${days} active ${days === 1 ? "day" : "days"} in the period`, activityBody: (total: string, average: string) => `${total} kcal logged in total · ${average} kcal per active day.` },
+  nl: { weight: "Gewicht", weightDown: (value: string) => `Gewicht ${value} kg gedaald`, weightUp: (value: string) => `Gewicht ${value} kg gestegen`, weightBody: "Verandering tussen de eerste en laatste meting in de geselecteerde periode.", budget: "Budget", within: (a: number, b: number) => `${a} van ${b} dagen binnen budget`, over: (a: number, b: number) => `${a} van ${b} dagen boven budget`, budgetGood: (p: number) => `Op ${p}% van de vergelijkbare dagen bleef je binnen het door SanoSync berekende budget.`, budgetOther: (p: number) => `Je bleef binnen budget op ${p}% van de dagen waarvoor een vergelijking beschikbaar was.`, mealLabels: ["ontbijt", "lunch", "avondeten", "overige maaltijden"], distribution: "Verdeling", mealTitle: (label: string, p: number) => `${label.charAt(0).toUpperCase()}${label.slice(1)} vormt ${p}% van de calorieën`, mealBody: "Dit dagdeel weegt het zwaarst in de calorieverdeling van de geselecteerde periode.", protein: "Eiwitten", proteinTitle: (value: string) => `${value} g eiwit per dag`, proteinBody: "Dagelijks gemiddelde over geregistreerde dagen in de geselecteerde voedingsperiode.", activity: "Activiteit", activityTitle: (days: number) => `${days} actieve ${days === 1 ? "dag" : "dagen"} in de periode`, activityBody: (total: string, average: string) => `${total} kcal in totaal geregistreerd · ${average} kcal per actieve dag.` },
+  fr: { weight: "Poids", weightDown: (value: string) => `Poids en baisse de ${value} kg`, weightUp: (value: string) => `Poids en hausse de ${value} kg`, weightBody: "Variation entre la première et la dernière mesure de la période sélectionnée.", budget: "Budget", within: (a: number, b: number) => `${a} jours sur ${b} dans le budget`, over: (a: number, b: number) => `${a} jours sur ${b} au-dessus du budget`, budgetGood: (p: number) => `Vous êtes resté dans le budget calculé par SanoSync pendant ${p}% des jours comparables.`, budgetOther: (p: number) => `Vous êtes resté dans le budget pendant ${p}% des jours où une comparaison était disponible.`, mealLabels: ["petit-déjeuner", "déjeuner", "dîner", "autres repas"], distribution: "Répartition", mealTitle: (label: string, p: number) => `${label.charAt(0).toUpperCase()}${label.slice(1)} représente ${p}% des calories`, mealBody: "C'est le moment de la journée qui pèse le plus dans la répartition calorique de la période sélectionnée.", protein: "Protéines", proteinTitle: (value: string) => `${value} g de protéines par jour`, proteinBody: "Moyenne quotidienne calculée sur les jours enregistrés de la période nutritionnelle sélectionnée.", activity: "Activité", activityTitle: (days: number) => `${days} ${days === 1 ? "jour actif" : "jours actifs"} sur la période`, activityBody: (total: string, average: string) => `${total} kcal enregistrées au total · ${average} kcal par jour actif.` },
+} as const;
 
 type RangeKey = "30" | "90" | "180" | "all";
 type NutritionRangeKey = "7" | "30" | "90";
@@ -32,27 +41,7 @@ type NutritionMetric =
   | "activity"
   | "meals";
 
-const NUTRITION_METRICS: Array<{
-  key: NutritionMetric;
-  label: string;
-}> = [
-  {
-    key: "calories",
-    label: "Calorie & budget",
-  },
-  {
-    key: "macros",
-    label: "Macros",
-  },
-  {
-    key: "activity",
-    label: "Attività",
-  },
-  {
-    key: "meals",
-    label: "Distribuzione pasti",
-  },
-];
+const NUTRITION_METRICS: NutritionMetric[] = ["calories", "macros", "activity", "meals"];
 
 
 const NUTRITION_RANGE_OPTIONS: Array<{
@@ -65,15 +54,7 @@ const NUTRITION_RANGE_OPTIONS: Array<{
 ];
 
 
-const RANGE_OPTIONS: Array<{
-  key: RangeKey;
-  label: string;
-}> = [
-  { key: "30", label: "30g" },
-  { key: "90", label: "90g" },
-  { key: "180", label: "6 mesi" },
-  { key: "all", label: "Tutto" },
-];
+const RANGE_OPTIONS: RangeKey[] = ["30", "90", "180", "all"];
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -118,12 +99,9 @@ function metricValue(
 
 function metricLabel(
   metric: NutritionMetric,
+  copy: typeof progressCopy.it | typeof progressCopy.en | typeof progressCopy.nl | typeof progressCopy.fr,
 ): string {
-  return (
-    NUTRITION_METRICS.find(
-      (item) => item.key === metric,
-    )?.label ?? "Andamento"
-  );
+  return metric === "calories" ? copy.caloriesBudget : metric === "macros" ? copy.macros : metric === "activity" ? copy.activity : metric === "meals" ? copy.mealDistribution : copy.metricFallback;
 }
 
 function metricUnit(
@@ -136,36 +114,37 @@ function metricUnit(
 
 function metricDescription(
   metric: NutritionMetric,
+  copy: typeof progressCopy.it | typeof progressCopy.en | typeof progressCopy.nl | typeof progressCopy.fr,
 ): string {
   switch (metric) {
     case "macros":
-      return "Come si distribuiscono proteine, carboidrati e grassi nelle tue giornate.";
+      return copy.macrosDescription;
     case "activity":
-      return "Le calorie registrate dalle tue attività.";
+      return copy.activityDescription;
     case "meals":
-      return "Come si distribuiscono le calorie tra i pasti della giornata.";
+      return copy.mealsDescription;
     default:
-      return "Quanto mangi rispetto al budget che SanoSync calcola per te.";
+      return copy.caloriesDescription;
   }
 }
 
-function roundKcal(value: number): string {
+function roundKcal(value: number, locale = "it-IT"): string {
   return Math.round(value).toLocaleString(
-    "it-IT",
+    locale,
   );
 }
 
-function formatWeight(value: number): string {
-  return value.toLocaleString("it-IT", {
+function formatWeight(value: number, locale = "it-IT"): string {
+  return value.toLocaleString(locale, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
 }
 
-function formatDate(value: string): string {
+function formatDate(value: string, locale = "it-IT"): string {
   const date = new Date(`${value}T00:00:00`);
 
-  return date.toLocaleDateString("it-IT", {
+  return date.toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
   });
@@ -225,6 +204,9 @@ function WeightChart({
 }: {
   items: WeightEntry[];
 }) {
+  const { locale } = useI18n();
+  const copy = progressCopy[locale];
+  const displayLocale = progressLocale[locale];
   const width = 900;
   const height = 360;
   const paddingX = 54;
@@ -234,9 +216,9 @@ function WeightChart({
   if (items.length === 0) {
     return (
       <div className={styles.emptyChart}>
-        <strong>Nessuna pesata nel periodo.</strong>
+        <strong>{copy.noWeights}</strong>
         <span>
-          Aggiungi una misurazione per iniziare a vedere il trend.
+          {copy.addMeasurement}
         </span>
       </div>
     );
@@ -341,12 +323,12 @@ function WeightChart({
       <div className={styles.chartLegend}>
         <span>
           <i className={styles.legendActual} />
-          Misurazioni
+          {copy.measurements}
         </span>
 
         <span>
           <i className={styles.legendTrend} />
-          Trend 7 misurazioni
+          {copy.sevenTrend}
         </span>
       </div>
 
@@ -354,7 +336,7 @@ function WeightChart({
         className={styles.chart}
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label="Andamento del peso"
+        aria-label={copy.weightTrend}
       >
         {gridValues.map((value) => {
           const y = yFor(value);
@@ -374,7 +356,7 @@ function WeightChart({
                 textAnchor="end"
                 className={styles.axisLabel}
               >
-                {formatWeight(value)}
+                {formatWeight(value, displayLocale)}
               </text>
             </g>
           );
@@ -403,10 +385,11 @@ function WeightChart({
             className={styles.weightPoint}
           >
             <title>
-              {formatDate(item.date)}
+              {formatDate(item.date, displayLocale)}
               {": "}
               {formatWeight(
                 Number(item.weight),
+                displayLocale,
               )}
               {" kg"}
             </title>
@@ -427,7 +410,7 @@ function WeightChart({
             }
             className={styles.dateLabel}
           >
-            {formatDate(items[index].date)}
+            {formatDate(items[index].date, displayLocale)}
           </text>
         ))}
       </svg>
@@ -442,10 +425,13 @@ function HeroWeightChart({
   items: WeightEntry[];
   range: RangeKey;
 }) {
+  const { locale } = useI18n();
+  const copy = progressCopy[locale];
+  const displayLocale = progressLocale[locale];
   if (items.length < 2) {
     return (
       <div className={styles.heroChartEmpty}>
-        Registra almeno due pesate per vedere la direzione.
+        {copy.needTwo}
       </div>
     );
   }
@@ -467,29 +453,29 @@ function HeroWeightChart({
 
   const rangeTitle =
     range === "30"
-      ? "ultimi 30 giorni"
+      ? copy.last30
       : range === "90"
-        ? "ultimi 90 giorni"
+        ? copy.last90
         : range === "180"
-          ? "ultimi 6 mesi"
-          : "tutto il periodo";
+          ? copy.last6Months
+          : copy.wholePeriod;
 
   const rangeStartLabel =
     range === "30"
-      ? "30 giorni fa"
+      ? `30 ${copy.daysAgo}`
       : range === "90"
-        ? "90 giorni fa"
+        ? `90 ${copy.daysAgo}`
         : range === "180"
-          ? "6 mesi fa"
-          : formatDate(items[0].date);
+          ? `6 ${copy.monthsAgo}`
+          : formatDate(items[0].date, displayLocale);
 
   return (
     <div className={styles.heroChartWrap}>
       <div className={styles.heroChartTitle}>
-        <span>Andamento peso · {rangeTitle}</span>
-        <strong>{formatWeight(values[0])} → {formatWeight(values[values.length - 1])} kg</strong>
+        <span>{copy.weightHeading} · {rangeTitle}</span>
+        <strong>{formatWeight(values[0], displayLocale)} → {formatWeight(values[values.length - 1], displayLocale)} kg</strong>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Trend del peso negli ultimi 90 giorni">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${copy.weightTrend}: ${rangeTitle}`}>
         {[0.25, 0.5, 0.75].map((ratio) => (
           <line key={ratio} x1={padding} x2={width - padding} y1={height * ratio} y2={height * ratio} className={styles.heroGridLine} />
         ))}
@@ -500,7 +486,7 @@ function HeroWeightChart({
       </svg>
       <div className={styles.heroChartDates}>
         <span>{rangeStartLabel}</span>
-        <span>Oggi</span>
+        <span>{copy.today}</span>
       </div>
     </div>
   );
@@ -513,6 +499,9 @@ function DailyMetricsChart({
   items: NutritionProgressItem[];
   metric: NutritionMetric;
 }) {
+  const { locale } = useI18n();
+  const copy = progressCopy[locale];
+  const displayLocale = progressLocale[locale];
   const relevantItems =
     metric === "activity"
       ? items.filter(
@@ -528,10 +517,10 @@ function DailyMetricsChart({
     return (
       <div className={styles.emptyChart}>
         <strong>
-          Nessun dato nel periodo.
+          {copy.noPeriodData}
         </strong>
         <span>
-          Quando registri i tuoi dati li vedrai qui.
+          {copy.loggedDataHere}
         </span>
       </div>
     );
@@ -699,34 +688,34 @@ function DailyMetricsChart({
           <>
             <span>
               <i className={styles.legendProtein} />
-              Proteine
+              {copy.protein}
             </span>
 
             <span>
               <i className={styles.legendCarbs} />
-              Carboidrati
+              {copy.carbs}
             </span>
 
             <span>
               <i className={styles.legendFat} />
-              Grassi
+              {copy.fat}
             </span>
           </>
         ) : metric === "meals" ? (
           <>
             <span>
               <i className={styles.legendBreakfast} />
-              Colazione
+              {copy.breakfast}
             </span>
 
             <span>
               <i className={styles.legendLunch} />
-              Pranzo
+              {copy.lunch}
             </span>
 
             <span>
               <i className={styles.legendDinner} />
-              Cena
+              {copy.dinner}
             </span>
 
             <span>
@@ -759,14 +748,14 @@ function DailyMetricsChart({
             <span>
               <i className={styles.legendCalories} />
               {metric === "calories"
-                ? "Consumate"
-                : metricLabel(metric)}
+                ? copy.consumed
+                : metricLabel(metric, copy)}
             </span>
 
             {metric === "calories" ? (
               <span>
                 <i className={styles.legendBudget} />
-                Budget
+                {copy.budget}
               </span>
             ) : null}
           </>
@@ -778,7 +767,7 @@ function DailyMetricsChart({
           className={styles.chart}
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={metricLabel(metric)}
+          aria-label={metricLabel(metric, copy)}
         >
           {gridValues.map((value) => {
             const y = yFor(value);
@@ -869,8 +858,8 @@ function DailyMetricsChart({
                       }
                     >
                       <title>
-                        {formatDate(item.date)}
-                        {": Proteine "}
+                        {formatDate(item.date, displayLocale)}
+                        {`: ${copy.protein} `}
                         {Math.round(protein)}
                         {" g"}
                       </title>
@@ -889,8 +878,8 @@ function DailyMetricsChart({
                       }
                     >
                       <title>
-                        {formatDate(item.date)}
-                        {": Carboidrati "}
+                        {formatDate(item.date, displayLocale)}
+                        {`: ${copy.carbs} `}
                         {Math.round(carbs)}
                         {" g"}
                       </title>
@@ -910,8 +899,8 @@ function DailyMetricsChart({
                       }
                     >
                       <title>
-                        {formatDate(item.date)}
-                        {": Grassi "}
+                        {formatDate(item.date, displayLocale)}
+                        {`: ${copy.fat} `}
                         {Math.round(fat)}
                         {" g"}
                       </title>
@@ -984,8 +973,8 @@ function DailyMetricsChart({
                       }
                     >
                       <title>
-                        {formatDate(item.date)}
-                        {": Colazione "}
+                        {formatDate(item.date, displayLocale)}
+                        {`: ${copy.breakfast} `}
                         {Math.round(breakfast)}
                         {" kcal"}
                       </title>
@@ -1004,8 +993,8 @@ function DailyMetricsChart({
                       }
                     >
                       <title>
-                        {formatDate(item.date)}
-                        {": Pranzo "}
+                        {formatDate(item.date, displayLocale)}
+                        {`: ${copy.lunch} `}
                         {Math.round(lunch)}
                         {" kcal"}
                       </title>
@@ -1024,8 +1013,8 @@ function DailyMetricsChart({
                       }
                     >
                       <title>
-                        {formatDate(item.date)}
-                        {": Cena "}
+                        {formatDate(item.date, displayLocale)}
+                        {`: ${copy.dinner} `}
                         {Math.round(dinner)}
                         {" kcal"}
                       </title>
@@ -1046,7 +1035,7 @@ function DailyMetricsChart({
                         }
                       >
                         <title>
-                          {formatDate(item.date)}
+                          {formatDate(item.date, displayLocale)}
                           {": Altro "}
                           {Math.round(other)}
                           {" kcal"}
@@ -1101,6 +1090,7 @@ function DailyMetricsChart({
                   <title>
                     {formatDate(
                       item.date,
+                      displayLocale,
                     )}
                     {": "}
                     {Math.round(value)}
@@ -1108,8 +1098,8 @@ function DailyMetricsChart({
                     {metricUnit(metric)}
                     {metric === "activity"
                       ? value < 500
-                        ? " · fascia < 500"
-                        : " · fascia ≥ 500"
+                        ? ` · ${locale === "it" ? "fascia" : locale === "en" ? "range" : locale === "nl" ? "bereik" : "plage"} < 500`
+                        : ` · ${locale === "it" ? "fascia" : locale === "en" ? "range" : locale === "nl" ? "bereik" : "plage"} ≥ 500`
                       : ""}
                   </title>
                 </rect>
@@ -1149,6 +1139,7 @@ function DailyMetricsChart({
                 {formatDate(
                   relevantItems[index]
                     .date,
+                  displayLocale,
                 )}
               </text>
             ),
@@ -1160,6 +1151,17 @@ function DailyMetricsChart({
 }
 
 export default function ProgressPage() {
+  const { locale } = useI18n();
+  const copy = progressCopy[locale];
+  const insightText = insightCopy[locale];
+  const displayLocale = progressLocale[locale];
+  const zeroDirection = locale === "en"
+    ? { down: "It's going down. Don't get carried away.", up: "It's going up. Charts have no tact.", flat: "Holding steady. At least someone is.", note: "One data point looks dramatic. A trend at least tries to say something." }
+    : locale === "nl"
+      ? { down: "Het daalt. Doe maar rustig.", up: "Het stijgt. Grafieken hebben geen tact.", flat: "Het blijft staan. Tenminste iemand.", note: "Eén meetpunt maakt indruk. Een trend probeert tenminste iets te zeggen." }
+      : locale === "fr"
+        ? { down: "Ça baisse. Ne vous emballez pas.", up: "Ça monte. Les graphiques manquent de tact.", flat: "Ça ne bouge pas. Au moins quelqu'un.", note: "Une donnée fait son effet. Une tendance essaie au moins de dire quelque chose." }
+        : { down: "Sta scendendo. Non fare il fenomeno.", up: "Sta salendo. I grafici non hanno tatto.", flat: "Fermo lì. Almeno qualcuno.", note: "Un dato fa scena. Il trend almeno prova a dire qualcosa." };
   const { accessToken } = useAuth();
   const { experienceMode } = useExperienceMode();
   const zero = experienceMode === "zero";
@@ -1242,7 +1244,7 @@ export default function ProgressPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Non riesco a caricare le calorie.",
+          : copy.loadCaloriesError,
       );
     } finally {
       setNutritionLoading(false);
@@ -1271,7 +1273,7 @@ export default function ProgressPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Non riesco a caricare il peso.",
+          : copy.loadWeightError,
       );
     } finally {
       setLoading(false);
@@ -1553,16 +1555,11 @@ export default function ProgressPage() {
           stats.change < 0;
 
         result.push({
-          eyebrow: "Peso",
+          eyebrow: insightText.weight,
           title: decreasing
-            ? `Peso in calo di ${formatWeight(
-                Math.abs(stats.change),
-              )} kg`
-            : `Peso in aumento di ${formatWeight(
-                Math.abs(stats.change),
-              )} kg`,
-          body:
-            "Variazione tra la prima e l’ultima misurazione del periodo selezionato.",
+            ? insightText.weightDown(formatWeight(Math.abs(stats.change), displayLocale))
+            : insightText.weightUp(formatWeight(Math.abs(stats.change), displayLocale)),
+          body: insightText.weightBody,
           tone: "navy",
         });
       }
@@ -1586,15 +1583,15 @@ export default function ProgressPage() {
           );
 
         result.push({
-          eyebrow: "Budget",
+          eyebrow: insightText.budget,
           title:
             percentage >= 70
-              ? `${within} giorni su ${total} entro budget`
-              : `${total - within} giorni su ${total} sopra budget`,
+              ? insightText.within(within, total)
+              : insightText.over(total - within, total),
           body:
             percentage >= 70
-              ? `Nel ${percentage}% dei giorni con un budget disponibile sei rimasto entro il valore calcolato da SanoSync.`
-              : `Sei rimasto entro budget nel ${percentage}% dei giorni per cui era disponibile un confronto.`,
+              ? insightText.budgetGood(percentage)
+              : insightText.budgetOther(percentage),
           tone:
             percentage >= 70
               ? "navy"
@@ -1608,22 +1605,22 @@ export default function ProgressPage() {
       if (mealDistributionStats) {
         const meals = [
           {
-            label: "colazione",
+            label: insightText.mealLabels[0],
             value:
               mealDistributionStats.breakfast,
           },
           {
-            label: "pranzo",
+            label: insightText.mealLabels[1],
             value:
               mealDistributionStats.lunch,
           },
           {
-            label: "cena",
+            label: insightText.mealLabels[2],
             value:
               mealDistributionStats.dinner,
           },
           {
-            label: "altri pasti",
+            label: insightText.mealLabels[3],
             value:
               mealDistributionStats.other,
           },
@@ -1639,21 +1636,9 @@ export default function ProgressPage() {
           dominant.value >= 35
         ) {
           result.push({
-            eyebrow: "Distribuzione",
-            title: `${
-              dominant.label === "cena"
-                ? "La cena"
-                : dominant.label === "pranzo"
-                  ? "Il pranzo"
-                  : dominant.label ===
-                      "colazione"
-                    ? "La colazione"
-                    : "Gli altri pasti"
-            } concentra il ${Math.round(
-              dominant.value,
-            )}% delle calorie`,
-            body:
-              "È il momento della giornata che pesa maggiormente sulla distribuzione calorica del periodo selezionato.",
+            eyebrow: insightText.distribution,
+            title: insightText.mealTitle(dominant.label, Math.round(dominant.value)),
+            body: insightText.mealBody,
             tone:
               dominant.value >= 50
                 ? "coral"
@@ -1670,12 +1655,9 @@ export default function ProgressPage() {
         macroStats.protein > 0
       ) {
         result.push({
-          eyebrow: "Proteine",
-          title: `${roundKcal(
-            macroStats.protein,
-          )} g di proteine al giorno`,
-          body:
-            "Media giornaliera calcolata sui giorni registrati nel periodo nutrizionale selezionato.",
+          eyebrow: insightText.protein,
+          title: insightText.proteinTitle(roundKcal(macroStats.protein, displayLocale)),
+          body: insightText.proteinBody,
           tone: "navy",
         });
       }
@@ -1693,17 +1675,9 @@ export default function ProgressPage() {
           metricStats.activeDays;
 
         result.push({
-          eyebrow: "Attività",
-          title: `${metricStats.activeDays} ${
-            metricStats.activeDays === 1
-              ? "giorno attivo"
-              : "giorni attivi"
-          } nel periodo`,
-          body: `${roundKcal(
-            metricStats.total,
-          )} kcal registrate complessivamente · ${roundKcal(
-            averageActivity,
-          )} kcal per giorno attivo.`,
+          eyebrow: insightText.activity,
+          title: insightText.activityTitle(metricStats.activeDays),
+          body: insightText.activityBody(roundKcal(metricStats.total, displayLocale), roundKcal(averageActivity, displayLocale)),
           tone:
             averageActivity >= 500
               ? "navy"
@@ -1719,6 +1693,8 @@ export default function ProgressPage() {
       macroStats,
       metricStats,
       nutritionMetric,
+      displayLocale,
+      insightText,
     ]);
 
   async function saveWeight() {
@@ -1734,7 +1710,7 @@ export default function ProgressPage() {
       numericWeight <= 0
     ) {
       setError(
-        "Inserisci un peso valido.",
+        copy.invalidWeight,
       );
       return;
     }
@@ -1757,7 +1733,7 @@ export default function ProgressPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Non riesco a salvare il peso.",
+          : copy.saveWeightError,
       );
     } finally {
       setSaving(false);
@@ -1772,19 +1748,19 @@ export default function ProgressPage() {
       <header className={styles.header}>
         <div>
           <p className={styles.brand}>
-            Progressi
+            {copy.progress}
           </p>
 
           <h1>
             {zero
-              ? "Vediamo cosa dicono i numeri."
-              : "La tua direzione"}
+              ? copy.zeroTitle
+              : copy.title}
           </h1>
 
           <p className={styles.subtitle}>
             {zero
-              ? "I dati non giudicano. Si limitano a ricordare tutto."
-              : "Guarda la direzione, non il singolo numero."}
+              ? copy.zeroSubtitle
+              : copy.subtitle}
           </p>
         </div>
       </header>
@@ -1792,7 +1768,7 @@ export default function ProgressPage() {
       {error ? (
         <section className={styles.errorCard}>
           <strong>
-            Qualcosa non ha funzionato.
+            {copy.errorTitle}
           </strong>
           <p>{error}</p>
         </section>
@@ -1801,12 +1777,12 @@ export default function ProgressPage() {
       <section className={styles.hero}>
         <div className={styles.heroSummary}>
           <p className={styles.kicker}>
-            Peso attuale
+            {copy.currentWeight}
           </p>
 
           <div className={styles.currentWeight}>
             {stats
-              ? formatWeight(stats.latest)
+              ? formatWeight(stats.latest, displayLocale)
               : "—"}
             <span>kg</span>
           </div>
@@ -1822,11 +1798,11 @@ export default function ProgressPage() {
               }
             >
               {stats.change > 0 ? "+" : ""}
-              {formatWeight(stats.change)} kg nel periodo
+              {formatWeight(stats.change, displayLocale)} kg {copy.inPeriod}
             </p>
           ) : (
             <p className={styles.muted}>
-              Nessuna misurazione disponibile.
+              {copy.noMeasurement}
             </p>
           )}
           <div className={styles.directionNote}>
@@ -1835,18 +1811,18 @@ export default function ProgressPage() {
               <strong>
                 {zero
                   ? stats && stats.change < 0
-                    ? "Sta scendendo. Non fare il fenomeno."
+                    ? zeroDirection.down
                     : stats && stats.change > 0
-                      ? "Sta salendo. I grafici non hanno tatto."
-                      : "Fermo lì. Almeno qualcuno."
+                      ? zeroDirection.up
+                      : zeroDirection.flat
                   : stats && stats.change < 0
-                    ? "Direzione costante"
-                    : "Il trend prende forma"}
+                    ? copy.down
+                    : copy.forming}
               </strong>
               <small>
                 {zero
-                  ? "Un dato fa scena. Il trend almeno prova a dire qualcosa."
-                  : "Conta la direzione, non la singola giornata."}
+                  ? zeroDirection.note
+                  : copy.directionNote}
               </small>
             </div>
           </div>
@@ -1865,7 +1841,7 @@ export default function ProgressPage() {
           }}
         >
           <label>
-            Data
+            {copy.date}
             <input
               type="date"
               value={date}
@@ -1876,7 +1852,7 @@ export default function ProgressPage() {
           </label>
 
           <label>
-            Peso
+            {copy.weight}
             <div className={styles.weightInput}>
               <input
                 type="text"
@@ -1896,65 +1872,65 @@ export default function ProgressPage() {
             disabled={saving}
           >
             {saving
-              ? "Salvo…"
-              : "Registra peso"}
+              ? copy.saving
+              : copy.saveWeight}
           </button>
         </form>
       </section>
 
       <section className={styles.topStatsGrid}>
-        <article><span className={styles.statIcon}>↗</span><div><strong>{stats ? `${stats.change > 0 ? "+" : ""}${formatWeight(stats.change)} kg` : "—"}</strong><span>Variazione nel periodo</span></div></article>
-        <article><span className={styles.statIcon}>▣</span><div><strong>{stats?.count ?? 0}</strong><span>Misurazioni totali</span></div></article>
-        <article><span className={`${styles.statIcon} ${styles.statIconWarm}`}>◎</span><div><strong>{nutritionStats?.days_with_budget ? `${nutritionStats.days_within_budget}/${nutritionStats.days_with_budget}` : "—"}</strong><span>Giorni nel budget</span></div></article>
-        <article><span className={`${styles.statIcon} ${styles.statIconLilac}`}>◇</span><div><strong>{macroStats ? `${roundKcal(macroStats.protein)} g` : "—"}</strong><span>Proteine medie</span></div></article>
+        <article><span className={styles.statIcon}>↗</span><div><strong>{stats ? `${stats.change > 0 ? "+" : ""}${formatWeight(stats.change, displayLocale)} kg` : "—"}</strong><span>{copy.periodChange}</span></div></article>
+        <article><span className={styles.statIcon}>▣</span><div><strong>{stats?.count ?? 0}</strong><span>{copy.measurementsTotal}</span></div></article>
+        <article><span className={`${styles.statIcon} ${styles.statIconWarm}`}>◎</span><div><strong>{nutritionStats?.days_with_budget ? `${nutritionStats.days_within_budget}/${nutritionStats.days_with_budget}` : "—"}</strong><span>{copy.daysInBudget}</span></div></article>
+        <article><span className={`${styles.statIcon} ${styles.statIconLilac}`}>◇</span><div><strong>{macroStats ? `${roundKcal(macroStats.protein, displayLocale)} g` : "—"}</strong><span>{copy.averageProtein}</span></div></article>
       </section>
 
       <section className={styles.overviewSection}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
-              La tua storia
+              {copy.yourStory}
             </p>
             <h2>
-              {zero ? "I numeri non dimenticano" : "Il quadro completo"}
+              {zero ? copy.zeroPicture : copy.completePicture}
             </h2>
             <p className={styles.sectionSubtitle}>
               {zero
-                ? "Peso, calorie e abitudini. Tutto nello stesso fascicolo."
-                : "Peso, bilancio calorico e abitudini letti insieme."}
+                ? copy.zeroStoryIntro
+                : copy.storyIntro}
             </p>
           </div>
 
           <div
             className={styles.rangeSelector}
-            aria-label="Periodo"
+            aria-label={copy.period}
           >
             {RANGE_OPTIONS.map((option) => (
               <button
-                key={option.key}
+                key={option}
                 type="button"
                 className={
-                  range === option.key
+                  range === option
                     ? styles.rangeActive
                     : ""
                 }
                 onClick={() => {
-                  setRange(option.key);
+                  setRange(option);
                 }}
               >
-                {option.label}
+                {option === "180" ? copy.months6 : option === "all" ? copy.all : `${option}${locale === "it" ? "g" : locale === "fr" ? "j" : "d"}`}
               </button>
             ))}
           </div>
         </div>
         <div className={styles.overviewGrid}>
           <div className={styles.overviewChart}>
-            {loading ? <div className={styles.loadingChart}>Carico lo storico…</div> : <WeightChart items={visibleItems} />}
+            {loading ? <div className={styles.loadingChart}>{copy.loadingHistory}</div> : <WeightChart items={visibleItems} />}
           </div>
           <aside className={styles.insightPanel}>
-            <p className={styles.kicker}>Insight</p>
+            <p className={styles.kicker}>{copy.insight}</p>
             <h3>
-              {zero ? "Cosa non è andato storto" : "Cosa sta funzionando"}
+              {zero ? copy.zeroWorking : copy.working}
             </h3>
             {progressInsights.length ? progressInsights.slice(0, 3).map((insight, index) => (
               <article key={`${insight.eyebrow}-summary-${index}`}>
@@ -1964,11 +1940,11 @@ export default function ProgressPage() {
             )) : (
               <p className={styles.muted}>
                 {zero
-                  ? "Continua a registrare. Prima o poi i dati avranno qualcosa da confessare."
-                  : "Continua a registrare: presto troverai qui una lettura dei tuoi progressi."}
+                  ? copy.zeroKeepLogging
+                  : copy.keepLogging}
               </p>
             )}
-            <Link href="#nutrition-detail" className={styles.insightLink}>Vedi dettaglio nutrizione →</Link>
+            <Link href="#nutrition-detail" className={styles.insightLink}>{copy.nutritionDetail} →</Link>
           </aside>
         </div>
       </section>
@@ -1977,20 +1953,21 @@ export default function ProgressPage() {
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
-              {zero ? "I conti" : "Andamento"}
+              {zero ? copy.zeroTrend : copy.trend}
             </p>
 
             <h2>
               {zero
-                ? "Nutrizione, attività e altre prove"
-                : "Nutrizione & attività"}
+                ? copy.zeroNutritionActivity
+                : copy.nutritionActivity}
             </h2>
 
             <p className={styles.sectionSubtitle}>
               {zero
-                ? "Vediamo cosa hai registrato. Il resto non può testimoniare."
+                ? copy.zeroNutritionIntro
                 : metricDescription(
                     nutritionMetric,
+                    copy,
                   )}
             </p>
           </div>
@@ -1998,7 +1975,7 @@ export default function ProgressPage() {
 
         <div className={styles.analyticsControls}>
           <label>
-            <span>Visualizzazione</span>
+            <span>{copy.view}</span>
 
             <select
               value={nutritionMetric}
@@ -2012,10 +1989,10 @@ export default function ProgressPage() {
               {NUTRITION_METRICS.map(
                 (option) => (
                   <option
-                    key={option.key}
-                    value={option.key}
+                    key={option}
+                    value={option}
                   >
-                    {option.label}
+                    {metricLabel(option, copy)}
                   </option>
                 ),
               )}
@@ -2023,7 +2000,7 @@ export default function ProgressPage() {
           </label>
 
           <label>
-            <span>Periodo</span>
+            <span>{copy.period}</span>
 
             <select
               value={nutritionRange}
@@ -2040,7 +2017,7 @@ export default function ProgressPage() {
                     key={option.key}
                     value={option.key}
                   >
-                    {option.key} giorni
+                    {option.key} {copy.days}
                   </option>
                 ),
               )}
@@ -2050,7 +2027,7 @@ export default function ProgressPage() {
 
         {nutritionLoading ? (
           <div className={styles.loadingChart}>
-            Carico i tuoi dati…
+            {copy.loadingData}
           </div>
         ) : nutrition ? (
           <DailyMetricsChart
@@ -2063,19 +2040,20 @@ export default function ProgressPage() {
       {nutritionMetric === "calories" ? (
         <section className={styles.nutritionStatsGrid}>
           <article>
-            <span>Media consumata</span>
+            <span>{copy.averageConsumed}</span>
             <strong>
               {nutritionStats
                 ? `${roundKcal(
                     nutritionStats
                       .average_consumed_kcal,
+                    displayLocale,
                   )} kcal`
                 : "—"}
             </strong>
           </article>
 
           <article>
-            <span>Budget medio</span>
+            <span>{copy.averageBudget}</span>
             <strong>
               {nutritionStats
                   ?.average_budget_kcal !==
@@ -2086,13 +2064,14 @@ export default function ProgressPage() {
                 ? `${roundKcal(
                     nutritionStats
                       .average_budget_kcal,
+                    displayLocale,
                   )} kcal`
                 : "—"}
             </strong>
           </article>
 
           <article>
-            <span>Entro budget</span>
+            <span>{copy.withinBudget}</span>
             <strong>
               {nutritionStats &&
               nutritionStats.days_with_budget >
@@ -2103,7 +2082,7 @@ export default function ProgressPage() {
           </article>
 
           <article>
-            <span>Scostamento medio</span>
+            <span>{copy.averageDifference}</span>
             <strong>
               {nutritionStats
                   ?.averageDifference !==
@@ -2114,6 +2093,7 @@ export default function ProgressPage() {
                 ? `${nutritionStats.averageDifference > 0 ? "+" : ""}${roundKcal(
                     nutritionStats
                       .averageDifference,
+                    displayLocale,
                   )} kcal`
                 : "—"}
             </strong>
@@ -2122,44 +2102,48 @@ export default function ProgressPage() {
       ) : nutritionMetric === "macros" ? (
         <section className={styles.nutritionStatsGrid}>
           <article>
-            <span>Proteine medie</span>
+            <span>{copy.averageProtein}</span>
             <strong>
               {macroStats
                 ? `${roundKcal(
                     macroStats.protein,
+                    displayLocale,
                   )} g`
                 : "—"}
             </strong>
           </article>
 
           <article>
-            <span>Carboidrati medi</span>
+            <span>{copy.averageCarbs}</span>
             <strong>
               {macroStats
                 ? `${roundKcal(
                     macroStats.carbs,
+                    displayLocale,
                   )} g`
                 : "—"}
             </strong>
           </article>
 
           <article>
-            <span>Grassi medi</span>
+            <span>{copy.averageFat}</span>
             <strong>
               {macroStats
                 ? `${roundKcal(
                     macroStats.fat,
+                    displayLocale,
                   )} g`
                 : "—"}
             </strong>
           </article>
 
           <article>
-            <span>Macro medi totali</span>
+            <span>{copy.averageMacros}</span>
             <strong>
               {macroStats
                 ? `${roundKcal(
                     macroStats.total,
+                    displayLocale,
                   )} g`
                 : "—"}
             </strong>
@@ -2168,7 +2152,7 @@ export default function ProgressPage() {
       ) : nutritionMetric === "meals" ? (
         <section className={styles.nutritionStatsGrid}>
           <article>
-            <span>Colazione</span>
+            <span>{copy.breakfast}</span>
             <strong>
               {mealDistributionStats
                 ? `${Math.round(
@@ -2179,7 +2163,7 @@ export default function ProgressPage() {
           </article>
 
           <article>
-            <span>Pranzo</span>
+            <span>{copy.lunch}</span>
             <strong>
               {mealDistributionStats
                 ? `${Math.round(
@@ -2190,7 +2174,7 @@ export default function ProgressPage() {
           </article>
 
           <article>
-            <span>Cena</span>
+            <span>{copy.dinner}</span>
             <strong>
               {mealDistributionStats
                 ? `${Math.round(
@@ -2201,7 +2185,7 @@ export default function ProgressPage() {
           </article>
 
           <article>
-            <span>Altro</span>
+            <span>{copy.other}</span>
             <strong>
               {mealDistributionStats
                 ? `${Math.round(
@@ -2214,11 +2198,12 @@ export default function ProgressPage() {
       ) : (
         <section className={styles.nutritionStatsGrid}>
           <article>
-            <span>Media giornaliera</span>
+            <span>{copy.dailyAverage}</span>
             <strong>
               {metricStats
                 ? `${roundKcal(
                     metricStats.average,
+                    displayLocale,
                   )} ${metricUnit(
                     nutritionMetric,
                   )}`
@@ -2227,11 +2212,12 @@ export default function ProgressPage() {
           </article>
 
           <article>
-            <span>Totale periodo</span>
+            <span>{copy.periodTotal}</span>
             <strong>
               {metricStats
                 ? `${roundKcal(
                     metricStats.total,
+                    displayLocale,
                   )} ${metricUnit(
                     nutritionMetric,
                   )}`
@@ -2240,7 +2226,7 @@ export default function ProgressPage() {
           </article>
 
           <article>
-            <span>Giorni attivi</span>
+            <span>{copy.activeDays}</span>
             <strong>
               {metricStats
                 ? metricStats.activeDays
@@ -2249,11 +2235,12 @@ export default function ProgressPage() {
           </article>
 
           <article>
-            <span>Massimo giornaliero</span>
+            <span>{copy.dailyMaximum}</span>
             <strong>
               {metricStats
                 ? `${roundKcal(
                     metricStats.maximum,
+                    displayLocale,
                   )} ${metricUnit(
                     nutritionMetric,
                   )}`
@@ -2265,13 +2252,13 @@ export default function ProgressPage() {
       <section className={styles.consistencySection}>
         <div>
           <p className={styles.kicker}>
-            {zero ? "Sette giorni di prove" : "Costanza"}
+            {zero ? copy.zeroConsistency : copy.consistency}
           </p>
-          <h2>Gli ultimi 7 giorni</h2>
+          <h2>{copy.last7}</h2>
           <p className={styles.sectionSubtitle}>
             {zero
-              ? "Abbastanza per un trend. Troppo pochi per una leggenda."
-              : "Una settimana è fatta di direzioni, non di giornate perfette."}
+              ? copy.zeroConsistencyIntro
+              : copy.consistencyIntro}
           </p>
         </div>
         <div className={styles.consistencyDays}>
@@ -2281,12 +2268,12 @@ export default function ProgressPage() {
             return (
               <article key={`consistency-${item.date}`}>
                 <span className={`${styles.dayRing} ${styles[`dayRing_${state}`]}`}>{state === "deficit" ? "↓" : state === "surplus" ? "↑" : state === "maintenance" ? "=" : "·"}</span>
-                <strong>{new Date(`${item.date}T00:00:00`).toLocaleDateString("it-IT", { weekday: "short" })}</strong>
-                <small>{formatDate(item.date)}</small>
+                <strong>{new Date(`${item.date}T00:00:00`).toLocaleDateString(displayLocale, { weekday: "short" })}</strong>
+                <small>{formatDate(item.date, displayLocale)}</small>
               </article>
             );
           })}
-          {!nutrition?.items.length ? <p className={styles.muted}>Nessun dato disponibile per questa settimana.</p> : null}
+          {!nutrition?.items.length ? <p className={styles.muted}>{copy.noWeekData}</p> : null}
         </div>
       </section>
 
