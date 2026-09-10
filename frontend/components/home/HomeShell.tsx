@@ -4937,15 +4937,15 @@ export function HomeShell() {
                 <div
                   className={styles.conversationPreviewTop}
                 >
-                  <strong>Ho capito così</strong>
+                  <strong>{homeCopy.understood}</strong>
 
                   {conversationDayPreview.needs_review ? (
                     <span>
-                      Controlla le stime prima di registrare
+                      {homeCopy.checkEstimates}
                     </span>
                   ) : (
                     <span>
-                      Pronto da registrare
+                      {homeCopy.readyToLog}
                     </span>
                   )}
                 </div>
@@ -4984,7 +4984,7 @@ export function HomeShell() {
                               ? action.meal_type
                               : action.kind === "activity"
                                 ? action.activity_name
-                                : "Peso"}
+                                : homeCopy.weight}
                           </strong>
 
                           <span>
@@ -5019,7 +5019,7 @@ export function HomeShell() {
                                   ]
                                     .filter(Boolean)
                                     .join(" · ")
-                                : "Peso di oggi"}
+                                : homeCopy.todayWeight}
                           </span>
 
                           {action.needs_review ? (
@@ -5030,8 +5030,8 @@ export function HomeShell() {
                             >
                               {action.kind === "activity" &&
                               action.calories_estimated
-                                ? "Consumo energetico stimato"
-                                : "Dato da controllare"}
+                                ? homeCopy.estimatedEnergy
+                                : homeCopy.reviewData}
                             </small>
                           ) : null}
                         </div>
@@ -5079,11 +5079,11 @@ export function HomeShell() {
                     disabled={conversationConfirming}
                   >
                     {conversationConfirming
-                      ? "Registro..."
+                      ? homeCopy.logging
                       : conversationDayPreview.actions.length ===
                           1
-                        ? "Conferma e registra"
-                        : `Conferma ${conversationDayPreview.actions.length} registrazioni`}
+                        ? homeCopy.confirmAndLog
+                        : homeCopy.confirmLogs(conversationDayPreview.actions.length)}
                   </button>
 
                   <button
@@ -5093,7 +5093,7 @@ export function HomeShell() {
                     }
                     disabled={conversationConfirming}
                   >
-                    Modifica testo
+                    {homeCopy.editText}
                   </button>
                 </div>
               </div>
@@ -5102,11 +5102,11 @@ export function HomeShell() {
             {conversationPreview ? (
               <div className={styles.conversationPreview}>
                 <div className={styles.conversationPreviewTop}>
-                  <strong>Ho capito così</strong>
+                  <strong>{homeCopy.understood}</strong>
 
                   {conversationPreview.needs_review ? (
                     <span>
-                      Controlla le quantità stimate
+                      {homeCopy.checkQuantities}
                     </span>
                   ) : null}
                 </div>
@@ -5124,7 +5124,7 @@ export function HomeShell() {
                             {formatNumber(item.quantity)}{" "}
                             {item.unit}
                             {item.uncertainty
-                              ? " · stimato"
+                              ? ` · ${homeCopy.estimated}`
                               : ""}
                           </span>
                         </div>
@@ -5149,15 +5149,15 @@ export function HomeShell() {
                     {formatNumber(
                       conversationPreview.totals.protein,
                     )}{" "}
-                    g proteine ·{" "}
+                    {homeCopy.proteinUnit} ·{" "}
                     {formatNumber(
                       conversationPreview.totals.carbs,
                     )}{" "}
-                    g carbo ·{" "}
+                    {homeCopy.carbsUnit} ·{" "}
                     {formatNumber(
                       conversationPreview.totals.fat,
                     )}{" "}
-                    g grassi
+                    {homeCopy.fatUnit}
                   </span>
                 </div>
 
@@ -5174,7 +5174,7 @@ export function HomeShell() {
                     disabled={conversationConfirming}
                   >
                     {conversationConfirming
-                      ? "Registro..."
+                      ? homeCopy.logging
                       : "Conferma e registra"}
                   </button>
 
@@ -5185,8 +5185,8 @@ export function HomeShell() {
                     }
                   >
                     {conversationMode === "photo"
-                      ? "Cambia foto"
-                      : "Modifica testo"}
+                      ? homeCopy.changePhoto
+                      : "{homeCopy.editText}"}
                   </button>
                 </div>
               </div>
@@ -5220,29 +5220,27 @@ export function HomeShell() {
                       }
                     >
                       <div>
-                        <span>AGGIUNGI A OGGI</span>
+                        <span>{homeCopy.quickAddToday}</span>
 
                         <h3 id="quick-add-title">
                           {quickAddMode === "meal"
                             ? quickAddMealSlot
-                              ? `Aggiungi a ${mealLabel(
-                                  quickAddMealSlot,
-                                ).toLowerCase()}`
-                              : "Aggiungi un pasto"
+                              ? homeCopy.addToMeal(mealLabel(quickAddMealSlot))
+                              : homeCopy.addMeal
                             : quickAddMode ===
                                 "activity"
-                              ? "Registra attività"
-                              : "Registra peso"}
+                              ? homeCopy.logActivity
+                              : homeCopy.logWeight}
                         </h3>
 
                         <p>
-                          Tutto senza lasciare la Home.
+                          {homeCopy.withoutLeavingHome}
                         </p>
                       </div>
 
                       <button
                         type="button"
-                        aria-label="Chiudi"
+                        aria-label={homeCopy.close}
                         onClick={
                           closeUnifiedQuickAdd
                         }
@@ -5256,16 +5254,16 @@ export function HomeShell() {
                         styles.quickAddTabs
                       }
                       role="tablist"
-                      aria-label="Tipo di registrazione"
+                      aria-label={homeCopy.logType}
                     >
                       {[
-                        ["meal", "🍽️", "Pasto"],
+                        ["meal", "🍽️", homeCopy.meal],
                         [
                           "activity",
                           "🏃",
-                          "Attività",
+                          homeCopy.activity,
                         ],
-                        ["weight", "⚖️", "Peso"],
+                        ["weight", "⚖️", homeCopy.weight],
                       ].map(
                         ([
                           mode,
@@ -5316,7 +5314,7 @@ export function HomeShell() {
                         >
                           <label>
                             <span>
-                              Scegli un alimento
+                              {homeCopy.chooseFood}
                             </span>
 
                             <select
@@ -5331,7 +5329,7 @@ export function HomeShell() {
                               }}
                             >
                               <option value="">
-                                Seleziona da dispensa o recenti…
+                                {homeCopy.selectPantryRecent}
                               </option>
 
                               {knownAlternates.some(
@@ -5343,7 +5341,7 @@ export function HomeShell() {
                                     quickAddMealSlot,
                                   ),
                               ) ? (
-                                <optgroup label="🏠 Dispensa · porzioni cucinate">
+                                <optgroup label={homeCopy.cookedPortions}>
                                   {knownAlternates
                                     .filter(
                                       (item) =>
@@ -5376,7 +5374,7 @@ export function HomeShell() {
                                     quickAddMealSlot,
                                   ),
                               ) ? (
-                                <optgroup label="🏠 Dispensa · alimenti">
+                                <optgroup label={homeCopy.pantryFoods}>
                                   {knownAlternates
                                     .filter(
                                       (item) =>
@@ -5410,7 +5408,7 @@ export function HomeShell() {
                                     quickAddMealSlot,
                                   ),
                               ) ? (
-                                <optgroup label="🕘 Consumati di recente">
+                                <optgroup label={homeCopy.recentlyConsumed}>
                                   {knownAlternates
                                     .filter(
                                       (item) =>
@@ -5448,7 +5446,7 @@ export function HomeShell() {
                               value={
                                 alternateName
                               }
-                              placeholder="Cerca o scrivi cosa hai mangiato…"
+                              placeholder={homeCopy.foodPlaceholder}
                               onChange={(event) => {
                                 updateQuickMealName(
                                   event.target.value,
@@ -5562,7 +5560,7 @@ export function HomeShell() {
                             </label>
 
                             <label>
-                              <span>Grassi</span>
+                              <span>{homeCopy.fats}</span>
                               <input
                                 type="number"
                                 min="0"
@@ -5617,8 +5615,8 @@ export function HomeShell() {
                             }}
                           >
                             {savingAlternate
-                              ? "Registro…"
-                              : "Aggiungi al pasto"}
+                              ? homeCopy.logging
+                              : homeCopy.addToMealButton}
                           </button>
                         </div>
                       </>
@@ -5652,7 +5650,7 @@ export function HomeShell() {
                         >
                           <label>
                             <span>
-                              Peso di oggi (kg)
+                              {homeCopy.todayWeightKg}
                             </span>
                             <input
                               type="text"
@@ -5717,10 +5715,10 @@ export function HomeShell() {
                             }}
                           >
                             {weightQuickAddSaving
-                              ? "Salvo…"
+                              ? homeCopy.savingShort
                               : weightQuickAddEditingEntry
-                                ? "Aggiorna peso"
-                                : "Registra peso"}
+                                ? homeCopy.updateWeight
+                                : homeCopy.logWeight}
                           </button>
                         </div>
                       </>
@@ -5750,19 +5748,19 @@ export function HomeShell() {
                 <p className={styles.kicker}>
                   {dailyDateLabel(selectedLogDate)}
                 </p>
-                <h2>Resoconto giornaliero</h2>
+                <h2>{homeCopy.dailySummary}</h2>
                 <p className={styles.dailySummarySubtitle}>
-                  Pasti e attività, tutto in un unico elenco.
+                  {homeCopy.dailySummaryIntro}
                 </p>
               </div>
 
               <div
                 className={styles.dailyDateControl}
-                aria-label="Data del resoconto giornaliero"
+                aria-label={homeCopy.summaryDate}
               >
                 <button
                   type="button"
-                  aria-label="Giorno precedente"
+                  aria-label={homeCopy.previousDay}
                   onClick={() =>
                     setSelectedLogDate((current) =>
                       shiftIsoDate(current, -1),
@@ -5777,7 +5775,7 @@ export function HomeShell() {
                     type="date"
                     value={selectedLogDate}
                     max={todayIso()}
-                    aria-label="Scegli la data del resoconto"
+                    aria-label={homeCopy.chooseSummaryDate}
                     onChange={(event) => {
                       if (event.target.value) {
                         setSelectedLogDate(event.target.value);
@@ -5802,7 +5800,7 @@ export function HomeShell() {
               <details className={styles.dailyAddMenu}>
                 <summary className={styles.addMealFab}>
                   <span aria-hidden="true">+</span>
-                  <span>Aggiungi</span>
+                  <span>{homeCopy.add}</span>
                   <span
                     className={styles.dailyAddChevron}
                     aria-hidden="true"
@@ -5862,7 +5860,7 @@ export function HomeShell() {
                     }}
                   >
                     <span aria-hidden="true">🏃</span>
-                    Attività
+                    {homeCopy.activity}
                   </button>
 
                   <button
@@ -5879,7 +5877,7 @@ export function HomeShell() {
                     }}
                   >
                     <span aria-hidden="true">⚖️</span>
-                    Peso
+                    {homeCopy.weight}
                   </button>
                 </div>
               </details>
@@ -5899,7 +5897,7 @@ export function HomeShell() {
               <span
                 className={styles.homePantryCtaCopy}
               >
-                <strong>Dispensa</strong>
+                <strong>{homeCopy.pantry}</strong>
 
                 <span>
                   {pantryHomeTotalItems > 0 &&
@@ -5925,14 +5923,14 @@ export function HomeShell() {
                               ? "porzione pronta"
                               : "porzioni pronte"
                           }`
-                        : "Dispensa vuota"}
+                        : homeCopy.emptyPantry}
                 </span>
               </span>
 
               <span
                 className={styles.homePantryCtaAction}
               >
-                Apri dispensa
+                {homeCopy.openPantry}
                 <span aria-hidden="true">→</span>
               </span>
             </a>
@@ -5948,11 +5946,11 @@ export function HomeShell() {
                   </span>
 
                   <span className={styles.dailyEntryMain}>
-                    <strong>Attività di oggi</strong>
+                    <strong>{homeCopy.todayActivity}</strong>
                     <span>
                       {summaryActivities.length === 1
                         ? summaryActivities[0].activity_name
-                        : `${summaryActivities.length} attività registrate`}
+                        : homeCopy.loggedActivities(summaryActivities.length)}
                     </span>
                   </span>
 
@@ -5962,7 +5960,7 @@ export function HomeShell() {
 
                   <span
                     className={styles.dailyEntryDone}
-                    aria-label="Registrata"
+                    aria-label={homeCopy.logged}
                   >
                     ✓
                   </span>
@@ -5994,7 +5992,7 @@ export function HomeShell() {
                             ? `${Math.round(
                                 activity.duration_seconds / 60,
                               )} min`
-                            : "Attività registrata"}
+                            : homeCopy.loggedActivity}
                           {activity.distance_meters
                             ? ` · ${(
                                 activity.distance_meters / 1000
@@ -6025,7 +6023,7 @@ export function HomeShell() {
                     }}
                   >
                     <span aria-hidden="true">+</span>
-                    Aggiungi attività
+                    {homeCopy.addActivity}
                   </button>
                 </div>
               </details>
@@ -6332,7 +6330,7 @@ export function HomeShell() {
                                   ),
                                 )}
                               </strong>
-                              <span>Proteine</span>
+                              <span>{homeCopy.proteins}</span>
                             </div>
 
                             <div className={styles.nutritionItem}>
@@ -6348,7 +6346,7 @@ export function HomeShell() {
                                   ),
                                 )}
                               </strong>
-                              <span>Carboidrati</span>
+                              <span>{homeCopy.carbs}</span>
                             </div>
 
                             <div className={styles.nutritionItem}>
@@ -6364,7 +6362,7 @@ export function HomeShell() {
                                   ),
                                 )}
                               </strong>
-                              <span>Grassi</span>
+                              <span>{homeCopy.fats}</span>
                             </div>
                           </div>
                         ) : null}
@@ -6535,7 +6533,7 @@ export function HomeShell() {
                                   <span>
                                     {simpleMealEditNutrition()
                                       .fat.toFixed(1)}{" "}
-                                    g grassi
+                                    {homeCopy.fatUnit}
                                   </span>
                                 </div>
                               </>
@@ -6610,7 +6608,7 @@ export function HomeShell() {
                                 <span>
                                   {mealEditNutrition()
                                     .fat.toFixed(1)}{" "}
-                                  g grassi
+                                  {homeCopy.fatUnit}
                                 </span>
                               </div>
                             ) : null}
@@ -6646,7 +6644,7 @@ export function HomeShell() {
                                 }}
                               >
                                 {savingMealEdit
-                                  ? "Salvo…"
+                                  ? homeCopy.savingShort
                                   : "Salva modifiche"}
                               </button>
 
@@ -7183,7 +7181,7 @@ export function HomeShell() {
                                 }}
                               >
                                 {savingAlternate
-                                  ? "Salvo…"
+                                  ? homeCopy.savingShort
                                   : "Salva"}
                               </button>
 
@@ -7301,7 +7299,7 @@ export function HomeShell() {
                       >
                         {committingIndex ===
                         dinnerOptions.options.indexOf(option)
-                          ? "Registro…"
+                          ? homeCopy.logging
                           : "Scelgo questa"}
                       </button>
                     </article>
@@ -7626,7 +7624,7 @@ export function HomeShell() {
                       disabled={weightQuickAddSaving}
                     >
                       {weightQuickAddSaving
-                        ? "Salvo…"
+                        ? homeCopy.savingShort
                         : weightQuickAddEditingEntry
                           ? "Aggiorna"
                           : "Registra"}
