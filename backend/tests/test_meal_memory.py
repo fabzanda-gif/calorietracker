@@ -38,7 +38,9 @@ def predict(meals, day_logs=None, *, context=None):
 def test_no_history_is_unknown():
     result = predict([])
 
-    assert result["state"] == "unknown"
+    assert result["state"] == "predicted"
+    assert result["value"] == "Colazione Casa"
+    assert result["confidence_level"] == "low"
     assert result["value"] is None
     assert result["estimated_carbs_g"] is None
     assert result["estimated_fat_g"] is None
@@ -58,6 +60,17 @@ def test_one_matching_meal_is_low_confidence():
     assert result["value"] == "Colazione Ufficio"
     assert result["confidence_level"] == "low"
     assert result["confidence"] == 1.0
+
+
+def test_two_recent_matching_meals_are_medium_confidence():
+    result = predict([
+        {"date": "2026-08-30", "meal_type": "Colazione", "name": "Yogurt e frutta"},
+        {"date": "2026-08-31", "meal_type": "Colazione", "name": "Yogurt e frutta"},
+    ])
+
+    assert result["value"] == "Yogurt e frutta"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["observations"] == 2
 
 
 def test_three_identical_weekly_meals_are_medium_confidence():
@@ -82,15 +95,16 @@ def test_four_recent_identical_weekly_meals_are_high_confidence():
     assert result["evidence"]["recent_matches"] == 4
 
 
-def test_only_same_weekday_is_considered():
+def test_sparse_weekday_history_falls_back_to_recent_meals():
     result = predict([
         {"date": "2026-08-24", "meal_type": "Colazione", "name": "Casa"},
         {"date": "2026-08-25", "meal_type": "Colazione", "name": "Ufficio"},
         {"date": "2026-08-26", "meal_type": "Colazione", "name": "Casa"},
     ])
 
-    assert result["value"] == "Ufficio"
-    assert result["evidence"]["observations"] == 1
+    assert result["value"] == "Casa"
+    assert result["evidence"]["observations"] == 3
+    assert result["confidence_level"] == "medium"
 
 
 def test_only_requested_meal_type_is_considered():
@@ -127,7 +141,7 @@ def test_context_filters_meal_history():
     assert result["evidence"]["observations"] == 2
 
 
-def test_context_does_not_fall_back_to_other_contexts():
+def test_context_without_enough_evidence_falls_back_to_recent_history():
     result = predict(
         [
             {
