@@ -6143,7 +6143,7 @@ export function HomeShell() {
                       }}
                     >
                       <span aria-hidden="true">+</span>
-                      Aggiungi altro
+                      {homeCopy.addMore}
                     </button>
 
                     <div
@@ -7206,7 +7206,7 @@ export function HomeShell() {
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
-                  Alternative
+                  {homeCopy.dinnerAlternatives}
                 </p>
                 <h2>{homeCopy.dinnerIdeas}</h2>
               </div>
@@ -7302,8 +7302,7 @@ export function HomeShell() {
                   Sto ancora imparando le tue cene.
                 </strong>
                 <p>
-                  Registra qualche altra scelta e SanoSync
-                  inizierà a proporti alternative più utili.
+                  {homeCopy.moreUsefulAlternatives}
                 </p>
               </article>
             )}
@@ -7477,8 +7476,7 @@ export function HomeShell() {
               </div>
 
               <p className={styles.bottomOverviewIntro}>
-                I segnali reali dei giorni che hai registrato,
-                senza trasformare la settimana in una pagella.
+                {homeCopy.weekIntro}
               </p>
 
               <div className={styles.weekKpis}>
@@ -7573,7 +7571,7 @@ export function HomeShell() {
                               day: "numeric",
                               month: "short",
                             },
-                          )}.`
+                          ))
                         : homeCopy.logWeightHome}
                     </strong>
                   </div>
@@ -7795,16 +7793,15 @@ export function HomeShell() {
 
                 <div>
                   <strong>
-                    Budget di oggi
+                    {homeCopy.todayBudget}
                   </strong>
                   <span>
                     {budget
-                      ? `${Math.round(
-                          budget.consumed_kcal,
-                        )} di ${Math.round(
-                          budget.daily_budget_kcal,
-                        )} kcal`
-                      : "Budget non disponibile"}
+                      ? homeCopy.budgetProgress(
+                          Math.round(budget.consumed_kcal),
+                          Math.round(budget.daily_budget_kcal),
+                        )
+                      : homeCopy.budgetUnavailable}
                   </span>
                 </div>
               </div>
