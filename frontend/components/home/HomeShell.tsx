@@ -496,6 +496,16 @@ export function HomeShell() {
   const currentLocaleCode = localeCode(locale);
   const formatNumber = (value: number) =>
     Math.round(value).toLocaleString(currentLocaleCode);
+  const localizedMealLabel = (slot: string) => {
+    const canonical = mealLabel(slot);
+    return canonical === "Colazione"
+      ? homeCopy.breakfast
+      : canonical === "Pranzo"
+        ? homeCopy.lunch
+        : canonical === "Cena"
+          ? homeCopy.dinner
+          : homeCopy.snack;
+  };
 
   const {
     experienceMode,
@@ -5175,7 +5185,7 @@ export function HomeShell() {
                   >
                     {conversationConfirming
                       ? homeCopy.logging
-                      : "Conferma e registra"}
+                      : homeCopy.confirmAndLog}
                   </button>
 
                   <button
@@ -5225,7 +5235,7 @@ export function HomeShell() {
                         <h3 id="quick-add-title">
                           {quickAddMode === "meal"
                             ? quickAddMealSlot
-                              ? homeCopy.addToMeal(mealLabel(quickAddMealSlot))
+                              ? homeCopy.addToMeal(localizedMealLabel(quickAddMealSlot))
                               : homeCopy.addMeal
                             : quickAddMode ===
                                 "activity"
@@ -5785,7 +5795,7 @@ export function HomeShell() {
                 </label>
                 <button
                   type="button"
-                  aria-label="Giorno successivo"
+                  aria-label={homeCopy.nextDay}
                   disabled={selectedLogDate >= todayIso()}
                   onClick={() =>
                     setSelectedLogDate((current) =>
@@ -5840,7 +5850,7 @@ export function HomeShell() {
                         <span aria-hidden="true">
                           {mealIcon(slot)}
                         </span>
-                        {mealLabel(slot)}
+                        {localizedMealLabel(slot)}
                       </button>
                     ))}
 
@@ -5900,30 +5910,10 @@ export function HomeShell() {
                 <strong>{homeCopy.pantry}</strong>
 
                 <span>
-                  {pantryHomeTotalItems > 0 &&
-                  pantryHomeCookedPortions > 0
-                    ? `${pantryHomeTotalItems} ${
-                        pantryHomeTotalItems === 1
-                          ? "alimento"
-                          : "alimenti"
-                      } · ${pantryHomeCookedPortions} ${
-                        pantryHomeCookedPortions === 1
-                          ? "porzione pronta"
-                          : "porzioni pronte"
-                      }`
-                    : pantryHomeTotalItems > 0
-                      ? `${pantryHomeTotalItems} ${
-                          pantryHomeTotalItems === 1
-                            ? "alimento disponibile"
-                            : "alimenti disponibili"
-                        }`
-                      : pantryHomeCookedPortions > 0
-                        ? `${pantryHomeCookedPortions} ${
-                            pantryHomeCookedPortions === 1
-                              ? "porzione pronta"
-                              : "porzioni pronte"
-                          }`
-                        : homeCopy.emptyPantry}
+                  {homeCopy.pantrySummary(
+                    pantryHomeTotalItems,
+                    pantryHomeCookedPortions,
+                  )}
                 </span>
               </span>
 
@@ -6069,7 +6059,7 @@ export function HomeShell() {
                         className={styles.dailyEntryMain}
                       >
                         <strong>
-                          {mealLabel(slot)}
+                          {localizedMealLabel(slot)}
                         </strong>
 
                         <span>
@@ -6172,7 +6162,7 @@ export function HomeShell() {
                         <span
                           className={styles.mealLabel}
                         >
-                          {mealLabel(slot)}
+                          {localizedMealLabel(slot)}
                         </span>
                       </div>
 
@@ -6964,7 +6954,7 @@ export function HomeShell() {
                               <div className={styles.quickMealChoicesHeader}>
                                 <div>
                                   <strong>
-                                    Scelte recenti per {mealLabel(slot).toLocaleLowerCase("it")}
+                                    {homeCopy.recentlyConsumed} · {localizedMealLabel(slot).toLocaleLowerCase(currentLocaleCode)}
                                   </strong>
                                   <span>
                                     {homeCopy.onlySuitable}
@@ -7339,7 +7329,7 @@ export function HomeShell() {
                       {homeCopy.today}
                     </p>
                     <h2>
-                      Focus della giornata
+                      {homeCopy.dailyFocus}
                     </h2>
                   </div>
                 </div>
@@ -7347,7 +7337,7 @@ export function HomeShell() {
                 <span
                   className={styles.bottomOverviewBadge}
                 >
-                  In tempo reale
+                  {homeCopy.realTime}
                 </span>
               </div>
 
@@ -7575,7 +7565,7 @@ export function HomeShell() {
                     <span>{homeCopy.todayWeightTitle}</span>
                     <strong>
                       {weightQuickAddEditingEntry
-                        ? `Modifica il peso del ${new Date(
+                        ? homeCopy.editWeightDate(new Date(
                             `${weightQuickAddEditingEntry.date}T00:00:00`,
                           ).toLocaleDateString(
                             currentLocaleCode,
