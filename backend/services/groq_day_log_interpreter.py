@@ -150,7 +150,7 @@ class GroqDayLogInterpreter:
                     },
                 ],
                 response_format=GroqDayLogInterpretation,
-                reasoning_effort="none",
+                reasoning_effort="low",
                 max_completion_tokens=1400,
             )
         except Exception as exc:
