@@ -240,7 +240,7 @@ export function DayPlanner({
                       option.value
                     }
                   >
-                    {option.label}
+                    {text[option.label]}
                   </button>
                 ),
               )}
