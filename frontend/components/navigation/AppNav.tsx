@@ -148,7 +148,7 @@ export function AppNav() {
         </div>
       ) : null}
 
-      {pathname === "/" ? <LanguageSwitcher /> : null}
+      <LanguageSwitcher />
 
       <div
         className={styles.globalExperienceSwitch}
