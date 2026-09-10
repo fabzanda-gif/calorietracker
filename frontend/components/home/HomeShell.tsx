@@ -6697,7 +6697,7 @@ export function HomeShell() {
                               ? ` · ${formatNumber(
                                   nextMealOptions.recommended
                                     .candidate.protein_g,
-                                )} {homeCopy.proteinUnit}`
+                                )} ${homeCopy.proteinUnit}`
                               : ""}
                           </p>
                         ) : typeof meal.estimated_calories ===
@@ -6711,7 +6711,7 @@ export function HomeShell() {
                             "number"
                               ? ` · ${Math.round(
                                   meal.estimated_protein_g,
-                                )} {homeCopy.proteinUnit}`
+                                )} ${homeCopy.proteinUnit}`
                               : ""}
                           </p>
                         ) : null}
@@ -6812,7 +6812,7 @@ export function HomeShell() {
                               ? ` · ${formatNumber(
                                   nextMealOptions.recommended
                                     .candidate.protein_g,
-                                )} {homeCopy.proteinUnit}`
+                                )} ${homeCopy.proteinUnit}`
                               : ""}
                           </p>
 
@@ -6995,7 +6995,7 @@ export function HomeShell() {
                                           <small>
                                             {Math.round(item.calories)} kcal
                                             {item.protein > 0
-                                              ? ` · ${Math.round(item.protein)} {homeCopy.proteinUnit}`
+                                              ? ` · ${Math.round(item.protein)} ${homeCopy.proteinUnit}`
                                               : ""}
                                           </small>
                                         </span>
@@ -7278,7 +7278,7 @@ export function HomeShell() {
                         "number"
                           ? ` · ${formatNumber(
                               option.candidate.protein_g,
-                            )} {homeCopy.proteinUnit}`
+                            )} ${homeCopy.proteinUnit}`
                           : ""}
                       </p>
 
