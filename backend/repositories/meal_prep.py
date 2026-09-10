@@ -48,6 +48,31 @@ class MealPrepRepository(BaseRepository):
                 f"Unable to load available meal prep: {exc}"
             ) from exc
 
+    def find_available_for_recipe_date(
+        self,
+        user_id: str,
+        recipe_id: Any,
+        prepared_at: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(MEAL_PREP_COLUMNS)
+                .eq("user_id", user_id)
+                .eq("recipe_id", recipe_id)
+                .eq("prepared_at", prepared_at)
+                .eq("status", "available")
+                .gt("portions_remaining", 0)
+                .limit(1)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to find matching meal prep batch: {exc}"
+            ) from exc
+
     def get_by_id(
         self,
         batch_id: Any,
