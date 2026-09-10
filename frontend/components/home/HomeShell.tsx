@@ -112,6 +112,8 @@ import {
 } from "@/lib/api/profile";
 
 import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { HOME_COPY, localeCode } from "./homeI18n";
 
 import QuickActivityForm from "./QuickActivityForm";
 import styles from "./HomeShell.module.css";
@@ -303,7 +305,7 @@ function mealFitsSlot(candidate: string, selected: string): boolean {
   return false;
 }
 
-function roundNumber(value: number): string {
+function legacyRoundNumber(value: number): string {
   return Math.round(value).toLocaleString("it-IT");
 }
 
@@ -493,6 +495,12 @@ type HomeSpeechRecognitionConstructor =
   new () => HomeSpeechRecognition;
 
 export function HomeShell() {
+  const { locale } = useI18n();
+  const homeCopy = HOME_COPY[locale];
+  const currentLocaleCode = localeCode(locale);
+  const formatNumber = (value: number) =>
+    Math.round(value).toLocaleString(currentLocaleCode);
+
   const {
     experienceMode,
     setExperienceMode,
@@ -3999,7 +4007,7 @@ export function HomeShell() {
   const plannedActivityLevel =
     budgetResult?.energy_baseline?.planned_activity_level ?? null;
   const plannedActivitySummary = todayPlannedActivities.length
-    ? `${todayPlannedActivities.map((item) => item.title).join(", ")} · circa ${Math.round(plannedActivityKcal)} kcal già incluse nel bilancio.`
+    ? `${todayPlannedActivities.map((item) => item.title).join(", ")} · ${homeCopy.plannedSummary(Math.round(plannedActivityKcal))}`
     : null;
 
 
@@ -4015,7 +4023,7 @@ export function HomeShell() {
       return nextMealOptions.recommended.candidate.name;
     }
 
-    return fallback || "Nessuna routine abbastanza forte";
+    return fallback || homeCopy.noStrongRoutine;
   }
 
   function displayedMealCalories(
@@ -4064,14 +4072,14 @@ export function HomeShell() {
       <header className={styles.header}>
         <div>
           <h1>
-            {greeting()}
+            {homeCopy[briefingMoment()]}
             {firstName
               ? `, ${firstName}`
               : ""}
             <span
               className={styles.greetingWave}
               role="img"
-              aria-label="Ciao"
+              aria-label={homeCopy.hello}
             >
               👋
             </span>
@@ -4083,7 +4091,7 @@ export function HomeShell() {
       {loading ? (
         <section className={styles.card}>
           <p className={styles.muted}>
-            Sto preparando la tua giornata…
+            {homeCopy.preparing}
           </p>
         </section>
       ) : null}
@@ -4091,7 +4099,7 @@ export function HomeShell() {
       {error ? (
         <section className={styles.errorCard}>
           <strong>
-            Non riesco a caricare la giornata.
+            {homeCopy.loadDayFailed}
           </strong>
           <p>{error}</p>
         </section>
@@ -4141,18 +4149,18 @@ export function HomeShell() {
           {budgetResult?.energy_baseline?.activity_suggestion ? (
             <section className={styles.activitySuggestion}>
               <div>
-                <span>Abitudine riconosciuta</span>
+                <span>{homeCopy.recognizedHabit}</span>
                 <strong>
                   {/bici|bicicletta/i.test(
                     budgetResult.energy_baseline.activity_suggestion.activity_name,
                   )
-                    ? "Sei andato in ufficio in bicicletta anche oggi?"
-                    : `Hai fatto ${budgetResult.energy_baseline.activity_suggestion.activity_name.toLowerCase()} anche oggi?`}
+                    ? homeCopy.officeBikeQuestion
+                    : homeCopy.activityAgain(budgetResult.energy_baseline.activity_suggestion.activity_name)}
                 </strong>
                 <p>{budgetResult.energy_baseline.activity_suggestion.reason}</p>
               </div>
               <button type="button" onClick={openSuggestedActivity}>
-                Sì, registrala
+                {homeCopy.yesLogIt}
               </button>
             </section>
           ) : null}
@@ -4160,7 +4168,7 @@ export function HomeShell() {
           {dayPlannerMessage ? (
             <p className={styles.muted}>
               {dayPlannerSaving
-                ? "Salvataggio..."
+                ? homeCopy.saving
                 : dayPlannerMessage}
             </p>
           ) : null}
@@ -4182,7 +4190,7 @@ export function HomeShell() {
                       styles.nextTrainingEyebrow
                     }
                   >
-                    PROSSIMO ALLENAMENTO ·{" "}
+                    {homeCopy.nextWorkout} ·{" "}
                     {plannedTrainingDateLabel(
                       nextRunningSession
                         .scheduled_date,
@@ -4214,7 +4222,7 @@ export function HomeShell() {
                 {nextRunningSession
                   .training_week ? (
                   <span>
-                    Settimana{" "}
+                    {homeCopy.week}{" "}
                     {
                       nextRunningSession
                         .training_week
@@ -4254,7 +4262,7 @@ export function HomeShell() {
                 {nextRunningSession
                   .scheduled_time ? (
                   <span>
-                    ore{" "}
+                    {homeCopy.at}{" "}
                     {nextRunningSession
                       .scheduled_time
                       .slice(0, 5)}
@@ -4268,22 +4276,14 @@ export function HomeShell() {
                 }
               >
                 {experienceMode === "zero"
-                  ? `${
-                      plannedTrainingDateLabel(
-                        nextRunningSession
-                          .scheduled_date,
-                      )
-                    }: ${
-                      nextRunningSession.title
-                    }. Non si correrà da solo.`
-                  : `${
-                      plannedTrainingDateLabel(
-                        nextRunningSession
-                          .scheduled_date,
-                      )
-                    } hai ${
-                      nextRunningSession.title
-                    }. Tienilo presente mentre organizzi la giornata.`}
+                  ? homeCopy.runZero(
+                      plannedTrainingDateLabel(nextRunningSession.scheduled_date),
+                      nextRunningSession.title,
+                    )
+                  : homeCopy.runStandard(
+                      plannedTrainingDateLabel(nextRunningSession.scheduled_date),
+                      nextRunningSession.title,
+                    )}
               </p>
             </section>
           ) : null}
@@ -4305,7 +4305,7 @@ export function HomeShell() {
                       styles.nextTrainingEyebrow
                     }
                   >
-                    PROSSIMA PALESTRA ·{" "}
+                    {homeCopy.nextGym} ·{" "}
                     {plannedTrainingDateLabel(
                       nextStrengthSession
                         .scheduled_date,
@@ -4334,7 +4334,7 @@ export function HomeShell() {
                 }
               >
                 <span>
-                  Settimana{" "}
+                  {homeCopy.week}{" "}
                   {
                     nextStrengthSession
                       .training_week
@@ -4346,7 +4346,7 @@ export function HomeShell() {
                     nextStrengthSession
                       .exercises.length
                   }{" "}
-                  esercizi
+                  {homeCopy.exercises}
                 </strong>
 
                 {nextStrengthSession
@@ -4368,18 +4368,14 @@ export function HomeShell() {
                 }
               >
                 {experienceMode === "zero"
-                  ? `${plannedTrainingDateLabel(
-                      nextStrengthSession
-                        .scheduled_date,
-                    )}: ${
-                      nextStrengthSession.title
-                    }. I pesi non si alzano da soli.`
-                  : `${plannedTrainingDateLabel(
-                      nextStrengthSession
-                        .scheduled_date,
-                    )} hai ${
-                      nextStrengthSession.title
-                    }. La seduta è già nel tuo programma.`}
+                  ? homeCopy.gymZero(
+                      plannedTrainingDateLabel(nextStrengthSession.scheduled_date),
+                      nextStrengthSession.title,
+                    )
+                  : homeCopy.gymStandard(
+                      plannedTrainingDateLabel(nextStrengthSession.scheduled_date),
+                      nextStrengthSession.title,
+                    )}
               </p>
             </section>
           ) : null}
@@ -4395,16 +4391,16 @@ export function HomeShell() {
               <div className={styles.budgetSummary}>
                 <div className={styles.budgetQuestion}>
                   <span className={styles.budgetEyebrow}>
-                    Il tuo piano di oggi
+                    {homeCopy.todayPlan}
                   </span>
-                  <h2>Quanto posso ancora mangiare oggi?</h2>
+                  <h2>{homeCopy.remainingQuestion}</h2>
                 </div>
 
                 <div className={styles.budgetHeadlineMetric}>
-                  <span className={styles.budgetLabel}>Consumate oggi</span>
+                  <span className={styles.budgetLabel}>{homeCopy.consumedToday}</span>
                   <div className={styles.budgetValueRow}>
                     <strong className={styles.budgetAvailable}>
-                      {roundNumber(budget.consumed_kcal)}
+                      {formatNumber(budget.consumed_kcal)}
                     </strong>
                     <span className={styles.budgetKcal}>kcal</span>
                   </div>
@@ -4412,11 +4408,11 @@ export function HomeShell() {
 
                 <div className={styles.budgetHeadlineMetric}>
                   <span className={styles.budgetLabel}>
-                    Puoi ancora mangiare
+                    {homeCopy.canStillEat}
                   </span>
                   <div className={styles.budgetValueRow}>
                     <strong className={styles.budgetAvailable}>
-                      {roundNumber(Math.max(0, budget.available_kcal))}
+                      {formatNumber(Math.max(0, budget.available_kcal))}
                     </strong>
                     <span className={styles.budgetKcal}>kcal</span>
                   </div>
@@ -4428,39 +4424,39 @@ export function HomeShell() {
                   </span>
                   {todayPlannedActivities.length > 0 ? (
                     <div className={styles.budgetPlannedActivity}>
-                      <span>Attività programmata</span>
+                      <span>{homeCopy.plannedActivity}</span>
                       <strong>
                         {todayPlannedActivities
                           .map((item) => item.title)
                           .join(", ")}
                       </strong>
                       <small>
-                        +{Math.round(plannedActivityKcal)} kcal previste
+                        {homeCopy.expectedKcal(Math.round(plannedActivityKcal))}
                       </small>
                     </div>
                   ) : (
                     <p>
                       {budget.budget_adapted
-                        ? "Oggi ti sei mosso meno del previsto. Abbiamo adattato il piano per lasciarti pasti completi."
+                        ? homeCopy.adaptedLowMovement
                         : budget.consumed_kcal === 0
-                          ? "Il piano è pronto e si adatterà con calma a quello che succede oggi."
+                          ? homeCopy.planReady
                           : budget.consumed_kcal < maintenanceBudgetKcal
-                            ? "Sei ancora sotto il mantenimento. Continua la giornata senza inseguire il singolo numero."
-                            : "Hai raggiunto il mantenimento: è un'informazione, non un giudizio."}
+                            ? homeCopy.belowMaintenance
+                            : homeCopy.reachedMaintenance}
                     </p>
                   )}
                   <span className={styles.budgetTodayDeficit}>
-                    Deficit di oggi{" "}
+                    {homeCopy.todayDeficit}{" "}
                     <strong>
-                      {roundNumber(
+                      {formatNumber(
                         budget.effective_goal_adjustment_kcal,
                       )} kcal
                     </strong>
                     {budget.budget_adapted ? (
                       <span
                         className={styles.budgetDeficitInfo}
-                        title="Deficit adattato in base alla giornata"
-                        aria-label="Deficit adattato in base alla giornata"
+                        title={homeCopy.adaptedDeficit}
+                        aria-label={homeCopy.adaptedDeficit}
                       >
                         i
                       </span>
@@ -4472,7 +4468,7 @@ export function HomeShell() {
                     aria-expanded={budgetExpanded}
                     onClick={() => setBudgetExpanded((current) => !current)}
                   >
-                    {budgetExpanded ? "Nascondi calcolo" : "Vedi calcolo"}
+                    {budgetExpanded ? homeCopy.hideCalculation : homeCopy.showCalculation}
                     <span
                       className={`${styles.budgetChevron} ${
                         budgetExpanded ? styles.budgetChevronUp : ""
@@ -4487,19 +4483,19 @@ export function HomeShell() {
                 <div className={styles.budgetExpandedPanel}>
                   <div className={styles.budgetDetailsGrid}>
                     <div className={styles.budgetDetail}>
-                      <span>Metabolismo basale</span>
-                      <strong>{bmr > 0 ? roundNumber(bmr) : "—"} kcal</strong>
-                      <small>energia minima del corpo</small>
+                      <span>{homeCopy.bmr}</span>
+                      <strong>{bmr > 0 ? formatNumber(bmr) : "—"} kcal</strong>
+                      <small>{homeCopy.bodyMinimum}</small>
                     </div>
                     <div className={styles.budgetDetail}>
-                      <span>Mantenimento stimato</span>
-                      <strong>{roundNumber(maintenanceBudgetKcal)} kcal</strong>
-                      <small>con la giornata di oggi</small>
+                      <span>{homeCopy.estimatedMaintenance}</span>
+                      <strong>{formatNumber(maintenanceBudgetKcal)} kcal</strong>
+                      <small>{homeCopy.withToday}</small>
                     </div>
                     <div className={styles.budgetDetail}>
-                      <span>Deficit di oggi</span>
-                      <strong>{roundNumber(budget.effective_goal_adjustment_kcal)} kcal</strong>
-                      <small>{budget.budget_adapted ? "adattato alla giornata" : "come programmato"}</small>
+                      <span>{homeCopy.todayDeficit}</span>
+                      <strong>{formatNumber(budget.effective_goal_adjustment_kcal)} kcal</strong>
+                      <small>{budget.budget_adapted ? homeCopy.adaptedToDay : homeCopy.asPlanned}</small>
                     </div>
                   </div>
 
@@ -4528,14 +4524,14 @@ export function HomeShell() {
                       />
                     </div>
                     <div className={styles.budgetScaleLabels}>
-                      <span>{roundNumber(budget.consumed_kcal)} consumate</span>
-                      <span>{roundNumber(budget.daily_budget_kcal)} obiettivo adattato</span>
-                      <span>{roundNumber(maintenanceBudgetKcal)} mantenimento</span>
+                      <span>{formatNumber(budget.consumed_kcal)} {homeCopy.consumed}</span>
+                      <span>{formatNumber(budget.daily_budget_kcal)} {homeCopy.adaptedTarget}</span>
+                      <span>{formatNumber(maintenanceBudgetKcal)} {homeCopy.maintenance}</span>
                     </div>
                   </div>
 
                   <div className={styles.budgetExplanation}>
-                    L'obiettivo si adatta con calma per proteggere pasti completi e sostenibili.
+                    {homeCopy.budgetExplanation}
                   </div>
                 </div>
               ) : null}
@@ -4543,11 +4539,10 @@ export function HomeShell() {
           ) : (
             <section className={styles.card}>
               <strong>
-                Budget non disponibile
+                {homeCopy.budgetUnavailable}
               </strong>
               <p className={styles.muted}>
-                Completa il profilo per calcolare
-                il budget energetico.
+                {homeCopy.completeProfileBudget}
               </p>
             </section>
           )}
@@ -4568,8 +4563,8 @@ export function HomeShell() {
               }}
             >
               {customizingDashboard
-                ? "Fine personalizzazione"
-                : "Personalizza Home"}
+                ? homeCopy.finishCustomization
+                : homeCopy.customizeHome}
             </button>
 
             {customizingDashboard ? (
@@ -4591,7 +4586,7 @@ export function HomeShell() {
                   );
                 }}
               >
-                Ripristina ordine
+                {homeCopy.resetOrder}
               </button>
             ) : null}
           </div>
@@ -5057,12 +5052,12 @@ export function HomeShell() {
                           }
                         >
                           {action.kind === "meal"
-                            ? `${roundNumber(
+                            ? `${formatNumber(
                                 action.totals.calories,
                               )} kcal`
                             : action.kind === "activity"
                               ? action.burned_calories > 0
-                                ? `${roundNumber(
+                                ? `${formatNumber(
                                     action.burned_calories,
                                   )} kcal`
                                 : "kcal n/d"
@@ -5136,7 +5131,7 @@ export function HomeShell() {
                         <div>
                           <strong>{item.name}</strong>
                           <span>
-                            {roundNumber(item.quantity)}{" "}
+                            {formatNumber(item.quantity)}{" "}
                             {item.unit}
                             {item.uncertainty
                               ? " · stimato"
@@ -5145,7 +5140,7 @@ export function HomeShell() {
                         </div>
 
                         <span>
-                          {roundNumber(item.calories)} kcal
+                          {formatNumber(item.calories)} kcal
                         </span>
                       </div>
                     ),
@@ -5154,22 +5149,22 @@ export function HomeShell() {
 
                 <div className={styles.conversationTotals}>
                   <strong>
-                    {roundNumber(
+                    {formatNumber(
                       conversationPreview.totals.calories,
                     )}{" "}
                     kcal
                   </strong>
 
                   <span>
-                    {roundNumber(
+                    {formatNumber(
                       conversationPreview.totals.protein,
                     )}{" "}
                     g proteine ·{" "}
-                    {roundNumber(
+                    {formatNumber(
                       conversationPreview.totals.carbs,
                     )}{" "}
                     g carbo ·{" "}
-                    {roundNumber(
+                    {formatNumber(
                       conversationPreview.totals.fat,
                     )}{" "}
                     g grassi
@@ -5972,7 +5967,7 @@ export function HomeShell() {
                   </span>
 
                   <strong className={styles.dailyActivityCalories}>
-                    −{roundNumber(summaryBurnedCalories)} kcal
+                    −{formatNumber(summaryBurnedCalories)} kcal
                   </strong>
 
                   <span
@@ -6021,7 +6016,7 @@ export function HomeShell() {
                       </div>
 
                       <strong>
-                        −{roundNumber(
+                        −{formatNumber(
                           Number(activity.burned_calories || 0),
                         )} kcal
                       </strong>
@@ -6112,7 +6107,7 @@ export function HomeShell() {
                         }
                       >
                         {summaryMealForSlot(slot)
-                          ? `${roundNumber(
+                          ? `${formatNumber(
                               summaryMealsForSlot(
                                 slot,
                               ).reduce(
@@ -6130,7 +6125,7 @@ export function HomeShell() {
                             )} kcal`
                           : selectedLogDate === todayIso() &&
                             displayedMealCalories(slot, meal.estimated_calories) != null
-                              ? `~${roundNumber(
+                              ? `~${formatNumber(
                                   Number(
                                     displayedMealCalories(slot, meal.estimated_calories),
                                   ),
@@ -6247,7 +6242,7 @@ export function HomeShell() {
 
                                   <span>
                                     {registeredMeal.recipe_servings
-                                      ? `${roundNumber(
+                                      ? `${formatNumber(
                                           registeredMeal.recipe_servings,
                                         )} ${
                                           registeredMeal.recipe_servings === 1
@@ -6320,7 +6315,7 @@ export function HomeShell() {
                           <div className={styles.registeredMealNutrition}>
                             <div className={styles.nutritionItem}>
                               <strong>
-                                {roundNumber(
+                                {formatNumber(
                                   summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
@@ -6336,7 +6331,7 @@ export function HomeShell() {
 
                             <div className={styles.nutritionItem}>
                               <strong>
-                                {roundNumber(
+                                {formatNumber(
                                   summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
@@ -6352,7 +6347,7 @@ export function HomeShell() {
 
                             <div className={styles.nutritionItem}>
                               <strong>
-                                {roundNumber(
+                                {formatNumber(
                                   summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
@@ -6368,7 +6363,7 @@ export function HomeShell() {
 
                             <div className={styles.nutritionItem}>
                               <strong>
-                                {roundNumber(
+                                {formatNumber(
                                   summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
@@ -6699,19 +6694,19 @@ export function HomeShell() {
                           <p className={styles.mealMeta}>
                             {typeof nextMealOptions.recommended
                               .recommended_quantity === "number"
-                              ? `${roundNumber(
+                              ? `${formatNumber(
                                   nextMealOptions.recommended
                                     .recommended_quantity,
                                 )} porz. · `
                               : ""}
-                            {roundNumber(
+                            {formatNumber(
                               nextMealOptions.recommended
                                 .candidate.calories,
                             )}{" "}
                             kcal
                             {typeof nextMealOptions.recommended
                               .candidate.protein_g === "number"
-                              ? ` · ${roundNumber(
+                              ? ` · ${formatNumber(
                                   nextMealOptions.recommended
                                     .candidate.protein_g,
                                 )} g proteine`
@@ -6813,12 +6808,12 @@ export function HomeShell() {
                           >
                             {typeof nextMealOptions.recommended
                               .recommended_quantity === "number"
-                              ? `${roundNumber(
+                              ? `${formatNumber(
                                   nextMealOptions.recommended
                                     .recommended_quantity,
                                 )} porz. · `
                               : ""}
-                            {roundNumber(
+                            {formatNumber(
                               nextMealOptions.recommended
                                 .candidate.calories,
                             )}{" "}
@@ -6826,7 +6821,7 @@ export function HomeShell() {
                             {typeof nextMealOptions
                               .recommended.candidate
                               .protein_g === "number"
-                              ? ` · ${roundNumber(
+                              ? ` · ${formatNumber(
                                   nextMealOptions.recommended
                                     .candidate.protein_g,
                                 )} g proteine`
@@ -7287,13 +7282,13 @@ export function HomeShell() {
                       </h3>
 
                       <p className={styles.optionNumbers}>
-                        {roundNumber(
+                        {formatNumber(
                           option.candidate.calories,
                         )}{" "}
                         kcal
                         {typeof option.candidate.protein_g ===
                         "number"
-                          ? ` · ${roundNumber(
+                          ? ` · ${formatNumber(
                               option.candidate.protein_g,
                             )} g proteine`
                           : ""}
