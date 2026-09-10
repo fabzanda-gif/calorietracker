@@ -5200,7 +5200,7 @@ export function HomeShell() {
                   >
                     {conversationMode === "photo"
                       ? homeCopy.changePhoto
-                      : "{homeCopy.editText}"}
+                      : homeCopy.editText}
                   </button>
                 </div>
               </div>
