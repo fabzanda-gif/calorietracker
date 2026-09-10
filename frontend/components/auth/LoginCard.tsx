@@ -20,49 +20,70 @@ function GoogleIcon() {
 
 function ProductPreview() {
   return (
-    <div className={styles.preview} aria-label="Anteprima della dashboard SanoSync">
-      <div className={styles.previewNav}>
-        <strong>SanoSync</strong>
-        <span className={styles.previewNavActive}>Oggi</span>
-        <span>Ricette</span>
-        <span>Attività</span>
-        <span>Progressi</span>
-      </div>
+    <div className={styles.preview} aria-label="Anteprima della Home SanoSync">
+      <aside className={styles.previewNav}>
+        <Image
+          src="/assets/LogoCoral.png"
+          alt=""
+          width={82}
+          height={81}
+          aria-hidden="true"
+        />
+        <span className={styles.previewNavActive}>⌂ <b>Oggi</b></span>
+        <span>⌁ <b>Attività</b></span>
+        <span>↗ <b>Progressi</b></span>
+        <span>◇ <b>Ricette</b></span>
+      </aside>
+
       <div className={styles.previewContent}>
-        <div className={styles.previewTop}>
-          <div className={styles.calorieTile}>
-            <span>Calorie giornaliere</span>
-            <strong>1.680 <small>kcal</small></strong>
-            <span>420 kcal rimanenti</span>
-            <i aria-hidden="true">80%</i>
-          </div>
-          <div className={styles.stepsTile}>
-            <span>Attività</span>
-            <strong>8.432 <small>/ 10.000</small></strong>
-            <svg aria-hidden="true" viewBox="0 0 150 36">
-              <path d="M2 29 C 22 31, 32 20, 47 24 S 75 34, 89 20 S 112 19, 124 9 S 139 8, 148 3" />
-            </svg>
-          </div>
-        </div>
-        <div className={styles.mealPreview}>
-          <div className={styles.previewSectionTitle}>
-            <strong>I pasti di oggi</strong><span>Vedi piano</span>
-          </div>
-          <div className={styles.previewMeals}>
-            <div><i>☕</i><span>Colazione</span><strong>Latte e cheesecake</strong><small>440 kcal</small></div>
-            <div><i>🥗</i><span>Pranzo</span><strong>Pollo, riso e verdure</strong><small>620 kcal</small></div>
-            <div><i>🍲</i><span>Cena</span><strong>Zuppa di legumi</strong><small>410 kcal</small></div>
-          </div>
-        </div>
-        <div className={styles.previewBottom}>
+        <div className={styles.previewGreeting}>
           <div>
-            <span>Peso</span><strong>72,4 <small>kg</small></strong>
-            <svg aria-hidden="true" viewBox="0 0 180 30">
-              <path d="M2 5 C 35 8, 50 4, 72 12 S 112 18, 129 16 S 156 25, 178 24" />
-            </svg>
+            <strong>Buongiorno, Fabio <span aria-hidden="true">👋</span></strong>
+            <small>La tua giornata è pronta. Il piano si adatta a ciò che succede.</small>
           </div>
-          <div className={styles.routineTile}>
-            <span>Routine</span><strong>4/5</strong><small>completate oggi</small>
+          <span className={styles.previewMode}>Standard</span>
+        </div>
+
+        <div className={styles.previewHabit}>
+          <div>
+            <small>ABITUDINE RICONOSCIUTA</small>
+            <strong>Sei andato in ufficio in bicicletta anche oggi?</strong>
+          </div>
+          <span>Sì, registrala</span>
+        </div>
+
+        <div className={styles.previewPlan}>
+          <div className={styles.previewPlanTitle}>
+            <small>IL TUO PIANO DI OGGI</small>
+            <strong>Quanto posso ancora mangiare oggi?</strong>
+          </div>
+          <div>
+            <span>Consumate oggi</span>
+            <strong>0 <small>kcal</small></strong>
+          </div>
+          <div>
+            <span>Puoi ancora mangiare</span>
+            <strong>2.305 <small>kcal</small></strong>
+          </div>
+          <p><i aria-hidden="true">◎</i> Il piano è pronto e si adatterà alla giornata.</p>
+        </div>
+
+        <div className={styles.previewColumns}>
+          <div className={styles.previewSummary}>
+            <div className={styles.previewCardTitle}>
+              <strong>▤ Resoconto giornaliero</strong>
+              <span>＋ Aggiungi</span>
+            </div>
+            <p><b>🧺 Dispensa</b><small>2 alimenti disponibili</small></p>
+            <p><b>☕ Colazione</b><small>Colazione Casa · 235 kcal</small></p>
+          </div>
+          <div className={styles.previewAi}>
+            <div className={styles.previewCardTitle}>
+              <strong>✦ SanoSync AI</strong>
+              <span>Tutto in un input</span>
+            </div>
+            <p>Racconta la tua giornata, penso io al resto.</p>
+            <div>Scrivi cosa hai mangiato o fatto…</div>
           </div>
         </div>
       </div>
@@ -147,18 +168,17 @@ export function LoginCard() {
       <div className={styles.shell}>
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}>IL TUO BENESSERE, IN SINCRONIA</p>
-            <h1>Tutto sotto controllo.</h1>
+            <p className={styles.eyebrow}>LA TUA GIORNATA, SOTTO CONTROLLO</p>
+            <h1>Tutto ciò che ti serve. Senza doverlo cercare.</h1>
             <p className={styles.intro}>
-              SanoSync unisce alimentazione, attività, peso e routine
-              quotidiane in un piano che si adatta davvero a te.
+              SanoSync collega pasti, dispensa, allenamenti e progressi per anticipare ciò che ti serve e rendere ogni registrazione più semplice.
             </p>
           </div>
           <ProductPreview />
           <div className={styles.benefits}>
-            <span><i aria-hidden="true">◎</i>Piano quotidiano</span>
-            <span><i aria-hidden="true">✦</i>Decisioni personalizzate</span>
-            <span><i aria-hidden="true">↗</i>Dati sotto controllo</span>
+            <span><i aria-hidden="true">◎</i>Piano predittivo</span>
+            <span><i aria-hidden="true">✦</i>Tutto connesso</span>
+            <span><i aria-hidden="true">↗</i>Logging immediato</span>
           </div>
         </section>
 
