@@ -1057,8 +1057,8 @@ export function HomeShell() {
               pantryItem.quantity_mode === "portion"
                 ? `${pantryItem.quantity} ${
                     Number(pantryItem.quantity) === 1
-                      ? "porzione"
-                      : "porzioni"
+                      ? homeCopy.portions
+                      : homeCopy.portions
                   }`
                 : `${pantryItem.quantity} ${pantryItem.unit}`,
           }];
@@ -1105,8 +1105,8 @@ export function HomeShell() {
               stockLabel:
                 `${batch.portions_remaining} ${
                   batch.portions_remaining === 1
-                    ? "porzione"
-                    : "porzioni"
+                    ? homeCopy.portions
+                    : homeCopy.portions
                 }`,
             }];
           },
@@ -5519,7 +5519,7 @@ export function HomeShell() {
 
                             <label>
                               <span>
-                                Proteine
+                                {homeCopy.proteins}
                               </span>
                               <input
                                 type="number"
@@ -6085,7 +6085,7 @@ export function HomeShell() {
                             : selectedLogDate === todayIso()
                               ? displayedMealName(slot, meal.value) ??
                                 "Da decidere"
-                              : "Nessun pasto registrato"}
+                              : homeCopy.noLoggedMeal}
                         </span>
                       </span>
 
@@ -6124,7 +6124,7 @@ export function HomeShell() {
                       {summaryMealForSlot(slot) ? (
                         <span
                           className={styles.dailyEntryDone}
-                          aria-label="Registrato"
+                          aria-label={homeCopy.logged}
                         >
                           ✓
                         </span>
@@ -6186,7 +6186,7 @@ export function HomeShell() {
                         }
                       >
                         {summaryMealForSlot(slot)
-                          ? "Registrato"
+                          ? homeCopy.logged
                           : meal.state === "predicted"
                             ? "Previsto"
                             : "Da decidere"}
@@ -6234,10 +6234,10 @@ export function HomeShell() {
                                           registeredMeal.recipe_servings,
                                         )} ${
                                           registeredMeal.recipe_servings === 1
-                                            ? "porzione"
-                                            : "porzioni"
+                                            ? homeCopy.portions
+                                            : homeCopy.portions
                                         }`
-                                      : "1 porzione"}
+                                      : `1 ${homeCopy.portions}`}
                                   </span>
                                 </div>
 
@@ -6269,7 +6269,7 @@ export function HomeShell() {
                                     {editingMealId ===
                                     registeredMeal.id
                                       ? "Chiudi"
-                                      : "Modifica"}
+                                      : homeCopy.edit}
                                   </button>
 
                                   <button
@@ -6291,7 +6291,7 @@ export function HomeShell() {
                                     {deletingMealId ===
                                     registeredMeal.id
                                       ? "Elimino…"
-                                      : "Elimina"}
+                                      : homeCopy.delete}
                                   </button>
                                 </div>
                               </div>
@@ -6377,7 +6377,7 @@ export function HomeShell() {
                                 styles.registeredMealInsightSuccess
                               }
                             >
-                              ✓ Pasto registrato
+                              {homeCopy.mealLogged}
                             </span>
 
                             {summaryMealsForSlot(slot).reduce(
@@ -6393,7 +6393,7 @@ export function HomeShell() {
                                   styles.registeredMealInsightWarning
                                 }
                               >
-                                ▮▮ Proteine basse
+                                {homeCopy.lowProtein}
                               </span>
                             ) : summaryMealsForSlot(slot).reduce(
                                 (total, registeredMeal) =>
@@ -6416,7 +6416,7 @@ export function HomeShell() {
                                   styles.registeredMealInsightSuccess
                                 }
                               >
-                                ↑ Ricco di proteine
+                                {homeCopy.highProtein}
                               </span>
                             )}
                           </div>
@@ -6437,7 +6437,7 @@ export function HomeShell() {
                                 styles.registeredMealTypeField
                               }
                             >
-                              <span>Sposta nel pasto</span>
+                              <span>{homeCopy.moveToMeal}</span>
 
                               <select
                                 value={mealEditType}
@@ -6468,7 +6468,7 @@ export function HomeShell() {
                                   <span>
                                     {simpleMealEdit.is_per_100g
                                       ? "Grammi"
-                                      : "Porzioni"}
+                                      : homeCopy.portions}
                                   </span>
 
                                   <div
@@ -6521,7 +6521,7 @@ export function HomeShell() {
                                   <span>
                                     {simpleMealEditNutrition()
                                       .protein.toFixed(1)}{" "}
-                                    g proteine
+                                    {homeCopy.proteinUnit}
                                   </span>
 
                                   <span>
@@ -6596,7 +6596,7 @@ export function HomeShell() {
                                 <span>
                                   {mealEditNutrition()
                                     .protein.toFixed(1)}{" "}
-                                  g proteine
+                                  {homeCopy.proteinUnit}
                                 </span>
 
                                 <span>
@@ -6645,7 +6645,7 @@ export function HomeShell() {
                               >
                                 {savingMealEdit
                                   ? homeCopy.savingShort
-                                  : "Salva modifiche"}
+                                  : homeCopy.saveChanges}
                               </button>
 
                               <button
@@ -6673,7 +6673,7 @@ export function HomeShell() {
                             ? nextMealOptions.recommended
                                 .candidate.name
                             : meal.value ||
-                              "Nessuna routine abbastanza forte"}
+                              homeCopy.noStrongRoutine}
                         </strong>
 
                         {slot === nextMeal?.next_slot &&
@@ -6697,7 +6697,7 @@ export function HomeShell() {
                               ? ` · ${formatNumber(
                                   nextMealOptions.recommended
                                     .candidate.protein_g,
-                                )} g proteine`
+                                )} {homeCopy.proteinUnit}`
                               : ""}
                           </p>
                         ) : typeof meal.estimated_calories ===
@@ -6711,7 +6711,7 @@ export function HomeShell() {
                             "number"
                               ? ` · ${Math.round(
                                   meal.estimated_protein_g,
-                                )} g proteine`
+                                )} {homeCopy.proteinUnit}`
                               : ""}
                           </p>
                         ) : null}
@@ -6741,12 +6741,12 @@ export function HomeShell() {
                             <strong>
                               {nextMealOptions
                                 .replanning_context?.title ??
-                                "Già adatta alla giornata"}
+                                homeCopy.alreadySuitable
                             </strong>
                             <p>
                               {nextMealOptions
                                 .replanning_context?.message ??
-                                "Il tuo pasto abituale va bene così com'è oggi."}
+                                homeCopy.usualMealFine}
                             </p>
                           </div>
                         </div>
@@ -6769,12 +6769,12 @@ export function HomeShell() {
                               {nextMealOptions.recommended
                                 .strategy ===
                               "component_reduction"
-                                ? "Pasto alleggerito"
+                                ? homeCopy.lighterMeal
                                 : nextMealOptions.recommended
                                     .strategy ===
                                   "adapted_routine"
-                                ? "Adattata alla tua giornata"
-                                : "Oggi ti conviene cambiare"}
+                                ? homeCopy.adaptedToDay
+                                : homeCopy.changeToday}
                             </span>
                           </div>
 
@@ -6812,7 +6812,7 @@ export function HomeShell() {
                               ? ` · ${formatNumber(
                                   nextMealOptions.recommended
                                     .candidate.protein_g,
-                                )} g proteine`
+                                )} {homeCopy.proteinUnit}`
                               : ""}
                           </p>
 
@@ -6864,7 +6864,7 @@ export function HomeShell() {
                           >
                             {confirmingSlot === slot
                               ? "Confermo…"
-                              : "Conferma"}
+                              : homeCopy.confirm}
                           </button>
 
                           {slot === "dinner" ? (
@@ -6885,7 +6885,7 @@ export function HomeShell() {
                             >
                               {showDinnerAlternatives
                                 ? "Nascondi idee"
-                                : "Alternative"}
+                                : homeCopy.dinnerAlternatives}
                             </button>
                           ) : null}
 
@@ -6967,7 +6967,7 @@ export function HomeShell() {
                                     Scelte recenti per {mealLabel(slot).toLocaleLowerCase("it")}
                                   </strong>
                                   <span>
-                                    Solo proposte adatte a questo pasto.
+                                    {homeCopy.onlySuitable}
                                   </span>
                                 </div>
                               </div>
@@ -6995,7 +6995,7 @@ export function HomeShell() {
                                           <small>
                                             {Math.round(item.calories)} kcal
                                             {item.protein > 0
-                                              ? ` · ${Math.round(item.protein)} g proteine`
+                                              ? ` · ${Math.round(item.protein)} {homeCopy.proteinUnit}`
                                               : ""}
                                           </small>
                                         </span>
@@ -7005,7 +7005,7 @@ export function HomeShell() {
                                 </div>
                               ) : (
                                 <p className={styles.quickMealChoicesEmpty}>
-                                  Nessuna scelta recente per questo pasto.
+                                  {homeCopy.noRecentChoices}
                                 </p>
                               )}
 
@@ -7017,7 +7017,7 @@ export function HomeShell() {
                                     styles.alternatePortionField
                                   }
                                 >
-                                  Porzioni
+                                  {homeCopy.portions}
                                   <input
                                     type="number"
                                     min="0.5"
@@ -7122,7 +7122,7 @@ export function HomeShell() {
                               </label>
 
                               <label>
-                                Proteine
+                                {homeCopy.proteins}
                                 <input
                                   type="number"
                                   min="0"
@@ -7182,7 +7182,7 @@ export function HomeShell() {
                               >
                                 {savingAlternate
                                   ? homeCopy.savingShort
-                                  : "Salva"}
+                                  : homeCopy.save}
                               </button>
 
                               <button
@@ -7211,14 +7211,14 @@ export function HomeShell() {
             >
             {dashboardWidgetControls(
               "dinner",
-              "Alternative cena",
+              homeCopy.dinnerAlternatives,
             )}
             <div className={styles.sectionHeader}>
               <div>
                 <p className={styles.kicker}>
                   Alternative
                 </p>
-                <h2>Tre idee per cena</h2>
+                <h2>{homeCopy.dinnerIdeas}</h2>
               </div>
 
               {dinnerOptions?.mode_label ? (
@@ -7278,7 +7278,7 @@ export function HomeShell() {
                         "number"
                           ? ` · ${formatNumber(
                               option.candidate.protein_g,
-                            )} g proteine`
+                            )} {homeCopy.proteinUnit}`
                           : ""}
                       </p>
 
@@ -7322,7 +7322,7 @@ export function HomeShell() {
 
           <section
             className={styles.homeBottomOverview}
-            aria-label="Focus della giornata e settimana"
+            aria-label={homeCopy.dayWeekFocus}
           >
             <div className={styles.dailyFocusCard}>
               <div className={styles.bottomOverviewHeader}>
@@ -7336,7 +7336,7 @@ export function HomeShell() {
 
                   <div>
                     <p className={styles.bottomOverviewKicker}>
-                      Oggi
+                      {homeCopy.today}
                     </p>
                     <h2>
                       Focus della giornata
@@ -7352,7 +7352,7 @@ export function HomeShell() {
               </div>
 
               <p className={styles.bottomOverviewIntro}>
-                Dove sei rispetto ai riferimenti di oggi.
+                {homeCopy.todayReferences}
               </p>
 
               <div className={styles.dailyFocusRings}>
@@ -7473,7 +7473,7 @@ export function HomeShell() {
                       Ritmo
                     </p>
                     <h2>
-                      La tua settimana
+                      {homeCopy.yourWeek}
                     </h2>
                   </div>
                 </div>
@@ -7497,7 +7497,7 @@ export function HomeShell() {
                     ✓
                   </span>
                   <div>
-                    <span>Giorni registrati</span>
+                    <span>{homeCopy.loggedDays}</span>
                     <strong>
                       {weeklyMealDays} / 7
                     </strong>
@@ -7509,7 +7509,7 @@ export function HomeShell() {
                     🍴
                   </span>
                   <div>
-                    <span>Pasti settimana</span>
+                    <span>{homeCopy.weeklyMeals}</span>
                     <strong>
                       {weeklyMealCount}
                     </strong>
@@ -7521,7 +7521,7 @@ export function HomeShell() {
                     🏃
                   </span>
                   <div>
-                    <span>Attività oggi</span>
+                    <span>{homeCopy.todayActivities}</span>
                     <strong>
                       {actualActivities.length}
                     </strong>
@@ -7546,7 +7546,7 @@ export function HomeShell() {
                   </span>
 
                   <div>
-                    <span>Ultimo peso</span>
+                    <span>{homeCopy.latestWeight}</span>
 
                     <strong>
                       {latestWeight != null
@@ -7556,7 +7556,7 @@ export function HomeShell() {
                               maximumFractionDigits: 1,
                             },
                           )} kg`
-                        : "Aggiungi"}
+                        : homeCopy.addLabel}
                     </strong>
                   </div>
 
@@ -7572,7 +7572,7 @@ export function HomeShell() {
               {weightQuickAddOpen ? (
                 <div className={styles.weekWeightQuickAdd}>
                   <div className={styles.weekWeightQuickAddCopy}>
-                    <span>Peso di oggi</span>
+                    <span>{homeCopy.todayWeightTitle}</span>
                     <strong>
                       {weightQuickAddEditingEntry
                         ? `Modifica il peso del ${new Date(
@@ -7584,14 +7584,14 @@ export function HomeShell() {
                               month: "short",
                             },
                           )}.`
-                        : "Registra il peso di oggi senza lasciare la Home."}
+                        : homeCopy.logWeightHome}
                     </strong>
                   </div>
 
                   <div className={styles.weekWeightQuickAddControls}>
                     <label>
                       <span className={styles.srOnly}>
-                        Peso in kg
+                        {homeCopy.weightKg}
                       </span>
 
                       <input
@@ -7627,7 +7627,7 @@ export function HomeShell() {
                         ? homeCopy.savingShort
                         : weightQuickAddEditingEntry
                           ? "Aggiorna"
-                          : "Registra"}
+                          : homeCopy.logWeight}
                     </button>
 
                     <button
@@ -7721,7 +7721,7 @@ export function HomeShell() {
                                 kg
                               </strong>
 
-                              <span>Modifica</span>
+                              <span>{homeCopy.edit}</span>
                             </button>
                           ))}
                       </div>
@@ -7729,7 +7729,7 @@ export function HomeShell() {
                       <span
                         className={styles.weekWeightRecentEmpty}
                       >
-                        Nessun peso precedente.
+                        {homeCopy.noPreviousWeight}
                       </span>
                     )}
                   </div>
@@ -7776,13 +7776,13 @@ export function HomeShell() {
                       }`}
                       aria-label={
                         item.mealCount > 0
-                          ? `${item.mealCount} pasti registrati`
-                          : "Nessun pasto registrato"
+                          ? homeCopy.mealsLogged(item.mealCount)
+                          : homeCopy.noLoggedMeal
                       }
                       title={
                         item.mealCount > 0
-                          ? `${item.mealCount} pasti registrati`
-                          : "Nessun pasto registrato"
+                          ? homeCopy.mealsLogged(item.mealCount)
+                          : homeCopy.noLoggedMeal
                       }
                     >
                       {item.mealCount > 0 ? "✓" : ""}
@@ -7821,8 +7821,8 @@ export function HomeShell() {
 
               <p className={styles.weekOverviewNote}>
                 {weeklyMealDays > 0
-                  ? `${weeklyMealDays} giorni su 7 hanno almeno un pasto registrato.`
-                  : "La settimana inizierà a prendere forma quando registrerai i pasti."}
+                  ? homeCopy.weekLogged(weeklyMealDays)
+                  : homeCopy.weekEmpty}
               </p>
             </div>
           </section>
