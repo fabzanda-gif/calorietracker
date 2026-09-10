@@ -13,6 +13,7 @@ const OPTIONS: Array<{
   { locale: "it", flag: "🇮🇹", label: "Italiano" },
   { locale: "en", flag: "🇬🇧", label: "English" },
   { locale: "nl", flag: "🇳🇱", label: "Nederlands" },
+  { locale: "fr", flag: "🇫🇷", label: "Français" },
 ];
 
 export function LanguageSwitcher({
@@ -63,7 +64,9 @@ export function LanguageSwitcher({
             ? "Cambia lingua"
             : locale === "nl"
               ? "Taal wijzigen"
-              : "Change language"
+              : locale === "fr"
+                ? "Changer de langue"
+                : "Change language"
         }
         aria-haspopup="menu"
         aria-expanded={open}
