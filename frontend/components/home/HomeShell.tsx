@@ -136,6 +136,36 @@ function todayIso(): string {
 }
 
 
+function shiftIsoDate(
+  value: string,
+  days: number,
+): string {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return localIsoDate(date);
+}
+
+
+function dailyDateLabel(value: string): string {
+  if (value === todayIso()) {
+    return "Oggi";
+  }
+
+  if (value === shiftIsoDate(todayIso(), -1)) {
+    return "Ieri";
+  }
+
+  return new Date(`${value}T12:00:00`).toLocaleDateString(
+    "it-IT",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    },
+  );
+}
+
+
 function futureIso(
   days: number,
 ): string {
@@ -612,6 +642,12 @@ export function HomeShell() {
     useState<LoggedMeal[]>([]);
 
   const [actualActivities, setActualActivities] =
+    useState<Activity[]>([]);
+  const [selectedLogDate, setSelectedLogDate] =
+    useState(todayIso);
+  const [summaryMeals, setSummaryMeals] =
+    useState<LoggedMeal[]>([]);
+  const [summaryActivities, setSummaryActivities] =
     useState<Activity[]>([]);
 
   const [plannedActivities, setPlannedActivities] =
@@ -1899,7 +1935,58 @@ export function HomeShell() {
       profile?.metadata.onboarding_completed !== true) ||
       (isOnboardingTestAccount && !onboardingTestCompleted));
 
+  useEffect(() => {
+    if (selectedLogDate === todayIso()) {
+      setSummaryMeals(actualMeals);
+      setSummaryActivities(actualActivities);
+      return;
+    }
+
+    if (!accessToken) {
+      return;
+    }
+
+    let active = true;
+
+    void Promise.all([
+      getMealsForDate(selectedLogDate, accessToken),
+      getActivitiesForDate(selectedLogDate, accessToken),
+    ])
+      .then(([mealsPayload, activitiesPayload]) => {
+        if (!active) {
+          return;
+        }
+
+        setSummaryMeals(mealsPayload.items ?? []);
+        setSummaryActivities(activitiesPayload.items ?? []);
+      })
+      .catch((err) => {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Non riesco a caricare il resoconto selezionato.",
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    accessToken,
+    selectedLogDate,
+    actualMeals,
+    actualActivities,
+  ]);
+
   const burnedCalories = actualActivities.reduce(
+    (total, activity) =>
+      total + Number(activity.burned_calories || 0),
+    0,
+  );
+
+  const summaryBurnedCalories = summaryActivities.reduce(
     (total, activity) =>
       total + Number(activity.burned_calories || 0),
     0,
@@ -2869,6 +2956,22 @@ export function HomeShell() {
     return actualMealsForSlot(slot)[0] ?? null;
   }
 
+  function summaryMealsForSlot(
+    slot: string,
+  ): LoggedMeal[] {
+    const type = mealLabel(slot);
+
+    return summaryMeals.filter(
+      (meal) => meal.meal_type === type,
+    );
+  }
+
+  function summaryMealForSlot(
+    slot: string,
+  ): LoggedMeal | null {
+    return summaryMealsForSlot(slot)[0] ?? null;
+  }
+
   async function openMealEditor(
     meal: LoggedMeal,
   ) {
@@ -3713,7 +3816,7 @@ export function HomeShell() {
         await logMealPrepPortion(
           accessToken,
           selected.mealPrepBatchId,
-          todayIso(),
+          selectedLogDate,
           mealLabel(slot),
         );
       } else if (
@@ -3723,7 +3826,7 @@ export function HomeShell() {
       ) {
         await logPantryMeal(
           {
-            date: todayIso(),
+            date: selectedLogDate,
             meal_type: mealLabel(slot),
             pantry_item_id:
               selected.pantryItemId,
@@ -3735,7 +3838,7 @@ export function HomeShell() {
       } else {
         await createMeal(
           {
-            date: todayIso(),
+            date: selectedLogDate,
             meal_type: mealLabel(slot),
             name,
             calories: Math.round(calories),
@@ -4040,7 +4143,11 @@ export function HomeShell() {
               <div>
                 <span>Abitudine riconosciuta</span>
                 <strong>
-                  Hai fatto {budgetResult.energy_baseline.activity_suggestion.activity_name.toLowerCase()} anche oggi?
+                  {/bici|bicicletta/i.test(
+                    budgetResult.energy_baseline.activity_suggestion.activity_name,
+                  )
+                    ? "Sei andato in ufficio in bicicletta anche oggi?"
+                    : `Hai fatto ${budgetResult.energy_baseline.activity_suggestion.activity_name.toLowerCase()} anche oggi?`}
                 </strong>
                 <p>{budgetResult.energy_baseline.activity_suggestion.reason}</p>
               </div>
@@ -4319,16 +4426,46 @@ export function HomeShell() {
                   <span className={styles.budgetCalmIcon} aria-hidden="true">
                     {budget.budget_adapted ? "✓" : "○"}
                   </span>
-                  <p>
-                    {budget.budget_adapted
-                      ? "Oggi ti sei mosso meno del previsto. Abbiamo ridotto il deficit per lasciarti pasti completi."
-                      : budget.consumed_kcal === 0
-                      ? "Il piano è pronto e si adatterà con calma a quello che succede oggi."
-                      : budget.consumed_kcal < maintenanceBudgetKcal
-                      ? "Sei ancora sotto il mantenimento. Continua la giornata senza inseguire il singolo numero."
-                      : "Hai raggiunto il mantenimento: è un'informazione, non un giudizio."
-                    }
-                  </p>
+                  {todayPlannedActivities.length > 0 ? (
+                    <div className={styles.budgetPlannedActivity}>
+                      <span>Attività programmata</span>
+                      <strong>
+                        {todayPlannedActivities
+                          .map((item) => item.title)
+                          .join(", ")}
+                      </strong>
+                      <small>
+                        +{Math.round(plannedActivityKcal)} kcal previste
+                      </small>
+                    </div>
+                  ) : (
+                    <p>
+                      {budget.budget_adapted
+                        ? "Oggi ti sei mosso meno del previsto. Abbiamo adattato il piano per lasciarti pasti completi."
+                        : budget.consumed_kcal === 0
+                          ? "Il piano è pronto e si adatterà con calma a quello che succede oggi."
+                          : budget.consumed_kcal < maintenanceBudgetKcal
+                            ? "Sei ancora sotto il mantenimento. Continua la giornata senza inseguire il singolo numero."
+                            : "Hai raggiunto il mantenimento: è un'informazione, non un giudizio."}
+                    </p>
+                  )}
+                  <span className={styles.budgetTodayDeficit}>
+                    Deficit di oggi{" "}
+                    <strong>
+                      {roundNumber(
+                        budget.effective_goal_adjustment_kcal,
+                      )} kcal
+                    </strong>
+                    {budget.budget_adapted ? (
+                      <span
+                        className={styles.budgetDeficitInfo}
+                        title="Deficit adattato in base alla giornata"
+                        aria-label="Deficit adattato in base alla giornata"
+                      >
+                        i
+                      </span>
+                    ) : null}
+                  </span>
                   <button
                     type="button"
                     className={styles.budgetToggle}
@@ -4358,11 +4495,6 @@ export function HomeShell() {
                       <span>Mantenimento stimato</span>
                       <strong>{roundNumber(maintenanceBudgetKcal)} kcal</strong>
                       <small>con la giornata di oggi</small>
-                    </div>
-                    <div className={styles.budgetDetail}>
-                      <span>Deficit scelto</span>
-                      <strong>{roundNumber(budget.goal_adjustment_kcal)} kcal</strong>
-                      <small>dal tuo obiettivo</small>
                     </div>
                     <div className={styles.budgetDetail}>
                       <span>Deficit di oggi</span>
@@ -5511,7 +5643,7 @@ export function HomeShell() {
                     accessToken ? (
                       <QuickActivityForm
                         accessToken={accessToken}
-                        date={todayIso()}
+                        date={selectedLogDate}
                         weightKg={latestWeight}
                         initialValue={quickActivityInitialValue}
                         onCancel={closeUnifiedQuickAdd}
@@ -5631,12 +5763,55 @@ export function HomeShell() {
 
               <div className={styles.dailySummaryHeaderCopy}>
                 <p className={styles.kicker}>
-                  Oggi
+                  {dailyDateLabel(selectedLogDate)}
                 </p>
                 <h2>Resoconto giornaliero</h2>
                 <p className={styles.dailySummarySubtitle}>
                   Pasti e attività, tutto in un unico elenco.
                 </p>
+              </div>
+
+              <div
+                className={styles.dailyDateControl}
+                aria-label="Data del resoconto giornaliero"
+              >
+                <button
+                  type="button"
+                  aria-label="Giorno precedente"
+                  onClick={() =>
+                    setSelectedLogDate((current) =>
+                      shiftIsoDate(current, -1),
+                    )
+                  }
+                >
+                  ‹
+                </button>
+                <label>
+                  <span>{dailyDateLabel(selectedLogDate)}</span>
+                  <input
+                    type="date"
+                    value={selectedLogDate}
+                    max={todayIso()}
+                    aria-label="Scegli la data del resoconto"
+                    onChange={(event) => {
+                      if (event.target.value) {
+                        setSelectedLogDate(event.target.value);
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  aria-label="Giorno successivo"
+                  disabled={selectedLogDate >= todayIso()}
+                  onClick={() =>
+                    setSelectedLogDate((current) =>
+                      shiftIsoDate(current, 1),
+                    )
+                  }
+                >
+                  ›
+                </button>
               </div>
 
               <details className={styles.dailyAddMenu}>
@@ -5777,7 +5952,7 @@ export function HomeShell() {
               </span>
             </a>
 
-            {actualActivities.length > 0 ? (
+            {summaryActivities.length > 0 ? (
               <details className={styles.dailyActivityEntry}>
                 <summary>
                   <span
@@ -5790,14 +5965,14 @@ export function HomeShell() {
                   <span className={styles.dailyEntryMain}>
                     <strong>Attività di oggi</strong>
                     <span>
-                      {actualActivities.length === 1
-                        ? actualActivities[0].activity_name
-                        : `${actualActivities.length} attività registrate`}
+                      {summaryActivities.length === 1
+                        ? summaryActivities[0].activity_name
+                        : `${summaryActivities.length} attività registrate`}
                     </span>
                   </span>
 
                   <strong className={styles.dailyActivityCalories}>
-                    −{roundNumber(burnedCalories)} kcal
+                    −{roundNumber(summaryBurnedCalories)} kcal
                   </strong>
 
                   <span
@@ -5816,7 +5991,7 @@ export function HomeShell() {
                 </summary>
 
                 <div className={styles.dailyActivityDetails}>
-                  {actualActivities.map((activity) => (
+                  {summaryActivities.map((activity) => (
                     <div
                       key={String(
                         activity.id ??
@@ -5888,10 +6063,10 @@ export function HomeShell() {
                     key={slot}
                     data-meal-slot={slot}
                     className={`${styles.mealCard} ${styles.dailyMealEntry} ${
-                      actualMealForSlot(slot)
-                        ? actualMealsForSlot(slot).length <= 1
+                      summaryMealForSlot(slot)
+                        ? summaryMealsForSlot(slot).length <= 1
                           ? styles.mealCardOneItem
-                          : actualMealsForSlot(slot).length === 2
+                          : summaryMealsForSlot(slot).length === 2
                             ? styles.mealCardTwoItems
                             : styles.mealCardManyItems
                         : ""
@@ -5915,8 +6090,8 @@ export function HomeShell() {
                         </strong>
 
                         <span>
-                          {actualMealForSlot(slot)
-                            ? actualMealsForSlot(slot)
+                          {summaryMealForSlot(slot)
+                            ? summaryMealsForSlot(slot)
                                 .map((registeredMeal) =>
                                   registeredMeal.name.replace(
                                     /\\s*\\([^)]*porz\\.\\)\\s*$/i,
@@ -5924,8 +6099,10 @@ export function HomeShell() {
                                   ),
                                 )
                                 .join(" · ")
-                            : displayedMealName(slot, meal.value) ??
-                              "Da decidere"}
+                            : selectedLogDate === todayIso()
+                              ? displayedMealName(slot, meal.value) ??
+                                "Da decidere"
+                              : "Nessun pasto registrato"}
                         </span>
                       </span>
 
@@ -5934,9 +6111,9 @@ export function HomeShell() {
                           styles.dailyMealCalories
                         }
                       >
-                        {actualMealForSlot(slot)
+                        {summaryMealForSlot(slot)
                           ? `${roundNumber(
-                              actualMealsForSlot(
+                              summaryMealsForSlot(
                                 slot,
                               ).reduce(
                                 (
@@ -5951,16 +6128,17 @@ export function HomeShell() {
                                 0,
                               ),
                             )} kcal`
-                          : displayedMealCalories(slot, meal.estimated_calories) != null
-                            ? `~${roundNumber(
-                                Number(
-                                  displayedMealCalories(slot, meal.estimated_calories),
-                                ),
-                              )} kcal`
-                            : "—"}
+                          : selectedLogDate === todayIso() &&
+                            displayedMealCalories(slot, meal.estimated_calories) != null
+                              ? `~${roundNumber(
+                                  Number(
+                                    displayedMealCalories(slot, meal.estimated_calories),
+                                  ),
+                                )} kcal`
+                              : "—"}
                       </strong>
 
-                      {actualMealForSlot(slot) ? (
+                      {summaryMealForSlot(slot) ? (
                         <span
                           className={styles.dailyEntryDone}
                           aria-label="Registrato"
@@ -6017,14 +6195,14 @@ export function HomeShell() {
 
                       <span
                         className={
-                          actualMealForSlot(slot)
+                          summaryMealForSlot(slot)
                             ? styles.registeredMealBadge
                             : meal.state === "predicted"
                               ? styles.predictedBadge
                               : styles.unknownBadge
                         }
                       >
-                        {actualMealForSlot(slot)
+                        {summaryMealForSlot(slot)
                           ? "Registrato"
                           : meal.state === "predicted"
                             ? "Previsto"
@@ -6032,7 +6210,7 @@ export function HomeShell() {
                       </span>
 
                       {slot === nextMeal?.next_slot &&
-                      !actualMealForSlot(slot) ? (
+                      !summaryMealForSlot(slot) ? (
                         <span
                           className={styles.nextMealBadge}
                         >
@@ -6041,10 +6219,10 @@ export function HomeShell() {
                       ) : null}
                     </div>
 
-                    {actualMealForSlot(slot) ? (
+                    {summaryMealForSlot(slot) ? (
                       <>
                         <div className={styles.registeredMealList}>
-                          {actualMealsForSlot(slot).map(
+                          {summaryMealsForSlot(slot).map(
                             (registeredMeal) => (
                               <div
                                 key={String(
@@ -6138,12 +6316,12 @@ export function HomeShell() {
                           )}
                         </div>
 
-                        {actualMealsForSlot(slot).length > 0 ? (
+                        {summaryMealsForSlot(slot).length > 0 ? (
                           <div className={styles.registeredMealNutrition}>
                             <div className={styles.nutritionItem}>
                               <strong>
                                 {roundNumber(
-                                  actualMealsForSlot(slot).reduce(
+                                  summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
                                       Number(
@@ -6159,7 +6337,7 @@ export function HomeShell() {
                             <div className={styles.nutritionItem}>
                               <strong>
                                 {roundNumber(
-                                  actualMealsForSlot(slot).reduce(
+                                  summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
                                       Number(
@@ -6175,7 +6353,7 @@ export function HomeShell() {
                             <div className={styles.nutritionItem}>
                               <strong>
                                 {roundNumber(
-                                  actualMealsForSlot(slot).reduce(
+                                  summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
                                       Number(
@@ -6191,7 +6369,7 @@ export function HomeShell() {
                             <div className={styles.nutritionItem}>
                               <strong>
                                 {roundNumber(
-                                  actualMealsForSlot(slot).reduce(
+                                  summaryMealsForSlot(slot).reduce(
                                     (total, registeredMeal) =>
                                       total +
                                       Number(
@@ -6205,7 +6383,7 @@ export function HomeShell() {
                             </div>
                           </div>
                         ) : null}
-                        {actualMealsForSlot(slot).length > 0 ? (
+                        {summaryMealsForSlot(slot).length > 0 ? (
                           <div
                             className={
                               styles.registeredMealInsights
@@ -6219,7 +6397,7 @@ export function HomeShell() {
                               ✓ Pasto registrato
                             </span>
 
-                            {actualMealsForSlot(slot).reduce(
+                            {summaryMealsForSlot(slot).reduce(
                               (total, registeredMeal) =>
                                 total +
                                 Number(
@@ -6234,7 +6412,7 @@ export function HomeShell() {
                               >
                                 ▮▮ Proteine basse
                               </span>
-                            ) : actualMealsForSlot(slot).reduce(
+                            ) : summaryMealsForSlot(slot).reduce(
                                 (total, registeredMeal) =>
                                   total +
                                   Number(
@@ -6262,7 +6440,7 @@ export function HomeShell() {
                         ) : null}
 
 
-                        {actualMealsForSlot(slot).some(
+                        {summaryMealsForSlot(slot).some(
                           (registeredMeal) =>
                             registeredMeal.id === editingMealId,
                         ) ? (
@@ -6465,7 +6643,7 @@ export function HomeShell() {
                                 disabled={savingMealEdit}
                                 onClick={() => {
                                   const actual =
-                                    actualMealsForSlot(slot).find(
+                                    summaryMealsForSlot(slot).find(
                                       (registeredMeal) =>
                                         registeredMeal.id ===
                                         editingMealId,
@@ -6507,7 +6685,7 @@ export function HomeShell() {
                           className={styles.mealName}
                         >
                           {slot === nextMeal?.next_slot &&
-                          !actualMealForSlot(slot) &&
+                          !summaryMealForSlot(slot) &&
                           nextMealOptions?.recommended
                             ? nextMealOptions.recommended
                                 .candidate.name
@@ -6516,7 +6694,7 @@ export function HomeShell() {
                         </strong>
 
                         {slot === nextMeal?.next_slot &&
-                        !actualMealForSlot(slot) &&
+                        !summaryMealForSlot(slot) &&
                         nextMealOptions?.recommended ? (
                           <p className={styles.mealMeta}>
                             {typeof nextMealOptions.recommended
@@ -6558,7 +6736,7 @@ export function HomeShell() {
                     )}
 
                     {slot === nextMeal?.next_slot &&
-                    !actualMealForSlot(slot) &&
+                    !summaryMealForSlot(slot) &&
                     nextMealOptions?.recommended ? (
                       nextMealOptions.recommended.strategy ===
                       "routine" ? (
@@ -6686,7 +6864,7 @@ export function HomeShell() {
                     ) : null}
 
                     {slot === nextMeal?.next_slot &&
-                    !actualMealForSlot(slot) &&
+                    !summaryMealForSlot(slot) &&
                     meal.state === "predicted" ? (
                       <>
                         <div className={styles.mealActions}>
@@ -6752,7 +6930,7 @@ export function HomeShell() {
 
                     {slot === "dinner" &&
                     slot === nextMeal?.next_slot &&
-                    !actualMealForSlot(slot) &&
+                    !summaryMealForSlot(slot) &&
                     nextMealOptions?.day_context?.kind ===
                       "training_prep" ? (
                       <div
