@@ -6727,7 +6727,7 @@ export function HomeShell() {
                             <strong>
                               {nextMealOptions
                                 .replanning_context?.title ??
-                                homeCopy.alreadySuitable
+                                homeCopy.alreadySuitable}
                             </strong>
                             <p>
                               {nextMealOptions
