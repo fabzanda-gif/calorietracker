@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -601,6 +602,10 @@ export default function ActivitiesPage() {
 
   const [gpxFile, setGpxFile] =
     useState<File | null>(null);
+  const plannedGpxInputRef =
+    useRef<HTMLInputElement | null>(null);
+  const plannedGpxTargetRef =
+    useRef<PlannedActivity | null>(null);
 
   const [
     plannedGpxActivity,
@@ -1769,6 +1774,13 @@ export default function ActivitiesPage() {
     }
   }
 
+  function openPlannedGpxPicker(
+    activity: PlannedActivity,
+  ) {
+    plannedGpxTargetRef.current = activity;
+    plannedGpxInputRef.current?.click();
+  }
+
   async function removeActivity(activity: Activity) {
     if (!accessToken || activity.id == null) return;
     if (!window.confirm(`Eliminare “${activity.activity_name}”?`)) return;
@@ -1965,6 +1977,23 @@ export default function ActivitiesPage() {
           zero ? styles.pageZero : ""
         }`}
       >
+        <input
+          ref={plannedGpxInputRef}
+          hidden
+          type="file"
+          accept=".gpx,application/gpx+xml"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0] ?? null;
+            const activity = plannedGpxTargetRef.current;
+
+            if (activity) {
+              void chooseGpx(file, activity);
+            }
+
+            plannedGpxTargetRef.current = null;
+            event.currentTarget.value = "";
+          }}
+        />
         <header className={styles.header}>
           <div>
             <p className={styles.eyebrow}>
@@ -2457,34 +2486,22 @@ export default function ActivitiesPage() {
                   {nextPlannedActivity.activity_type
                     .trim()
                     .toLocaleLowerCase("it-IT") === "corsa" ? (
-                    <label
+                    <button
+                      type="button"
                       className={styles.nextActivityGpx}
                       onClick={(event) => {
+                        event.preventDefault();
                         event.stopPropagation();
+                        openPlannedGpxPicker(
+                          nextPlannedActivity,
+                        );
                       }}
+                      disabled={
+                        busyPlanId === nextPlannedActivity.id
+                      }
                     >
                       Carica GPX
-
-                      <input
-                        hidden
-                        type="file"
-                        accept=".gpx,application/gpx+xml"
-                        disabled={
-                          busyPlanId === nextPlannedActivity.id
-                        }
-                        onChange={(event) => {
-                          const file =
-                            event.target.files?.[0] ?? null;
-
-                          void chooseGpx(
-                            file,
-                            nextPlannedActivity,
-                          );
-
-                          event.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
+                    </button>
                   ) : null}
 
                   <span className={styles.plannerMorePrompt}>
@@ -3498,36 +3515,20 @@ export default function ActivitiesPage() {
                                 .toLocaleLowerCase(
                                   "it-IT",
                                 ) === "corsa" ? (
-                                <label
+                                <button
+                                  type="button"
                                   className={
                                     styles.completePlanButton
                                   }
+                                  disabled={
+                                    busyPlanId === item.id
+                                  }
+                                  onClick={() => {
+                                    openPlannedGpxPicker(item);
+                                  }}
                                 >
                                   Carica GPX
-                                  <input
-                                    hidden
-                                    type="file"
-                                    accept=".gpx,application/gpx+xml"
-                                    disabled={
-                                      busyPlanId ===
-                                      item.id
-                                    }
-                                    onChange={(event) => {
-                                      const file =
-                                        event.target
-                                          .files?.[0] ??
-                                        null;
-
-                                      void chooseGpx(
-                                        file,
-                                        item,
-                                      );
-
-                                      event.currentTarget.value =
-                                        "";
-                                    }}
-                                  />
-                                </label>
+                                </button>
                               ) : null}
 
                               <button
