@@ -55,7 +55,7 @@
   min-width: 310px;
   padding: 5px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   border-radius: 14px;
   background: #f0f0ef;
 }
