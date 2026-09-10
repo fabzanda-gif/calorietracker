@@ -4619,21 +4619,20 @@ export function HomeShell() {
 
                 <p>
                   {conversationMode === "text"
-                    ? "Racconta la tua giornata, penso io al resto."
-                    : "Scatta una foto o scegline una dalla galleria."}
+                    ? homeCopy.aiTextIntro
+                    : homeCopy.aiPhotoIntro}
                 </p>
               </div>
 
               <span className={styles.aiCapabilityPill}>
-                ✦ Tutto in un input
+                ✦ {homeCopy.allInOneInput}
               </span>
             </div>
 
             <div className={styles.aiHelperPanel}>
               <span aria-hidden="true">✦</span>
               <p>
-                Puoi registrare pasti, attività e peso,
-                anche insieme nello stesso messaggio.
+                {homeCopy.aiHelper}
               </p>
             </div>
 
@@ -4654,7 +4653,7 @@ export function HomeShell() {
                 }}
               >
                 <span aria-hidden="true">⌨</span>
-                Scrivi
+                {homeCopy.write}
               </button>
 
               <button
@@ -4673,7 +4672,7 @@ export function HomeShell() {
                 }}
               >
                 <span aria-hidden="true">▣</span>
-                Foto
+                {homeCopy.photo}
               </button>
             </div>
 
@@ -4685,19 +4684,19 @@ export function HomeShell() {
                     event.target.value,
                   )
                 }
-                aria-label="Tipo di pasto"
+                aria-label={homeCopy.mealType}
               >
                 <option value="Colazione">
-                  Colazione
+                  {homeCopy.breakfast}
                 </option>
                 <option value="Pranzo">
-                  Pranzo
+                  {homeCopy.lunch}
                 </option>
                 <option value="Snack">
-                  Snack
+                  {homeCopy.snack}
                 </option>
                 <option value="Cena">
-                  Cena
+                  {homeCopy.dinner}
                 </option>
               </select>
 
@@ -4710,7 +4709,7 @@ export function HomeShell() {
                         event.target.value,
                       )
                     }
-                    placeholder="Es. Ho mangiato una piadina, corso 5 km e peso 77,4 kg..."
+                    placeholder={homeCopy.conversationPlaceholder}
                     rows={3}
                   />
 
@@ -4729,8 +4728,8 @@ export function HomeShell() {
                     }
                     title={
                       conversationListening
-                        ? "Ferma dettatura"
-                        : "Detta con il microfono"
+                        ? homeCopy.stopDictation
+                        : homeCopy.dictate
                     }
                   >
                     <span aria-hidden="true">
@@ -4740,8 +4739,8 @@ export function HomeShell() {
                     </span>
                     <span className={styles.srOnly}>
                       {conversationListening
-                        ? "Ferma dettatura"
-                        : "Detta con il microfono"}
+                        ? homeCopy.stopDictation
+                        : homeCopy.dictate}
                     </span>
                   </button>
 
@@ -4760,8 +4759,8 @@ export function HomeShell() {
                     </span>
                     <span className={styles.srOnly}>
                       {conversationLoading
-                        ? "Analizzo"
-                        : "Analizza"}
+                        ? homeCopy.analyzing
+                        : homeCopy.analyze}
                     </span>
                   </button>
                 </>
@@ -4776,7 +4775,7 @@ export function HomeShell() {
                       }
                     >
                       <span aria-hidden="true">📷</span>
-                      <strong>Scatta foto</strong>
+                      <strong>{homeCopy.takePhoto}</strong>
 
                       <input
                         type="file"
@@ -4821,7 +4820,7 @@ export function HomeShell() {
                       }
                     >
                       <span aria-hidden="true">🖼️</span>
-                      <strong>Carica foto</strong>
+                      <strong>{homeCopy.uploadPhoto}</strong>
 
                       <input
                         type="file"
@@ -4866,7 +4865,7 @@ export function HomeShell() {
                         styles.conversationPhotoSelected
                       }
                     >
-                      <span>Foto selezionata</span>
+                      <span>{homeCopy.selectedPhoto}</span>
                       <strong>{conversationPhoto.name}</strong>
                     </div>
                   ) : null}
@@ -4879,7 +4878,7 @@ export function HomeShell() {
                     >
                       <img
                         src={conversationPhotoPreview}
-                        alt="Anteprima del pasto"
+                        alt={homeCopy.mealPreview}
                       />
                     </div>
                   ) : null}
@@ -4895,8 +4894,8 @@ export function HomeShell() {
                     }
                   >
                     {conversationLoading
-                      ? "Analizzo..."
-                      : "Analizza foto"}
+                      ? homeCopy.analyzingPhoto
+                      : homeCopy.analyzePhoto}
                   </button>
                 </>
               )}
@@ -4907,14 +4906,9 @@ export function HomeShell() {
             !conversationDayPreview ? (
               <div
                 className={styles.aiSuggestionChips}
-                aria-label="Esempi da provare"
+                aria-label={homeCopy.examples}
               >
-                {[
-                  "Ho mangiato una piadina con pollo",
-                  "Ho corso 5 km in 30 minuti",
-                  "Stamattina peso 77,4 kg",
-                  "A pranzo pasta, poi palestra 45 minuti",
-                ].map((example) => (
+                {homeCopy.exampleItems.map((example) => (
                   <button
                     key={example}
                     type="button"
