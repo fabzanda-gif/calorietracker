@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { updateProfile } from "@/lib/api/profile";
 import { createWeight } from "@/lib/api/weight";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import styles from "./WelcomeJourney.module.css";
 
@@ -19,6 +20,7 @@ export function WelcomeJourney({
   initialName = "",
   testMode = false,
 }: WelcomeJourneyProps) {
+  const { t } = useI18n();
   const [step, setStep] = useState<"welcome" | "profile">(
     "welcome",
   );
@@ -53,7 +55,7 @@ export function WelcomeJourney({
       !Number.isFinite(weightValue) ||
       weightValue <= 0
     ) {
-      setError("Completa i campi necessari per calcolare il tuo piano.");
+      setError(t("onboardingRequired"));
       return;
     }
 
@@ -91,7 +93,7 @@ export function WelcomeJourney({
       setError(
         err instanceof Error
           ? err.message
-          : "Non siamo riusciti a salvare il profilo.",
+          : t("profileSaveFailed"),
       );
       setSaving(false);
     }
@@ -105,7 +107,7 @@ export function WelcomeJourney({
         aria-modal="true"
         aria-labelledby="welcome-title"
       >
-        <div className={styles.progress} aria-label="Passaggio">
+        <div className={styles.progress} aria-label={t("onboardingStep")}>
           <span className={styles.progressActive} />
           <span className={step === "profile" ? styles.progressActive : ""} />
         </div>
@@ -113,74 +115,72 @@ export function WelcomeJourney({
         {step === "welcome" ? (
           <div className={styles.welcome}>
             <img src="/assets/LogoCoral.png" alt="SanoSync" />
-            <p className={styles.eyebrow}>Benvenuto in SanoSync</p>
-            <h1 id="welcome-title">Tutto sotto controllo.</h1>
+            <p className={styles.eyebrow}>{t("onboardingWelcome")}</p>
+            <h1 id="welcome-title">{t("onboardingTitle")}</h1>
             <p>
-              Registra pasti, movimento e peso. SanoSync trasforma i tuoi
-              dati in un piano quotidiano semplice da seguire.
+              {t("onboardingIntro")}
             </p>
             <div className={styles.features}>
-              <span>◎ Budget calorico personale</span>
-              <span>✦ Pasti e attività in un unico posto</span>
-              <span>↗ Progressi chiari nel tempo</span>
+              <span>◎ {t("personalCalorieBudget")}</span>
+              <span>✦ {t("mealsActivitiesTogether")}</span>
+              <span>↗ {t("clearProgress")}</span>
             </div>
             <button type="button" onClick={() => setStep("profile")}>
-              Configura il mio piano
+              {t("configurePlan")}
             </button>
           </div>
         ) : (
           <form className={styles.form} onSubmit={completeJourney}>
-            <p className={styles.eyebrow}>Il tuo punto di partenza</p>
-            <h1 id="welcome-title">Creiamo il tuo piano.</h1>
+            <p className={styles.eyebrow}>{t("startingPoint")}</p>
+            <h1 id="welcome-title">{t("createPlanTitle")}</h1>
             <p className={styles.intro}>
-              Questi dati servono a stimare metabolismo e obiettivo calorico.
-              Potrai modificarli in qualsiasi momento dal profilo.
+              {t("createPlanIntro")}
             </p>
 
             <div className={styles.grid}>
               <label>
-                <span>Nome</span>
+                <span>{t("name")}</span>
                 <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="given-name" />
               </label>
               <label>
-                <span>Formula per il calcolo BMR</span>
+                <span>{t("bmrFormula")}</span>
                 <select value={gender} onChange={(e) => setGender(e.target.value)} required>
-                  <option value="">Seleziona</option>
-                  <option value="female">Donna</option>
-                  <option value="male">Uomo</option>
+                  <option value="">{t("select")}</option>
+                  <option value="female">{t("female")}</option>
+                  <option value="male">{t("male")}</option>
                 </select>
               </label>
               <label>
-                <span>Data di nascita</span>
+                <span>{t("birthDate")}</span>
                 <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required />
               </label>
               <label>
-                <span>Altezza (cm)</span>
+                <span>{t("heightCm")}</span>
                 <input type="number" min="100" max="250" value={height} onChange={(e) => setHeight(e.target.value)} required />
               </label>
               <label>
-                <span>Peso attuale (kg)</span>
+                <span>{t("currentWeightKg")}</span>
                 <input type="number" min="30" max="350" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} required />
               </label>
               <label>
-                <span>Peso obiettivo (kg) <small>facoltativo</small></span>
+                <span>{t("targetWeightKg")} <small>{t("optional")}</small></span>
                 <input type="number" min="30" max="350" step="0.1" value={targetWeight} onChange={(e) => setTargetWeight(e.target.value)} />
               </label>
               <label className={styles.fullWidth}>
-                <span>Obiettivo</span>
+                <span>{t("goal")}</span>
                 <select value={goalMode} onChange={(e) => setGoalMode(e.target.value)}>
-                  <option value="loss">Perdere peso</option>
-                  <option value="maintenance">Mantenere il peso</option>
-                  <option value="gain">Aumentare il peso</option>
+                  <option value="loss">{t("loseWeight")}</option>
+                  <option value="maintenance">{t("maintainWeight")}</option>
+                  <option value="gain">{t("gainWeight")}</option>
                 </select>
               </label>
               {goalMode !== "maintenance" ? (
                 <label className={styles.fullWidth}>
-                  <span>{goalMode === "loss" ? "Velocità di perdita" : "Velocità di aumento"}</span>
+                  <span>{goalMode === "loss" ? t("lossSpeed") : t("gainSpeed")}</span>
                   <select value={adjustment} onChange={(e) => setAdjustment(e.target.value)}>
-                    <option value="100">Lento · {goalMode === "loss" ? "deficit" : "surplus"} di 100 kcal</option>
-                    <option value="300">Bilanciato · {goalMode === "loss" ? "deficit" : "surplus"} di 300 kcal</option>
-                    <option value="500">Rapido · {goalMode === "loss" ? "deficit" : "surplus"} di 500 kcal</option>
+                    <option value="100">{t("slow")} · {goalMode === "loss" ? t("deficit") : t("surplus")} 100 kcal</option>
+                    <option value="300">{t("balanced")} · {goalMode === "loss" ? t("deficit") : t("surplus")} 300 kcal</option>
+                    <option value="500">{t("fast")} · {goalMode === "loss" ? t("deficit") : t("surplus")} 500 kcal</option>
                   </select>
                 </label>
               ) : null}
@@ -190,16 +190,16 @@ export function WelcomeJourney({
 
             <div className={styles.actions}>
               <button type="button" className={styles.back} onClick={() => setStep("welcome")}>
-                Indietro
+                {t("back")}
               </button>
               <button type="submit" disabled={saving}>
-                {saving ? "Creazione del piano..." : "Inizia con SanoSync"}
+                {saving ? t("creatingPlan") : t("startSanoSync")}
               </button>
             </div>
             <p className={styles.consent}>
-              Continuando confermi di aver letto la
-              {" "}<Link href="/privacy">Privacy Policy</Link> e i
-              {" "}<Link href="/terms">Termini e condizioni</Link>.
+              {t("consentContinue")}
+              {" "}<Link href="/privacy">Privacy Policy</Link> {t("consentAnd")}
+              {" "}<Link href="/terms">{t("terms")}</Link>.
             </p>
           </form>
         )}
