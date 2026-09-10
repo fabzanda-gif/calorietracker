@@ -14,6 +14,8 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { RECIPES_COPY } from "./recipesI18n";
 import {
   createIngredient,
   getIngredients,
@@ -119,7 +121,20 @@ function todayLocalIso(): string {
 export default function RecipesPage() {
   const { accessToken, user } = useAuth();
   const { experienceMode } = useExperienceMode();
+  const { locale } = useI18n();
+  const copy = RECIPES_COPY[locale];
   const zero = experienceMode === "zero";
+
+  const mealTypeLabel = (value?: string | null) => {
+    const normalized = String(value ?? "").trim().toLowerCase();
+
+    if (["colazione", "breakfast"].includes(normalized)) return copy.breakfast;
+    if (["pranzo", "lunch"].includes(normalized)) return copy.lunch;
+    if (["cena", "dinner"].includes(normalized)) return copy.dinner;
+    if (["snack", "spuntino"].includes(normalized)) return copy.snack;
+
+    return value || copy.recipe;
+  };
 
   const [recipes, setRecipes] =
     useState<Recipe[]>([]);
@@ -1129,31 +1144,31 @@ export default function RecipesPage() {
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>
-            Ricette
+            {copy.kicker}
           </p>
 
           <h1>
             {zero
-              ? "Le ricette che almeno sai già gestire"
-              : "Le tue ricette"}
+              ? copy.titleZero
+              : copy.title}
           </h1>
             <Link
               href="/inventory"
               className={styles.inventoryLink}
             >
-              Apri dispensa
+              {copy.openPantry}
             </Link>
             <Link
               href="/ingredients"
               className={styles.inventoryLink}
             >
-              Gestisci ingredienti
+              {copy.manageIngredients}
             </Link>
 
           <p className={styles.headerSubtitle}>
             {zero
-              ? "Piatti già collaudati. Almeno qui evitiamo di fare i fenomeni."
-              : "I piatti che conosci già, pronti da registrare quando servono."}
+              ? copy.subtitleZero
+              : copy.subtitle}
           </p>
         </div>
       </header>
@@ -1169,9 +1184,9 @@ export default function RecipesPage() {
           <div className={styles.sectionHeader}>
             <div>
               <p className={styles.kicker}>
-                Meal prep
+                {copy.mealPrep}
               </p>
-              <h2>Cucina</h2>
+              <h2>{copy.cookingTitle}</h2>
             </div>
 
             <button
@@ -1180,7 +1195,7 @@ export default function RecipesPage() {
               onClick={closeCookDialog}
               disabled={cooking}
             >
-              Annulla
+              {copy.cancel}
             </button>
           </div>
 
@@ -1189,7 +1204,7 @@ export default function RecipesPage() {
           </p>
 
           <label className={styles.field}>
-            <span>Quante porzioni hai cucinato?</span>
+            <span>{copy.cookedHowMany}</span>
             <input
               type="number"
               min="1"
@@ -1213,8 +1228,8 @@ export default function RecipesPage() {
             disabled={cooking}
           >
             {cooking
-              ? "Salvataggio..."
-              : "Aggiungi all'inventario"}
+              ? copy.saving
+              : copy.addToInventory}
           </button>
         </section>
       ) : null}
@@ -1224,7 +1239,7 @@ export default function RecipesPage() {
           <div className={styles.sectionHeader}>
             <div>
               <p className={styles.kicker}>
-                Pasto di oggi
+                {copy.todayMeal}
               </p>
               <h2>
                 {mealDraft.name}
@@ -1243,15 +1258,13 @@ export default function RecipesPage() {
           </div>
 
           <p>
-            {mealDraft.mealType} · modifica
-            liberamente le quantità. La ricetta
-            originale non verrà cambiata.
+            {mealTypeLabel(mealDraft.mealType)} · {copy.editQuantities}
           </p>
 
 
           <div className={styles.twoColumns}>
             <label className={styles.field}>
-              Porzioni da mangiare
+              {copy.servingsToEat}
               <input
                 type="number"
                 min="0.1"
@@ -1270,7 +1283,7 @@ export default function RecipesPage() {
             </label>
 
             <div className={styles.field}>
-              Ricetta originale
+              {copy.originalRecipe}
               <div>
                 {mealDraft.recipeServings}{" "}
                 porzioni
@@ -1296,7 +1309,7 @@ export default function RecipesPage() {
                 >
                   <strong>
                     {ingredient?.name ||
-                      "Ingrediente"}
+                      copy.ingredient}
                   </strong>
 
                   <div
@@ -1370,8 +1383,8 @@ export default function RecipesPage() {
             }}
           >
             {loggingMeal
-              ? "Registro…"
-              : "Registra questo pasto"}
+              ? copy.logging
+              : copy.logThisMeal}
           </button>
         </section>
       ) : null}
@@ -1380,10 +1393,10 @@ export default function RecipesPage() {
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>
-              Libreria personale
+              {copy.personalLibrary}
             </p>
             <h2>
-              {zero ? "Le solite affidabili" : "Pronte quando ti servono"}
+              {zero ? copy.reliable : copy.ready}
             </h2>
           </div>
 
@@ -1395,7 +1408,7 @@ export default function RecipesPage() {
               void migrateLegacyLibrary();
             }}
           >
-            Aggiorna ricette legacy
+            {copy.updateLegacy}
           </button>
         </div>
 
@@ -1408,8 +1421,8 @@ export default function RecipesPage() {
             <input
               type="search"
               value={recipeSearch}
-              placeholder="Cerca una ricetta…"
-              aria-label="Cerca una ricetta"
+              placeholder={copy.search}
+              aria-label={copy.search}
               onChange={(event) => {
                 setRecipeSearch(
                   event.target.value,
@@ -1421,7 +1434,7 @@ export default function RecipesPage() {
               <button
                 type="button"
                 className={styles.clearSearch}
-                aria-label="Cancella ricerca"
+                aria-label={copy.clearSearch}
                 onClick={() => {
                   setRecipeSearch("");
                 }}
@@ -1433,7 +1446,7 @@ export default function RecipesPage() {
 
           <div
             className={styles.recipeFilters}
-            aria-label="Filtra per tipo di pasto"
+            aria-label={copy.filterMeal}
           >
             <button
               type="button"
@@ -1446,7 +1459,7 @@ export default function RecipesPage() {
                 setRecipeMealFilter("Tutte");
               }}
             >
-              Tutte
+              {copy.all}
             </button>
 
             {availableRecipeMealTypes.map(
@@ -1463,7 +1476,7 @@ export default function RecipesPage() {
                     setRecipeMealFilter(type);
                   }}
                 >
-                  {type}
+                  {mealTypeLabel(type)}
                 </button>
               ),
             )}
@@ -1474,21 +1487,21 @@ export default function RecipesPage() {
               {filteredRecipes.length}
             </strong>{" "}
             {filteredRecipes.length === 1
-              ? "ricetta"
-              : "ricette"}
+              ? copy.recipe
+              : copy.recipes}
           </div>
           <label className={styles.recipeSort}>
-            <span>Ordina</span>
+            <span>{copy.sort}</span>
             <select value={recipeSort} onChange={(event) => setRecipeSort(event.target.value as "recent" | "taste" | "ease")}>
-              <option value="recent">Più recenti</option>
-              <option value="taste">Gusto</option>
-              <option value="ease">Facilità</option>
+              <option value="recent">{copy.recent}</option>
+              <option value="taste">{copy.taste}</option>
+              <option value="ease">{copy.ease}</option>
             </select>
           </label>
         </div>
 
         {loading ? (
-          <p>Caricamento…</p>
+          <p>{copy.loading}</p>
         ) : filteredRecipes.length ? (
           <div className={styles.recipeList}>
             {filteredRecipes.map((recipe) => (
@@ -1514,7 +1527,7 @@ export default function RecipesPage() {
                   )}
 
                   <span className={styles.recipeTypeBadge}>
-                    {recipe.meal_type || "Ricetta"}
+                    {mealTypeLabel(recipe.meal_type)}
                   </span>
                 </div>
 
@@ -1526,7 +1539,7 @@ export default function RecipesPage() {
 
                     <div className={styles.recipeNutrition}>
                       <div className={styles.recipeRating}>
-                        <span>Gusto</span>
+                        <span>{copy.taste}</span>
                         <div aria-label={`Valuta il gusto di ${recipe.name}`}>
                           {[1, 2, 3, 4, 5].map((rating) => (
                             <button
@@ -1542,7 +1555,7 @@ export default function RecipesPage() {
                         </div>
                       </div>
                       <div className={styles.recipeRating}>
-                        <span>Facilità</span>
+                        <span>{copy.ease}</span>
                         <div aria-label={`Valuta la facilità di ${recipe.name}`}>
                           {[1, 2, 3, 4, 5].map((rating) => (
                             <button
@@ -1565,7 +1578,7 @@ export default function RecipesPage() {
                             ),
                           )}
                         </strong>
-                        kcal totali
+                        {copy.totalCalories}
                       </span>
 
                       {recipe.protein != null ? (
@@ -1577,7 +1590,7 @@ export default function RecipesPage() {
                               ),
                             )}
                           </strong>
-                          g proteine totali
+                          {copy.totalProtein}
                         </span>
                       ) : null}
 
@@ -1593,8 +1606,8 @@ export default function RecipesPage() {
                         {Number(
                           recipe.recipe_servings || 1,
                         ) === 1
-                          ? " porzione"
-                          : " porzioni"}
+                          ? ` ${copy.serving}`
+                          : ` ${copy.servings}`}
                       </span>
 
                       <span className={styles.recipePerServing}>
@@ -1611,7 +1624,7 @@ export default function RecipesPage() {
                               ),
                           )}
                         </strong>{" "}
-                        kcal / porzione
+                        {copy.perServing}
                       </span>
 
                       {recipe.protein != null ? (
@@ -1629,7 +1642,7 @@ export default function RecipesPage() {
                                 ),
                             )}
                           </strong>{" "}
-                          g proteine / porzione
+                          {copy.proteinPerServing}
                         </span>
                       ) : null}
                     </div>
@@ -1665,7 +1678,7 @@ export default function RecipesPage() {
                         openCookDialog(recipe);
                       }}
                     >
-                      Cucina
+                      {copy.cook}
                     </button>
 <button
                       type="button"
@@ -1678,14 +1691,14 @@ export default function RecipesPage() {
                         );
                       }}
                     >
-                      Registra
+                      {copy.log}
                     </button>
 
                     <Link
                       className={styles.secondaryButton}
                       href={`/recipes/${encodeURIComponent(recipe.id)}`}
                     >
-                      Dettaglio
+                      {copy.detail}
                     </Link>
                   </div>
                 </div>
@@ -1697,21 +1710,21 @@ export default function RecipesPage() {
             <strong>
               {recipes.length
                 ? zero
-                  ? "Niente. I filtri hanno lavorato fin troppo bene."
-                  : "Nessuna ricetta trovata"
+                  ? copy.noResultsZero
+                  : copy.noResults
                 : zero
-                  ? "Libreria vuota. Minimalismo non richiesto."
-                  : "La tua libreria è ancora vuota"}
+                  ? copy.emptyZero
+                  : copy.empty}
             </strong>
 
             <p>
               {recipes.length
                 ? zero
-                  ? "Cambia ricerca o filtro. Magari compare qualcosa."
-                  : "Prova a cambiare ricerca o filtro."
+                  ? copy.changeFilterZero
+                  : copy.changeFilter
                 : zero
-                  ? "Salva una ricetta. Prima o poi servirà anche questa organizzazione."
-                  : "Salva una ricetta e la troverai qui pronta da riutilizzare."}
+                  ? copy.emptyHelpZero
+                  : copy.emptyHelp}
             </p>
 
             {recipes.length ? (
@@ -1723,7 +1736,7 @@ export default function RecipesPage() {
                   setRecipeMealFilter("Tutte");
                 }}
               >
-                Azzera filtri
+                {copy.resetFilters}
               </button>
             ) : null}
           </div>
@@ -1736,13 +1749,13 @@ export default function RecipesPage() {
           <div>
             <p className={styles.kicker}>
               {editingId
-                ? "Modifica"
-                : "Nuova"}
+                ? copy.edit
+                : copy.new}
             </p>
             <h2>
               {editingId
-                ? "Modifica ricetta"
-                : "Crea ricetta"}
+                ? copy.editRecipe
+                : copy.createRecipe}
             </h2>
           </div>
 
@@ -1752,13 +1765,13 @@ export default function RecipesPage() {
               onClick={resetEditor}
               className={styles.secondaryButton}
             >
-              Nuova
+              {copy.new}
             </button>
           ) : null}
         </div>
 
         <label className={styles.field}>
-          Nome
+          {copy.name}
           <input
             value={name}
             placeholder="Chicken rice"
@@ -1781,8 +1794,8 @@ export default function RecipesPage() {
 
         <label className={styles.secondaryButton}>
           {imageUrl
-            ? "Sostituisci foto"
-            : "Aggiungi foto"}
+            ? copy.replacePhoto
+            : copy.addPhoto}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -1802,7 +1815,7 @@ export default function RecipesPage() {
 
         <div className={styles.twoColumns}>
           <label className={styles.field}>
-            Tipo
+            {copy.type}
             <select
               value={mealType}
               onChange={(event) => {
@@ -1811,14 +1824,14 @@ export default function RecipesPage() {
                 );
               }}
             >
-              <option>Colazione</option>
-              <option>Pranzo</option>
-              <option>Cena</option>
+              <option value="Colazione">{copy.breakfast}</option>
+              <option value="Pranzo">{copy.lunch}</option>
+              <option value="Cena">{copy.dinner}</option>
             </select>
           </label>
 
           <label className={styles.field}>
-            Porzioni
+            {copy.servings}
             <input
               type="number"
               min="1"
@@ -1834,28 +1847,28 @@ export default function RecipesPage() {
 
         <div className={styles.twoColumns}>
           <label className={styles.field}>
-            Gusto
+            {copy.taste}
             <select value={tasteRating} onChange={(event) => setTasteRating(event.target.value)}>
-              <option value="">Non valutato</option>
+              <option value="">{copy.unrated}</option>
               {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
             </select>
           </label>
           <label className={styles.field}>
-            Facilità
+            {copy.ease}
             <select value={easeRating} onChange={(event) => setEaseRating(event.target.value)}>
-              <option value="">Non valutata</option>
+              <option value="">{copy.unrated}</option>
               {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
             </select>
           </label>
         </div>
 
         <label className={styles.field}>
-          Preparazione
+          {copy.preparation}
           <textarea
             className={styles.preparationTextarea}
             value={notes}
             rows={8}
-            placeholder="Descrivi la preparazione, i passaggi, i tempi di cottura, eventuali sostituzioni o suggerimenti..."
+            placeholder={copy.preparationPlaceholder}
             onChange={(event) => {
               setNotes(event.target.value);
             }}
@@ -1863,7 +1876,7 @@ export default function RecipesPage() {
         </label>
 
         <div className={styles.ingredientsHeader}>
-          <strong>Ingredienti</strong>
+          <strong>{copy.ingredients}</strong>
 
           <div className={styles.smallActions}>
             <button
@@ -1871,7 +1884,7 @@ export default function RecipesPage() {
               className={styles.secondaryButton}
               onClick={addIngredientRow}
             >
-              + Esistente
+              + {copy.existing}
             </button>
 
             <button
@@ -1883,7 +1896,7 @@ export default function RecipesPage() {
                 );
               }}
             >
-              + Nuovo
+              + {copy.newIngredient}
             </button>
           </div>
         </div>
@@ -2058,7 +2071,7 @@ export default function RecipesPage() {
         {showIngredientCreator ? (
           <div className={styles.newIngredientCard}>
             <strong>
-              Nuovo ingrediente
+              {copy.newIngredientTitle}
             </strong>
 
             <label className={styles.field}>
@@ -2093,8 +2106,8 @@ export default function RecipesPage() {
                 }}
               >
                 {ingredientAiLoading
-                  ? "Calcolo valori…"
-                  : "✨ Compila con AI"}
+                  ? copy.aiCalculating
+                  : copy.aiFill}
               </button>
             </div>
 
@@ -2105,7 +2118,7 @@ export default function RecipesPage() {
             ) : null}
 
             <label className={styles.field}>
-              Porzione predefinita (g)
+              {copy.defaultServingGrams}
               <input
                 type="number"
                 min="1"
@@ -2125,16 +2138,16 @@ export default function RecipesPage() {
                 }}
               />
               <small>
-                Opzionale. Esempio: 1 porzione di riso = 70 g.
+                {copy.optionalServingHelp}
               </small>
             </label>
 
             <div className={styles.macroInputs}>
               {[
                 ["calories", "kcal / 100 g"],
-                ["protein", "Proteine"],
-                ["carbs", "Carboidrati"],
-                ["fat", "Grassi"],
+                ["protein", copy.protein],
+                ["carbs", copy.carbs],
+                ["fat", copy.fat],
               ].map(([key, label]) => (
                 <label
                   key={key}
@@ -2171,7 +2184,7 @@ export default function RecipesPage() {
                   void saveIngredient();
                 }}
               >
-                Salva ingrediente
+                {copy.saveIngredient}
               </button>
 
               <button
@@ -2183,7 +2196,7 @@ export default function RecipesPage() {
                   );
                 }}
               >
-                Annulla
+                {copy.cancel}
               </button>
             </div>
           </div>
@@ -2216,13 +2229,13 @@ export default function RecipesPage() {
           <div className={styles.recipeSaveCopy}>
             <strong>
               {editingId
-                ? "Hai modificato questa ricetta"
-                : "Ricetta pronta"}
+                ? copy.recipeEdited
+                : copy.recipeReady}
             </strong>
             <span>
               {editingId
-                ? "Salva per applicare ingredienti, porzioni e valori aggiornati."
-                : "Salva per aggiungerla alla tua libreria personale."}
+                ? copy.saveEditHelp
+                : copy.saveRecipeHelp}
             </span>
           </div>
 
@@ -2235,10 +2248,10 @@ export default function RecipesPage() {
             }}
           >
             {saving
-              ? "Salvataggio…"
+              ? copy.saving
               : editingId
-                ? "✓ Salva modifiche"
-                : "✓ Salva ricetta"}
+                ? copy.saveChanges
+                : copy.saveRecipe}
           </button>
         </div>
       </section>
