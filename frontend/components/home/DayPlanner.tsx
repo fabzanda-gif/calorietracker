@@ -113,6 +113,15 @@ const copy = {
     planned: "Activiteit berekend op basis van je trainingsplan",
     expectedActivity: "Verwachte activiteit",
   },
+  fr: {
+    office: "Bureau", home: "Télétravail", free: "Jour de repos",
+    low: "Peu actif", moderate: "Modérément actif", high: "Très actif",
+    program: "Votre programme du jour",
+    description: "Une proposition basée sur votre programme et vos habitudes.",
+    close: "Fermer", edit: "Modifier", day: "Journée",
+    planned: "Activité calculée à partir de votre programme",
+    expectedActivity: "Activité prévue",
+  },
 } as const;
 
 function dayLabel(value: DayType): string {
