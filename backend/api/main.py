@@ -26,6 +26,7 @@ from backend.api.routers.decision_selections import router as decision_selection
 from backend.api.routers.days import router as days_router
 from backend.api.routers.health import router as health_router
 from backend.api.routers.ingredients import router as ingredients_router
+from backend.api.routers.auth_events import router as auth_events_router
 from backend.api.routers.learned_insights import router as learned_insights_router
 from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
@@ -261,6 +262,7 @@ app.add_middleware(
 
 
 app.include_router(health_router)
+app.include_router(auth_events_router)
 app.include_router(meals_router)
 app.include_router(oura_router)
 app.include_router(google_calendar_router)
