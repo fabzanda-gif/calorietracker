@@ -17,6 +17,7 @@ import {
   useExperienceMode,
 } from "@/components/experience/ExperienceModeProvider";
 import { AppNav } from "@/components/navigation/AppNav";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import {
   getActivitiesForRange,
   getActivityOverview,
@@ -47,16 +48,14 @@ import {
 } from "@/lib/api/google-calendar";
 
 import styles from "./ActivitiesPage.module.css";
+import { activitiesCopy, activityLocale } from "./activitiesI18n";
 
-const WEEKDAYS = [
-  "Lun",
-  "Mar",
-  "Mer",
-  "Gio",
-  "Ven",
-  "Sab",
-  "Dom",
-];
+const plannerCopy = {
+  it: { plan: "Pianifica", planActivity: "Pianifica attività", openToAdd: "Apri per aggiungere la prossima.", activity: "Attività", example: "Es. Lungo 12 km", type: "Tipo", date: "Data", time: "Ora", expectedDuration: "Durata prevista", distance: "Distanza", noDistance: "Distanza non prevista per", intensity: "Intensità", easy: "Facile", moderate: "Moderata", hard: "Intensa", race: "Gara / test", unknown: "Da definire", notes: "Note", optional: "Opzionale", planning: "Pianifico…", add: "Aggiungi al piano", edit: "Modifica", closeEdit: "Chiudi modifica", completed: "Completata", skipped: "Saltata", remove: "Elimina", noMore: "Nessun'altra attività programmata.", firstSix: "Mostra i primi 6", all: "Mostra tutti", uploadGpx: "Carica GPX", saveChanges: "Salva modifiche" },
+  en: { plan: "Plan", planActivity: "Plan activity", openToAdd: "Open to add the next one.", activity: "Activity", example: "E.g. Long run 12 km", type: "Type", date: "Date", time: "Time", expectedDuration: "Expected duration", distance: "Distance", noDistance: "Distance not available for", intensity: "Intensity", easy: "Easy", moderate: "Moderate", hard: "Hard", race: "Race / test", unknown: "To be decided", notes: "Notes", optional: "Optional", planning: "Planning…", add: "Add to plan", edit: "Edit", closeEdit: "Close editor", completed: "Completed", skipped: "Skipped", remove: "Delete", noMore: "No other activities planned.", firstSix: "Show first 6", all: "Show all", uploadGpx: "Upload GPX", saveChanges: "Save changes" },
+  nl: { plan: "Plannen", planActivity: "Activiteit plannen", openToAdd: "Open om de volgende toe te voegen.", activity: "Activiteit", example: "Bijv. lange duurloop 12 km", type: "Type", date: "Datum", time: "Tijd", expectedDuration: "Verwachte duur", distance: "Afstand", noDistance: "Afstand niet van toepassing op", intensity: "Intensiteit", easy: "Rustig", moderate: "Gemiddeld", hard: "Intensief", race: "Wedstrijd / test", unknown: "Nog te bepalen", notes: "Notities", optional: "Optioneel", planning: "Plannen…", add: "Aan plan toevoegen", edit: "Bewerken", closeEdit: "Bewerking sluiten", completed: "Voltooid", skipped: "Overgeslagen", remove: "Verwijderen", noMore: "Geen andere activiteiten gepland.", firstSix: "Eerste 6 tonen", all: "Alles tonen", uploadGpx: "GPX uploaden", saveChanges: "Wijzigingen opslaan" },
+  fr: { plan: "Planifier", planActivity: "Planifier une activité", openToAdd: "Ouvrez pour ajouter la prochaine.", activity: "Activité", example: "Ex. Sortie longue 12 km", type: "Type", date: "Date", time: "Heure", expectedDuration: "Durée prévue", distance: "Distance", noDistance: "Distance non prévue pour", intensity: "Intensité", easy: "Facile", moderate: "Modérée", hard: "Intense", race: "Course / test", unknown: "À définir", notes: "Notes", optional: "Facultatif", planning: "Planification…", add: "Ajouter au programme", edit: "Modifier", closeEdit: "Fermer la modification", completed: "Terminée", skipped: "Ignorée", remove: "Supprimer", noMore: "Aucune autre activité planifiée.", firstSix: "Afficher les 6 premières", all: "Tout afficher", uploadGpx: "Importer un GPX", saveChanges: "Enregistrer les modifications" },
+} as const;
 
 function isoDate(date: Date): string {
   const year = date.getFullYear();
@@ -365,6 +364,9 @@ type PlannedActivityEditDraft = {
 
 function plannedDateLabel(
   value: string,
+  locale: string,
+  todayLabel: string,
+  tomorrowLabel: string,
 ): string {
   const target = new Date(
     `${value}T00:00:00`,
@@ -382,18 +384,18 @@ function plannedDateLabel(
     target.getTime() ===
     today.getTime()
   ) {
-    return "Oggi";
+    return todayLabel;
   }
 
   if (
     target.getTime() ===
     tomorrow.getTime()
   ) {
-    return "Domani";
+    return tomorrowLabel;
   }
 
   return target.toLocaleDateString(
-    "it-IT",
+    locale,
     {
       weekday: "short",
       day: "numeric",
@@ -403,8 +405,8 @@ function plannedDateLabel(
 }
 
 
-function formatActivityDate(value: string): string {
-  return new Date(`${value}T00:00:00`).toLocaleDateString("it-IT", {
+function formatActivityDate(value: string, locale: string): string {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -431,11 +433,13 @@ function MetricChart({
   metric,
   title,
   unit,
+  copy,
 }: {
   points: ActivitySeriesPoint[];
   metric: "cadence" | "heart_rate";
   title: string;
   unit: string;
+  copy: typeof activitiesCopy.it | typeof activitiesCopy.en | typeof activitiesCopy.nl | typeof activitiesCopy.fr;
 }) {
   const values = points
     .map((point, index) => ({
@@ -456,9 +460,9 @@ function MetricChart({
       <section className={styles.chartCard}>
         <h3>{title}</h3>
         <div className={styles.emptyChart}>
-          <strong>Dato non disponibile</strong>
+          <strong>{copy.dataUnavailable}</strong>
           <span>
-            Questo GPX non contiene {title.toLowerCase()}.
+            GPX: {copy.unavailable.toLowerCase()} ({title.toLowerCase()}).
           </span>
         </div>
       </section>
@@ -521,7 +525,7 @@ function MetricChart({
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`Grafico ${title}`}
+        aria-label={`${copy.chart}: ${title}`}
       >
         {[0, 1, 2, 3].map((line) => {
           const y =
@@ -559,10 +563,10 @@ function MetricChart({
 
       <div className={styles.chartRange}>
         <span>
-          Min {Math.round(minimum)} {unit}
+          {copy.min} {Math.round(minimum)} {unit}
         </span>
         <span>
-          Max {Math.round(maximum)} {unit}
+          {copy.max} {Math.round(maximum)} {unit}
         </span>
       </div>
     </section>
@@ -570,6 +574,10 @@ function MetricChart({
 }
 
 export default function ActivitiesPage() {
+  const { locale } = useI18n();
+  const copy = activitiesCopy[locale];
+  const planText = plannerCopy[locale];
+  const displayLocale = activityLocale[locale];
   const { accessToken } = useAuth();
   const {
     experienceMode,
@@ -915,7 +923,7 @@ export default function ActivitiesPage() {
 
   const periodLabel = useMemo(() => {
     if (calendarView === "monthly") {
-      return month.toLocaleDateString("it-IT", {
+      return month.toLocaleDateString(displayLocale, {
         month: "long",
         year: "numeric",
       });
@@ -928,9 +936,9 @@ export default function ActivitiesPage() {
       start.getMonth() === end.getMonth();
 
     return sameMonth
-      ? `${start.getDate()}–${end.getDate()} ${end.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}`
-      : `${start.toLocaleDateString("it-IT", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}`;
-  }, [calendarView, month]);
+      ? `${start.getDate()}–${end.getDate()} ${end.toLocaleDateString(displayLocale, { month: "long", year: "numeric" })}`
+      : `${start.toLocaleDateString(displayLocale, { day: "numeric", month: "short" })} – ${end.toLocaleDateString(displayLocale, { day: "numeric", month: "short", year: "numeric" })}`;
+  }, [calendarView, displayLocale, month]);
 
   const navigatePeriod = useCallback((direction: -1 | 1) => {
     setMonth((current) => {
@@ -1997,26 +2005,24 @@ export default function ActivitiesPage() {
         <header className={styles.header}>
           <div>
             <p className={styles.eyebrow}>
-              Attività
+              {copy.activity}
             </p>
             <h1>
               {zero
-                ? "Muoviti. Poi ne parliamo."
-                : "La tua routine attiva"}
+                ? copy.zeroTitle
+                : copy.activeRoutine}
             </h1>
             <p>
               {zero
-                ? "La cronaca dei tuoi tentativi di non diventare arredamento."
-                : "Gli allenamenti che aggiungono qualcosa al movimento naturale della tua giornata."}
+                ? copy.zeroIntro
+                : copy.activeIntro}
             </p>
           </div>
 
           <div className={styles.monthTotal}>
             <strong>{rollingTrainingActivities.length}</strong>
             <span>
-              {rollingTrainingActivities.length === 1
-                ? "attività negli ultimi 30 giorni"
-                : "attività negli ultimi 30 giorni"}
+              {copy.last30Activities}
             </span>
           </div>
         </header>
@@ -2024,15 +2030,15 @@ export default function ActivitiesPage() {
         <section className={styles.summarySection}>
           <div className={styles.summaryHeading}>
             <div>
-              <p className={styles.eyebrow}>Il tuo movimento</p>
-              <h2>Ultimi 30 giorni</h2>
+              <p className={styles.eyebrow}>{copy.yourMovement}</p>
+              <h2>{copy.last30Days}</h2>
             </div>
           </div>
           <div className={styles.summaryGrid}>
-            <div><span>Attività</span><strong>{rollingSummary.workouts}</strong></div>
-            <div><span>Tempo totale</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
-            <div><span>Distanza</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
-            <div><span>Energia</span><strong>{rollingSummary.calories.toLocaleString("it-IT")} kcal</strong></div>
+            <div><span>{copy.activity}</span><strong>{rollingSummary.workouts}</strong></div>
+            <div><span>{copy.totalTime}</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
+            <div><span>{copy.distance}</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
+            <div><span>{copy.energy}</span><strong>{rollingSummary.calories.toLocaleString(displayLocale)} kcal</strong></div>
           </div>
         </section>
 
@@ -2041,29 +2047,29 @@ export default function ActivitiesPage() {
             <div className={styles.cardHeading}>
               <div>
                 <p className={styles.eyebrow}>
-                  Costanza
+                  {copy.consistency}
                 </p>
-                <h2>Calendario attività</h2>
+                <h2>{copy.activityCalendar}</h2>
               </div>
 
               <div className={styles.calendarActions}>
                 <div
                   className={styles.calendarViewToggle}
-                  aria-label="Vista calendario"
+                  aria-label={copy.calendarView}
                 >
                   <button
                     type="button"
                     className={calendarView === "weekly" ? styles.calendarViewActive : ""}
                     onClick={() => setCalendarView("weekly")}
                   >
-                    Weekly
+                    {copy.weekly}
                   </button>
                   <button
                     type="button"
                     className={calendarView === "monthly" ? styles.calendarViewActive : ""}
                     onClick={() => setCalendarView("monthly")}
                   >
-                    Monthly
+                    {copy.monthly}
                   </button>
                 </div>
 
@@ -2076,14 +2082,14 @@ export default function ActivitiesPage() {
                   }
                 >
                   {calendarSyncing
-                    ? "Sincronizzazione…"
-                    : "Sincronizza Google Calendar"}
+                    ? copy.syncing
+                    : copy.syncCalendar}
                 </button>
 
                 <div className={styles.monthControls}>
                 <button
                   type="button"
-                  aria-label="Mese precedente"
+                  aria-label={copy.previousPeriod}
                   onClick={() => navigatePeriod(-1)}
                 >
                   ←
@@ -2095,7 +2101,7 @@ export default function ActivitiesPage() {
 
                 <button
                   type="button"
-                  aria-label="Mese successivo"
+                  aria-label={copy.nextPeriod}
                   onClick={() => navigatePeriod(1)}
                 >
                   →
@@ -2105,7 +2111,7 @@ export default function ActivitiesPage() {
                 <button
                   type="button"
                   className={styles.circularToggle}
-                  aria-label={calendarExpanded ? "Comprimi calendario" : "Espandi calendario"}
+                  aria-label={calendarExpanded ? copy.collapseCalendar : copy.expandCalendar}
                   aria-expanded={calendarExpanded}
                   onClick={() => setCalendarExpanded((current) => !current)}
                 >
@@ -2123,7 +2129,7 @@ export default function ActivitiesPage() {
             {calendarExpanded ? (
               <div className={styles.calendarBody}>
             <div className={`${styles.calendar} ${calendarView === "weekly" ? styles.weekCalendar : ""}`}>
-              {WEEKDAYS.map((weekday) => (
+              {copy.weekdays.map((weekday) => (
                 <span
                   key={weekday}
                   className={styles.weekday}
@@ -2224,7 +2230,7 @@ export default function ActivitiesPage() {
                             ? styles.energySurplus
                             : styles.energyMaintenance
                         }`}
-                        title={`${energy.state === "deficit" ? "Deficit" : energy.state === "surplus" ? "Surplus" : "Mantenimento"}: ${Math.abs(energy.balance_kcal)} kcal`}
+                        title={`${energy.state === "deficit" ? copy.deficit : energy.state === "surplus" ? copy.surplus : copy.maintenance}: ${Math.abs(energy.balance_kcal)} kcal`}
                         aria-label={energy.state}
                       >
                         {energy.state === "deficit" ? "↓" : energy.state === "surplus" ? "↑" : "="}
@@ -2257,7 +2263,7 @@ export default function ActivitiesPage() {
                         className={
                           styles.dayPlannedMarker
                         }
-                        aria-label="Attività pianificata"
+                        aria-label={copy.plannedActivity}
                         title={
                           visiblePlannedActivities
                             .map(
@@ -2277,7 +2283,7 @@ export default function ActivitiesPage() {
                         className={
                           styles.daySkippedMarker
                         }
-                        aria-label="Attività saltata"
+                        aria-label={copy.skippedActivity}
                         title={
                           skippedPlannedActivities
                             .map(
@@ -2320,12 +2326,11 @@ export default function ActivitiesPage() {
             <summary className={styles.utilitySummary}>
               <div>
               <p className={styles.eyebrow}>
-                Importa
+                {copy.import}
               </p>
-              <h2>Carica un GPX</h2>
+              <h2>{copy.uploadGpx}</h2>
               <p>
-                Percorso, durata, cadenza e frequenza
-                cardiaca vengono letti dal file.
+                {copy.uploadGpxIntro}
               </p>
               </div>
               <span className={styles.expandToggle} aria-hidden="true" />
@@ -2374,15 +2379,15 @@ export default function ActivitiesPage() {
           >
             <div>
               <p className={styles.eyebrow}>
-                Programmi
+                {copy.programs}
               </p>
 
               <strong>
-                Programmi di allenamento
+                {copy.trainingPrograms}
               </strong>
 
               <span>
-                Corsa e palestra in un unico posto.
+                {copy.programsIntro}
               </span>
             </div>
 
@@ -2418,7 +2423,7 @@ export default function ActivitiesPage() {
               <>
                 <div className={styles.nextActivitySpotlightCopy}>
                   <p className={styles.eyebrow}>
-                    Prossima attività
+                    {copy.nextActivity}
                   </p>
 
                   <h2>{nextPlannedActivity.title}</h2>
@@ -2426,6 +2431,9 @@ export default function ActivitiesPage() {
                   <p className={styles.nextActivitySpotlightMeta}>
                     {plannedDateLabel(
                       nextPlannedActivity.scheduled_date,
+                      displayLocale,
+                      copy.today,
+                      copy.tomorrow,
                     )}
 
                     {nextPlannedActivity.scheduled_time
@@ -2479,8 +2487,8 @@ export default function ActivitiesPage() {
                     {nextPlannedActivity.activity_type
                       .trim()
                       .toLocaleLowerCase("it-IT") === "corsa"
-                      ? "✓ Conferma corsa"
-                      : "✓ Conferma attività"}
+                      ? `✓ ${copy.confirmRun}`
+                      : `✓ ${copy.confirmActivity}`}
                   </button>
 
                   {nextPlannedActivity.activity_type
@@ -2500,12 +2508,12 @@ export default function ActivitiesPage() {
                         busyPlanId === nextPlannedActivity.id
                       }
                     >
-                      Carica GPX
+                      {copy.uploadGpx.replace("un ", "")}
                     </button>
                   ) : null}
 
                   <span className={styles.plannerMorePrompt}>
-                    Vedi altre attività programmate
+                    {copy.seeMorePlanned}
                     <span
                       className={styles.expandToggle}
                       aria-hidden="true"
@@ -2517,16 +2525,16 @@ export default function ActivitiesPage() {
               <>
                 <div>
                   <p className={styles.eyebrow}>
-                    Pianifica
+                    {planText.plan}
                   </p>
-                  <h2>Nessuna attività in programma</h2>
+                  <h2>{copy.noPlanned}</h2>
                   <p>
-                    Apri per aggiungere la prossima.
+                    {planText.openToAdd}
                   </p>
                 </div>
 
                 <span className={styles.plannerMorePrompt}>
-                  Pianifica attività
+                  {planText.planActivity}
                   <span
                     className={styles.expandToggle}
                     aria-hidden="true"
@@ -2540,10 +2548,10 @@ export default function ActivitiesPage() {
           <div className={styles.plannerGrid}>
             <div className={styles.plannerForm}>
               <label>
-                Attività
+                {planText.activity}
                 <input
                   value={planTitle}
-                  placeholder="Es. Lungo 12 km"
+                  placeholder={planText.example}
                   onChange={(event) =>
                     setPlanTitle(
                       event.target.value,
@@ -2553,7 +2561,7 @@ export default function ActivitiesPage() {
               </label>
 
               <label>
-                Tipo
+                {planText.type}
                 <select
                   value={planType}
                   onChange={(event) => {
@@ -2573,18 +2581,18 @@ export default function ActivitiesPage() {
                     }
                   }}
                 >
-                  <option>Corsa</option>
-                  <option>Palestra</option>
-                  <option>Padel</option>
-                  <option>Bici</option>
-                  <option>Nuoto</option>
-                  <option>Camminata</option>
-                  <option>Altro</option>
+                  <option value="Corsa">{copy.run}</option>
+                  <option value="Palestra">{locale === "it" ? "Palestra" : locale === "en" ? "Gym" : locale === "nl" ? "Sportschool" : "Musculation"}</option>
+                  <option value="Padel">Padel</option>
+                  <option value="Bici">{copy.bicycle}</option>
+                  <option value="Nuoto">{locale === "it" ? "Nuoto" : locale === "en" ? "Swimming" : locale === "nl" ? "Zwemmen" : "Natation"}</option>
+                  <option value="Camminata">{copy.walk}</option>
+                  <option value="Altro">{copy.other}</option>
                 </select>
               </label>
 
               <label>
-                Data
+                {planText.date}
                 <input
                   type="date"
                   value={planDate}
@@ -2597,7 +2605,7 @@ export default function ActivitiesPage() {
               </label>
 
               <label>
-                Ora
+                {planText.time}
                 <input
                   type="time"
                   value={planTime}
@@ -2610,7 +2618,7 @@ export default function ActivitiesPage() {
               </label>
 
               <label>
-                Durata prevista
+                {planText.expectedDuration}
                 <div className={styles.planUnitInput}>
                   <input
                     type="number"
@@ -2631,7 +2639,7 @@ export default function ActivitiesPage() {
                 planType,
               ) ? (
                 <label>
-                  Distanza
+                  {planText.distance}
                   <div
                     className={
                       styles.planUnitInput
@@ -2659,10 +2667,10 @@ export default function ActivitiesPage() {
                   }
                 >
                   <span>
-                    Distanza
+                    {planText.distance}
                   </span>
                   <strong>
-                    Non prevista per{" "}
+                    {planText.noDistance}{" "}
                     {planType.toLocaleLowerCase(
                       "it-IT",
                     )}
@@ -2671,7 +2679,7 @@ export default function ActivitiesPage() {
               )}
 
               <label>
-                Intensità
+                {planText.intensity}
                 <select
                   value={planIntensity}
                   onChange={(event) =>
@@ -2682,28 +2690,28 @@ export default function ActivitiesPage() {
                   }
                 >
                   <option value="low">
-                    Facile
+                    {planText.easy}
                   </option>
                   <option value="moderate">
-                    Moderata
+                    {planText.moderate}
                   </option>
                   <option value="hard">
-                    Intensa
+                    {planText.hard}
                   </option>
                   <option value="race">
-                    Gara / test
+                    {planText.race}
                   </option>
                   <option value="unknown">
-                    Da definire
+                    {planText.unknown}
                   </option>
                 </select>
               </label>
 
               <label className={styles.planNotes}>
-                Note
+                {planText.notes}
                 <input
                   value={planNotes}
-                  placeholder="Opzionale"
+                  placeholder={planText.optional}
                   onChange={(event) =>
                     setPlanNotes(
                       event.target.value,
@@ -2725,8 +2733,8 @@ export default function ActivitiesPage() {
                 }}
               >
                 {savingPlan
-                  ? "Pianifico…"
-                  : "Aggiungi al piano"}
+                  ? planText.planning
+                  : planText.add}
               </button>
             </div>
 
@@ -2754,6 +2762,9 @@ export default function ActivitiesPage() {
                         <strong>
                           {plannedDateLabel(
                             item.scheduled_date,
+                            displayLocale,
+                            copy.today,
+                            copy.tomorrow,
                           )}
                         </strong>
 
@@ -3483,7 +3494,7 @@ export default function ActivitiesPage() {
                                 {editingPlan?.id ===
                                 item.id
                                   ? "Chiudi modifica"
-                                  : "Modifica"}
+                                  : planText.edit}
                               </button>
 
                               <button
@@ -3507,7 +3518,7 @@ export default function ActivitiesPage() {
                                   .trim()
                                   .toLocaleLowerCase("it-IT") === "corsa"
                                   ? "✓ Conferma corsa"
-                                  : "Completata"}
+                                  : planText.completed}
                               </button>
 
                               {item.activity_type
@@ -3527,7 +3538,7 @@ export default function ActivitiesPage() {
                                     openPlannedGpxPicker(item);
                                   }}
                                 >
-                                  Carica GPX
+                                  {planText.uploadGpx}
                                 </button>
                               ) : null}
 
@@ -3544,15 +3555,15 @@ export default function ActivitiesPage() {
                                   );
                                 }}
                               >
-                                Saltata
+                                {planText.skipped}
                               </button>
                             </>
                           ) : (
                             <span>
                               {item.status ===
                               "completed"
-                                ? "Completata"
-                                : "Saltata"}
+                                ? planText.completed
+                                : planText.skipped}
                             </span>
                           )}
 
@@ -3571,7 +3582,7 @@ export default function ActivitiesPage() {
                               );
                             }}
                           >
-                            Elimina
+                            {planText.remove}
                           </button>
                         </div>
                       </div>
@@ -3581,7 +3592,7 @@ export default function ActivitiesPage() {
               ) : (
                 <div className={styles.emptyPlan}>
                   <strong>
-                    Nessun'altra attività programmata.
+                    {planText.noMore}
                   </strong>
                   <p>
                     Per ora il futuro è sorprendentemente
@@ -3603,8 +3614,8 @@ export default function ActivitiesPage() {
                   }}
                 >
                   {showAllPlannedActivities
-                    ? "Mostra i primi 6"
-                    : `Mostra tutti (${remainingPlannedActivities.length})`}
+                    ? planText.firstSix
+                    : `${planText.all} (${remainingPlannedActivities.length})`}
                 </button>
               ) : null}
 
@@ -3625,8 +3636,8 @@ export default function ActivitiesPage() {
         <details className={styles.loggerCard}>
           <summary className={styles.loggerHeading}>
             <span>
-              <span className={styles.eyebrow}>Registra</span>
-              <strong>Nuova attività o passi</strong>
+              <span className={styles.eyebrow}>{copy.register}</span>
+              <strong>{copy.newActivityOrSteps}</strong>
             </span>
             <span
               className={
@@ -3657,9 +3668,9 @@ export default function ActivitiesPage() {
             <div className={styles.cardHeading}>
               <div>
                 <p className={styles.eyebrow}>
-                  Anteprima
+                  {copy.preview}
                 </p>
-                <h2>Conferma l’attività</h2>
+                <h2>{copy.confirmActivity}</h2>
               </div>
 
               <span className={styles.gpxBadge}>
@@ -3670,7 +3681,7 @@ export default function ActivitiesPage() {
             <div className={styles.previewGrid}>
               <div className={styles.previewForm}>
                 <label>
-                  Nome
+                  {copy.name}
                   <input
                     value={gpxName}
                     onChange={(event) =>
@@ -3680,23 +3691,23 @@ export default function ActivitiesPage() {
                 </label>
 
                 <label>
-                  Tipo
+                  {copy.type}
                   <select
                     value={gpxType}
                     onChange={(event) =>
                       setGpxType(event.target.value)
                     }
                   >
-                    <option>Corsa</option>
-                    <option>Camminata</option>
-                    <option>Escursione</option>
-                    <option>Bicicletta</option>
-                    <option>Altro</option>
+                    <option value="Corsa">{copy.run}</option>
+                    <option value="Camminata">{copy.walk}</option>
+                    <option value="Escursione">{copy.hike}</option>
+                    <option value="Bicicletta">{copy.bicycle}</option>
+                    <option value="Altro">{copy.other}</option>
                   </select>
                 </label>
 
                 <label>
-                  Data
+                  {copy.date}
                   <input
                     type="date"
                     value={selectedDate}
@@ -3709,7 +3720,7 @@ export default function ActivitiesPage() {
                 </label>
 
                 <label>
-                  Calorie bruciate
+                  {copy.caloriesBurned}
                   <input
                     type="number"
                     min="0"
@@ -3725,7 +3736,7 @@ export default function ActivitiesPage() {
 
               <div className={styles.previewStats}>
                 <div>
-                  <span>Distanza</span>
+                  <span>{copy.distance}</span>
                   <strong>
                     {formatDistance(
                       gpxPreview.distance_meters,
@@ -3733,7 +3744,7 @@ export default function ActivitiesPage() {
                   </strong>
                 </div>
                 <div>
-                  <span>Durata</span>
+                  <span>{copy.duration}</span>
                   <strong>
                     {formatDuration(
                       gpxPreview.duration_seconds,
@@ -3741,23 +3752,23 @@ export default function ActivitiesPage() {
                   </strong>
                 </div>
                 <div>
-                  <span>Cadenza media</span>
+                  <span>{copy.averageCadence}</span>
                   <strong>
                     {gpxPreview.average_cadence != null
                       ? `${Math.round(
                           gpxPreview.average_cadence,
                         )} spm`
-                      : "Non disponibile"}
+                      : copy.unavailable}
                   </strong>
                 </div>
                 <div>
-                  <span>FC media</span>
+                  <span>{copy.averageHeartRate}</span>
                   <strong>
                     {gpxPreview.average_heart_rate != null
                       ? `${Math.round(
                           gpxPreview.average_heart_rate,
                         )} bpm`
-                      : "Non disponibile"}
+                      : copy.unavailable}
                   </strong>
                 </div>
               </div>
@@ -3778,8 +3789,8 @@ export default function ActivitiesPage() {
               }}
             >
               {importing
-                ? "Importazione…"
-                : "Salva attività"}
+                ? copy.importing
+                : copy.saveActivity}
             </button>
           </section>
         ) : null}
@@ -3793,15 +3804,15 @@ export default function ActivitiesPage() {
                     ? new Date(
                         `${selectedDate}T00:00:00`,
                       ).toLocaleDateString(
-                        "it-IT",
+                        displayLocale,
                         {
                           day: "numeric",
                           month: "long",
                         },
                       )
-                    : "Mese"}
+                    : copy.monthly}
                 </p>
-                <h2>Attività registrate</h2>
+                <h2>{copy.registeredActivities}</h2>
               </div>
 
               {selectedDate ? (
@@ -3815,7 +3826,7 @@ export default function ActivitiesPage() {
                     );
                   }}
                 >
-                  Mostra tutto il mese
+                  {copy.showWholeMonth}
                 </button>
               ) : null}
             </div>
@@ -3847,10 +3858,10 @@ export default function ActivitiesPage() {
                         {activity.activity_name}
                       </strong>
                       <small>
-                        {formatActivityDate(activity.date)} · {activity.activity_type ??
+                        {formatActivityDate(activity.date, displayLocale)} · {activity.activity_type ??
                           (activity.source === "gpx"
-                            ? "Attività GPX"
-                            : "Attività manuale")}
+                            ? copy.gpxActivity
+                            : copy.manualActivity)}
                       </small>
                     </span>
 
@@ -3866,8 +3877,8 @@ export default function ActivitiesPage() {
               ) : (
                 <div className={styles.emptyList}>
                   {selectedDate
-                    ? "Nessuna attività registrata in questo giorno."
-                    : "Nessuna attività registrata in questo mese."}
+                    ? copy.noDayActivities
+                    : copy.noMonthActivities}
                 </div>
               )}
             </div>
@@ -3879,31 +3890,31 @@ export default function ActivitiesPage() {
                 <div className={styles.cardHeading}>
                   <div>
                     <p className={styles.eyebrow}>
-                      Dettaglio
+                      {copy.detail}
                     </p>
                     <h2>{detail.activity_name}</h2>
                   </div>
 
                   <div className={styles.detailActions}>
-                    <span className={styles.gpxBadge}>{detail.source === "gpx" ? "GPX" : "Manuale"}</span>
+                    <span className={styles.gpxBadge}>{detail.source === "gpx" ? "GPX" : copy.manual}</span>
                     <button
                       type="button"
                       className={styles.deleteButton}
                       disabled={deletingId === detail.id}
                       onClick={() => void removeActivity(detail)}
                     >
-                      {deletingId === detail.id ? "Elimino…" : "Elimina"}
+                      {deletingId === detail.id ? copy.deleting : copy.delete}
                     </button>
                   </div>
                 </div>
 
                 <div className={styles.detailStats}>
                   <div>
-                    <span>Data</span>
-                    <strong>{formatActivityDate(detail.date)}</strong>
+                    <span>{copy.date}</span>
+                    <strong>{formatActivityDate(detail.date, displayLocale)}</strong>
                   </div>
                   <div>
-                    <span>Distanza</span>
+                    <span>{copy.distance}</span>
                     <strong>
                       {formatDistance(
                         detail.distance_meters,
@@ -3911,7 +3922,7 @@ export default function ActivitiesPage() {
                     </strong>
                   </div>
                   <div>
-                    <span>Durata</span>
+                    <span>{copy.duration}</span>
                     <strong>
                       {formatDuration(
                         detail.duration_seconds,
@@ -3919,7 +3930,7 @@ export default function ActivitiesPage() {
                     </strong>
                   </div>
                   <div>
-                    <span>Calorie</span>
+                    <span>{copy.calories}</span>
                     <strong>
                       {detail.burned_calories} kcal
                     </strong>
@@ -3950,8 +3961,8 @@ export default function ActivitiesPage() {
                       </span>
                       <strong>
                         {zero
-                          ? "Il verdetto"
-                          : "Commento attività"}
+                          ? copy.verdict
+                          : copy.activityComment}
                       </strong>
                     </div>
                   </div>
@@ -3960,12 +3971,12 @@ export default function ActivitiesPage() {
                     {activityCommentLoading &&
                     !activityComment
                       ? zero
-                        ? "Sto cercando qualcosa da dire. Non abituarti."
-                        : "Analizzo questa attività…"
+                        ? copy.zeroAnalysing
+                        : copy.analysing
                       : activityComment ??
                         (zero
-                          ? "Attività registrata. Le prove esistono."
-                          : "Attività registrata. La continuità parte anche da qui.")}
+                          ? copy.zeroRegisteredFallback
+                          : copy.registeredFallback)}
                   </p>
                 </div>
 
@@ -3979,24 +3990,26 @@ export default function ActivitiesPage() {
                   <MetricChart
                     points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
                     metric="cadence"
-                    title="Cadenza"
+                    title={copy.cadence}
                     unit="spm"
+                    copy={copy}
                   />
                   <MetricChart
                     points={normalizedArray<ActivitySeriesPoint>(detail.series_points)}
                     metric="heart_rate"
-                    title="Frequenza cardiaca"
+                    title={copy.heartRate}
                     unit="bpm"
+                    copy={copy}
                   />
                 </div>
               </>
             ) : (
               <div className={styles.emptyDetail}>
                 <strong>
-                  Seleziona un’attività
+                  {copy.selectActivity}
                 </strong>
                 <span>
-                  Qui vedrai percorso e metriche del GPX.
+                  {copy.selectActivityIntro}
                 </span>
               </div>
             )}
