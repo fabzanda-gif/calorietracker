@@ -139,6 +139,54 @@ def test_context_filters_meal_history():
     assert result["evidence"]["observations"] == 2
 
 
+def test_office_context_matches_legacy_italian_label():
+    result = predict(
+        [
+            {
+                "date": "2026-08-18",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+            {
+                "date": "2026-08-25",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+        ],
+        [
+            {"date": "2026-08-18", "day_type": "Ufficio"},
+            {"date": "2026-08-25", "day_type": "Ufficio"},
+        ],
+        context="office",
+    )
+
+    assert result["value"] == "Colazione Ufficio"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["scope"] == "context"
+
+
+def test_explicit_context_can_use_unclassified_legacy_history():
+    result = predict(
+        [
+            {
+                "date": "2026-08-18",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+            {
+                "date": "2026-08-25",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+        ],
+        context="office",
+    )
+
+    assert result["value"] == "Colazione Ufficio"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["scope"] == "unclassified_weekday"
+
+
 def test_explicit_context_never_falls_back_to_another_context():
     result = predict(
         [
