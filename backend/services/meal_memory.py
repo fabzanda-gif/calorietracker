@@ -18,11 +18,10 @@ class MealMemoryService:
     """
     Deterministic meal-routine memory.
 
-    v0.2 predicts a recurring meal for a given meal_type using:
-    - same weekday;
-    - optional day context;
-    - recent history;
-    - the same 3/4-week confidence philosophy used by Day Memory.
+    Predicts a recurring meal for a given meal_type using progressive
+    evidence: matching day context first, then the same weekday, then
+    recent history. Two coherent observations are enough for a useful
+    prediction; additional repetition increases confidence.
 
     Nutrition estimates are averages across matching historical occurrences.
     The service predicts only; it never writes meal data.
@@ -86,7 +85,7 @@ class MealMemoryService:
             meal_type=meal_type,
         )
 
-        candidates: list[dict[str, Any]] = []
+        history: list[dict[str, Any]] = []
 
         for event in events:
             raw_date = event.get("date")
@@ -98,35 +97,46 @@ class MealMemoryService:
             except ValueError:
                 continue
 
-            event_context = context_by_date.get(
-                str(raw_date)
-            )
-
-            if day_context is None:
-                if (
-                    meal_date.weekday()
-                    != day_date.weekday()
-                ):
-                    continue
-            elif not self._contexts_match(
-                day_context,
-                event_context,
-            ):
-                continue
-
-            candidates.append(
+            history.append(
                 {
                     **event,
                     "date": meal_date,
                     "name": str(
                         event.get("name") or ""
                     ).strip(),
+                    "day_context": context_by_date.get(
+                        str(raw_date)
+                    ),
                 }
             )
 
-        candidates.sort(
-            key=lambda item: item["date"]
-        )
+        history.sort(key=lambda item: item["date"])
+
+        context_candidates = [
+            item
+            for item in history
+            if day_context is not None
+            and self._contexts_match(
+                day_context,
+                item.get("day_context"),
+            )
+        ]
+        weekday_candidates = [
+            item
+            for item in history
+            if item["date"].weekday()
+            == day_date.weekday()
+        ]
+
+        # Prefer the most specific signal once it has enough evidence.
+        # Otherwise progressively fall back so a new user can receive a
+        # useful routine after two coherent logs rather than waiting weeks.
+        if len(context_candidates) >= 2:
+            candidates = context_candidates
+        elif len(weekday_candidates) >= 2:
+            candidates = weekday_candidates
+        else:
+            candidates = history
 
         if not candidates:
             return self._unknown(
@@ -148,7 +158,7 @@ class MealMemoryService:
             winner, matches = counts.most_common(1)[0]
             probability = matches / len(names)
 
-            if len(names) >= 3 and matches >= 3 and probability >= 0.75:
+            if len(names) >= 2 and matches >= 2 and probability >= 0.5:
                 confidence_level = MEDIUM
             else:
                 confidence_level = LOW
