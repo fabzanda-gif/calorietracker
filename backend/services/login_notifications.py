@@ -33,7 +33,7 @@ def _configured_excluded_user_ids() -> set[str]:
     return _DEFAULT_EXCLUDED_USER_IDS | configured
 
 
-def _session_issued_at(access_token: str) -> str:
+def _session_payload(access_token: str) -> dict:
     try:
         payload_segment = access_token.split(".")[1]
         padding = "=" * (-len(payload_segment) % 4)
@@ -42,13 +42,15 @@ def _session_issued_at(access_token: str) -> str:
                 payload_segment + padding
             )
         )
-        return str(payload.get("iat") or "")
+        return payload if isinstance(payload, dict) else {}
     except (IndexError, ValueError, TypeError, json.JSONDecodeError):
-        return ""
+        return {}
 
 
 def _idempotency_key(user_id: str, access_token: str) -> str:
-    issued_at = _session_issued_at(access_token)
+    issued_at = str(
+        _session_payload(access_token).get("iat") or ""
+    )
     material = f"{user_id}:{issued_at or access_token}"
     digest = hashlib.sha256(material.encode("utf-8")).hexdigest()
     return f"sanosync-login-{digest}"
@@ -74,7 +76,12 @@ def send_login_notification(
         )
         return LoginNotificationResult(status="not_configured")
 
-    email = str(metadata.get("email") or "").strip()
+    token_payload = _session_payload(access_token)
+    email = str(
+        metadata.get("email")
+        or token_payload.get("email")
+        or ""
+    ).strip()
     name = str(
         metadata.get("full_name")
         or metadata.get("name")
