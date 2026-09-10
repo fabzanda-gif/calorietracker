@@ -148,6 +148,7 @@ export const HOME_COPY = {
           : cooked > 0
             ? `${cooked} ${cooked === 1 ? "porzione pronta" : "porzioni pronte"}`
             : "Dispensa vuota",
+    pantry: "Dispensa",
     emptyPantry: "Dispensa vuota",
     openPantry: "Apri dispensa",
     todayActivity: "Attività di oggi",
@@ -352,6 +353,7 @@ export const HOME_COPY = {
           : cooked > 0
             ? `${cooked} prepared ${cooked === 1 ? "portion" : "portions"}`
             : "Empty pantry",
+    pantry: "Pantry",
     emptyPantry: "Empty pantry",
     openPantry: "Open pantry",
     todayActivity: "Today’s activity",
@@ -556,6 +558,7 @@ export const HOME_COPY = {
           : cooked > 0
             ? `${cooked} bereide ${cooked === 1 ? "portie" : "porties"}`
             : "Lege voorraad",
+    pantry: "Voorraad",
     emptyPantry: "Lege voorraad",
     openPantry: "Voorraad openen",
     todayActivity: "Activiteit van vandaag",
