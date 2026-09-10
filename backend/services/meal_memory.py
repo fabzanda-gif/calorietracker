@@ -133,10 +133,13 @@ class MealMemoryService:
         # useful routine after two coherent logs rather than waiting weeks.
         if len(context_candidates) >= 2:
             candidates = context_candidates
+            evidence_scope = "context"
         elif len(weekday_candidates) >= 2:
             candidates = weekday_candidates
+            evidence_scope = "weekday"
         else:
             candidates = history
+            evidence_scope = "recent"
 
         if not candidates:
             return self._unknown(
@@ -247,6 +250,7 @@ class MealMemoryService:
                 else []
             ),
             "evidence": {
+                "scope": evidence_scope,
                 "observations": len(names),
                 "matches": matches,
                 "recent_observations": len(recent_names),
