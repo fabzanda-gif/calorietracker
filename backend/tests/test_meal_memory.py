@@ -139,27 +139,44 @@ def test_context_filters_meal_history():
     assert result["evidence"]["observations"] == 2
 
 
-def test_context_without_enough_evidence_falls_back_to_recent_history():
+def test_explicit_context_never_falls_back_to_another_context():
     result = predict(
         [
+            {
+                "date": "2026-08-11",
+                "meal_type": "Colazione",
+                "name": "Colazione Casa",
+            },
+            {
+                "date": "2026-08-18",
+                "meal_type": "Colazione",
+                "name": "Colazione Casa",
+            },
             {
                 "date": "2026-08-25",
                 "meal_type": "Colazione",
                 "name": "Colazione Casa",
-            }
+            },
         ],
         [
             {
+                "date": "2026-08-11",
+                "day_type": "Lavoro da casa",
+            },
+            {
+                "date": "2026-08-18",
+                "day_type": "Lavoro da casa",
+            },
+            {
                 "date": "2026-08-25",
                 "day_type": "Lavoro da casa",
-            }
+            },
         ],
         context="Ufficio",
     )
 
-    assert result["state"] == "predicted"
-    assert result["value"] == "Colazione Casa"
-    assert result["confidence_level"] == "low"
+    assert result["state"] == "unknown"
+    assert result["value"] is None
 
 
 def test_estimated_nutrition_uses_matching_routine_average():
