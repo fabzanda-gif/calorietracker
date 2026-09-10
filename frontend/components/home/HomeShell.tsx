@@ -7125,7 +7125,7 @@ export function HomeShell() {
 
 
                               <label>
-                                Carboidrati
+                                {homeCopy.carbs}
                                 <input
                                   type="number"
                                   min="0"
@@ -7141,7 +7141,7 @@ export function HomeShell() {
                               </label>
 
                               <label>
-                                Grassi
+                                {homeCopy.fats}
                                 <input
                                   type="number"
                                   min="0"
@@ -7355,15 +7355,7 @@ export function HomeShell() {
                       <div
                         className={styles.dailyFocusRing}
                         style={{
-                          background: `conic-gradient(${
-                            item.label === "Calorie"
-                              ? "#ff6868"
-                              : item.label === "Proteine"
-                                ? "#63cf91"
-                                : item.label === "Carboidrati"
-                                  ? "#69a9ff"
-                                  : "#f4bb42"
-                          } ${item.progress}%, #edf0f2 ${item.progress}% 100%)`,
+                          background: `conic-gradient(${item.color} ${item.progress}%, #edf0f2 ${item.progress}% 100%)`,
                         }}
                         role="img"
                         aria-label={`${item.label}: ${Math.round(item.progress)}%`}
