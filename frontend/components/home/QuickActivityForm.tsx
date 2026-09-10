@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { createActivity } from "@/lib/api/activities";
 import { updateDailyLog } from "@/lib/api/day";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import styles from "./QuickActivityForm.module.css";
 
@@ -35,16 +36,128 @@ interface QuickActivityFormProps {
 
 const OPTIONS: Array<{
   value: ActivityKind;
-  label: string;
+  label: ActivityKind;
 }> = [
-  { value: "steps", label: "Passi" },
-  { value: "bike", label: "Bici" },
-  { value: "ebike", label: "Bici elettrica" },
-  { value: "run", label: "Corsa" },
-  { value: "padel", label: "Padel" },
-  { value: "gym", label: "Palestra" },
-  { value: "other", label: "Altro" },
+  { value: "steps", label: "steps" },
+  { value: "bike", label: "bike" },
+  { value: "ebike", label: "ebike" },
+  { value: "run", label: "run" },
+  { value: "padel", label: "padel" },
+  { value: "gym", label: "gym" },
+  { value: "other", label: "other" },
 ];
+
+
+const copy = {
+  it: {
+    steps: "Passi",
+    bike: "Bici",
+    ebike: "Bici elettrica",
+    run: "Corsa",
+    padel: "Padel",
+    gym: "Palestra",
+    other: "Altro",
+    wholeSteps: "Inserisci un numero di passi intero maggiore di zero.",
+    bikeMetric: "Inserisci almeno i minuti oppure i chilometri.",
+    runDistance: "Inserisci i chilometri percorsi.",
+    runPace: "Inserisci il passo medio nel formato mm:ss.",
+    padelDuration: "Inserisci la durata della partita.",
+    sportNameRequired: "Inserisci il nome dello sport.",
+    caloriesRequired: "Inserisci delle kcal valide.",
+    saveFailed: text.saveFailed,
+    activityType: "Tipo di attività",
+    bikeHint: "minuti o km",
+    runHint: "km e passo medio",
+    otherHint: "kcal",
+    otherSports: "Altri sport",
+    stepCount: "Numero di passi *",
+    sportName: "Nome dello sport *",
+    sportExample: "Es. Tennis",
+    duration: "Durata (min)",
+    distance: "Distanza (km)",
+    averagePace: "Passo medio (min/km) *",
+    estimatedCalories: "Kcal stimate",
+    calories: "Kcal *",
+    stepsHelper: "Calcolate automaticamente dal numero di passi.",
+    caloriesHelper: "Calcolate automaticamente quando possibile, puoi modificarle.",
+    validData: "✓ Dati validi",
+    cancel: "Annulla",
+    saving: "Registro…",
+    addActivity: "Aggiungi attività",
+  },
+  en: {
+    steps: "Steps",
+    bike: "Bike",
+    ebike: "E-bike",
+    run: "Run",
+    padel: "Padel",
+    gym: "Gym",
+    other: "Other",
+    wholeSteps: "Enter a whole number of steps greater than zero.",
+    bikeMetric: "Enter at least minutes or kilometres.",
+    runDistance: "Enter the distance covered in kilometres.",
+    runPace: "Enter the average pace in mm:ss format.",
+    padelDuration: "Enter the match duration.",
+    sportNameRequired: "Enter the sport name.",
+    caloriesRequired: "Enter valid kcal.",
+    saveFailed: "Unable to log the activity.",
+    activityType: "Activity type",
+    bikeHint: "minutes or km",
+    runHint: "km and average pace",
+    otherHint: "kcal",
+    otherSports: "Other sports",
+    stepCount: "Number of steps *",
+    sportName: "Sport name *",
+    sportExample: "E.g. Tennis",
+    duration: "Duration (min)",
+    distance: "Distance (km)",
+    averagePace: "Average pace (min/km) *",
+    estimatedCalories: "Estimated kcal",
+    calories: "Kcal *",
+    stepsHelper: "Calculated automatically from the number of steps.",
+    caloriesHelper: "Calculated automatically when possible; you can edit them.",
+    validData: "✓ Valid data",
+    cancel: "Cancel",
+    saving: "Saving…",
+    addActivity: "Add activity",
+  },
+  nl: {
+    steps: "Stappen",
+    bike: "Fiets",
+    ebike: "Elektrische fiets",
+    run: "Hardlopen",
+    padel: "Padel",
+    gym: "Sportschool",
+    other: "Overig",
+    wholeSteps: "Voer een geheel aantal stappen groter dan nul in.",
+    bikeMetric: "Voer minimaal het aantal minuten of kilometers in.",
+    runDistance: "Voer het aantal afgelegde kilometers in.",
+    runPace: "Voer het gemiddelde tempo in als mm:ss.",
+    padelDuration: "Voer de duur van de wedstrijd in.",
+    sportNameRequired: "Voer de naam van de sport in.",
+    caloriesRequired: "Voer geldige kcal in.",
+    saveFailed: "De activiteit kan niet worden geregistreerd.",
+    activityType: "Type activiteit",
+    bikeHint: "minuten of km",
+    runHint: "km en gemiddeld tempo",
+    otherHint: "kcal",
+    otherSports: "Andere sporten",
+    stepCount: "Aantal stappen *",
+    sportName: "Naam van de sport *",
+    sportExample: "Bijv. tennis",
+    duration: "Duur (min)",
+    distance: "Afstand (km)",
+    averagePace: "Gemiddeld tempo (min/km) *",
+    estimatedCalories: "Geschatte kcal",
+    calories: "Kcal *",
+    stepsHelper: "Automatisch berekend op basis van het aantal stappen.",
+    caloriesHelper: "Waar mogelijk automatisch berekend; je kunt dit aanpassen.",
+    validData: "✓ Geldige gegevens",
+    cancel: "Annuleren",
+    saving: "Opslaan…",
+    addActivity: "Activiteit toevoegen",
+  },
+} as const;
 
 function numberValue(value: string): number {
   const parsed = Number(value.replace(",", "."));
@@ -81,6 +194,8 @@ export default function QuickActivityForm({
   onSaved,
   onError,
 }: QuickActivityFormProps) {
+  const { locale } = useI18n();
+  const text = copy[locale];
   const startingKind = initialKind(initialValue);
   const [kind, setKind] =
     useState<ActivityKind>(startingKind);
@@ -160,7 +275,7 @@ export default function QuickActivityForm({
 
     if (kind === "steps") {
       if (!Number.isInteger(stepCount) || stepCount <= 0) {
-        return "Inserisci un numero di passi intero maggiore di zero.";
+        return text.wholeSteps;
       }
       return null;
     }
@@ -170,28 +285,28 @@ export default function QuickActivityForm({
       duration <= 0 &&
       distance <= 0
     ) {
-      return "Inserisci almeno i minuti oppure i chilometri.";
+      return text.bikeMetric;
     }
 
     if (kind === "run") {
       if (distance <= 0) {
-        return "Inserisci i chilometri percorsi.";
+        return text.runDistance;
       }
       if (paceSeconds(pace) <= 0) {
-        return "Inserisci il passo medio nel formato mm:ss.";
+        return text.runPace;
       }
     }
 
     if (kind === "padel" && duration <= 0) {
-      return "Inserisci la durata della partita.";
+      return text.padelDuration;
     }
 
     if (kind === "other" && !otherName.trim()) {
-      return "Inserisci il nome dello sport.";
+      return text.sportNameRequired;
     }
 
     if (effectiveCalories <= 0) {
-      return "Inserisci delle kcal valide.";
+      return text.caloriesRequired;
     }
 
     return null;
@@ -203,6 +318,7 @@ export default function QuickActivityForm({
     otherName,
     pace,
     steps,
+    text,
   ]);
 
   function selectKind(value: ActivityKind) {
@@ -311,7 +427,7 @@ export default function QuickActivityForm({
     <>
       <div className={styles.body}>
         <fieldset className={styles.types}>
-          <legend>Tipo di attività</legend>
+          <legend>{text.activityType}</legend>
           <div className={styles.typeGrid}>
             {OPTIONS.map((option) => (
               <button
@@ -325,22 +441,22 @@ export default function QuickActivityForm({
                 }
                 onClick={() => selectKind(option.value)}
               >
-                {option.label}
+                {text[option.label]}
               </button>
             ))}
           </div>
         </fieldset>
 
         <div className={styles.hints}>
-          <span><strong>Bici:</strong> minuti o km</span>
-          <span><strong>Corsa:</strong> km e passo medio</span>
-          <span><strong>Altri sport:</strong> kcal</span>
+          <span><strong>{text.bike}:</strong> {text.bikeHint}</span>
+          <span><strong>{text.run}:</strong> {text.runHint}</span>
+          <span><strong>{text.otherSports}:</strong> {text.otherHint}</span>
         </div>
 
         <div className={styles.fields}>
           {kind === "steps" ? (
             <label>
-              <span>Numero di passi *</span>
+              <span>{text.stepCount}</span>
               <input
                 autoFocus
                 type="number"
@@ -358,11 +474,11 @@ export default function QuickActivityForm({
 
           {kind === "other" ? (
             <label>
-              <span>Nome dello sport *</span>
+              <span>{text.sportName}</span>
               <input
                 autoFocus
                 value={otherName}
-                placeholder="Es. Tennis"
+                placeholder={text.sportExample}
                 onChange={(event) =>
                   setOtherName(event.target.value)
                 }
@@ -373,7 +489,7 @@ export default function QuickActivityForm({
           {showMinutes ? (
             <label>
               <span>
-                Durata (min)
+                {text.duration}
                 {kind === "padel" ? " *" : ""}
               </span>
               <input
@@ -394,7 +510,7 @@ export default function QuickActivityForm({
           {showDistance ? (
             <label>
               <span>
-                Distanza (km)
+                {text.distance}
                 {kind === "run" ? " *" : ""}
               </span>
               <input
@@ -411,7 +527,7 @@ export default function QuickActivityForm({
 
           {kind === "run" ? (
             <label>
-              <span>Passo medio (min/km) *</span>
+              <span>{text.averagePace}</span>
               <input
                 type="text"
                 inputMode="numeric"
@@ -427,8 +543,8 @@ export default function QuickActivityForm({
           <label>
             <span>
               {kind === "steps"
-                ? "Kcal stimate"
-                : "Kcal *"}
+                ? text.estimatedCalories
+                : text.calories}
             </span>
             <input
               type="number"
@@ -452,8 +568,8 @@ export default function QuickActivityForm({
 
         <p className={styles.helper}>
           {kind === "steps"
-            ? "Calcolate automaticamente dal numero di passi."
-            : "Calcolate automaticamente quando possibile, puoi modificarle."}
+            ? text.stepsHelper
+            : text.caloriesHelper}
         </p>
 
         <p
@@ -464,7 +580,7 @@ export default function QuickActivityForm({
           }
           role="status"
         >
-          {validationMessage ?? "✓ Dati validi"}
+          {validationMessage ?? text.validData}
         </p>
       </div>
 
@@ -474,7 +590,7 @@ export default function QuickActivityForm({
           className={styles.cancel}
           onClick={onCancel}
         >
-          Annulla
+          {text.cancel}
         </button>
         <button
           type="button"
@@ -482,7 +598,7 @@ export default function QuickActivityForm({
           disabled={saving || Boolean(validationMessage)}
           onClick={() => void submit()}
         >
-          {saving ? "Registro…" : "Aggiungi attività"}
+          {saving ? text.saving : text.addActivity}
         </button>
       </div>
     </>
