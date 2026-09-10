@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "./AuthProvider";
 import { LoginCard } from "./LoginCard";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import styles from "./AuthGate.module.css";
 
 export function AuthGate({
@@ -13,6 +14,7 @@ export function AuthGate({
   children: ReactNode;
 }) {
   const { loading, user } = useAuth();
+  const { t } = useI18n();
   const pathname = usePathname();
 
   if (pathname === "/privacy" || pathname === "/terms") {
@@ -26,7 +28,7 @@ export function AuthGate({
           SANOSYNC
         </p>
         <p className={styles.muted}>
-          Caricamento sessione…
+          {t("loadingSession")}
         </p>
       </main>
     );
