@@ -3514,10 +3514,10 @@ export function HomeShell() {
     slot: string,
   ): typeof knownAlternates {
     const sourcePriority = {
-      history: 0,
-      recipe: 1,
-      meal_prep: 2,
-      pantry: 3,
+      meal_prep: 0,
+      pantry: 1,
+      history: 2,
+      recipe: 3,
       ingredient: 4,
     } as const;
 
