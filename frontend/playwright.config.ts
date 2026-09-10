@@ -11,6 +11,7 @@ export default defineConfig({
   timeout: 30_000,
   use: {
     baseURL: externalBaseUrl || "http://127.0.0.1:3000",
+    locale: "it-IT",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
