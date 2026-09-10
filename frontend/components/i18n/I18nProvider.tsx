@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type AppLocale = "it" | "en";
+export type AppLocale = "it" | "en" | "nl";
 
 const STORAGE_KEY = "sanosync-language";
 
@@ -98,6 +98,48 @@ const messages = {
     loginFailed: "Sign-in failed",
     googleFailed: "Google sign-in failed",
   },
+  nl: {
+    today: "Vandaag",
+    activities: "Activiteiten",
+    progress: "Voortgang",
+    recipes: "Recepten",
+    profile: "Profiel",
+    signOut: "Uitloggen",
+    openProfile: "Profiel openen",
+    manageProfile: "Profiel beheren",
+    primaryNavigation: "Hoofdnavigatie",
+    demoMode: "Demomodus · echte gegevens, alleen-lezen",
+    language: "Taal van de app",
+    languageHelp:
+      "De eerste keer gebruiken we de taal van je apparaat. Je kunt deze altijd wijzigen.",
+    welcomeBack: "Welkom terug.",
+    startHere: "Begin hier.",
+    loginIntro: "Log in met hetzelfde account dat je voor SanoSync gebruikt.",
+    signupIntro: "Maak je account aan en stel je eerste plan in.",
+    continueGoogle: "Doorgaan met Google",
+    signupGoogle: "Registreren met Google",
+    or: "of",
+    email: "E-mail",
+    password: "Wachtwoord",
+    passwordPlaceholder: "Je wachtwoord",
+    newPasswordPlaceholder: "Minimaal 8 tekens",
+    login: "Inloggen",
+    createAccount: "Account aanmaken",
+    signingIn: "Inloggen…",
+    creatingAccount: "Account aanmaken…",
+    noAccount: "Heb je nog geen account?",
+    haveAccount: "Heb je al een account?",
+    register: "Registreren",
+    privacyNote: "Je gegevens blijven privé en onder jouw controle.",
+    terms: "Algemene voorwaarden",
+    consentPrefix: "Ik accepteer de",
+    consentMiddle: "en bevestig dat ik het volgende heb gelezen:",
+    confirmationEmail:
+      "Controleer je e-mail en bevestig je account om te beginnen.",
+    signupFailed: "Registreren mislukt",
+    loginFailed: "Inloggen mislukt",
+    googleFailed: "Inloggen met Google mislukt",
+  },
 } as const;
 
 type MessageKey = keyof typeof messages.it;
@@ -116,11 +158,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const initial: AppLocale =
-      stored === "it" || stored === "en"
+      stored === "it" || stored === "en" || stored === "nl"
         ? stored
         : navigator.language.toLowerCase().startsWith("it")
           ? "it"
-          : "en";
+          : navigator.language.toLowerCase().startsWith("nl")
+            ? "nl"
+            : "en";
     setLocaleState(initial);
     document.documentElement.lang = initial;
   }, []);
