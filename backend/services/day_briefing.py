@@ -11,6 +11,7 @@ from backend.services.ai_tone import ZERO_TONE_GUIDE
 
 
 BriefingMode = Literal["standard", "zero"]
+BriefingLanguage = Literal["it", "en", "nl", "fr"]
 BriefingMoment = Literal[
     "morning",
     "afternoon",
@@ -162,28 +163,52 @@ Contesto quotidiano:
 """.strip()
 
 
-def _greeting(moment: BriefingMoment) -> str:
-    return {
-        "morning": "Buongiorno",
-        "afternoon": "Buon pomeriggio",
-        "evening": "Buonasera",
-    }[moment]
+LANGUAGE_INSTRUCTIONS = {
+    "it": "Rispondi esclusivamente in italiano.",
+    "en": "Reply exclusively in British English.",
+    "nl": "Antwoord uitsluitend in natuurlijk Nederlands.",
+    "fr": "Réponds exclusivement en français naturel.",
+}
 
 
-def _closing(moment: BriefingMoment) -> str:
-    return {
-        "morning": "Buona giornata!",
-        "afternoon": "Continua così!",
-        "evening": "Goditi la serata!",
-    }[moment]
+FALLBACK_COPY = {
+    "it": {
+        "greetings": {"morning": "Buongiorno", "afternoon": "Buon pomeriggio", "evening": "Buonasera"},
+        "days": {"office": "giornata in ufficio", "home": "giornata di lavoro da casa", "free": "giornata di riposo"},
+        "closings": {"morning": "Buona giornata!", "afternoon": "Continua così!", "evening": "Goditi la serata!"},
+    },
+    "en": {
+        "greetings": {"morning": "Good morning", "afternoon": "Good afternoon", "evening": "Good evening"},
+        "days": {"office": "an office day", "home": "a work-from-home day", "free": "a rest day"},
+        "closings": {"morning": "Have a good day!", "afternoon": "Keep it up!", "evening": "Enjoy your evening!"},
+    },
+    "nl": {
+        "greetings": {"morning": "Goedemorgen", "afternoon": "Goedemiddag", "evening": "Goedenavond"},
+        "days": {"office": "een kantoordag", "home": "een thuiswerkdag", "free": "een rustdag"},
+        "closings": {"morning": "Fijne dag!", "afternoon": "Ga zo door!", "evening": "Fijne avond!"},
+    },
+    "fr": {
+        "greetings": {"morning": "Bonjour", "afternoon": "Bon après-midi", "evening": "Bonsoir"},
+        "days": {"office": "une journée au bureau", "home": "une journée en télétravail", "free": "une journée de repos"},
+        "closings": {"morning": "Bonne journée !", "afternoon": "Continue comme ça !", "evening": "Profite bien de ta soirée !"},
+    },
+}
 
 
-def _day_label(day_type: str) -> str:
-    return {
-        "office": "giornata in ufficio",
-        "home": "giornata di lavoro da casa",
-        "free": "giornata di riposo",
-    }.get(day_type, "giornata")
+def normalize_briefing_language(value: str | None) -> BriefingLanguage:
+    return value if value in LANGUAGE_INSTRUCTIONS else "it"
+
+
+def _greeting(moment: BriefingMoment, language: BriefingLanguage) -> str:
+    return FALLBACK_COPY[language]["greetings"][moment]
+
+
+def _closing(moment: BriefingMoment, language: BriefingLanguage) -> str:
+    return FALLBACK_COPY[language]["closings"][moment]
+
+
+def _day_label(day_type: str, language: BriefingLanguage) -> str:
+    return FALLBACK_COPY[language]["days"].get(day_type, "day")
 
 
 MORNING_OUTCOME_PHRASES = (
@@ -239,6 +264,7 @@ def fallback_day_briefing(
     *,
     mode: BriefingMode = "standard",
 ) -> str:
+    language = normalize_briefing_language(payload.get("language"))
     moment: BriefingMoment = payload.get(
         "moment",
         "evening",
@@ -246,7 +272,7 @@ def fallback_day_briefing(
     name = str(
         payload.get("first_name") or ""
     ).strip()
-    greeting = _greeting(moment)
+    greeting = _greeting(moment, language)
     opening = (
         f"{greeting} {name}!"
         if name
@@ -254,7 +280,8 @@ def fallback_day_briefing(
     )
 
     day_label = _day_label(
-        str(payload.get("day_type") or "")
+        str(payload.get("day_type") or ""),
+        language,
     )
     activity_count = int(
         payload.get("activity_count") or 0
@@ -265,6 +292,18 @@ def fallback_day_briefing(
     meal_count = int(
         payload.get("meal_count") or 0
     )
+
+    if language != "it":
+        return _localized_fallback(
+            language=language,
+            moment=moment,
+            opening=opening,
+            day_label=day_label,
+            mode=mode,
+            meal_count=meal_count,
+            activity_count=activity_count,
+            status=status,
+        )
 
     if moment == "morning":
         if meal_count == 0:
@@ -338,8 +377,45 @@ def fallback_day_briefing(
     return (
         f"{opening} Oggi è stata una {day_label}: "
         f"{result}{activity_text}. "
-        f"{_closing(moment)}"
+        f"{_closing(moment, language)}"
     )
+
+
+def _localized_fallback(
+    *,
+    language: BriefingLanguage,
+    moment: BriefingMoment,
+    opening: str,
+    day_label: str,
+    mode: BriefingMode,
+    meal_count: int,
+    activity_count: int,
+    status: str,
+) -> str:
+    if language == "en":
+        if moment == "morning":
+            body = "Log breakfast when you have it; we can assess the day later." if meal_count == 0 else "The day is still in progress. Keep logging your meals and we will assess it later."
+        else:
+            result = {"deficit": "you are within your calorie target", "maintenance": "you are around maintenance", "over_maintenance": "you are above maintenance"}.get(status, "your day is up to date")
+            body = f"Today was {day_label}: {result}."
+    elif language == "nl":
+        if moment == "morning":
+            body = "Registreer je ontbijt zodra je hebt gegeten; later bekijken we de balans." if meal_count == 0 else "De dag is nog bezig. Blijf je maaltijden registreren; later bekijken we de balans."
+        else:
+            result = {"deficit": "je zit binnen je caloriedoel", "maintenance": "je zit rond onderhoud", "over_maintenance": "je zit boven onderhoud"}.get(status, "je dag is bijgewerkt")
+            body = f"Vandaag was {day_label}: {result}."
+    else:
+        if moment == "morning":
+            body = "Enregistre ton petit-déjeuner après l’avoir pris ; nous ferons le point plus tard." if meal_count == 0 else "La journée est encore en cours. Continue à enregistrer tes repas ; nous ferons le point plus tard."
+        else:
+            result = {"deficit": "tu es dans ton objectif calorique", "maintenance": "tu es autour du maintien", "over_maintenance": "tu es au-dessus du maintien"}.get(status, "ta journée est à jour")
+            body = f"Aujourd’hui, c’était {day_label} : {result}."
+
+    if mode == "zero" and moment != "morning" and activity_count == 0:
+        zero_tail = {"en": "No activity logged. At least the injury risk is impressively low.", "nl": "Geen activiteit geregistreerd. Het blessurerisico is in elk geval indrukwekkend laag.", "fr": "Aucune activité enregistrée. Au moins, le risque de blessure est remarquablement bas."}[language]
+        return f"{opening} {body} {zero_tail}"
+
+    return f"{opening} {body} {_closing(moment, language)}"
 
 
 class DayBriefingService:
@@ -385,6 +461,8 @@ class DayBriefingService:
             if mode == "standard"
             else ZERO_PROMPT
         )
+        language = normalize_briefing_language(payload.get("language"))
+        system_prompt = f"{system_prompt}\n\nREGOLA LINGUISTICA PRIORITARIA:\n{LANGUAGE_INSTRUCTIONS[language]}"
 
         try:
             completion = (
