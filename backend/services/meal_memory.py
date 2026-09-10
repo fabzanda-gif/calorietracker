@@ -128,10 +128,11 @@ class MealMemoryService:
             == day_date.weekday()
         ]
 
-        # Prefer the most specific signal once it has enough evidence.
-        # Otherwise progressively fall back so a new user can receive a
-        # useful routine after two coherent logs rather than waiting weeks.
-        if len(context_candidates) >= 2:
+        # An explicit day context is a hard boundary: an office day
+        # must never inherit a home routine (and vice versa). Within an
+        # unknown context, progressively fall back from weekday to recent
+        # history so two coherent logs can already produce a prediction.
+        if day_context is not None:
             candidates = context_candidates
             evidence_scope = "context"
         elif len(weekday_candidates) >= 2:
