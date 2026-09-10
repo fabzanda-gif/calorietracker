@@ -4,6 +4,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { ExperienceModeProvider } from "@/components/experience/ExperienceModeProvider";
+import { I18nProvider } from "@/components/i18n/I18nProvider";
 
 import "./globals.css";
 
@@ -58,16 +59,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="it">
+    <html lang="it" suppressHydrationWarning>
       <body>
         <RegisterServiceWorker />
-        <AuthProvider>
-          <ExperienceModeProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <ExperienceModeProvider>
             <AuthGate>
               {children}
             </AuthGate>
-          </ExperienceModeProvider>
-        </AuthProvider>
+            </ExperienceModeProvider>
+          </AuthProvider>
+        </I18nProvider>
       </body>
     </html>
   );
