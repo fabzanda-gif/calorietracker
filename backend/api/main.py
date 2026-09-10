@@ -182,6 +182,9 @@ async def demo_read_only_middleware(
     request,
     call_next,
 ):
+    if request.url.path == "/auth-events/login":
+        return await call_next(request)
+
     if request.method not in {
         "POST",
         "PUT",
