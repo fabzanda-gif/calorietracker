@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type AppLocale = "it" | "en" | "nl";
+export type AppLocale = "it" | "en" | "nl" | "fr";
 
 const STORAGE_KEY = "sanosync-language";
 
@@ -356,6 +356,56 @@ const messages = {
     consentContinue: "Door verder te gaan bevestig je dat je het volgende hebt gelezen:",
     consentAnd: "en de",
   },
+  fr: {
+    today: "Aujourd’hui", breakfast: "Petit-déjeuner", privacyPolicy: "Politique de confidentialité",
+    activities: "Activités", progress: "Progrès", recipes: "Recettes", profile: "Profil",
+    signOut: "Se déconnecter", openProfile: "Ouvrir le profil", manageProfile: "Gérer le profil",
+    primaryNavigation: "Navigation principale", demoMode: "Mode démo · données réelles en lecture seule",
+    language: "Langue de l’application", languageHelp: "Lors de la première visite, nous utilisons la langue de votre appareil. Vous pouvez la modifier à tout moment.",
+    welcomeBack: "Bon retour.", startHere: "Commencez ici.",
+    loginIntro: "Connectez-vous avec le compte que vous utilisez sur SanoSync.",
+    signupIntro: "Créez votre compte et configurez votre premier programme.",
+    continueGoogle: "Continuer avec Google", signupGoogle: "S’inscrire avec Google", or: "ou",
+    email: "E-mail", password: "Mot de passe", passwordPlaceholder: "Votre mot de passe",
+    newPasswordPlaceholder: "Au moins 8 caractères", login: "Se connecter", createAccount: "Créer un compte",
+    signingIn: "Connexion…", creatingAccount: "Création du compte…",
+    noAccount: "Vous n’avez pas encore de compte ?", haveAccount: "Vous avez déjà un compte ?",
+    register: "S’inscrire", privacyNote: "Vos données restent privées et sous votre contrôle.",
+    terms: "Conditions générales", consentPrefix: "J’accepte les", consentMiddle: "et confirme avoir lu la",
+    confirmationEmail: "Consultez votre e-mail et confirmez votre compte pour commencer.",
+    signupFailed: "Échec de l’inscription", loginFailed: "Échec de la connexion",
+    googleFailed: "Échec de la connexion avec Google", loadingSession: "Chargement de la session…",
+    legalNavigation: "Liens juridiques", landingEyebrow: "VOTRE JOURNÉE, SOUS CONTRÔLE",
+    landingTitle: "Tout ce dont vous avez besoin. Sans avoir à le chercher.",
+    landingIntro: "SanoSync relie repas, garde-manger, entraînements et progrès pour anticiper vos besoins et simplifier chaque saisie.",
+    previewHomeLabel: "Aperçu de l’accueil SanoSync", previewGreeting: "Bonjour, Fabio",
+    previewDayReady: "Votre journée est prête. Le programme s’adapte à ce qui se passe.",
+    recognizedHabit: "HABITUDE RECONNUE", bikeOfficeQuestion: "Êtes-vous encore allé au bureau à vélo aujourd’hui ?",
+    yesLogIt: "Oui, l’enregistrer", todayPlan: "VOTRE PROGRAMME DU JOUR",
+    remainingQuestion: "Combien puis-je encore manger aujourd’hui ?", consumedToday: "Consommé aujourd’hui",
+    canStillEat: "Vous pouvez encore manger", planReady: "Le programme est prêt et s’adaptera au fil de la journée.",
+    dailySummary: "Résumé quotidien", add: "Ajouter", pantry: "Garde-manger",
+    availableItems: "2 aliments disponibles", homeBreakfast: "Petit-déjeuner à la maison · 235 kcal",
+    allInOneInput: "Tout dans une seule saisie", aiIntro: "Racontez-moi votre journée, je m’occupe du reste.",
+    aiPlaceholder: "Écrivez ce que vous avez mangé ou fait…", predictivePlan: "Programme prédictif",
+    everythingConnected: "Tout est connecté", instantLogging: "Saisie immédiate",
+    emailPlaceholder: "nom@exemple.fr", onboardingStep: "Étape", onboardingWelcome: "Bienvenue sur SanoSync",
+    onboardingTitle: "Tout sous contrôle.", onboardingIntro: "Enregistrez repas, activité et poids. SanoSync transforme vos données en un programme quotidien simple à suivre.",
+    personalCalorieBudget: "Budget calorique personnel", mealsActivitiesTogether: "Repas et activités au même endroit",
+    clearProgress: "Des progrès clairs dans le temps", configurePlan: "Configurer mon programme",
+    startingPoint: "Votre point de départ", createPlanTitle: "Créons votre programme.",
+    createPlanIntro: "Ces informations servent à estimer votre métabolisme et votre objectif calorique. Vous pourrez les modifier à tout moment dans votre profil.",
+    name: "Nom", bmrFormula: "Formule de calcul du métabolisme de base", select: "Sélectionner",
+    female: "Femme", male: "Homme", birthDate: "Date de naissance", heightCm: "Taille (cm)",
+    currentWeightKg: "Poids actuel (kg)", targetWeightKg: "Poids cible (kg)", optional: "facultatif",
+    goal: "Objectif", loseWeight: "Perdre du poids", maintainWeight: "Maintenir le poids",
+    gainWeight: "Prendre du poids", lossSpeed: "Rythme de perte", gainSpeed: "Rythme de prise",
+    slow: "Lent", balanced: "Équilibré", fast: "Rapide", deficit: "déficit", surplus: "surplus",
+    onboardingRequired: "Remplissez les champs requis pour calculer votre programme.",
+    profileSaveFailed: "Nous n’avons pas pu enregistrer votre profil.", back: "Retour",
+    creatingPlan: "Création du programme...", startSanoSync: "Commencer avec SanoSync",
+    consentContinue: "En continuant, vous confirmez avoir lu la", consentAnd: "et les",
+  },
 } as const;
 
 type MessageKey = keyof typeof messages.it;
@@ -374,13 +424,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const initial: AppLocale =
-      stored === "it" || stored === "en" || stored === "nl"
+      stored === "it" || stored === "en" || stored === "nl" || stored === "fr"
         ? stored
         : navigator.language.toLowerCase().startsWith("it")
           ? "it"
           : navigator.language.toLowerCase().startsWith("nl")
             ? "nl"
-            : "en";
+            : navigator.language.toLowerCase().startsWith("fr")
+              ? "fr"
+              : "en";
     setLocaleState(initial);
     document.documentElement.lang = initial;
   }, []);
