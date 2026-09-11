@@ -3027,3 +3027,10 @@ label.completePlanButton {
   outline:3px solid rgba(255,102,102,.24);
   outline-offset:2px;
 }
+
+/* More breathing room below language / experience controls */
+@media (min-width: 760px) {
+  .monthTotal {
+    margin-top: 16px;
+  }
+}
