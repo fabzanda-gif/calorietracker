@@ -36,6 +36,18 @@ class MealPrimaryPriorityService:
             meal_slot == "breakfast"
             and self._is_home(day_context)
         ):
+            inventory = [
+                candidate
+                for candidate in candidates
+                if candidate.get("source") == "meal_prep"
+            ]
+
+            if inventory:
+                return min(
+                    inventory,
+                    key=self._expiry_key,
+                )
+
             routine = next(
                 (
                     candidate

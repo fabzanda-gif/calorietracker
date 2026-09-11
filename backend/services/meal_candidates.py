@@ -36,10 +36,32 @@ class MealCandidateService:
     ) -> list[dict]:
         candidates: list[dict] = []
 
+        compatible_meal_types = (
+            MealSuggestionPolicy.compatible_meal_types(
+                meal_type
+            )
+        )
+
+        recipe_meal_types = {
+            str(recipe.get("id")): recipe.get("meal_type")
+            for recipe in recipes
+            if recipe.get("id") is not None
+        }
+
         for batch in meal_prep_items:
             if (
                 batch.get("status") != "available"
                 or self._number(batch.get("portions_remaining")) <= 0
+            ):
+                continue
+
+            source_meal_type = recipe_meal_types.get(
+                str(batch.get("recipe_id"))
+            )
+
+            if (
+                source_meal_type
+                and source_meal_type not in compatible_meal_types
             ):
                 continue
 
@@ -55,6 +77,7 @@ class MealCandidateService:
                     "source_id": batch.get("id"),
                     "name": batch.get("name"),
                     "meal_type": meal_type,
+                    "source_meal_type": source_meal_type,
                     "calories": self._number(
                         batch.get("calories_per_portion")
                     ),
@@ -131,8 +154,6 @@ class MealCandidateService:
                     ),
                 }
             )
-
-        compatible_meal_types = MealSuggestionPolicy.compatible_meal_types(meal_type)
 
         for recipe in recipes:
             recipe_meal_type = recipe.get("meal_type")

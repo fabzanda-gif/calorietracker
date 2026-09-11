@@ -11,6 +11,7 @@ class MealSuggestionPolicy:
     """
 
     MAIN_MEAL_TYPES = frozenset({"Pranzo", "Cena"})
+    LIGHT_MEAL_TYPES = frozenset({"Colazione", "Snack"})
     DEFAULT_MIN_MAIN_MEAL_KCAL = 500.0
     DEFAULT_MAX_MAIN_MEAL_KCAL = 1000.0
 
@@ -37,6 +38,9 @@ class MealSuggestionPolicy:
 
         if cls.is_main_meal(normalized):
             return set(cls.MAIN_MEAL_TYPES)
+
+        if normalized in cls.LIGHT_MEAL_TYPES:
+            return set(cls.LIGHT_MEAL_TYPES)
 
         return {normalized}
 
