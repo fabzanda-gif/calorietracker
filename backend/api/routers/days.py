@@ -48,6 +48,7 @@ from backend.services.day_budget import DayBudgetService
 from backend.services.day_briefing import (
     DayBriefingError,
     DayBriefingService,
+    _looks_like_provider_block,
     build_status_hint,
     fallback_day_briefing,
 )
@@ -1170,7 +1171,13 @@ def get_day_briefing(
     except RepositoryError:
         persisted = None
 
-    if persisted and persisted.get("input_signature") == input_signature:
+    if (
+        persisted
+        and persisted.get("input_signature") == input_signature
+        and not _looks_like_provider_block(
+            persisted.get("message") or ""
+        )
+    ):
         return {
             "date": str(day_date),
             "mode": mode,
@@ -1208,7 +1215,12 @@ def get_day_briefing(
             cached_entry
         )
 
-        if expires_at > time.monotonic():
+        if (
+            expires_at > time.monotonic()
+            and not _looks_like_provider_block(
+                cached_response.get("message") or ""
+            )
+        ):
             return {
                 **cached_response,
                 "cached": True,
