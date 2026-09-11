@@ -224,10 +224,48 @@ class DayBudgetService:
             activity_level
         )
 
+        completed_planned_ids = {
+            str(item.get("planned_activity_id"))
+            for item in today_activities
+            if item.get("planned_activity_id") is not None
+        }
+
+        remaining_planned_activities = [
+            item
+            for item in planned_activities
+            if str(item.get("id")) not in completed_planned_ids
+        ]
+
         planned_energy = summarize_planned_activity_energy(
-            planned_activities,
+            remaining_planned_activities,
             weight_kg=current_weight,
         )
+
+        actual_activity_kcal = float(
+            metrics.get("actual_activity_kcal") or 0.0
+        )
+
+        expected_activity_kcal = (
+            average_activity_kcal
+            + activity_buffer_kcal
+        )
+
+        if actual_activity_kcal > 0:
+            activity_kcal_for_budget = (
+                actual_activity_kcal
+                + planned_energy["estimated_kcal"]
+            )
+            activity_budget_source = (
+                "actual_plus_remaining_planned"
+            )
+        else:
+            activity_kcal_for_budget = (
+                expected_activity_kcal
+                + planned_energy["estimated_kcal"]
+            )
+            activity_budget_source = (
+                "expected_plus_planned"
+            )
 
         today_row = self.daily_logs_repo.get_for_date_compatible(
             user_id=user_id,
@@ -267,11 +305,7 @@ class DayBudgetService:
         budget = self.budget_service.calculate(
             BudgetInput(
                 bmr=profile["bmr"],
-                activity_kcal=(
-                    average_activity_kcal
-                    + activity_buffer_kcal
-                    + planned_energy["estimated_kcal"]
-                ),
+                activity_kcal=activity_kcal_for_budget,
                 baseline_activity_factor=1.0,
                 consumed_kcal=metrics["consumed_kcal"],
                 planned_kcal=0.0,
@@ -293,11 +327,10 @@ class DayBudgetService:
                 "average_activity_kcal_7d": average_activity_kcal,
                 "activity_level": activity_level,
                 "activity_buffer_kcal": activity_buffer_kcal,
-                "activity_kcal_for_budget": (
-                    average_activity_kcal
-                    + activity_buffer_kcal
-                    + planned_energy["estimated_kcal"]
-                ),
+                "actual_activity_kcal": actual_activity_kcal,
+                "expected_activity_kcal": expected_activity_kcal,
+                "activity_kcal_for_budget": activity_kcal_for_budget,
+                "activity_budget_source": activity_budget_source,
                 "planned_activity_kcal": planned_energy["estimated_kcal"],
                 "planned_activity_count": planned_energy["count"],
                 "planned_activity_level": planned_energy["activity_level"],

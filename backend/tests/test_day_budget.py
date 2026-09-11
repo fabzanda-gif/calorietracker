@@ -108,11 +108,19 @@ def test_day_budget_combines_profile_food_and_activity():
     assert result["actual"]["actual_activity_kcal"] == 450
 
     budget = result["budget"]
-    # Today's activity stays observable but is not added directly
-    # to today's calorie target.
-    assert budget["maintenance_kcal"] == result["profile"]["bmr"]
+    assert budget["maintenance_kcal"] == (
+        result["profile"]["bmr"] + 450
+    )
     assert budget["available_kcal"] == (
         budget["daily_budget_kcal"] - 1200
+    )
+    assert (
+        result["energy_baseline"]["activity_kcal_for_budget"]
+        == 450
+    )
+    assert (
+        result["energy_baseline"]["activity_budget_source"]
+        == "actual_plus_remaining_planned"
     )
 
 
@@ -398,7 +406,7 @@ def test_day_budget_moderate_buffer_is_150():
     )
 
 
-def test_today_activity_does_not_change_today_budget():
+def test_today_activity_replaces_expected_activity_in_budget():
     before = service(
         activities=[],
         daily_log={
@@ -431,13 +439,22 @@ def test_today_activity_does_not_change_today_budget():
         current_weight=80,
     )
 
+    assert after["actual"]["actual_activity_kcal"] == 500
     assert (
-        after["actual"]["actual_activity_kcal"]
+        after["energy_baseline"]["activity_kcal_for_budget"]
         == 500
     )
     assert (
+        after["energy_baseline"]["activity_budget_source"]
+        == "actual_plus_remaining_planned"
+    )
+    assert (
+        after["budget"]["maintenance_kcal"]
+        == after["profile"]["bmr"] + 500
+    )
+    assert (
         after["budget"]["daily_budget_kcal"]
-        == before["budget"]["daily_budget_kcal"]
+        > before["budget"]["daily_budget_kcal"]
     )
 
 
@@ -464,3 +481,41 @@ def test_planned_run_is_included_from_the_start_of_the_day():
     assert baseline["planned_activity_kcal"] == 400
     assert baseline["planned_activity_level"] == "moderate"
     assert result["budget"]["maintenance_kcal"] == result["profile"]["bmr"] + 400
+
+
+def test_completed_planned_activity_is_not_counted_twice():
+    result = service(
+        activities=[
+            {
+                "burned_calories": 1000,
+                "planned_activity_id": "padel-1",
+            }
+        ],
+        planned_activities=[
+            {
+                "id": "padel-1",
+                "status": "planned",
+                "title": "Padel",
+                "activity_type": "Padel",
+                "duration_minutes": 90,
+            }
+        ],
+        daily_log={
+            "date": str(DAY),
+            "activity_plan": "Attiva",
+        },
+    ).build(
+        user_id="u1",
+        day_date=DAY,
+        metadata={
+            **BASE_META,
+            "goal_mode": "maintenance",
+        },
+        current_weight=80,
+    )
+
+    baseline = result["energy_baseline"]
+
+    assert baseline["actual_activity_kcal"] == 1000
+    assert baseline["planned_activity_kcal"] == 0
+    assert baseline["activity_kcal_for_budget"] == 1000

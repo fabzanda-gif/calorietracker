@@ -273,3 +273,43 @@ def test_ai_morning_outcome_is_rejected():
             payload,
             mode="standard",
         )
+
+
+def test_ai_provider_block_message_is_rejected():
+    parsed = SimpleNamespace(
+        message=(
+            "The model's output was blocked due to "
+            "a safety policy violation."
+        )
+    )
+    completion = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(parsed=parsed),
+            )
+        ]
+    )
+
+    class FakeParse:
+        def parse(self, **kwargs):
+            return completion
+
+    client = SimpleNamespace(
+        beta=SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=FakeParse(),
+            )
+        )
+    )
+
+    with pytest.raises(
+        DayBriefingError,
+        match="blocked briefing",
+    ):
+        DayBriefingService(
+            api_key="test",
+            client=client,
+        ).generate(
+            _payload(),
+            mode="standard",
+        )

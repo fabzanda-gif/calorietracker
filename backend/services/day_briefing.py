@@ -242,6 +242,25 @@ def _violates_morning_timing(
     )
 
 
+PROVIDER_BLOCK_PHRASES = (
+    "blocked due to a safety policy violation",
+    "safety policy violation",
+    "content was blocked",
+    "response was blocked",
+)
+
+
+def _looks_like_provider_block(message: str) -> bool:
+    normalized = " ".join(
+        str(message or "").casefold().split()
+    )
+
+    return any(
+        phrase in normalized
+        for phrase in PROVIDER_BLOCK_PHRASES
+    )
+
+
 def build_status_hint(
     *,
     consumed_kcal: float,
@@ -507,6 +526,11 @@ class DayBriefingService:
         if not message:
             raise DayBriefingError(
                 "Groq returned an empty briefing"
+            )
+
+        if _looks_like_provider_block(message):
+            raise DayBriefingError(
+                "Groq returned a blocked briefing"
             )
 
         if _violates_morning_timing(
