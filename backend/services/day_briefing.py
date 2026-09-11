@@ -247,6 +247,9 @@ PROVIDER_BLOCK_PHRASES = (
     "safety policy violation",
     "content was blocked",
     "response was blocked",
+    "flagged for potential intellectual property violation",
+    "intellectual property violation",
+    "potential intellectual property violation",
 )
 
 
