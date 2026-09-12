@@ -16,7 +16,7 @@ def candidate(source, name, expires_at=None):
     }
 
 
-def test_home_breakfast_prefers_recurring_routine():
+def test_home_breakfast_prefers_available_meal_prep():
     fallback = candidate("recipe", "Fallback")
     routine = candidate("routine", "Yogurt e avena")
     inventory = candidate(
@@ -33,7 +33,7 @@ def test_home_breakfast_prefers_recurring_routine():
         fallback=fallback,
     )
 
-    assert result is routine
+    assert result is inventory
 
 
 def test_free_day_is_not_treated_as_home_priority():

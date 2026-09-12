@@ -79,6 +79,7 @@ def test_conversational_day_preview_supports_multiple_actions(
         *,
         text,
         default_meal_type,
+        reference_date=None,
     ):
         assert (
             text

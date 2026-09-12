@@ -12,13 +12,13 @@ def test_lunch_and_dinner_are_compatible():
     ) == {"Pranzo", "Cena"}
 
 
-def test_snacks_and_breakfast_remain_isolated():
+def test_snacks_and_breakfast_are_compatible():
     assert MealSuggestionPolicy.compatible_meal_types(
         "Snack"
-    ) == {"Snack"}
+    ) == {"Colazione", "Snack"}
     assert MealSuggestionPolicy.compatible_meal_types(
         "Colazione"
-    ) == {"Colazione"}
+    ) == {"Colazione", "Snack"}
 
 
 def test_main_meal_calorie_boundaries_are_inclusive():

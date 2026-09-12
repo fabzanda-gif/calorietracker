@@ -41,6 +41,22 @@ class FakeMealPrepRepository:
             and item["portions_remaining"] > 0
         ]
 
+    def find_available_for_recipe_date(
+        self,
+        user_id,
+        recipe_id,
+        prepared_at,
+    ):
+        for item in self.items.values():
+            if (
+                item.get("user_id") == user_id
+                and str(item.get("recipe_id")) == str(recipe_id)
+                and str(item.get("prepared_at")) == str(prepared_at)
+                and item.get("status") == "available"
+            ):
+                return item
+        return None
+
     def create(self, payload):
         item = {"id": "batch-1", **payload}
         self.items["batch-1"] = item

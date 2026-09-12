@@ -482,7 +482,7 @@ def test_activity_can_relax_lunch_replanning():
 
     assert (
         after_budget["available_kcal"]
-        == before_budget["available_kcal"]
+        == before_budget["available_kcal"] + 500
     )
 
     assert (
