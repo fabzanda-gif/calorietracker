@@ -77,6 +77,9 @@ from backend.services.generic_order_candidates import (
 from backend.services.future_training_nutrition import (
     FutureTrainingNutritionService,
 )
+from backend.services.training_nutrition import (
+    TrainingNutritionService,
+)
 from backend.services.meal_candidates import MealCandidateService
 from backend.services.meal_primary_priority import (
     MealPrimaryPriorityService,
@@ -369,6 +372,85 @@ def get_next_meal(
         ) from exc
 
 
+@router.get("/{day_date}/training-nutrition")
+def get_training_nutrition(
+    day_date: Date,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+):
+    try:
+        planned_repo = (
+            _planned_repo_from_activities(
+                activities_repo
+            )
+        )
+
+        tomorrow = (
+            day_date
+            + timedelta(days=1)
+        )
+
+        planned_activities = (
+            planned_repo.list_range(
+                current_user.id,
+                day_date,
+                tomorrow,
+            )
+            if planned_repo is not None
+            else []
+        )
+
+        actual_activities = (
+            activities_repo.list_for_date(
+                current_user.id,
+                day_date,
+            )
+        )
+
+        latest_weight = weight_repo.latest(
+            current_user.id
+        )
+
+        weight_kg = (
+            latest_weight.get("weight")
+            if latest_weight
+            else None
+        )
+
+        context = (
+            TrainingNutritionService().build(
+                day_date=day_date,
+                planned_activities=(
+                    planned_activities
+                ),
+                actual_activities=(
+                    actual_activities
+                ),
+                weight_kg=weight_kg,
+            )
+        )
+
+        return {
+            "date": str(day_date),
+            "context": context,
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/{day_date}/budget")
 def get_day_budget(
     day_date: Date,
@@ -603,6 +685,51 @@ def get_ranked_meal_options(
             mode=mode_result["mode"],
         )
 
+        training_nutrition_context = None
+
+        try:
+            planned_repo = (
+                _planned_repo_from_activities(
+                    activities_repo
+                )
+            )
+
+            nutrition_planned = (
+                planned_repo.list_range(
+                    current_user.id,
+                    day_date,
+                    day_date + timedelta(days=1),
+                )
+                if planned_repo is not None
+                else []
+            )
+
+            nutrition_actual = (
+                activities_repo.list_for_date(
+                    current_user.id,
+                    day_date,
+                )
+            )
+
+            latest_weight = weight_repo.latest(
+                current_user.id
+            )
+
+            training_nutrition_context = (
+                TrainingNutritionService().build(
+                    day_date=day_date,
+                    planned_activities=nutrition_planned,
+                    actual_activities=nutrition_actual,
+                    weight_kg=(
+                        latest_weight.get("weight")
+                        if latest_weight
+                        else None
+                    ),
+                )
+            )
+        except RepositoryError:
+            training_nutrition_context = None
+
         future_training_context = None
 
         if meal_slot == "dinner":
@@ -709,7 +836,8 @@ def get_ranked_meal_options(
             preferred_mode=feedback["preferred_mode"],
             max_main_meal_kcal=max_main_meal_kcal,
             future_training_context=(
-                future_training_context
+                training_nutrition_context
+                or future_training_context
             ),
         )
 
@@ -796,6 +924,9 @@ def get_ranked_meal_options(
             "recommended": recommended,
             "replanning_context": replanning_context,
             "future_training": future_training_context,
+            "training_nutrition": (
+                training_nutrition_context
+            ),
             **ranked,
         }
 

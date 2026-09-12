@@ -83,6 +83,7 @@ import {
   getDay,
   getDayBriefing,
   getDayBudget,
+  getTrainingNutrition,
   getMealOptions,
   getNextMeal,
   updateDailyLog,
@@ -93,6 +94,7 @@ import type {
   MealOptionsResponse,
   NextMealResponse,
   RankedMealOption,
+  TrainingNutritionResponse,
 } from "@/lib/api/types";
 
 import {
@@ -204,6 +206,95 @@ function plannedTrainingDateLabel(
   );
 }
 
+
+function trainingNutritionTitle(
+  context: TrainingNutritionResponse["context"],
+): string {
+  if (context.phase === "pre_race") {
+    return "Gara oggi";
+  }
+
+  if (context.phase === "pre_training") {
+    return "Allenamento oggi";
+  }
+
+  if (context.phase === "recovery") {
+    return "Recupero post-allenamento";
+  }
+
+  if (context.phase === "tomorrow_prep") {
+    return context.priority === "race"
+      ? "Gara domani"
+      : "Allenamento domani";
+  }
+
+  return "Nutrizione";
+}
+
+function trainingNutritionMessage(
+  context: TrainingNutritionResponse["context"],
+): string {
+  const distanceKm =
+    context.session?.distance_meters
+      ? (
+          context.session.distance_meters /
+          1000
+        ).toLocaleString("it-IT", {
+          maximumFractionDigits: 1,
+        })
+      : null;
+
+  const carbs = context.carbs_target_g
+    ? `${context.carbs_target_g.min}–${context.carbs_target_g.max} g di carboidrati`
+    : null;
+
+  const protein = context.protein_target_g
+    ? `${context.protein_target_g.min}–${context.protein_target_g.max} g di proteine`
+    : null;
+
+  if (context.phase === "pre_race") {
+    const timing =
+      context.hours_to_start != null
+        ? ` Mancano circa ${context.hours_to_start.toLocaleString(
+            "it-IT",
+            { maximumFractionDigits: 1 },
+          )} ore.`
+        : "";
+
+    return (
+      `${distanceKm ? `${distanceKm} km. ` : ""}` +
+      `Buona gara.${timing}` +
+      `${carbs ? ` Punta a circa ${carbs} prima della partenza.` : ""}`
+    );
+  }
+
+  if (context.phase === "pre_training") {
+    return (
+      `${distanceKm ? `${distanceKm} km previsti. ` : ""}` +
+      `${carbs ? `Prima della sessione punta a circa ${carbs}.` : "Arriva alla sessione ben alimentato e idratato."}`
+    );
+  }
+
+  if (context.phase === "recovery") {
+    const targets = [
+      carbs,
+      protein,
+    ].filter(Boolean).join(" e ");
+
+    return targets
+      ? `Per il recupero nelle prossime ore punta a circa ${targets}, oltre ai liquidi.`
+      : "Dai priorità a recupero, proteine, carboidrati e liquidi.";
+  }
+
+  if (context.phase === "tomorrow_prep") {
+    return (
+      `${distanceKm ? `${distanceKm} km domani. ` : ""}` +
+      `${carbs ? `Oggi distribuisci circa ${carbs} nella giornata.` : "Oggi prepara bene energia e idratazione per domani."}`
+    );
+  }
+
+  return "";
+}
 
 function plannedTrainingKindLabel(
   value?: string | null,
@@ -571,6 +662,7 @@ export function HomeShell() {
     user,
     accessToken,
   } = useAuth();
+
   const [onboardingTestCompleted] = useState(
     () =>
       typeof window !== "undefined" &&
@@ -583,6 +675,13 @@ export function HomeShell() {
     useState<DayResponse | null>(null);
   const [budgetResult, setBudgetResult] =
     useState<DayBudgetResponse | null>(null);
+
+  const [
+    trainingNutrition,
+    setTrainingNutrition,
+  ] = useState<TrainingNutritionResponse | null>(
+    null,
+  );
   const [nextMealOptions, setNextMealOptions] =
     useState<MealOptionsResponse | null>(null);
   const [dinnerOptions, setDinnerOptions] =
@@ -697,6 +796,38 @@ export function HomeShell() {
 
   const [plannedActivities, setPlannedActivities] =
     useState<PlannedActivity[]>([]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setTrainingNutrition(null);
+      return;
+    }
+
+    let active = true;
+
+    void getTrainingNutrition(
+      todayIso(),
+      accessToken,
+    )
+      .then((payload) => {
+        if (active) {
+          setTrainingNutrition(payload);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setTrainingNutrition(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    accessToken,
+    actualActivities.length,
+    plannedActivities.length,
+  ]);
 
   const [
     nextRunningSession,
@@ -4590,6 +4721,54 @@ export function HomeShell() {
               </p>
             </section>
           )}
+
+          {trainingNutrition &&
+          trainingNutrition.context.phase !== "normal" ? (
+            <section
+              className={styles.trainingNutritionCard}
+            >
+              <div
+                className={
+                  styles.trainingNutritionIcon
+                }
+                aria-hidden="true"
+              >
+                {trainingNutrition.context.phase ===
+                "recovery"
+                  ? "↻"
+                  : trainingNutrition.context.priority ===
+                      "race"
+                    ? "🏁"
+                    : "⚡"}
+              </div>
+
+              <div
+                className={
+                  styles.trainingNutritionBody
+                }
+              >
+                <span
+                  className={
+                    styles.trainingNutritionEyebrow
+                  }
+                >
+                  Training nutrition
+                </span>
+
+                <strong>
+                  {trainingNutritionTitle(
+                    trainingNutrition.context,
+                  )}
+                </strong>
+
+                <p>
+                  {trainingNutritionMessage(
+                    trainingNutrition.context,
+                  )}
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           <div className={styles.dashboardToolbar}>
             <button

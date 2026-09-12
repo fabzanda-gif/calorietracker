@@ -265,6 +265,8 @@ export function getActivityComment(
       method: "POST",
       accessToken,
       body: JSON.stringify({
+        date:
+          activity.date,
         activity_name:
           activity.activity_name,
         activity_type:

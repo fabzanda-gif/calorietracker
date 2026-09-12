@@ -25,15 +25,18 @@ class ActivityCommentError(RuntimeError):
 class ActivityCommentOutput(BaseModel):
     comment: str = Field(
         min_length=1,
-        max_length=280,
+        max_length=650,
     )
 
 
 STANDARD_PROMPT = """
 Sei SanoSync, un assistente fitness e benessere.
 
-Devi commentare UNA singola attività fisica
-registrata dall'utente.
+Devi valutare una singola attività fisica
+registrata dall'utente, ma quando il payload
+contiene training_review devi interpretarla
+anche rispetto al programma di allenamento
+e alla gara target.
 
 Tono Standard:
 - positivo;
@@ -56,10 +59,22 @@ Regole:
   ma evita superlativi ingiustificati.
 
 Formato:
-- una o due frasi;
-- massimo 34 parole;
+- da 2 a 4 frasi;
+- massimo 85 parole;
 - niente titoli;
 - niente elenchi;
+- termina, quando i dati lo permettono, con
+  un consiglio pratico per migliorare;
+- se training_review.signals contiene anomalie,
+  spiegane al massimo due, dando priorità a
+  vicinanza alla gara, carico, ritmo e regolarità;
+- se esiste race.days_to_race, considera sempre
+  quanto manca alla gara;
+- se pace_variability_pct è elevata, puoi parlare
+  di ritmo irregolare;
+- se il servizio segnala too_fast_for_easy_session,
+  spiega che il ritmo è stato troppo aggressivo
+  per il tipo di seduta;
 - niente markdown;
 - niente emoji.
 

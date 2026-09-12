@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import binascii
 from datetime import date, time, timedelta
+
+DateType = date
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -51,6 +53,9 @@ from backend.services.activity_comment import (
     ActivityCommentError,
     ActivityCommentService,
     fallback_activity_comment,
+)
+from backend.services.training_activity_review import (
+    TrainingActivityReviewService,
 )
 from backend.services.profile_goal import ProfileGoalService
 from backend.services.planned_activity_outcome import (
@@ -145,6 +150,7 @@ class ActivityUpdate(BaseModel):
 
 
 class ActivityCommentRequest(BaseModel):
+    date: DateType | None = None
     activity_name: str = Field(
         min_length=1,
         max_length=160,
@@ -1673,15 +1679,174 @@ def get_activity_comment(
     current_user: CurrentUser = Depends(
         get_current_user
     ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    plans_repo: TrainingPlansRepository = Depends(
+        get_training_plans_repository
+    ),
 ):
-    # current_user is intentionally resolved here:
-    # generating AI text remains an authenticated
-    # SanoSync capability.
-    _ = current_user
-
     payload = request.model_dump(
         exclude={"mode"}
     )
+
+    stored_activity = None
+    planned = None
+    plan = None
+    plan_sessions = []
+    recent_activities = []
+
+    try:
+        if request.date:
+            stored_activity = (
+                activities_repo.get_named_for_date(
+                    current_user.id,
+                    request.date,
+                    request.activity_name,
+                )
+            )
+
+        review_activity = {
+            **payload,
+            **(stored_activity or {}),
+        }
+
+        planned_id = (
+            review_activity.get(
+                "planned_activity_id"
+            )
+        )
+
+        if planned_id:
+            planned = planned_repo.get(
+                str(planned_id),
+                current_user.id,
+            )
+
+        plans = plans_repo.list_for_user(
+            current_user.id
+        )
+
+        if (
+            planned
+            and planned.get(
+                "training_plan_id"
+            )
+        ):
+            plan_id = str(
+                planned[
+                    "training_plan_id"
+                ]
+            )
+
+            plan = next(
+                (
+                    item
+                    for item in plans
+                    if str(
+                        item.get("id")
+                    ) == plan_id
+                ),
+                None,
+            )
+        else:
+            plan = next(
+                (
+                    item
+                    for item in plans
+                    if (
+                        item.get("sport")
+                        == "running"
+                        and item.get("status")
+                        == "active"
+                    )
+                ),
+                None,
+            )
+
+        if plan and plan.get("id"):
+            plan_sessions = (
+                planned_repo.list_for_training_plan(
+                    current_user.id,
+                    str(plan["id"]),
+                )
+            )
+
+            if (
+                planned is None
+                and request.date
+            ):
+                planned = next(
+                    (
+                        item
+                        for item
+                        in plan_sessions
+                        if (
+                            str(
+                                item.get(
+                                    "scheduled_date"
+                                )
+                            )
+                            == str(request.date)
+                            and str(
+                                item.get(
+                                    "activity_type"
+                                )
+                                or ""
+                            )
+                            .strip()
+                            .casefold()
+                            in {
+                                "corsa",
+                                "running",
+                                "run",
+                            }
+                        )
+                    ),
+                    None,
+                )
+
+        if request.date:
+            recent_start = (
+                request.date
+                - timedelta(days=6)
+            )
+
+            recent_activities = (
+                activities_repo.list_date_range(
+                    current_user.id,
+                    recent_start,
+                    request.date,
+                )
+            )
+
+        payload[
+            "training_review"
+        ] = (
+            TrainingActivityReviewService()
+            .build(
+                activity=review_activity,
+                planned=planned,
+                plan=plan,
+                plan_sessions=plan_sessions,
+                recent_activities=(
+                    recent_activities
+                ),
+            )
+        )
+
+    except RepositoryError:
+        payload[
+            "training_review"
+        ] = {
+            "available": False,
+            "reason": (
+                "training_context_unavailable"
+            ),
+        }
 
     mode = (
         "zero"

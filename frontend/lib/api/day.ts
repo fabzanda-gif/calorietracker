@@ -8,6 +8,7 @@ import type {
   DecisionMode,
   MealOptionsResponse,
   NextMealResponse,
+  TrainingNutritionResponse,
 } from "./types";
 
 export function getDay(
@@ -28,6 +29,19 @@ export function getNextMeal(
 ): Promise<NextMealResponse> {
   return apiRequest<NextMealResponse>(
     `/days/${encodeURIComponent(dayDate)}/next-meal`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function getTrainingNutrition(
+  dayDate: string,
+  accessToken?: string | null,
+): Promise<TrainingNutritionResponse> {
+  return apiRequest<TrainingNutritionResponse>(
+    `/days/${encodeURIComponent(dayDate)}` +
+      `/training-nutrition`,
     {
       accessToken,
     },

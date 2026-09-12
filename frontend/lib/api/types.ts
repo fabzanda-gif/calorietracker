@@ -68,6 +68,49 @@ export interface DayBudget {
   protein_remaining_g: number | null;
 }
 
+export interface TrainingNutritionRange {
+  min: number;
+  max: number;
+}
+
+export interface TrainingNutritionSession {
+  id?: string | null;
+  title?: string | null;
+  activity_type?: string | null;
+  session_kind?: string | null;
+  scheduled_time?: string | null;
+  distance_meters?: number | null;
+  duration_minutes?: number | null;
+}
+
+export interface TrainingNutritionContext {
+  phase:
+    | "normal"
+    | "pre_race"
+    | "pre_training"
+    | "recovery"
+    | "tomorrow_prep";
+  priority:
+    | "normal"
+    | "low"
+    | "moderate"
+    | "high"
+    | "race";
+  message_key: string;
+  session: TrainingNutritionSession | null;
+  hours_to_start: number | null;
+  carbs_target_g: TrainingNutritionRange | null;
+  protein_target_g: TrainingNutritionRange | null;
+  carb_focus: boolean;
+  protein_focus: boolean;
+  guidance?: string[];
+}
+
+export interface TrainingNutritionResponse {
+  date: string;
+  context: TrainingNutritionContext;
+}
+
 export interface NextMealResponse {
   date: string;
   next_slot:

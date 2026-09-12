@@ -3978,7 +3978,15 @@ export default function ActivitiesPage() {
                       <strong>
                         {zero
                           ? copy.verdict
-                          : copy.activityComment}
+                          : (
+                              detail.activity_type === "Corsa"
+                                ? (
+                                    detail.planned_activity_id
+                                      ? "Analisi rispetto al piano"
+                                      : "Analisi della corsa"
+                                  )
+                                : copy.activityComment
+                            )}
                       </strong>
                     </div>
                   </div>
