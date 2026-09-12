@@ -43,11 +43,22 @@ class GroqMealInterpreter:
             else os.getenv("GROQ_API_KEY")
         )
 
-        self.model = (
+        configured_model = (
             model
             or os.getenv("GROQ_TEXT_MODEL")
-            or "qwen/qwen3.6-27b"
         )
+        # qwen3.6 was previously documented in .env.example, but it
+        # does not support the structured-output request used here.
+        # Transparently migrate that legacy setting to a production
+        # model with documented structured-output support.
+        if configured_model in {
+            None,
+            "",
+            "qwen/qwen3.6-27b",
+        }:
+            configured_model = "openai/gpt-oss-20b"
+
+        self.model = configured_model
 
         self._client = client
 
@@ -95,7 +106,7 @@ class GroqMealInterpreter:
                     },
                 ],
                 response_format=GroqMealInterpretation,
-                reasoning_effort="none",
+                reasoning_effort="low",
                 max_completion_tokens=1200,
             )
         except Exception as exc:

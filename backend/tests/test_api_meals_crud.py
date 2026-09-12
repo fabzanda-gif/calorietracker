@@ -31,6 +31,11 @@ class FakeMealsRepository:
         self.last_create = payload
         return SimpleNamespace(data=[{"id": "meal-1", **payload}])
 
+    def get_by_id(self, meal_id, user_id):
+        if meal_id == "meal-1" and user_id == "authenticated-user":
+            return {"id": meal_id, "category": "regular"}
+        return None
+
     def update(self, meal_id, user_id, payload):
         self.last_update = (meal_id, user_id, payload)
         return {"id": meal_id, **payload}
@@ -146,4 +151,22 @@ def test_delete_meal_is_user_scoped():
     assert fake_repo.last_delete == (
         "meal-1",
         "authenticated-user",
+    )
+
+
+def test_update_meal_can_move_to_another_meal_type():
+    response = client.patch(
+        "/meals/meal-1",
+        json={
+            "meal_type": "Pranzo",
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake_repo.last_update == (
+        "meal-1",
+        "authenticated-user",
+        {
+            "meal_type": "Pranzo",
+        },
     )

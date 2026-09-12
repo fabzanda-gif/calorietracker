@@ -14,6 +14,7 @@ import type {
 } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase/client";
+import { notifyLogin } from "@/lib/api/authEvents";
 
 interface AuthContextValue {
   session: Session | null;
@@ -24,6 +25,11 @@ interface AuthContextValue {
     email: string,
     password: string,
   ) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signUpWithPassword: (
+    email: string,
+    password: string,
+  ) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -64,13 +70,27 @@ export function AuthProvider({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
+      (event, nextSession) => {
         if (!active) {
           return;
         }
 
         setSession(nextSession);
         setLoading(false);
+
+        if (
+          event === "SIGNED_IN" &&
+          nextSession?.access_token
+        ) {
+          void notifyLogin(
+            nextSession.access_token,
+          ).catch((error) => {
+            console.error(
+              "Unable to send login notification",
+              error,
+            );
+          });
+        }
       },
     );
 
@@ -101,6 +121,40 @@ export function AuthProvider({
         if (error) {
           throw error;
         }
+      },
+
+      async signInWithGoogle() {
+        const { error } =
+          await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+              redirectTo: window.location.origin,
+            },
+          });
+
+        if (error) {
+          throw error;
+        }
+      },
+
+      async signUpWithPassword(
+        email: string,
+        password: string,
+      ) {
+        const { data, error } =
+          await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: window.location.origin,
+            },
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        return data.session == null;
       },
 
       async signOut() {

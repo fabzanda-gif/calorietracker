@@ -5,6 +5,10 @@ from typing import Any
 
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
+from backend.services.meal_prep_consumption import (
+    MealPrepConsumptionService,
+    MealPrepPortionConflictError,
+)
 
 
 class MealPrepLoggingError(ValueError):
@@ -89,39 +93,32 @@ class MealPrepLoggingService:
             "fat": self._number(
                 batch.get("fat_per_portion")
             ),
-            "notes": "Logged from meal prep inventory",
+            "notes": (
+                f"Logged from meal prep inventory; "
+                f"Meal prep batch: {batch_id}"
+            ),
             "category": "meal_prep",
         }
 
-        meal = self.meals_repo.create(payload)
-        if meal is None:
-            meal = payload
-
-        new_remaining = remaining - 1
-        batch_update = {
-            "portions_remaining": new_remaining,
-            "status": (
-                "finished"
-                if new_remaining == 0
-                else "available"
-            ),
-        }
-
-        updated_batch = self.meal_prep_repo.update(
-            batch_id,
-            user_id,
-            batch_update,
-        )
-        if updated_batch is None:
-            updated_batch = {
-                **batch,
-                **batch_update,
-            }
+        try:
+            consumption = MealPrepConsumptionService(
+                meal_prep_repo=self.meal_prep_repo,
+                meals_repo=self.meals_repo,
+            ).create_and_consume(
+                user_id=user_id,
+                batch_id=batch_id,
+                batch=batch,
+                meal_payload=payload,
+            )
+        except MealPrepPortionConflictError as exc:
+            raise MealPrepBatchUnavailableError(
+                "Meal prep batch is no longer available"
+            ) from exc
 
         return {
             "logged": True,
-            "meal": meal,
-            "inventory": updated_batch,
+            "meal": consumption.meal,
+            "inventory": consumption.inventory,
         }
 
     @staticmethod

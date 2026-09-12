@@ -9,7 +9,8 @@ INGREDIENT_COLUMNS = (
     "id,user_id,name,normalized_name,"
     "calories_per_100g,protein_per_100g,"
     "carbs_per_100g,fat_per_100g,"
-    "default_unit,grams_per_unit,default_quantity,created_at"
+    "default_unit,grams_per_unit,default_quantity,"
+    "kind,meal_slots,created_at"
 )
 
 

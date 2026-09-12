@@ -20,7 +20,10 @@ export interface StructuredRecipeIngredient {
 }
 
 export interface Recipe {
+  preparation?: string | null;
   id: string;
+  user_id?: string | null;
+  is_shared?: boolean;
   name: string;
   meal_type?: string | null;
   category?: string | null;
@@ -32,6 +35,8 @@ export interface Recipe {
   notes?: string | null;
   ingredients_json?: unknown;
   image_url?: string | null;
+  taste_rating?: number | null;
+  ease_rating?: number | null;
   structured_ingredients?: StructuredRecipeIngredient[];
 }
 
@@ -47,6 +52,8 @@ export interface RecipeWriteInput {
   recipe_servings?: number | null;
   image_url?: string | null;
   notes?: string | null;
+  taste_rating?: number | null;
+  ease_rating?: number | null;
   structured_ingredients: Array<{
     ingredient_id: string;
     quantity: number;
@@ -60,6 +67,39 @@ export async function getRecipes(
 ): Promise<RecipesResponse> {
   return apiRequest<RecipesResponse>(
     "/recipes",
+    {
+      accessToken,
+    },
+  );
+}
+
+export async function getAvailableRecipes(
+  accessToken?: string | null,
+): Promise<RecipesResponse> {
+  return apiRequest<RecipesResponse>(
+    "/recipes/available",
+    {
+      accessToken,
+    },
+  );
+}
+
+export async function getPersonalRecipes(
+  accessToken?: string | null,
+): Promise<RecipesResponse> {
+  return apiRequest<RecipesResponse>(
+    "/recipes",
+    {
+      accessToken,
+    },
+  );
+}
+
+export async function getSharedRecipes(
+  accessToken?: string | null,
+): Promise<RecipesResponse> {
+  return apiRequest<RecipesResponse>(
+    "/recipes/shared?exclude_mine=true",
     {
       accessToken,
     },
@@ -94,7 +134,7 @@ export async function createRecipe(
 
 export async function updateRecipe(
   recipeId: string,
-  input: RecipeWriteInput,
+  input: Partial<RecipeWriteInput>,
   accessToken?: string | null,
 ): Promise<{ updated: boolean; item: Recipe }> {
   return apiRequest(

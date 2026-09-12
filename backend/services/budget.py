@@ -11,6 +11,7 @@ GoalMode = Literal["loss", "maintenance", "gain"]
 class BudgetInput:
     bmr: float
     activity_kcal: float = 0.0
+    baseline_activity_factor: float = 1.0
 
     consumed_kcal: float = 0.0
     planned_kcal: float = 0.0
@@ -20,6 +21,7 @@ class BudgetInput:
 
     goal_mode: GoalMode = "maintenance"
     goal_adjustment_kcal: float = 0.0
+    remaining_meal_reserve_kcal: float = 0.0
 
 
 class BudgetService:
@@ -29,8 +31,8 @@ class BudgetService:
     v0.1 deliberately contains no Streamlit, FastAPI, Supabase or AI logic.
 
     Definitions:
-    - maintenance_kcal = BMR + actual/planned activity contribution supplied
-      by the caller.
+    - maintenance_kcal applies the caller's baseline daily-living factor to
+      BMR, then adds actual/planned exercise supplied by the caller.
     - daily_budget_kcal applies the selected objective:
         loss        -> maintenance - adjustment
         maintenance -> maintenance
@@ -51,17 +53,34 @@ class BudgetService:
         activity = float(data.activity_kcal)
         consumed = float(data.consumed_kcal)
         planned = float(data.planned_kcal)
-        adjustment = abs(float(data.goal_adjustment_kcal))
+        requested_adjustment = abs(float(data.goal_adjustment_kcal))
+        reserve = max(0.0, float(data.remaining_meal_reserve_kcal))
 
-        maintenance = bmr + activity
+        maintenance = (
+            bmr * float(data.baseline_activity_factor)
+        ) + activity
 
         if data.goal_mode == "loss":
-            daily_budget = maintenance - adjustment
+            base_daily_budget = maintenance - requested_adjustment
+            # A deficit is a direction, not a reason to leave too little for
+            # the meals that still need to happen. Relax it up to maintenance.
+            daily_budget = min(
+                maintenance,
+                max(base_daily_budget, consumed + reserve),
+            )
         elif data.goal_mode == "gain":
-            daily_budget = maintenance + adjustment
+            base_daily_budget = maintenance + requested_adjustment
+            daily_budget = base_daily_budget
         else:
+            base_daily_budget = maintenance
             daily_budget = maintenance
-            adjustment = 0.0
+            requested_adjustment = 0.0
+
+        effective_adjustment = (
+            max(0.0, maintenance - daily_budget)
+            if data.goal_mode == "loss"
+            else requested_adjustment
+        )
 
         available = daily_budget - consumed
         unallocated = available - planned
@@ -82,13 +101,23 @@ class BudgetService:
 
         return {
             "goal_mode": data.goal_mode,
-            "goal_adjustment_kcal": round(adjustment, 2),
+            "goal_adjustment_kcal": round(requested_adjustment, 2),
+            "effective_goal_adjustment_kcal": round(
+                effective_adjustment,
+                2,
+            ),
             "maintenance_kcal": round(maintenance, 2),
+            "base_daily_budget_kcal": round(base_daily_budget, 2),
             "daily_budget_kcal": round(daily_budget, 2),
             "consumed_kcal": round(consumed, 2),
             "planned_kcal": round(planned, 2),
             "available_kcal": round(available, 2),
             "unallocated_kcal": round(unallocated, 2),
+            "remaining_meal_reserve_kcal": round(reserve, 2),
+            "budget_adapted": (
+                data.goal_mode == "loss"
+                and daily_budget > base_daily_budget
+            ),
             "protein_consumed_g": round(protein_consumed, 2),
             "protein_target_g": (
                 round(protein_target, 2)
@@ -114,6 +143,9 @@ class BudgetService:
         if float(data.activity_kcal) < 0:
             raise ValueError("activity_kcal cannot be negative")
 
+        if float(data.baseline_activity_factor) < 1:
+            raise ValueError("baseline_activity_factor cannot be below 1")
+
         if float(data.consumed_kcal) < 0:
             raise ValueError("consumed_kcal cannot be negative")
 
@@ -122,6 +154,9 @@ class BudgetService:
 
         if float(data.goal_adjustment_kcal) < 0:
             raise ValueError("goal_adjustment_kcal cannot be negative")
+
+        if float(data.remaining_meal_reserve_kcal) < 0:
+            raise ValueError("remaining_meal_reserve_kcal cannot be negative")
 
         if float(data.protein_consumed_g or 0.0) < 0:
             raise ValueError("protein_consumed_g cannot be negative")

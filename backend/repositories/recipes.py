@@ -8,7 +8,7 @@ from .base import BaseRepository, RepositoryError
 RECIPE_COLUMNS = (
     "id,user_id,name,meal_type,category,recipe_servings,"
     "calories,protein,carbs,fat,notes,ingredients_json,"
-    "is_shared,image_url,created_at"
+    "is_shared,image_url,taste_rating,ease_rating,created_at"
 )
 
 
@@ -115,6 +115,30 @@ class RecipesRepository(BaseRepository):
         )
 
         return matches[0]
+
+    def get_available_by_id(
+        self,
+        recipe_id: Any,
+        user_id: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(RECIPE_COLUMNS)
+                .eq("id", recipe_id)
+                .or_(
+                    f"user_id.eq.{user_id},"
+                    "is_shared.eq.true"
+                )
+                .limit(1)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load available recipe: {exc}"
+            ) from exc
 
     def get_personal_by_id(
         self,

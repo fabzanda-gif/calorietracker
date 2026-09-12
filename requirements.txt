@@ -7,3 +7,4 @@ streamlit-cookies-controller
 openai
 fastapi
 uvicorn
+fitparse==1.2.0

@@ -62,6 +62,16 @@ class FakeActivitiesRepository:
         return []
 
 
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+    ):
+        # No historical activity is provided in these scenarios.
+        # Today's activity must not enter the 7-day baseline.
+        return []
+
 class FakeWeightRepository:
     def latest(self, user_id):
         return {

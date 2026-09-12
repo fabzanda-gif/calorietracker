@@ -10,6 +10,12 @@ from backend.services.meal_prep import (
 
 
 class FakeRecipesRepository:
+    def get_available_by_id(self, recipe_id, user_id):
+        return self.get_personal_by_id(
+            recipe_id,
+            user_id,
+        )
+
     def get_personal_by_id(self, recipe_id, user_id):
         if recipe_id == "missing":
             return None
@@ -29,6 +35,22 @@ class FakeMealPrepRepository:
     def __init__(self):
         self.items = {}
         self.created = []
+
+    def find_available_for_recipe_date(
+        self,
+        user_id,
+        recipe_id,
+        prepared_at,
+    ):
+        for item in self.items.values():
+            if (
+                item.get("user_id") == user_id
+                and str(item.get("recipe_id")) == str(recipe_id)
+                and str(item.get("prepared_at")) == str(prepared_at)
+                and item.get("status") == "available"
+            ):
+                return item
+        return None
 
     def create(self, payload):
         item = {"id": "batch-1", **payload}

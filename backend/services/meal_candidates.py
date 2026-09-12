@@ -6,6 +6,9 @@ from typing import Any
 from backend.services.legacy_meal_events import (
     LegacyMealEventService,
 )
+from backend.services.meal_suggestion_policy import (
+    MealSuggestionPolicy,
+)
 
 
 class MealCandidateService:
@@ -33,10 +36,32 @@ class MealCandidateService:
     ) -> list[dict]:
         candidates: list[dict] = []
 
+        compatible_meal_types = (
+            MealSuggestionPolicy.compatible_meal_types(
+                meal_type
+            )
+        )
+
+        recipe_meal_types = {
+            str(recipe.get("id")): recipe.get("meal_type")
+            for recipe in recipes
+            if recipe.get("id") is not None
+        }
+
         for batch in meal_prep_items:
             if (
                 batch.get("status") != "available"
                 or self._number(batch.get("portions_remaining")) <= 0
+            ):
+                continue
+
+            source_meal_type = recipe_meal_types.get(
+                str(batch.get("recipe_id"))
+            )
+
+            if (
+                source_meal_type
+                and source_meal_type not in compatible_meal_types
             ):
                 continue
 
@@ -52,6 +77,7 @@ class MealCandidateService:
                     "source_id": batch.get("id"),
                     "name": batch.get("name"),
                     "meal_type": meal_type,
+                    "source_meal_type": source_meal_type,
                     "calories": self._number(
                         batch.get("calories_per_portion")
                     ),
@@ -122,6 +148,10 @@ class MealCandidateService:
                     "confidence_level": prediction.get(
                         "confidence_level"
                     ),
+                    "components": prediction.get(
+                        "components",
+                        [],
+                    ),
                 }
             )
 
@@ -129,7 +159,7 @@ class MealCandidateService:
             recipe_meal_type = recipe.get("meal_type")
             if (
                 recipe_meal_type
-                and recipe_meal_type != meal_type
+                and recipe_meal_type not in compatible_meal_types
             ):
                 continue
 
@@ -146,7 +176,11 @@ class MealCandidateService:
                     "source": "recipe",
                     "source_id": recipe.get("id"),
                     "name": recipe.get("name"),
+                    "recipe_scope": recipe.get(
+                        "_recommendation_scope"
+                    ),
                     "meal_type": meal_type,
+                    "source_meal_type": recipe_meal_type,
                     "calories": self._number(
                         recipe.get("calories")
                     ) / servings,
@@ -172,12 +206,15 @@ class MealCandidateService:
             if meal.get("is_reusable") is not False
         ]
 
-        historical_events = (
-            LegacyMealEventService().build(
-                meals=reusable_historical_meals,
-                meal_type=meal_type,
+        historical_events = []
+        for compatible_type in compatible_meal_types:
+            historical_events.extend(
+                LegacyMealEventService().build(
+                    meals=reusable_historical_meals,
+                    meal_type=compatible_type,
+                )
             )
-        )
+        historical_events.sort(key=lambda item: item["date"], reverse=True)
 
         historical_by_name: dict[
             str,
@@ -185,6 +222,16 @@ class MealCandidateService:
         ] = {}
 
         for event in historical_events:
+            # Legacy rows grouped only by date and slot are ambiguous: a
+            # handful of small entries can look like one dinner. Structured
+            # meals and recipes remain reusable, but inferred multi-row
+            # composites are deliberately excluded from main-meal planning.
+            if (
+                meal_type in {"Pranzo", "Cena"}
+                and int(event.get("component_count") or 0) > 1
+            ):
+                continue
+
             name = str(
                 event.get("name") or ""
             ).strip()
@@ -220,6 +267,7 @@ class MealCandidateService:
                     "source_id": None,
                     "name": name,
                     "meal_type": meal_type,
+                    "source_meal_type": latest.get("meal_type"),
                     "calories": self._average(
                         events,
                         "calories",
@@ -247,9 +295,12 @@ class MealCandidateService:
             )
 
         for order in order_candidates or []:
-            if order.get("meal_type") != meal_type:
+            if order.get("meal_type") not in compatible_meal_types:
                 continue
-            candidates.append(dict(order))
+            candidate = dict(order)
+            candidate["source_meal_type"] = candidate.get("meal_type")
+            candidate["meal_type"] = meal_type
+            candidates.append(candidate)
 
         return self._deduplicate(candidates)
 

@@ -5,6 +5,10 @@ from fastapi.security import HTTPAuthorizationCredentials
 from backend.api import dependencies
 
 
+def setup_function():
+    dependencies._AUTH_CACHE.clear()
+
+
 class FakeAuth:
     def get_user(self, token):
         return SimpleNamespace(

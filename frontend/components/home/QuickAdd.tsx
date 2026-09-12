@@ -6,12 +6,22 @@ import {
   useState,
 } from "react";
 
+import { ActivityLogger } from "@/components/activity/ActivityLogger";
 import { createActivity } from "@/lib/api/activities";
 import {
   getIngredients,
   type Ingredient,
 } from "@/lib/api/ingredients";
-import { createMeal } from "@/lib/api/meals";
+import {
+  createMeal,
+  getMealHistory,
+  type LoggedMeal,
+} from "@/lib/api/meals";
+import {
+  getAvailableRecipes,
+  type Recipe,
+} from "@/lib/api/recipes";
+import { createWeight } from "@/lib/api/weight";
 
 import styles from "./QuickAdd.module.css";
 
@@ -20,7 +30,8 @@ type QuickAddMode =
   | null
   | "meal"
   | "snack"
-  | "activity";
+  | "activity"
+  | "weight";
 
 type MealEntryMode =
   | "quick"
@@ -30,6 +41,8 @@ type MealEntryMode =
 interface QuickAddProps {
   date: string;
   accessToken?: string | null;
+  latestWeight?: number | null;
+  defaultMealType?: string;
   onSaved: () => Promise<void> | void;
 }
 
@@ -38,6 +51,117 @@ interface IngredientRow {
   ingredientId: string;
   amount: string;
   unitMode: "g" | "unit";
+}
+
+type KnownMeal = {
+  key: string;
+  name: string;
+  mealType: string;
+  quantityMode: "portion" | "grams";
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  source: "Ricetta" | "Cronologia";
+};
+
+function normalizedMealSlot(value: string):
+  "breakfast" | "lunch" | "dinner" | "snack" | "unknown" {
+  const normalized = value.trim().toLocaleLowerCase("it");
+
+  if (["colazione", "breakfast"].includes(normalized)) return "breakfast";
+  if (["pranzo", "lunch"].includes(normalized)) return "lunch";
+  if (["cena", "dinner"].includes(normalized)) return "dinner";
+  if (["spuntino", "snack"].includes(normalized)) return "snack";
+  return "unknown";
+}
+
+function mealFitsSlot(candidate: string, selected: string): boolean {
+  const candidateSlot = normalizedMealSlot(candidate);
+  const selectedSlot = normalizedMealSlot(selected);
+
+  if (selectedSlot === "breakfast" || selectedSlot === "snack") {
+    return candidateSlot === selectedSlot;
+  }
+
+  if (selectedSlot === "lunch" || selectedSlot === "dinner") {
+    return candidateSlot === "lunch" || candidateSlot === "dinner";
+  }
+
+  return false;
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 12000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error("Tempo di caricamento scaduto")),
+      timeoutMs,
+    );
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
+function mergeKnownMeals(current: KnownMeal[], incoming: KnownMeal[]): KnownMeal[] {
+  const seen = new Set<string>();
+
+  return [...current, ...incoming]
+    .sort((a, b) =>
+      Number(b.source === "Ricetta") - Number(a.source === "Ricetta"),
+    )
+    .filter((meal) => {
+      const key = meal.name.trim().toLocaleLowerCase("it");
+
+      if (!key || seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+}
+
+function recipeKnownMeal(recipe: Recipe): KnownMeal {
+  const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
+
+  return {
+    key: `recipe-${recipe.id}`,
+    name: recipe.name,
+    mealType: recipe.meal_type || "Pranzo",
+    quantityMode: "portion",
+    calories: Number(recipe.calories || 0) / servings,
+    protein: Number(recipe.protein || 0) / servings,
+    carbs: Number(recipe.carbs || 0) / servings,
+    fat: Number(recipe.fat || 0) / servings,
+    source: "Ricetta",
+  };
+}
+
+function historyKnownMeal(meal: LoggedMeal): KnownMeal {
+  const quantity = Math.max(0.01, Number(meal.quantity) || 1);
+  const perHundred = meal.is_per_100g === true;
+  const fallbackFactor = perHundred ? 100 / quantity : 1 / quantity;
+
+  return {
+    key: `history-${meal.id ?? `${meal.date}-${meal.name}`}`,
+    name: meal.base_name || meal.name,
+    mealType: meal.meal_type || "Pranzo",
+    quantityMode: perHundred ? "grams" : "portion",
+    calories: Number(meal.base_calories ?? Number(meal.calories || 0) * fallbackFactor),
+    protein: Number(meal.base_protein ?? Number(meal.protein || 0) * fallbackFactor),
+    carbs: Number(meal.base_carbs ?? Number(meal.carbs || 0) * fallbackFactor),
+    fat: Number(meal.base_fat ?? Number(meal.fat || 0) * fallbackFactor),
+    source: "Cronologia",
+  };
 }
 
 
@@ -130,6 +254,8 @@ function roundValue(
 export function QuickAdd({
   date,
   accessToken,
+  latestWeight = null,
+  defaultMealType = "Colazione",
   onSaved,
 }: QuickAddProps) {
   const [mode, setMode] =
@@ -139,10 +265,18 @@ export function QuickAdd({
     useState<MealEntryMode>("quick");
 
   const [mealType, setMealType] =
-    useState("Colazione");
+    useState(defaultMealType);
 
   const [name, setName] =
     useState("");
+  const [knownMeals, setKnownMeals] =
+    useState<KnownMeal[]>([]);
+  const [showKnownMeals, setShowKnownMeals] =
+    useState(false);
+  const [knownMealsLoading, setKnownMealsLoading] =
+    useState(false);
+  const [knownMealsLoaded, setKnownMealsLoaded] =
+    useState(false);
 
   const [calories, setCalories] =
     useState("");
@@ -186,11 +320,88 @@ export function QuickAdd({
   ] =
     useState("");
 
+  const [weightValue, setWeightValue] =
+    useState("");
+
   const [saving, setSaving] =
     useState(false);
 
   const [message, setMessage] =
     useState<string | null>(null);
+
+  const knownMealSuggestions = useMemo(() => {
+    const query = name.trim().toLocaleLowerCase("it");
+    const selectedSlot = mode === "snack" ? "Snack" : mealType;
+
+    return knownMeals
+      .filter((meal) => {
+        return mealFitsSlot(meal.mealType, selectedSlot) && (
+          !query || meal.name.toLocaleLowerCase("it").includes(query)
+        );
+      })
+      .slice(0, 8);
+  }, [knownMeals, mealType, mode, name]);
+
+  useEffect(() => {
+    if ((mode !== "meal" && mode !== "snack") || !accessToken) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadKnownMeals() {
+      setKnownMealsLoading(true);
+      setKnownMealsLoaded(false);
+      setKnownMeals([]);
+
+      let settled = 0;
+
+      function finish(items: KnownMeal[]) {
+        if (!active) {
+          return;
+        }
+
+        settled += 1;
+
+        if (items.length) {
+          setKnownMeals((current) => mergeKnownMeals(current, items));
+          setKnownMealsLoading(false);
+          setKnownMealsLoaded(true);
+        } else if (settled === 2) {
+          setKnownMealsLoading(false);
+          setKnownMealsLoaded(true);
+        }
+      }
+
+      void withTimeout(getAvailableRecipes(accessToken))
+        .then((response) => finish(response.items.map(recipeKnownMeal)))
+        .catch(() => finish([]));
+
+      void withTimeout(getMealHistory(accessToken))
+        .then((response) => finish(response.items.map(historyKnownMeal)))
+        .catch(() => finish([]));
+    }
+
+    void loadKnownMeals();
+
+    return () => {
+      active = false;
+    };
+  }, [mode, accessToken]);
+
+  function selectKnownMeal(meal: KnownMeal) {
+    setName(meal.name);
+    setMealType(meal.mealType === "Spuntino" ? "Pranzo" : meal.mealType);
+    setQuantityMode(meal.quantityMode);
+    setMealQuantity(meal.quantityMode === "grams" ? "100" : "1");
+    setCalories(String(Math.round(meal.calories * 10) / 10));
+    setProtein(String(Math.round(meal.protein * 10) / 10));
+    setCarbs(String(Math.round(meal.carbs * 10) / 10));
+    setFat(String(Math.round(meal.fat * 10) / 10));
+    setMealEntryMode("quick");
+    setShowKnownMeals(false);
+    setMessage(null);
+  }
 
 
   useEffect(() => {
@@ -627,6 +838,51 @@ export function QuickAdd({
   }
 
 
+  async function saveWeight() {
+    if (!accessToken) {
+      return;
+    }
+
+    const weight = Number(weightValue);
+
+    if (
+      !Number.isFinite(weight) ||
+      weight <= 0
+    ) {
+      setMessage(
+        "Inserisci un peso valido.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      await createWeight(
+        {
+          date,
+          weight,
+        },
+        accessToken,
+      );
+
+      setWeightValue("");
+      setMode(null);
+      await onSaved();
+      setMessage("Peso registrato.");
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a registrare il peso.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
   async function saveActivity() {
     if (!accessToken) {
       return;
@@ -715,14 +971,22 @@ export function QuickAdd({
           }
           onClick={() => {
             setMessage(null);
-            setMode(
-              mode === "meal"
-                ? null
-                : "meal",
-            );
+
+            if (mode === "meal") {
+              setMode(null);
+              return;
+            }
+
+            setMealType(defaultMealType);
+            setMode("meal");
           }}
         >
-          + Pasto
+          <span className={styles.actionIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M7 3v7M4.5 3v4.5A2.5 2.5 0 0 0 7 10M9.5 3v4.5A2.5 2.5 0 0 1 7 10v11M16 3v18M16 3c2.5 2.2 3.5 5.2 3 9h-3" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>+ Pasto</span>
         </button>
 
         <button
@@ -734,14 +998,23 @@ export function QuickAdd({
           }
           onClick={() => {
             setMessage(null);
-            setMode(
-              mode === "snack"
-                ? null
-                : "snack",
-            );
+
+            if (mode === "snack") {
+              setMode(null);
+              return;
+            }
+
+            setMealType("Snack");
+            setMode("snack");
           }}
         >
-          + Snack
+          <span className={styles.actionIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12.3 7.2c-1.6-2.3-4.3-2.4-5.8-.8-2 2.1-1.5 7.3.6 10.7 1.2 2 2.4 3.6 4 3.6.7 0 1.2-.3 1.9-.3s1.2.3 1.9.3c1.6 0 2.8-1.6 4-3.6 2.1-3.4 2.6-8.6.6-10.7-1.5-1.6-4.2-1.5-5.8.8" />
+              <path d="M12.2 6.7c0-2 1.4-3.7 3.5-4.2.1 2.1-1.2 3.8-3.5 4.2Z" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>+ Snack</span>
         </button>
 
         <button
@@ -760,7 +1033,51 @@ export function QuickAdd({
             );
           }}
         >
-          + Attività
+          <span className={styles.actionIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="15.5" cy="4.5" r="2" />
+              <path d="m13 8-2.2 3.2 3.2 2.3 1.8 3.3M13 8l3.2 2 2.8-.7M10.8 11.2 8 10M14 13.5l-3 2.2-1.5 4M15.8 16.8l2.8 3" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>+ Attività</span>
+        </button>
+
+        <button
+          type="button"
+          className={
+            mode === "weight"
+              ? styles.actionActive
+              : styles.action
+          }
+          onClick={() => {
+            setMessage(null);
+
+            if (mode === "weight") {
+              setMode(null);
+              return;
+            }
+
+            setWeightValue(
+              latestWeight != null
+                ? latestWeight.toFixed(1)
+                : "",
+            );
+            setMode("weight");
+          }}
+        >
+          <span
+            className={styles.actionIcon}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M5 7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5V20H5V7.5Z" />
+              <path d="M9 9a3 3 0 0 1 6 0" />
+              <path d="m12 9 1.7-1.7" />
+            </svg>
+          </span>
+          <span className={styles.actionLabel}>
+            + Peso
+          </span>
         </button>
       </div>
 
@@ -850,7 +1167,7 @@ export function QuickAdd({
             </label>
           ) : null}
 
-          <label>
+          <label className={styles.knownMealField}>
             <span>
               Nome del pasto
             </span>
@@ -862,8 +1179,44 @@ export function QuickAdd({
                 setName(
                   event.target.value,
                 );
+                setShowKnownMeals(true);
               }}
+              onFocus={() => setShowKnownMeals(true)}
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={showKnownMeals && knownMealSuggestions.length > 0}
+              aria-autocomplete="list"
             />
+
+            {showKnownMeals ? (
+              <div className={styles.knownMealSuggestions} role="listbox">
+                {knownMealsLoading ? (
+                  <p>Carico ricette e pasti recenti…</p>
+                ) : null}
+                {knownMealSuggestions.map((meal) => (
+                  <button
+                    key={meal.key}
+                    type="button"
+                    role="option"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectKnownMeal(meal)}
+                  >
+                    <span>
+                      <strong>{meal.name}</strong>
+                      <small>{meal.source} · {meal.mealType}</small>
+                    </span>
+                    <b>{Math.round(meal.calories)} kcal</b>
+                  </button>
+                ))}
+                {!knownMealsLoading && knownMealsLoaded && !knownMealSuggestions.length ? (
+                  <p>
+                    {name.trim()
+                      ? "Nessuna ricetta o pasto corrispondente."
+                      : "Non ci sono ancora pasti da riutilizzare."}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </label>
 
           {mealEntryMode === "quick" ? (
@@ -1296,12 +1649,10 @@ export function QuickAdd({
         </div>
       ) : null}
 
-      {mode === "activity" ? (
+      {mode === "weight" ? (
         <div className={styles.panel}>
           <div className={styles.panelHeader}>
-            <strong>
-              Aggiungi attività
-            </strong>
+            <strong>Registra peso</strong>
 
             <button
               type="button"
@@ -1313,31 +1664,17 @@ export function QuickAdd({
           </div>
 
           <label>
-            <span>Cosa hai fatto?</span>
-
-            <input
-              value={activityName}
-              placeholder="Es. Padel"
-              onChange={(event) => {
-                setActivityName(
-                  event.target.value,
-                );
-              }}
-            />
-          </label>
-
-          <label>
-            <span>
-              Calorie bruciate
-            </span>
+            <span>Peso (kg)</span>
 
             <input
               type="number"
-              min="0"
-              value={activityCalories}
-              placeholder="450"
+              min="1"
+              step="0.1"
+              inputMode="decimal"
+              value={weightValue}
+              placeholder="Es. 78,3"
               onChange={(event) => {
-                setActivityCalories(
+                setWeightValue(
                   event.target.value,
                 );
               }}
@@ -1349,13 +1686,42 @@ export function QuickAdd({
             className={styles.saveButton}
             disabled={saving}
             onClick={() => {
-              void saveActivity();
+              void saveWeight();
             }}
           >
             {saving
               ? "Salvo…"
-              : "Registra attività"}
+              : "Registra peso"}
           </button>
+        </div>
+      ) : null}
+
+      {mode === "activity" ? (
+        <div className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <strong>
+              Aggiungi allenamento
+            </strong>
+
+            <button
+              type="button"
+              className={styles.closeButton}
+              onClick={close}
+            >
+              Chiudi
+            </button>
+          </div>
+
+          <ActivityLogger
+            date={date}
+            accessToken={accessToken}
+            compact
+            showMovement
+            onSaved={async () => {
+              setMode(null);
+              await onSaved();
+            }}
+          />
         </div>
       ) : null}
     </section>
