@@ -88,7 +88,7 @@ export async function getPersonalRecipes(
   accessToken?: string | null,
 ): Promise<RecipesResponse> {
   return apiRequest<RecipesResponse>(
-    "/recipes/personal",
+    "/recipes",
     {
       accessToken,
     },
