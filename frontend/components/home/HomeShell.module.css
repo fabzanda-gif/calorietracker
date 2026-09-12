@@ -15838,3 +15838,11 @@ details[open] > summary .dailyEntryChevron {
     white-space: normal;
   }
 }
+
+.conversationDayActionDate {
+  display: block;
+  margin-top: 3px;
+  color: #8b6d67;
+  font-size: 0.76rem;
+  font-weight: 700;
+}

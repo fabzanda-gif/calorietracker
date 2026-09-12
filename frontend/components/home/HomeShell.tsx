@@ -496,6 +496,37 @@ export function HomeShell() {
   const currentLocaleCode = localeCode(locale);
   const formatNumber = (value: number) =>
     Math.round(value).toLocaleString(currentLocaleCode);
+
+  const conversationActionDateLabel = (
+    value: string,
+  ): string => {
+    const target = new Date(`${value}T12:00:00`);
+    const today = new Date(`${todayIso()}T12:00:00`);
+
+    const differenceDays = Math.round(
+      (target.getTime() - today.getTime()) /
+        86_400_000,
+    );
+
+    const relative = new Intl.RelativeTimeFormat(
+      currentLocaleCode,
+      { numeric: "auto" },
+    ).format(differenceDays, "day");
+
+    const absolute = target.toLocaleDateString(
+      currentLocaleCode,
+      {
+        day: "numeric",
+        month: "short",
+        year:
+          target.getFullYear() !== today.getFullYear()
+            ? "numeric"
+            : undefined,
+      },
+    );
+
+    return `${relative} · ${absolute}`;
+  };
   const localizedMealLabel = (slot: string) => {
     const canonical = mealLabel(slot);
     return canonical === "Colazione"
@@ -5003,6 +5034,16 @@ export function HomeShell() {
                                 ? action.activity_name
                                 : homeCopy.weight}
                           </strong>
+
+                          <span
+                            className={
+                              styles.conversationDayActionDate
+                            }
+                          >
+                            📅 {conversationActionDateLabel(
+                              action.date,
+                            )}
+                          </span>
 
                           <span>
                             {action.kind === "meal"
