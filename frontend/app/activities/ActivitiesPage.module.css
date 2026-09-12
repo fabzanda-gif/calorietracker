@@ -3052,3 +3052,27 @@ label.completePlanButton {
     margin-top: 104px;
   }
 }
+
+.monthTotal {
+  margin-top: 96px;
+}
+
+@media (max-width: 760px) {
+  .monthTotal {
+    margin-top: 104px;
+  }
+}
+
+/* Activity hero spacing:
+   mobile stays compact; desktop clears the top controls. */
+@media (max-width: 760px) {
+  .monthTotal {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 761px) {
+  .monthTotal {
+    margin-top: 96px;
+  }
+}
