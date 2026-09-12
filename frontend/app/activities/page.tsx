@@ -621,12 +621,31 @@ export default function ActivitiesPage() {
   const [gpxBase64, setGpxBase64] = useState("");
   const [gpxPreview, setGpxPreview] =
     useState<GpxActivityPreview | null>(null);
+  const gpxPreviewRef =
+    useRef<HTMLElement | null>(null);
   const [gpxName, setGpxName] = useState("");
   const [gpxType, setGpxType] = useState("Altro");
   const [gpxCalories, setGpxCalories] =
     useState("0");
   const [previewing, setPreviewing] =
     useState(false);
+
+  useEffect(() => {
+    if (!gpxPreview) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      gpxPreviewRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [gpxPreview]);
   const [importing, setImporting] =
     useState(false);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
@@ -3669,7 +3688,9 @@ export default function ActivitiesPage() {
         </details>
 
         {gpxPreview ? (
-          <section className={styles.previewCard}>
+          <section className={styles.previewCard}
+            ref={gpxPreviewRef}
+          >
             <div className={styles.cardHeading}>
               <div>
                 <p className={styles.eyebrow}>
