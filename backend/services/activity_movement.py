@@ -95,6 +95,7 @@ def normalize_activity_type(
         "bici": "Bicicletta",
         "bicicletta": "Bicicletta",
         "cycling": "Bicicletta",
+        "biking": "Bicicletta",
         "ciclismo": "Bicicletta",
     }
 

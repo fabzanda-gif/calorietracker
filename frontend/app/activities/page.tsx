@@ -250,7 +250,6 @@ function activityIcon(
   }
 
   if (
-    activity.source === "gpx" &&
     (
       label.includes("bici") ||
       label.includes("bicicletta") ||
@@ -623,7 +622,7 @@ export default function ActivitiesPage() {
   const [gpxPreview, setGpxPreview] =
     useState<GpxActivityPreview | null>(null);
   const [gpxName, setGpxName] = useState("");
-  const [gpxType, setGpxType] = useState("Corsa");
+  const [gpxType, setGpxType] = useState("Altro");
   const [gpxCalories, setGpxCalories] =
     useState("0");
   const [previewing, setPreviewing] =
@@ -1684,7 +1683,7 @@ export default function ActivitiesPage() {
 
     if (plannedActivity) {
       setPlannedGpxActivity(plannedActivity);
-      setGpxType("Corsa");
+      setGpxType(plannedActivity.activity_type);
       setGpxName(plannedActivity.title);
       setSelectedDate(
         plannedActivity.scheduled_date,
@@ -1701,13 +1700,23 @@ export default function ActivitiesPage() {
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith(".gpx")) {
-      setError("Seleziona un file con estensione .gpx.");
+    const extension =
+      file.name.toLowerCase().split(".").pop();
+
+    if (
+      !extension ||
+      !["gpx", "fit", "tcx"].includes(extension)
+    ) {
+      setError(
+        "Formato non supportato. Usa GPX, FIT o TCX.",
+      );
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Il file GPX supera il limite di 5 MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setError(
+        "Il file attività supera il limite di 10 MB.",
+      );
       return;
     }
 
@@ -1726,15 +1735,21 @@ export default function ActivitiesPage() {
           file_name: file.name,
           content_base64: contentBase64,
           activity_type:
-            plannedActivity
-              ? "Corsa"
-              : gpxType,
+            plannedActivity?.activity_type ||
+            undefined,
         },
         accessToken,
       );
 
       setGpxBase64(contentBase64);
       setGpxPreview(response.preview);
+
+      setGpxType(
+        plannedActivity?.activity_type ||
+        response.preview.activity_type ||
+        "Altro",
+      );
+
       setGpxName(
         plannedActivity
           ? plannedActivity.title
@@ -1775,7 +1790,7 @@ export default function ActivitiesPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Non riesco ad analizzare il GPX.",
+          : "Non riesco ad analizzare il file attività.",
       );
     } finally {
       setPreviewing(false);
@@ -1851,8 +1866,8 @@ export default function ActivitiesPage() {
 
       setImportMessage(
         plannedGpxActivity
-          ? "Corsa completata e GPX importato."
-          : "Attività GPX importata.",
+          ? "Attività completata e file importato."
+          : "Attività importata.",
       );
       setGpxFile(null);
       setGpxBase64("");
@@ -1989,7 +2004,7 @@ export default function ActivitiesPage() {
           ref={plannedGpxInputRef}
           hidden
           type="file"
-          accept=".gpx,application/gpx+xml"
+          accept=".gpx,.fit,.tcx,application/gpx+xml,application/xml,application/octet-stream"
           onChange={(event) => {
             const file = event.currentTarget.files?.[0] ?? null;
             const activity = plannedGpxTargetRef.current;
@@ -2340,7 +2355,7 @@ export default function ActivitiesPage() {
             <label className={styles.dropZone}>
               <input
                 type="file"
-                accept=".gpx,application/gpx+xml"
+                accept=".gpx,.fit,.tcx,application/gpx+xml,application/xml,application/octet-stream"
                 onChange={(event) => {
                   void chooseGpx(
                     event.target.files?.[0] ?? null,
@@ -2354,9 +2369,9 @@ export default function ActivitiesPage() {
               <strong>
                 {previewing
                   ? "Analizzo il percorso…"
-                  : "Scegli file GPX"}
+                  : "Scegli file attività"}
               </strong>
-              <small>Massimo 5 MB</small>
+              <small>GPX, FIT o TCX · massimo 10 MB</small>
             </label>
 
             {gpxFile ? (
@@ -2491,26 +2506,22 @@ export default function ActivitiesPage() {
                       : `✓ ${copy.confirmActivity}`}
                   </button>
 
-                  {nextPlannedActivity.activity_type
-                    .trim()
-                    .toLocaleLowerCase("it-IT") === "corsa" ? (
-                    <button
-                      type="button"
-                      className={styles.nextActivityGpx}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        openPlannedGpxPicker(
-                          nextPlannedActivity,
-                        );
-                      }}
-                      disabled={
-                        busyPlanId === nextPlannedActivity.id
-                      }
-                    >
-                      {copy.uploadGpx.replace("un ", "")}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.nextActivityGpx}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openPlannedGpxPicker(
+                        nextPlannedActivity,
+                      );
+                    }}
+                    disabled={
+                      busyPlanId === nextPlannedActivity.id
+                    }
+                  >
+                    {copy.uploadGpx}
+                  </button>
 
                   <span className={styles.plannerMorePrompt}>
                     {copy.seeMorePlanned}
@@ -3521,26 +3532,20 @@ export default function ActivitiesPage() {
                                   : planText.completed}
                               </button>
 
-                              {item.activity_type
-                                .trim()
-                                .toLocaleLowerCase(
-                                  "it-IT",
-                                ) === "corsa" ? (
-                                <button
-                                  type="button"
-                                  className={
-                                    styles.completePlanButton
-                                  }
-                                  disabled={
-                                    busyPlanId === item.id
-                                  }
-                                  onClick={() => {
-                                    openPlannedGpxPicker(item);
-                                  }}
-                                >
-                                  {planText.uploadGpx}
-                                </button>
-                              ) : null}
+                              <button
+                                type="button"
+                                className={
+                                  styles.completePlanButton
+                                }
+                                disabled={
+                                  busyPlanId === item.id
+                                }
+                                onClick={() => {
+                                  openPlannedGpxPicker(item);
+                                }}
+                              >
+                                {copy.uploadGpx}
+                              </button>
 
                               <button
                                 type="button"
@@ -3674,7 +3679,7 @@ export default function ActivitiesPage() {
               </div>
 
               <span className={styles.gpxBadge}>
-                GPX
+                {gpxPreview.file_format ?? "ACTIVITY"}
               </span>
             </div>
 
@@ -3702,6 +3707,17 @@ export default function ActivitiesPage() {
                     <option value="Camminata">{copy.walk}</option>
                     <option value="Escursione">{copy.hike}</option>
                     <option value="Bicicletta">{copy.bicycle}</option>
+                    <option value="Nuoto">
+                      {locale === "it" ? "Nuoto" : locale === "en" ? "Swimming" : locale === "nl" ? "Zwemmen" : "Natation"}
+                    </option>
+                    <option value="Palestra">
+                      {locale === "it" ? "Palestra" : locale === "en" ? "Gym / strength" : locale === "nl" ? "Sportschool / kracht" : "Musculation"}
+                    </option>
+                    <option value="Padel">Padel</option>
+                    <option value="Tennis">Tennis</option>
+                    <option value="Calcio">
+                      {locale === "it" ? "Calcio" : locale === "en" ? "Football" : locale === "nl" ? "Voetbal" : "Football"}
+                    </option>
                     <option value="Altro">{copy.other}</option>
                   </select>
                 </label>

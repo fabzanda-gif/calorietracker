@@ -20,7 +20,7 @@ export interface Activity {
   date: string;
   activity_name: string;
   burned_calories: number;
-  source?: "manual" | "gpx";
+  source?: "manual" | "gpx" | "fit" | "tcx";
   activity_type?: string | null;
   started_at?: string | null;
   duration_seconds?: number | null;
@@ -130,7 +130,9 @@ export function deleteActivity(
 
 export interface GpxActivityPreview
   extends Omit<Activity, "id" | "user_id" | "burned_calories"> {
-  source: "gpx";
+  source: "gpx" | "fit" | "tcx";
+  file_format?: "GPX" | "FIT" | "TCX";
+  activity_type?: string | null;
   original_point_count: number;
   estimated_calories?: number;
 }

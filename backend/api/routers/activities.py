@@ -35,7 +35,9 @@ from backend.repositories.training_plan_adaptations import (
 from backend.repositories.weight import WeightRepository
 from backend.services.gpx_activity import (
     GpxActivityError,
-    parse_gpx_activity,
+)
+from backend.services.activity_file import (
+    parse_activity_file,
 )
 from backend.services.activity_movement import (
     estimated_activity_steps,
@@ -295,7 +297,7 @@ class RunningTrainingPlanCreate(BaseModel):
 class GpxPreviewRequest(BaseModel):
     file_name: str = Field(min_length=1, max_length=255)
     content_base64: str = Field(min_length=1)
-    activity_type: str | None = Field(default="Corsa", max_length=80)
+    activity_type: str | None = Field(default=None, max_length=80)
 
 
 class GpxImportRequest(GpxPreviewRequest):
@@ -1456,12 +1458,13 @@ def preview_gpx_activity(
 
     fallback_name = (
         Path(request.file_name).stem.strip()
-        or "Attività GPX"
+        or "Attività"
     )
 
     try:
-        preview = parse_gpx_activity(
+        preview = parse_activity_file(
             content,
+            file_name=request.file_name,
             fallback_name=fallback_name,
         )
     except GpxActivityError as exc:
@@ -1471,11 +1474,22 @@ def preview_gpx_activity(
         ) from exc
 
     latest_weight = weight_repo.latest(current_user.id)
-    preview["estimated_calories"] = estimated_gpx_calories(
-        activity_type=request.activity_type or preview["activity_name"],
-        duration_seconds=preview["duration_seconds"],
-        distance_meters=preview["distance_meters"],
-        weight_kg=(latest_weight or {}).get("weight"),
+    resolved_activity_type = normalize_activity_type(
+        request.activity_type
+        or preview.get("activity_type")
+        or preview["activity_name"]
+    )
+    preview["activity_type"] = resolved_activity_type
+
+    preview["estimated_calories"] = (
+        int(preview["file_calories"])
+        if preview.get("file_calories") is not None
+        else estimated_gpx_calories(
+            activity_type=resolved_activity_type,
+            duration_seconds=preview["duration_seconds"],
+            distance_meters=preview["distance_meters"],
+            weight_kg=(latest_weight or {}).get("weight"),
+        )
     )
 
     return {
@@ -1515,12 +1529,13 @@ def import_gpx_activity(
 
     fallback_name = (
         Path(request.file_name).stem.strip()
-        or "Attività GPX"
+        or "Attività"
     )
 
     try:
-        parsed = parse_gpx_activity(
+        parsed = parse_activity_file(
             content,
+            file_name=request.file_name,
             fallback_name=fallback_name,
         )
     except GpxActivityError as exc:
@@ -1558,9 +1573,19 @@ def import_gpx_activity(
 
     latest_weight = weight_repo.latest(current_user.id)
     burned_calories = request.burned_calories
+    if (
+        burned_calories is None
+        and parsed.get("file_calories") is not None
+    ):
+        burned_calories = int(parsed["file_calories"])
+
     if burned_calories is None:
         burned_calories = estimated_gpx_calories(
-            activity_type=request.activity_type or parsed["activity_name"],
+            activity_type=(
+                request.activity_type
+                or parsed.get("activity_type")
+                or parsed["activity_name"]
+            ),
             duration_seconds=parsed["duration_seconds"],
             distance_meters=parsed["distance_meters"],
             weight_kg=(latest_weight or {}).get("weight"),
