@@ -29,7 +29,8 @@ import {
 import {
   createRecipe,
   getRecipe,
-  getRecipes,
+  getPersonalRecipes,
+  getSharedRecipes,
   migrateLegacyRecipes,
   updateRecipe,
   type Recipe,
@@ -177,6 +178,9 @@ export default function RecipesPage() {
   const [ingredientAiMessage, setIngredientAiMessage] =
     useState<string | null>(null);
 
+  const [sharedRecipes, setSharedRecipes] =
+    useState<Recipe[]>([]);
+
   const [loading, setLoading] =
     useState(true);
   const [saving, setSaving] =
@@ -231,7 +235,10 @@ export default function RecipesPage() {
   }
 
   const availableRecipeMealTypes = useMemo(() => {
-    const values = recipes
+    const values = [
+      ...recipes,
+      ...sharedRecipes,
+    ]
       .map((recipe) =>
         String(recipe.meal_type || "").trim(),
       )
@@ -248,18 +255,19 @@ export default function RecipesPage() {
         },
       ),
     );
-  }, [recipes]);
+  }, [recipes, sharedRecipes]);
 
-  const filteredRecipes = useMemo(() => {
+  function filterAndSortRecipes(
+    source: Recipe[],
+  ): Recipe[] {
     const query = recipeSearch
       .trim()
       .toLocaleLowerCase("it");
 
-    const matches = recipes.filter((recipe) => {
-      const recipeType =
-        String(
-          recipe.meal_type || "",
-        ).trim();
+    const matches = source.filter((recipe) => {
+      const recipeType = String(
+        recipe.meal_type || "",
+      ).trim();
 
       const matchesMealType =
         recipeMealFilter === "Tutte" ||
@@ -293,20 +301,43 @@ export default function RecipesPage() {
     });
 
     if (recipeSort === "taste") {
-      return matches.sort((a, b) => Number(b.taste_rating || 0) - Number(a.taste_rating || 0));
+      return matches.sort(
+        (a, b) =>
+          Number(b.taste_rating || 0) -
+          Number(a.taste_rating || 0),
+      );
     }
 
     if (recipeSort === "ease") {
-      return matches.sort((a, b) => Number(b.ease_rating || 0) - Number(a.ease_rating || 0));
+      return matches.sort(
+        (a, b) =>
+          Number(b.ease_rating || 0) -
+          Number(a.ease_rating || 0),
+      );
     }
 
     return matches;
-  }, [
-    recipes,
-    recipeSearch,
-    recipeMealFilter,
-    recipeSort,
-  ]);
+  }
+
+  const filteredRecipes = useMemo(
+    () => filterAndSortRecipes(recipes),
+    [
+      recipes,
+      recipeSearch,
+      recipeMealFilter,
+      recipeSort,
+    ],
+  );
+
+  const filteredSharedRecipes = useMemo(
+    () => filterAndSortRecipes(sharedRecipes),
+    [
+      sharedRecipes,
+      recipeSearch,
+      recipeMealFilter,
+      recipeSort,
+    ],
+  );
 
   useEffect(() => {
     if (!accessToken) {
@@ -325,13 +356,18 @@ export default function RecipesPage() {
     setMessage(null);
 
     try {
-      const [recipePayload, ingredientPayload] =
-        await Promise.all([
-          getRecipes(accessToken),
-          getIngredients(accessToken),
-        ]);
+      const [
+        personalPayload,
+        sharedPayload,
+        ingredientPayload,
+      ] = await Promise.all([
+        getPersonalRecipes(accessToken),
+        getSharedRecipes(accessToken),
+        getIngredients(accessToken),
+      ]);
 
-      setRecipes(recipePayload.items);
+      setRecipes(personalPayload.items);
+      setSharedRecipes(sharedPayload.items);
       setIngredients(ingredientPayload.items);
     } catch (err) {
       setMessage(
@@ -1742,6 +1778,146 @@ export default function RecipesPage() {
           </div>
         )}
       </section>
+
+
+      <section className={styles.communitySection}>
+        <div className={styles.communityHeading}>
+          <div>
+            <p className={styles.kicker}>
+              Community
+            </p>
+            <h2>{copy.communityTitle}</h2>
+            <p className={styles.communitySubtitle}>
+              {copy.communitySubtitle}
+            </p>
+          </div>
+
+          <span className={styles.communityCount}>
+            {filteredSharedRecipes.length}
+          </span>
+        </div>
+
+        {loading ? (
+          <p>{copy.loading}</p>
+        ) : filteredSharedRecipes.length ? (
+          <div className={styles.recipeList}>
+            {filteredSharedRecipes.map((recipe) => (
+              <article
+                key={recipe.id}
+                className={styles.recipeCard}
+              >
+                <div className={styles.recipeVisual}>
+                  {recipe.image_url ? (
+                    <img
+                      src={recipe.image_url}
+                      alt={recipe.name}
+                      className={styles.recipeThumb}
+                    />
+                  ) : (
+                    <div
+                      className={styles.recipePlaceholder}
+                    >
+                      <span>S</span>
+                    </div>
+                  )}
+
+                  <span className={styles.recipeTypeBadge}>
+                    {mealTypeLabel(recipe.meal_type)}
+                  </span>
+                </div>
+
+                <div className={styles.recipeContent}>
+                  <div className={styles.recipeMain}>
+                    <strong className={styles.recipeTitle}>
+                      {recipe.name}
+                    </strong>
+
+                    <div className={styles.recipeNutrition}>
+                      <span>
+                        <strong>
+                          {Math.round(
+                            Number(recipe.calories || 0),
+                          )}
+                        </strong>
+                        {copy.totalCalories}
+                      </span>
+
+                      {recipe.protein != null ? (
+                        <span>
+                          <strong>
+                            {Math.round(
+                              Number(recipe.protein || 0),
+                            )}
+                          </strong>
+                          {copy.totalProtein}
+                        </span>
+                      ) : null}
+
+                      <span>
+                        <strong>
+                          {Math.max(
+                            1,
+                            Number(
+                              recipe.recipe_servings || 1,
+                            ),
+                          )}
+                        </strong>
+                        {Number(
+                          recipe.recipe_servings || 1,
+                        ) === 1
+                          ? ` ${copy.serving}`
+                          : ` ${copy.servings}`}
+                      </span>
+                    </div>
+
+                    {recipe.notes ? (
+                      <p className={styles.recipeDescription}>
+                        {recipe.notes}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.recipeActions}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => {
+                        openCookDialog(recipe);
+                      }}
+                    >
+                      {copy.cook}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.primarySmallButton}
+                      onClick={() => {
+                        void startMealFromRecipe(recipe.id);
+                      }}
+                    >
+                      {copy.log}
+                    </button>
+
+                    <Link
+                      className={styles.secondaryButton}
+                      href={`/recipes/${encodeURIComponent(
+                        recipe.id,
+                      )}`}
+                    >
+                      {copy.detail}
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.recipeEmptyState}>
+            <strong>{copy.communityEmpty}</strong>
+          </div>
+        )}
+      </section>
+
 
 
 <section ref={editorRef} className={styles.editorCard}>

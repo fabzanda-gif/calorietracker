@@ -11,6 +11,12 @@ from backend.api.main import app
 
 
 class FakeRecipesRepository:
+    def get_available_by_id(self, recipe_id, user_id):
+        return self.get_personal_by_id(
+            recipe_id,
+            user_id,
+        )
+
     def get_personal_by_id(self, recipe_id, user_id):
         return {
             "id": recipe_id,

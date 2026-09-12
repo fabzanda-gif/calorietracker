@@ -1579,3 +1579,45 @@
       78px;
   }
 }
+
+.communitySection {
+  margin-top: 48px;
+  padding-top: 36px;
+  border-top: 1px solid rgba(120, 120, 120, 0.18);
+}
+
+.communityHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.communitySubtitle {
+  max-width: 720px;
+  margin-top: 8px;
+}
+
+.communityCount {
+  display: inline-flex;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(120, 120, 120, 0.1);
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .communitySection {
+    margin-top: 36px;
+    padding-top: 28px;
+  }
+
+  .communityHeading {
+    gap: 16px;
+  }
+}

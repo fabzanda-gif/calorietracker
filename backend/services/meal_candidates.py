@@ -176,6 +176,9 @@ class MealCandidateService:
                     "source": "recipe",
                     "source_id": recipe.get("id"),
                     "name": recipe.get("name"),
+                    "recipe_scope": recipe.get(
+                        "_recommendation_scope"
+                    ),
                     "meal_type": meal_type,
                     "source_meal_type": recipe_meal_type,
                     "calories": self._number(

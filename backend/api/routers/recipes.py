@@ -166,7 +166,7 @@ def get_recipe(
     ),
 ):
     try:
-        item = repo.get_personal_by_id(
+        item = repo.get_available_by_id(
             recipe_id,
             current_user.id,
         )

@@ -22,6 +22,8 @@ export interface StructuredRecipeIngredient {
 export interface Recipe {
   preparation?: string | null;
   id: string;
+  user_id?: string | null;
+  is_shared?: boolean;
   name: string;
   meal_type?: string | null;
   category?: string | null;
@@ -76,6 +78,28 @@ export async function getAvailableRecipes(
 ): Promise<RecipesResponse> {
   return apiRequest<RecipesResponse>(
     "/recipes/available",
+    {
+      accessToken,
+    },
+  );
+}
+
+export async function getPersonalRecipes(
+  accessToken?: string | null,
+): Promise<RecipesResponse> {
+  return apiRequest<RecipesResponse>(
+    "/recipes/personal",
+    {
+      accessToken,
+    },
+  );
+}
+
+export async function getSharedRecipes(
+  accessToken?: string | null,
+): Promise<RecipesResponse> {
+  return apiRequest<RecipesResponse>(
+    "/recipes/shared?exclude_mine=true",
     {
       accessToken,
     },

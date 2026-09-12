@@ -33,6 +33,9 @@ type RecipeCopy = {
   log: string;
   detail: string;
   share: string;
+  communityTitle: string;
+  communitySubtitle: string;
+  communityEmpty: string;
   noResults: string;
   noResultsZero: string;
   empty: string;
@@ -125,6 +128,9 @@ export const RECIPES_COPY: Record<AppLocale, RecipeCopy> = {
     log: "Registra",
     detail: "Dettaglio",
     share: "Condividi",
+    communityTitle: "Dalla community",
+    communitySubtitle: "Ricette condivise da altri utenti. Possono entrare nei tuoi consigli solo dopo che le hai cucinate almeno una volta.",
+    communityEmpty: "Nessuna ricetta della community corrisponde ai filtri.",
     noResults: "Nessuna ricetta trovata",
     noResultsZero: "Niente. I filtri hanno lavorato fin troppo bene.",
     empty: "La tua libreria è ancora vuota",
@@ -216,6 +222,9 @@ export const RECIPES_COPY: Record<AppLocale, RecipeCopy> = {
     log: "Log",
     detail: "Details",
     share: "Share",
+    communityTitle: "From the community",
+    communitySubtitle: "Recipes shared by other users. They can enter your recommendations only after you have cooked them at least once.",
+    communityEmpty: "No community recipes match these filters.",
     noResults: "No recipes found",
     noResultsZero: "Nothing. The filters did their job a little too well.",
     empty: "Your library is still empty",
@@ -307,6 +316,9 @@ export const RECIPES_COPY: Record<AppLocale, RecipeCopy> = {
     log: "Registreren",
     detail: "Details",
     share: "Delen",
+    communityTitle: "Uit de community",
+    communitySubtitle: "Recepten gedeeld door andere gebruikers. Ze kunnen pas in je aanbevelingen verschijnen nadat je ze minstens één keer hebt gemaakt.",
+    communityEmpty: "Geen recepten uit de community passen bij deze filters.",
     noResults: "Geen recepten gevonden",
     noResultsZero: "Niets. De filters hebben iets te goed gewerkt.",
     empty: "Je bibliotheek is nog leeg",
@@ -398,6 +410,9 @@ export const RECIPES_COPY: Record<AppLocale, RecipeCopy> = {
     log: "Enregistrer",
     detail: "Détails",
     share: "Partager",
+    communityTitle: "De la communauté",
+    communitySubtitle: "Recettes partagées par d’autres utilisateurs. Elles ne peuvent apparaître dans vos recommandations qu’après les avoir cuisinées au moins une fois.",
+    communityEmpty: "Aucune recette de la communauté ne correspond à ces filtres.",
     noResults: "Aucune recette trouvée",
     noResultsZero: "Rien. Les filtres ont un peu trop bien travaillé.",
     empty: "Votre bibliothèque est encore vide",

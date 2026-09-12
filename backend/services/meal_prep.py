@@ -62,7 +62,7 @@ class MealPrepService:
                 "portions_prepared must be greater than zero"
             )
 
-        recipe = self.recipes_repo.get_personal_by_id(
+        recipe = self.recipes_repo.get_available_by_id(
             recipe_id,
             user_id,
         )

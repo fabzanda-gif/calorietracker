@@ -10,6 +10,12 @@ from backend.services.meal_prep import (
 
 
 class FakeRecipesRepository:
+    def get_available_by_id(self, recipe_id, user_id):
+        return self.get_personal_by_id(
+            recipe_id,
+            user_id,
+        )
+
     def get_personal_by_id(self, recipe_id, user_id):
         if recipe_id == "missing":
             return None

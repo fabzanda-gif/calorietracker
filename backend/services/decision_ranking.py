@@ -357,6 +357,13 @@ class DecisionRankingService:
             )
         )
 
+        recipe_priority_bonus = (
+            self._recipe_priority_bonus(
+                item,
+                lens=lens,
+            )
+        )
+
         feedback = DecisionFeedbackService().score_boost(
             candidate=item,
             lens=lens,
@@ -369,6 +376,7 @@ class DecisionRankingService:
             base
             + ready_bonus
             + training_bonus
+            + recipe_priority_bonus
             + feedback
         )
 
@@ -632,6 +640,25 @@ class DecisionRankingService:
 
         return weight * carb_fit
 
+
+    @staticmethod
+    def _recipe_priority_bonus(
+        item: dict,
+        *,
+        lens: str,
+    ) -> float:
+        if (
+            item.get("source") != "recipe"
+            or item.get("recipe_scope")
+            != "personal"
+        ):
+            return 0.0
+
+        return {
+            "calorie": 0.02,
+            "balanced": 0.08,
+            "taste": 0.04,
+        }.get(lens, 0.0)
 
     @staticmethod
     def _waste_bonus(waste_risk: Any) -> float:
