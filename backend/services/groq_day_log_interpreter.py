@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date
 from typing import Any, Literal
 
 from openai import OpenAI
@@ -13,6 +14,7 @@ class GroqDayLogInterpreterError(RuntimeError):
 
 class GroqDayLogIntent(BaseModel):
     kind: Literal["meal", "activity", "weight"]
+    log_date: date | None = None
 
     # Meal
     text: str | None = None
@@ -85,6 +87,7 @@ class GroqDayLogInterpreter:
         *,
         text: str,
         default_meal_type: str,
+        reference_date: date | None = None,
     ) -> dict[str, Any]:
         if not self.api_key:
             raise GroqDayLogInterpreterError(
@@ -108,6 +111,15 @@ class GroqDayLogInterpreter:
                             "dell'utente e separalo in azioni indipendenti. "
                             "Le sole azioni consentite sono meal, activity "
                             "e weight. "
+                            "\n\n"
+                            "REGOLE DATA: ogni azione deve avere log_date "
+                            "in formato YYYY-MM-DD. Interpreta riferimenti "
+                            "temporali come oggi, ieri, l'altro ieri, "
+                            "venerdì scorso e date esplicite rispetto alla "
+                            "data di riferimento fornita. Se il messaggio "
+                            "non specifica una data, usa la data di "
+                            "riferimento. Non assegnare date future a "
+                            "registrazioni già avvenute. "
                             "\n\n"
                             "REGOLE PASTI: per kind='meal' inserisci in "
                             "'text' soltanto la parte del messaggio che "
@@ -143,6 +155,8 @@ class GroqDayLogInterpreter:
                     {
                         "role": "user",
                         "content": (
+                            f"Data di riferimento: "
+                            f"{reference_date or date.today()}\n"
                             f"Tipo pasto predefinito: "
                             f"{default_meal_type}\n"
                             f"Messaggio: {text}"

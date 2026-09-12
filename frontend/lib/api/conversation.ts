@@ -8,6 +8,7 @@ import type {
 export interface ConversationalDayMealAction {
   id: string;
   kind: "meal";
+  date: string;
   text: string;
   meal_type: string;
   items: ConversationalMealPreviewItem[];
@@ -25,6 +26,7 @@ export interface ConversationalDayMealAction {
 export interface ConversationalDayActivityAction {
   id: string;
   kind: "activity";
+  date: string;
   activity_name: string;
   activity_type: string;
   duration_seconds?: number | null;
@@ -39,6 +41,7 @@ export interface ConversationalDayActivityAction {
 export interface ConversationalDayWeightAction {
   id: string;
   kind: "weight";
+  date: string;
   weight_kg: number;
   needs_review: boolean;
   requires_confirmation: true;
@@ -63,6 +66,7 @@ export interface ConversationalDayPreview {
 export function previewConversationalDay(
   text: string,
   defaultMealType: string,
+  referenceDate: string,
   accessToken?: string | null,
 ): Promise<ConversationalDayPreview> {
   return apiRequest<ConversationalDayPreview>(
@@ -73,6 +77,7 @@ export function previewConversationalDay(
       body: JSON.stringify({
         text,
         default_meal_type: defaultMealType,
+        reference_date: referenceDate,
       }),
     },
   );

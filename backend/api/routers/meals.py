@@ -128,10 +128,12 @@ def interpret_day_log_text(
     *,
     text: str,
     default_meal_type: str,
+    reference_date: date | None = None,
 ) -> dict:
     return GroqDayLogInterpreter().interpret(
         text=text,
         default_meal_type=default_meal_type,
+        reference_date=reference_date,
     )
 
 
@@ -144,6 +146,7 @@ class ConversationalMealPreviewRequest(BaseModel):
 class ConversationalDayPreviewRequest(BaseModel):
     text: str = Field(min_length=1)
     default_meal_type: str = "Pranzo"
+    reference_date: date | None = None
 
 
 class PhotoMealPreviewRequest(BaseModel):
@@ -213,6 +216,7 @@ def preview_conversational_day(
         interpretation = interpret_day_log_text(
             text=request.text,
             default_meal_type=request.default_meal_type,
+            reference_date=request.reference_date,
         )
     except GroqDayLogInterpreterError as exc:
         raise HTTPException(
@@ -258,7 +262,14 @@ def preview_conversational_day(
         "Cena",
     }
 
+    reference_date = (
+        request.reference_date or date.today()
+    )
+
     for intent in intents:
+        intent_date = intent.get("log_date") or reference_date
+        action_date = str(intent_date)
+
         kind = str(
             intent.get("kind")
             or ""
@@ -308,6 +319,7 @@ def preview_conversational_day(
                         f"action-{len(actions) + 1}"
                     ),
                     "kind": "meal",
+                    "date": action_date,
                     "text": meal_text,
                     "meal_type": (
                         meal_preview["meal_type"]
@@ -393,6 +405,7 @@ def preview_conversational_day(
                         f"action-{len(actions) + 1}"
                     ),
                     "kind": "activity",
+                    "date": action_date,
                     "activity_name": activity_name,
                     "activity_type": activity_type,
                     "duration_seconds": duration_seconds,
@@ -426,6 +439,7 @@ def preview_conversational_day(
                         f"action-{len(actions) + 1}"
                     ),
                     "kind": "weight",
+                    "date": action_date,
                     "weight_kg": weight_kg,
                     "needs_review": bool(
                         intent.get("uncertainty")

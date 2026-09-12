@@ -2509,6 +2509,7 @@ export function HomeShell() {
         await previewConversationalDay(
           conversationText.trim(),
           conversationMealType,
+          todayIso(),
           accessToken,
         );
 
@@ -2552,7 +2553,7 @@ export function HomeShell() {
         if (action.kind === "meal") {
           await confirmConversationalMeal(
             {
-              date: todayIso(),
+              date: action.date,
               meal_type: action.meal_type,
               items: action.items,
             },
@@ -2561,7 +2562,7 @@ export function HomeShell() {
         } else if (action.kind === "activity") {
           await createActivity(
             {
-              date: todayIso(),
+              date: action.date,
               activity_name:
                 action.activity_name,
               burned_calories:
@@ -2585,7 +2586,7 @@ export function HomeShell() {
         } else {
           const result = await createWeight(
             {
-              date: todayIso(),
+              date: action.date,
               weight: action.weight_kg,
             },
             accessToken,
