@@ -3034,3 +3034,15 @@ label.completePlanButton {
     margin-top: 16px;
   }
 }
+
+@media (max-width: 760px) {
+  .monthTotal {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .monthTotal {
+    margin-top: 24px;
+  }
+}
