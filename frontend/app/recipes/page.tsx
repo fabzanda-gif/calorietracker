@@ -221,6 +221,11 @@ export default function RecipesPage() {
     setRecipeAiFinalWeight,
   ] = useState("");
 
+  const [
+    recipeAiServings,
+    setRecipeAiServings,
+  ] = useState("1");
+
   const [recipeSearch, setRecipeSearch] =
     useState("");
 
@@ -408,10 +413,32 @@ export default function RecipesPage() {
 
       setRecipeAiPreview(preview);
 
-      if (preview.final_weight_g) {
+      setRecipeAiServings(
+        String(preview.servings || 1),
+      );
+
+      const ingredientWeight =
+        Number(preview.ingredient_weight_g) || 0;
+
+      const proposedFinalWeight =
+        Number(preview.final_weight_g) || 0;
+
+      const plausibleFinalWeight =
+        proposedFinalWeight > 0 &&
+        (
+          ingredientWeight <= 0 ||
+          (
+            proposedFinalWeight >=
+              ingredientWeight * 0.25 &&
+            proposedFinalWeight <=
+              ingredientWeight * 1.5
+          )
+        );
+
+      if (plausibleFinalWeight) {
         setRecipeAiWeightMode("manual");
         setRecipeAiFinalWeight(
-          String(preview.final_weight_g),
+          String(proposedFinalWeight),
         );
       } else {
         setRecipeAiWeightMode("ingredients");
@@ -428,6 +455,101 @@ export default function RecipesPage() {
     }
   }
 
+  function updateRecipeAiIngredient(
+    index: number,
+    changes: Partial<
+      RecipeAIPreview["ingredients"][number]
+    >,
+  ) {
+    setRecipeAiPreview((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextIngredients =
+        current.ingredients.map(
+          (item, itemIndex) =>
+            itemIndex === index
+              ? {
+                  ...item,
+                  ...changes,
+                }
+              : item,
+        );
+
+      const ingredientWeightG =
+        nextIngredients.reduce(
+          (sum, item) =>
+            sum +
+            Math.max(
+              0,
+              Number(item.quantity_g) || 0,
+            ),
+          0,
+        );
+
+      const totals =
+        nextIngredients.reduce(
+          (total, item) => {
+            const factor =
+              Math.max(
+                0,
+                Number(item.quantity_g) || 0,
+              ) / 100;
+
+            return {
+              calories:
+                total.calories +
+                (
+                  Number(
+                    item.calories_per_100g,
+                  ) || 0
+                ) *
+                  factor,
+              protein:
+                total.protein +
+                (
+                  Number(
+                    item.protein_per_100g,
+                  ) || 0
+                ) *
+                  factor,
+              carbs:
+                total.carbs +
+                (
+                  Number(
+                    item.carbs_per_100g,
+                  ) || 0
+                ) *
+                  factor,
+              fat:
+                total.fat +
+                (
+                  Number(
+                    item.fat_per_100g,
+                  ) || 0
+                ) *
+                  factor,
+            };
+          },
+          {
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+          },
+        );
+
+      return {
+        ...current,
+        ingredients: nextIngredients,
+        ingredient_weight_g:
+          ingredientWeightG,
+        totals,
+      };
+    });
+  }
+
   const recipeAiCalculated = useMemo(() => {
     if (!recipeAiPreview) {
       return null;
@@ -442,6 +564,12 @@ export default function RecipesPage() {
       manualWeight > 0
         ? manualWeight
         : recipeAiPreview.ingredient_weight_g;
+
+    const servings =
+      Math.max(
+        1,
+        Number(recipeAiServings) || 1,
+      );
 
     return {
       weight,
@@ -463,11 +591,26 @@ export default function RecipesPage() {
           100 /
           weight,
       },
+      perServing: {
+        calories:
+          recipeAiPreview.totals.calories /
+          servings,
+        protein:
+          recipeAiPreview.totals.protein /
+          servings,
+        carbs:
+          recipeAiPreview.totals.carbs /
+          servings,
+        fat:
+          recipeAiPreview.totals.fat /
+          servings,
+      },
     };
   }, [
     recipeAiPreview,
     recipeAiFinalWeight,
     recipeAiWeightMode,
+    recipeAiServings,
   ]);
 
   async function useRecipeAiPreview() {
@@ -551,7 +694,10 @@ export default function RecipesPage() {
       );
       setServings(
         String(
-          recipeAiPreview.servings || 1,
+          Math.max(
+            1,
+            Number(recipeAiServings) || 1,
+          ),
         ),
       );
       setFinalWeight(
@@ -1558,6 +1704,7 @@ export default function RecipesPage() {
             Incolla ingredienti e quantità
           </span>
           <textarea
+            className={styles.recipeAiTextarea}
             rows={5}
             value={recipeAiText}
             placeholder={
@@ -1601,48 +1748,120 @@ export default function RecipesPage() {
               </div>
             </div>
 
-            {recipeAiPreview.ingredients.map(
-              (item, index) => (
-                <div
-                  key={`${item.name}-${index}`}
-                  className={
-                    styles.ingredientRow
-                  }
-                >
-                  <div>
-                    <strong>
-                      {item.name}
-                    </strong>
-                    {item.estimated ? (
-                      <small>
-                        {" "}· stimato
-                      </small>
-                    ) : null}
+            <div
+              className={
+                styles.recipeAiIngredientList
+              }
+            >
+              {recipeAiPreview.ingredients.map(
+                (item, index) => (
+                  <div
+                    key={`${item.name}-${index}`}
+                    className={
+                      styles.recipeAiIngredientRow
+                    }
+                  >
+                    <div
+                      className={
+                        styles.recipeAiIngredientName
+                      }
+                    >
+                      <strong>
+                        {item.name}
+                      </strong>
+
+                      {item.estimated ? (
+                        <small>
+                          Stimato da AI
+                        </small>
+                      ) : null}
+                    </div>
+
+                    <label
+                      className={
+                        styles.recipeAiMiniField
+                      }
+                    >
+                      <span>Peso</span>
+                      <div
+                        className={
+                          styles.recipeAiInputWithUnit
+                        }
+                      >
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={item.quantity_g}
+                          onChange={(event) => {
+                            updateRecipeAiIngredient(
+                              index,
+                              {
+                                quantity_g:
+                                  Number(
+                                    event.target
+                                      .value,
+                                  ) || 0,
+                              },
+                            );
+                          }}
+                        />
+                        <span>g</span>
+                      </div>
+                    </label>
+
+                    <label
+                      className={
+                        styles.recipeAiMiniField
+                      }
+                    >
+                      <span>Kcal / 100 g</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={
+                          item.calories_per_100g
+                        }
+                        onChange={(event) => {
+                          updateRecipeAiIngredient(
+                            index,
+                            {
+                              calories_per_100g:
+                                Number(
+                                  event.target
+                                    .value,
+                                ) || 0,
+                            },
+                          );
+                        }}
+                      />
+                    </label>
                   </div>
+                ),
+              )}
+            </div>
 
-                  <span>
-                    {item.quantity}{" "}
-                    {item.unit}
-                  </span>
+            <div
+              className={
+                styles.recipeAiControls
+              }
+            >
+              <label className={styles.field}>
+                <span>Porzioni</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={recipeAiServings}
+                  onChange={(event) => {
+                    setRecipeAiServings(
+                      event.target.value,
+                    );
+                  }}
+                />
+              </label>
 
-                  <span>
-                    {Math.round(
-                      item.quantity_g,
-                    )}{" "}
-                    g
-                  </span>
-
-                  <span>
-                    {Math.round(
-                      item.calories_per_100g,
-                    )}{" "}
-                    kcal/100 g
-                  </span>
-                </div>
-              ),
-            )}
-
-            <div className={styles.twoColumns}>
               <label className={styles.field}>
                 <span>
                   Peso usato per il calcolo
@@ -1785,6 +2004,49 @@ export default function RecipesPage() {
                 ? "Preparo…"
                 : "Usa questa ricetta"}
             </button>
+
+            {recipeAiCalculated ? (
+              <div className={styles.nutritionCard}>
+                <strong>
+                  Per porzione
+                </strong>
+
+                <span>
+                  {Math.round(
+                    recipeAiCalculated
+                      .perServing.calories,
+                  )}{" "}
+                  kcal
+                </span>
+
+                <span>
+                  P{" "}
+                  {recipeAiCalculated
+                    .perServing.protein.toFixed(
+                      1,
+                    )}{" "}
+                  g
+                </span>
+
+                <span>
+                  C{" "}
+                  {recipeAiCalculated
+                    .perServing.carbs.toFixed(
+                      1,
+                    )}{" "}
+                  g
+                </span>
+
+                <span>
+                  G{" "}
+                  {recipeAiCalculated
+                    .perServing.fat.toFixed(
+                      1,
+                    )}{" "}
+                  g
+                </span>
+              </div>
+            ) : null}
 
             {recipeAiPreview
               .needs_final_weight_confirmation ? (

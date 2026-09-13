@@ -1621,3 +1621,113 @@
     gap: 16px;
   }
 }
+
+/* Recipe AI review */
+.recipeAiTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 132px;
+  resize: vertical;
+  padding: 12px 13px;
+  border: 1px solid #dfe2e4;
+  border-radius: 10px;
+  background: #fafbfa;
+  color: #102846;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 450;
+  line-height: 1.55;
+}
+
+.recipeAiTextarea:focus {
+  outline: 2px solid rgba(239, 94, 92, 0.18);
+  outline-offset: 1px;
+  border-color: #ef5e5c;
+}
+
+.recipeAiIngredientList {
+  display: grid;
+  gap: 8px;
+}
+
+.recipeAiIngredientRow {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1.5fr)
+    minmax(120px, 0.7fr)
+    minmax(140px, 0.8fr);
+  gap: 12px;
+  align-items: end;
+  padding: 12px 0;
+  border-bottom: 1px solid #eef0ef;
+}
+
+.recipeAiIngredientName {
+  display: grid;
+  gap: 3px;
+  align-self: center;
+  color: #153354;
+}
+
+.recipeAiIngredientName strong {
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.recipeAiIngredientName small {
+  color: #7a8795;
+  font-size: 0.68rem;
+  font-weight: 450;
+}
+
+.recipeAiMiniField {
+  display: grid;
+  gap: 5px;
+  color: #69778a;
+  font-size: 0.67rem;
+  font-weight: 600;
+}
+
+.recipeAiMiniField input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 8px 9px;
+  border: 1px solid #dfe2e4;
+  border-radius: 9px;
+  background: #fafbfa;
+  color: #102846;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.recipeAiInputWithUnit {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.recipeAiInputWithUnit > span {
+  color: #69778a;
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.recipeAiControls {
+  display: grid;
+  grid-template-columns:
+    minmax(110px, 0.55fr)
+    minmax(220px, 1.25fr)
+    minmax(180px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+@media (max-width: 760px) {
+  .recipeAiIngredientRow,
+  .recipeAiControls {
+    grid-template-columns: 1fr;
+  }
+}
