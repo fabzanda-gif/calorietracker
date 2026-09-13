@@ -64,8 +64,19 @@ Regole:
 - quantity_g deve essere il peso in grammi usato nella ricetta;
 - se l'utente usa pezzi, cucchiai, cucchiaini, confezioni o porzioni,
   stima quantity_g solo quando ragionevole;
-- i valori nutrizionali devono essere SEMPRE riferiti a 100 g
+- i campi nutrizionali di output devono essere SEMPRE riferiti a 100 g
   dell'ingrediente;
+- ATTENZIONE: se l'utente scrive una quantità dell'ingrediente seguita da
+  kcal/macronutrienti, considera quei valori come TOTALI riferiti a quella
+  quantità, salvo che il testo dica esplicitamente "per 100 g", "/100 g",
+  "100g" o equivalente;
+- in quel caso devi convertire i valori totali in valori per 100 g usando:
+  valore_per_100g = valore_totale * 100 / quantity_g;
+- NON copiare mai direttamente nei campi *_per_100g valori nutrizionali
+  forniti per una quantità diversa da 100 g;
+- esempio: "Pelati (400 g): 80 kcal | C 16 g | P 4 g | G 0.5 g"
+  significa circa 20 kcal/100 g, 4 g carboidrati/100 g,
+  1 g proteine/100 g e 0.125 g grassi/100 g;
 - calories_per_100g significa kcal per 100 g;
 - protein_per_100g, carbs_per_100g e fat_per_100g sono grammi per 100 g;
 - se i valori nutrizionali non sono esplicitamente forniti,
