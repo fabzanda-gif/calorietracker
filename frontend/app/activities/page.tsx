@@ -1863,7 +1863,8 @@ export default function ActivitiesPage() {
             gpxName.trim() ||
             gpxPreview.activity_name,
           activity_type: gpxType,
-          activity_date: selectedDate,
+          activity_date:
+            gpxPreview.date || selectedDate,
           burned_calories:
             Math.max(
               0,

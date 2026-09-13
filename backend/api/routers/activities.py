@@ -1551,8 +1551,8 @@ def import_gpx_activity(
         ) from exc
 
     effective_date = (
-        request.activity_date
-        or parsed.get("date")
+        parsed.get("date")
+        or request.activity_date
     )
 
     if effective_date is None:

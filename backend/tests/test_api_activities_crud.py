@@ -309,6 +309,39 @@ def test_import_gpx_saves_parsed_activity():
     assert len(fake_repo.last_create["route_points"]) == 2
 
 
+def test_import_gpx_prefers_file_date_over_requested_date():
+    import base64
+
+    content = b"""<gpx version="1.1">
+      <trk>
+        <trkseg>
+          <trkpt lat="45.0" lon="9.0">
+            <time>2026-09-01T07:00:00Z</time>
+          </trkpt>
+          <trkpt lat="45.001" lon="9.001">
+            <time>2026-09-01T07:01:00Z</time>
+          </trkpt>
+        </trkseg>
+      </trk>
+    </gpx>"""
+
+    response = client.post(
+        "/activities/gpx/import",
+        json={
+            "file_name": "corsa.gpx",
+            "content_base64": base64.b64encode(
+                content
+            ).decode("ascii"),
+            "activity_date": "2026-09-02",
+            "burned_calories": 300,
+        },
+    )
+
+    assert response.status_code == 201
+    assert fake_repo.last_create is not None
+    assert fake_repo.last_create["date"] == "2026-09-01"
+
+
 def test_import_gpx_requires_manual_date_when_missing():
     import base64
 
