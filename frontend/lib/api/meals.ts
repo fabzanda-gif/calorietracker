@@ -272,6 +272,25 @@ export interface ConversationalMealPreview {
   requires_confirmation: boolean;
 }
 
+export function recheckConversationalMeal(
+  input: {
+    meal_type: string;
+    items: ConversationalMealPreviewItem[];
+    item_indices: number[];
+  },
+  accessToken?: string | null,
+): Promise<ConversationalMealPreview> {
+  return apiRequest<ConversationalMealPreview>(
+    "/meals/conversational/recheck",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+
 export function previewConversationalMeal(
   text: string,
   mealType: string,

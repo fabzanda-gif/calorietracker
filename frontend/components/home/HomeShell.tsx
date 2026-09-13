@@ -52,6 +52,7 @@ import {
   getMealHistory,
   getMealsForDate,
   previewConversationalMeal,
+  recheckConversationalMeal,
   previewPhotoMeal,
   updateMeal,
   type ConversationalMealPreview,
@@ -936,6 +937,12 @@ export function HomeShell() {
     useState<string | null>(null);
   const [conversationConfirming, setConversationConfirming] =
     useState(false);
+  const [
+    conversationRecheckSelection,
+    setConversationRecheckSelection,
+  ] = useState<Record<string, number[]>>({});
+  const [conversationRechecking, setConversationRechecking] =
+    useState<string | null>(null);
   const [conversationSuccess, setConversationSuccess] =
     useState<string | null>(null);
 
@@ -2834,6 +2841,99 @@ export function HomeShell() {
       );
     } finally {
       setConversationConfirming(false);
+    }
+  }
+
+
+  function toggleConversationRecheckItem(
+    key: string,
+    index: number,
+  ) {
+    setConversationRecheckSelection((current) => {
+      const selected = current[key] ?? [];
+
+      return {
+        ...current,
+        [key]: selected.includes(index)
+          ? selected.filter((item) => item !== index)
+          : [...selected, index],
+      };
+    });
+  }
+
+  async function recheckConversationItems(
+    key: string,
+    mealType: string,
+    items: ConversationalMealPreview["items"],
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    const selected =
+      conversationRecheckSelection[key] ?? [];
+
+    if (!selected.length) {
+      setConversationError(
+        "Seleziona almeno un ingrediente da ricontrollare.",
+      );
+      return;
+    }
+
+    setConversationRechecking(key);
+    setConversationError(null);
+
+    try {
+      const preview = await recheckConversationalMeal(
+        {
+          meal_type: mealType,
+          items,
+          item_indices: selected,
+        },
+        accessToken,
+      );
+
+      if (key === "single") {
+        setConversationPreview(preview);
+      } else {
+        setConversationDayPreview((current) => {
+          if (!current) {
+            return current;
+          }
+
+          const actions = current.actions.map((action) =>
+            action.id === key && action.kind === "meal"
+              ? {
+                  ...action,
+                  items: preview.items,
+                  totals: preview.totals,
+                  needs_review: preview.needs_review,
+                }
+              : action,
+          );
+
+          return {
+            ...current,
+            actions,
+            needs_review: actions.some(
+              (action) => action.needs_review,
+            ),
+          };
+        });
+      }
+
+      setConversationRecheckSelection((current) => ({
+        ...current,
+        [key]: [],
+      }));
+    } catch (err) {
+      setConversationError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a ricontrollare gli ingredienti selezionati.",
+      );
+    } finally {
+      setConversationRechecking(null);
     }
   }
 
@@ -5224,41 +5324,104 @@ export function HomeShell() {
                             )}
                           </span>
 
-                          <span>
-                            {action.kind === "meal"
-                              ? action.items
-                                  .map(
-                                    (item) =>
-                                      item.name,
-                                  )
-                                  .join(" · ")
-                              : action.kind === "activity"
-                                ? [
-                                    action.activity_type,
-                                    action.duration_seconds
-                                      ? `${Math.round(
-                                          action.duration_seconds /
-                                            60,
-                                        )} min`
-                                      : null,
-                                    action.distance_meters
-                                      ? `${(
-                                          action.distance_meters /
-                                          1000
-                                        ).toLocaleString(
-                                          currentLocaleCode,
-                                          {
-                                            maximumFractionDigits:
-                                              2,
-                                          },
-                                        )} km`
-                                      : null,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" · ")
-                                : homeCopy.todayWeight}
-                          </span>
+                          {action.kind === "meal" ? (
+                            <>
+                              <div className={styles.conversationItems}>
+                              {action.items.map(
+                                (item, index) => (
+                                  <div
+                                    key={`${item.name}-${index}`}
+                                    className={styles.conversationItem}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={(
+                                        conversationRecheckSelection[
+                                          action.id
+                                        ] ?? []
+                                      ).includes(index)}
+                                      onChange={() =>
+                                        toggleConversationRecheckItem(
+                                          action.id,
+                                          index,
+                                        )
+                                      }
+                                      aria-label={`Ricontrolla ${item.name}`}
+                                    />
 
+                                    <div>
+                                      <strong>{item.name}</strong>
+                                      <span>
+                                        {formatNumber(item.quantity)}{" "}
+                                        {item.unit}
+                                        {item.uncertainty
+                                          ? ` · ${homeCopy.estimated}`
+                                          : ""}
+                                      </span>
+                                    </div>
+
+                                    <span>
+                                      {formatNumber(item.calories)} kcal
+                                    </span>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void recheckConversationItems(
+                                  action.id,
+                                  action.meal_type,
+                                  action.items,
+                                )
+                              }
+                              disabled={
+                                conversationRechecking ===
+                                  action.id ||
+                                !(
+                                  conversationRecheckSelection[
+                                    action.id
+                                  ] ?? []
+                                ).length
+                              }
+                            >
+                              {conversationRechecking ===
+                              action.id
+                                ? "Ricontrollo…"
+                                : "Ricontrolla selezionati"}
+                            </button>
+                            </>
+                          ) : (
+                            <span>
+                              {action.kind === "activity"
+                              ? [
+                                  action.activity_type,
+                                  action.duration_seconds
+                                    ? `${Math.round(
+                                        action.duration_seconds /
+                                          60,
+                                      )} min`
+                                    : null,
+                                  action.distance_meters
+                                    ? `${(
+                                        action.distance_meters /
+                                        1000
+                                      ).toLocaleString(
+                                        currentLocaleCode,
+                                        {
+                                          maximumFractionDigits:
+                                            2,
+                                        },
+                                      )} km`
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              : homeCopy.todayWeight}
+                            </span>
+                          )}
                           {action.needs_review ? (
                             <small
                               className={
@@ -5355,6 +5518,21 @@ export function HomeShell() {
                         key={`${item.name}-${index}`}
                         className={styles.conversationItem}
                       >
+                        <input
+                          type="checkbox"
+                          checked={(
+                            conversationRecheckSelection.single ??
+                            []
+                          ).includes(index)}
+                          onChange={() =>
+                            toggleConversationRecheckItem(
+                              "single",
+                              index,
+                            )
+                          }
+                          aria-label={`Ricontrolla ${item.name}`}
+                        />
+
                         <div>
                           <strong>{item.name}</strong>
                           <span>
@@ -5373,6 +5551,28 @@ export function HomeShell() {
                     ),
                   )}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void recheckConversationItems(
+                      "single",
+                      conversationPreview.meal_type,
+                      conversationPreview.items,
+                    )
+                  }
+                  disabled={
+                    conversationRechecking === "single" ||
+                    !(
+                      conversationRecheckSelection.single ??
+                      []
+                    ).length
+                  }
+                >
+                  {conversationRechecking === "single"
+                    ? "Ricontrollo…"
+                    : "Ricontrolla selezionati"}
+                </button>
 
                 <div className={styles.conversationTotals}>
                   <strong>

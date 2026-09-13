@@ -162,6 +162,14 @@ class ConversationalMealItem(BaseModel):
     protein: float = Field(default=0, ge=0)
     carbs: float = Field(default=0, ge=0)
     fat: float = Field(default=0, ge=0)
+    estimated: bool = True
+    uncertainty: str | None = None
+
+
+class ConversationalMealRecheckRequest(BaseModel):
+    meal_type: str = Field(min_length=1)
+    items: list[ConversationalMealItem] = Field(min_length=1)
+    item_indices: list[int] = Field(min_length=1)
 
 
 class ConversationalMealConfirmRequest(BaseModel):
@@ -467,6 +475,66 @@ def preview_conversational_day(
         ),
         "requires_confirmation": True,
     }
+
+
+@router.post("/conversational/recheck")
+def recheck_conversational_meal(
+    request: ConversationalMealRecheckRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    items = [
+        item.model_dump()
+        for item in request.items
+    ]
+
+    indices = sorted(set(request.item_indices))
+
+    if any(
+        index < 0 or index >= len(items)
+        for index in indices
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Indice ingrediente non valido.",
+        )
+
+    for index in indices:
+        current = items[index]
+
+        recheck_text = (
+            "Ricontrolla esclusivamente questo ingrediente, "
+            "senza aggiungere altri alimenti: "
+            f"{current['quantity']} {current['unit']} "
+            f"{current['name']}"
+        )
+
+        raw = interpret_meal_text(
+            text=recheck_text,
+            meal_type=request.meal_type,
+        )
+
+        normalized = MealTextInterpreter().normalize(raw)
+        recalculated = list(normalized.get("items") or [])
+
+        if not recalculated:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Non sono riuscito a ricontrollare "
+                    f"{current['name']}."
+                ),
+            )
+
+        items[index] = recalculated[0]
+
+    return (
+        ConversationalMealLoggingService()
+        .build_preview(
+            text="[ingredient recheck]",
+            meal_type=request.meal_type,
+            interpreted_items=items,
+        )
+    )
 
 
 @router.post("/conversational/preview")
