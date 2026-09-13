@@ -33,7 +33,9 @@ import {
   getSharedRecipes,
   migrateLegacyRecipes,
   updateRecipe,
+  previewRecipeWithAI,
   type Recipe,
+  type RecipeAIPreview,
 } from "@/lib/api/recipes";
 
 import {
@@ -105,6 +107,18 @@ function ingredientDisplayQuantity(
   return row.quantityG;
 }
 
+function normalizeIngredientName(
+  value: string,
+): string {
+  return value
+    .trim()
+    .toLocaleLowerCase("it")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+
 function todayLocalIso(): string {
   const now = new Date();
 
@@ -150,6 +164,8 @@ export default function RecipesPage() {
     useState("Cena");
   const [servings, setServings] =
     useState("1");
+  const [finalWeight, setFinalWeight] =
+    useState("");
   const [tasteRating, setTasteRating] =
     useState("");
   const [easeRating, setEaseRating] =
@@ -187,6 +203,23 @@ export default function RecipesPage() {
     useState(false);
   const [message, setMessage] =
     useState<string | null>(null);
+
+  const [recipeAiText, setRecipeAiText] =
+    useState("");
+  const [recipeAiPreview, setRecipeAiPreview] =
+    useState<RecipeAIPreview | null>(null);
+  const [recipeAiLoading, setRecipeAiLoading] =
+    useState(false);
+  const [
+    recipeAiWeightMode,
+    setRecipeAiWeightMode,
+  ] = useState<"ingredients" | "manual">(
+    "ingredients",
+  );
+  const [
+    recipeAiFinalWeight,
+    setRecipeAiFinalWeight,
+  ] = useState("");
 
   const [recipeSearch, setRecipeSearch] =
     useState("");
@@ -347,6 +380,209 @@ export default function RecipesPage() {
     void refresh();
   }, [accessToken]);
 
+  async function analyzeRecipeWithAI() {
+    if (!accessToken) {
+      return;
+    }
+
+    const text = recipeAiText.trim();
+
+    if (!text) {
+      setMessage(
+        "Scrivi prima la ricetta da analizzare.",
+      );
+      return;
+    }
+
+    setRecipeAiLoading(true);
+    setMessage(null);
+
+    try {
+      const response =
+        await previewRecipeWithAI(
+          text,
+          accessToken,
+        );
+
+      const preview = response.result;
+
+      setRecipeAiPreview(preview);
+
+      if (preview.final_weight_g) {
+        setRecipeAiWeightMode("manual");
+        setRecipeAiFinalWeight(
+          String(preview.final_weight_g),
+        );
+      } else {
+        setRecipeAiWeightMode("ingredients");
+        setRecipeAiFinalWeight("");
+      }
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad analizzare la ricetta.",
+      );
+    } finally {
+      setRecipeAiLoading(false);
+    }
+  }
+
+  const recipeAiCalculated = useMemo(() => {
+    if (!recipeAiPreview) {
+      return null;
+    }
+
+    const manualWeight =
+      Number(recipeAiFinalWeight);
+
+    const weight =
+      recipeAiWeightMode === "manual" &&
+      Number.isFinite(manualWeight) &&
+      manualWeight > 0
+        ? manualWeight
+        : recipeAiPreview.ingredient_weight_g;
+
+    return {
+      weight,
+      per100g: {
+        calories:
+          recipeAiPreview.totals.calories *
+          100 /
+          weight,
+        protein:
+          recipeAiPreview.totals.protein *
+          100 /
+          weight,
+        carbs:
+          recipeAiPreview.totals.carbs *
+          100 /
+          weight,
+        fat:
+          recipeAiPreview.totals.fat *
+          100 /
+          weight,
+      },
+    };
+  }, [
+    recipeAiPreview,
+    recipeAiFinalWeight,
+    recipeAiWeightMode,
+  ]);
+
+  async function useRecipeAiPreview() {
+    if (
+      !accessToken ||
+      !recipeAiPreview
+    ) {
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const available = [...ingredients];
+      const rows: DraftIngredient[] = [];
+
+      for (
+        const aiIngredient
+        of recipeAiPreview.ingredients
+      ) {
+        const normalized =
+          normalizeIngredientName(
+            aiIngredient.name,
+          );
+
+        let ingredient =
+          available.find(
+            (item) =>
+              item.normalized_name ===
+                normalized ||
+              normalizeIngredientName(
+                item.name,
+              ) === normalized,
+          );
+
+        if (!ingredient) {
+          const created =
+            await createIngredient(
+              {
+                name: aiIngredient.name,
+                calories_per_100g:
+                  aiIngredient
+                    .calories_per_100g,
+                protein_per_100g:
+                  aiIngredient
+                    .protein_per_100g,
+                carbs_per_100g:
+                  aiIngredient
+                    .carbs_per_100g,
+                fat_per_100g:
+                  aiIngredient
+                    .fat_per_100g,
+                default_unit: "g",
+                default_quantity: null,
+                grams_per_unit: null,
+                kind: "ingredient",
+                meal_slots: [],
+              },
+              accessToken,
+            );
+
+          ingredient = created.item;
+          available.push(ingredient);
+        }
+
+        rows.push({
+          ingredientId: ingredient.id,
+          quantityG:
+            aiIngredient.quantity_g,
+          inputUnit: "g",
+        });
+      }
+
+      setIngredients(available);
+
+      setEditingId(null);
+      setName(
+        recipeAiPreview.name ||
+          "Nuova ricetta",
+      );
+      setServings(
+        String(
+          recipeAiPreview.servings || 1,
+        ),
+      );
+      setFinalWeight(
+        String(
+          recipeAiCalculated?.weight ||
+            recipeAiPreview
+              .ingredient_weight_g,
+        ),
+      );
+      setDraftIngredients(rows);
+      setTasteRating("");
+      setEaseRating("");
+      setImageUrl(null);
+      setNotes("");
+
+      setMessage(
+        "Ricetta caricata nell'editor. Controlla ingredienti, quantità e peso finale prima di salvarla.",
+      );
+
+      reveal(editorRef);
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a preparare la ricetta.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function refresh() {
     if (!accessToken) {
       return;
@@ -385,6 +621,7 @@ export default function RecipesPage() {
     setName("");
     setMealType("Cena");
     setServings("1");
+    setFinalWeight("");
     setTasteRating("");
     setEaseRating("");
     setImageUrl(null);
@@ -484,6 +721,78 @@ export default function RecipesPage() {
       },
     );
   }, [draftIngredients, ingredients]);
+
+  async function openRecipeEditor(
+    recipeId: string,
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const response = await getRecipe(
+        recipeId,
+        accessToken,
+      );
+
+      const recipe = response.item;
+      const structured =
+        recipe.structured_ingredients ?? [];
+
+      setEditingId(recipe.id);
+      setName(recipe.name || "");
+      setMealType(
+        recipe.meal_type || "Cena",
+      );
+      setServings(
+        String(
+          recipe.recipe_servings || 1,
+        ),
+      );
+      setFinalWeight(
+        recipe.final_weight_g != null
+          ? String(recipe.final_weight_g)
+          : "",
+      );
+      setTasteRating(
+        recipe.taste_rating != null
+          ? String(recipe.taste_rating)
+          : "",
+      );
+      setEaseRating(
+        recipe.ease_rating != null
+          ? String(recipe.ease_rating)
+          : "",
+      );
+      setImageUrl(
+        recipe.image_url || null,
+      );
+      setNotes(recipe.notes || "");
+
+      setDraftIngredients(
+        structured.map((item) => ({
+          ingredientId:
+            item.ingredient_id,
+          quantityG:
+            Number(item.quantity_g) || 0,
+          inputUnit: "g",
+        })),
+      );
+
+      reveal(editorRef);
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad aprire la ricetta.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function openCookDialog(recipe: Recipe) {
     setMealDraft(null);
@@ -931,6 +1240,24 @@ export default function RecipesPage() {
       return;
     }
 
+    const parsedFinalWeight =
+      finalWeight.trim()
+        ? Number(finalWeight)
+        : null;
+
+    if (
+      parsedFinalWeight !== null &&
+      (
+        !Number.isFinite(parsedFinalWeight) ||
+        parsedFinalWeight <= 0
+      )
+    ) {
+      setMessage(
+        "Il peso finale deve essere maggiore di zero.",
+      );
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
 
@@ -942,6 +1269,7 @@ export default function RecipesPage() {
           1,
           Number(servings) || 1,
         ),
+      final_weight_g: parsedFinalWeight,
       image_url: imageUrl,
       notes: notes.trim() || null,
       taste_rating: tasteRating ? Number(tasteRating) : null,
@@ -1214,6 +1542,262 @@ export default function RecipesPage() {
           {message}
         </p>
       ) : null}
+
+      <section className={styles.editorCard}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.kicker}>
+              SanoSync AI
+            </p>
+            <h2>Crea una ricetta con AI</h2>
+          </div>
+        </div>
+
+        <label className={styles.field}>
+          <span>
+            Incolla ingredienti e quantità
+          </span>
+          <textarea
+            rows={5}
+            value={recipeAiText}
+            placeholder={
+              "Es. Pollo al curry: 500 g pollo, 200 g riso, 20 g olio, 1 cipolla. 4 porzioni. Peso finale 1100 g."
+            }
+            onChange={(event) => {
+              setRecipeAiText(
+                event.target.value,
+              );
+            }}
+          />
+        </label>
+
+        <button
+          type="button"
+          className={styles.saveButton}
+          disabled={
+            recipeAiLoading ||
+            !recipeAiText.trim()
+          }
+          onClick={() => {
+            void analyzeRecipeWithAI();
+          }}
+        >
+          {recipeAiLoading
+            ? "Analizzo…"
+            : "Analizza ricetta"}
+        </button>
+
+        {recipeAiPreview ? (
+          <>
+            <div className={styles.sectionHeader}>
+              <div>
+                <p className={styles.kicker}>
+                  Preview
+                </p>
+                <h3>
+                  {recipeAiPreview.name ||
+                    "Ricetta"}
+                </h3>
+              </div>
+            </div>
+
+            {recipeAiPreview.ingredients.map(
+              (item, index) => (
+                <div
+                  key={`${item.name}-${index}`}
+                  className={
+                    styles.ingredientRow
+                  }
+                >
+                  <div>
+                    <strong>
+                      {item.name}
+                    </strong>
+                    {item.estimated ? (
+                      <small>
+                        {" "}· stimato
+                      </small>
+                    ) : null}
+                  </div>
+
+                  <span>
+                    {item.quantity}{" "}
+                    {item.unit}
+                  </span>
+
+                  <span>
+                    {Math.round(
+                      item.quantity_g,
+                    )}{" "}
+                    g
+                  </span>
+
+                  <span>
+                    {Math.round(
+                      item.calories_per_100g,
+                    )}{" "}
+                    kcal/100 g
+                  </span>
+                </div>
+              ),
+            )}
+
+            <div className={styles.twoColumns}>
+              <label className={styles.field}>
+                <span>
+                  Peso usato per il calcolo
+                </span>
+
+                <select
+                  value={recipeAiWeightMode}
+                  onChange={(event) => {
+                    setRecipeAiWeightMode(
+                      event.target.value as
+                        | "ingredients"
+                        | "manual",
+                    );
+                  }}
+                >
+                  <option value="ingredients">
+                    Somma pesi ingredienti
+                  </option>
+                  <option value="manual">
+                    Peso finale ricetta
+                  </option>
+                </select>
+              </label>
+
+              {recipeAiWeightMode ===
+              "manual" ? (
+                <label className={styles.field}>
+                  <span>
+                    Peso finale (g)
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={recipeAiFinalWeight}
+                    onChange={(event) => {
+                      setRecipeAiFinalWeight(
+                        event.target.value,
+                      );
+                    }}
+                  />
+                </label>
+              ) : (
+                <div className={styles.field}>
+                  <span>
+                    Peso ingredienti
+                  </span>
+                  <strong>
+                    {Math.round(
+                      recipeAiPreview
+                        .ingredient_weight_g,
+                    )}{" "}
+                    g
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.nutritionCard}>
+              <span>
+                Totale{" "}
+                {Math.round(
+                  recipeAiPreview.totals
+                    .calories,
+                )}{" "}
+                kcal
+              </span>
+
+              <span>
+                {recipeAiPreview.totals
+                  .protein.toFixed(1)}{" "}
+                g proteine
+              </span>
+
+              <span>
+                {recipeAiPreview.totals
+                  .carbs.toFixed(1)}{" "}
+                g carbo
+              </span>
+
+              <span>
+                {recipeAiPreview.totals
+                  .fat.toFixed(1)}{" "}
+                g grassi
+              </span>
+            </div>
+
+            {recipeAiCalculated ? (
+              <div className={styles.nutritionCard}>
+                <strong>
+                  Per 100 g
+                </strong>
+
+                <span>
+                  {Math.round(
+                    recipeAiCalculated
+                      .per100g.calories,
+                  )}{" "}
+                  kcal
+                </span>
+
+                <span>
+                  P{" "}
+                  {recipeAiCalculated
+                    .per100g.protein.toFixed(
+                      1,
+                    )}{" "}
+                  g
+                </span>
+
+                <span>
+                  C{" "}
+                  {recipeAiCalculated
+                    .per100g.carbs.toFixed(
+                      1,
+                    )}{" "}
+                  g
+                </span>
+
+                <span>
+                  G{" "}
+                  {recipeAiCalculated
+                    .per100g.fat.toFixed(
+                      1,
+                    )}{" "}
+                  g
+                </span>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              className={styles.saveButton}
+              disabled={saving}
+              onClick={() => {
+                void useRecipeAiPreview();
+              }}
+            >
+              {saving
+                ? "Preparo…"
+                : "Usa questa ricetta"}
+            </button>
+
+            {recipeAiPreview
+              .needs_final_weight_confirmation ? (
+              <p className={styles.message}>
+                Il peso finale non era indicato.
+                Per una ricetta cotta è meglio
+                pesare il risultato finale e
+                selezionare “Peso finale ricetta”.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </section>
 
       {cookRecipe ? (
         <section ref={actionPanelRef} className={styles.editorCard}>
@@ -1711,12 +2295,25 @@ export default function RecipesPage() {
                       type="button"
                       className={styles.secondaryButton}
                       onClick={() => {
+                        void openRecipeEditor(
+                          recipe.id,
+                        );
+                      }}
+                    >
+                      {copy.edit}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => {
                         openCookDialog(recipe);
                       }}
                     >
                       {copy.cook}
                     </button>
-<button
+
+                    <button
                       type="button"
                       className={
                         styles.primarySmallButton
@@ -2019,6 +2616,22 @@ export default function RecipesPage() {
               }}
             />
           </label>
+
+            <label className={styles.field}>
+              <span>Peso finale ricetta (g)</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={finalWeight}
+                placeholder="Es. 1200"
+                onChange={(event) => {
+                  setFinalWeight(
+                    event.target.value,
+                  );
+                }}
+              />
+            </label>
         </div>
 
         <div className={styles.twoColumns}>

@@ -28,6 +28,7 @@ export interface Recipe {
   meal_type?: string | null;
   category?: string | null;
   recipe_servings?: number | null;
+  final_weight_g?: number | null;
   calories: number;
   protein: number;
   carbs: number;
@@ -45,11 +46,54 @@ export interface RecipesResponse {
   items: Recipe[];
 }
 
+export interface RecipeAIPreviewIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  quantity_g: number;
+  calories_per_100g: number;
+  protein_per_100g: number;
+  carbs_per_100g: number;
+  fat_per_100g: number;
+  confidence: "high" | "medium" | "low";
+  estimated: boolean;
+  notes?: string | null;
+}
+
+export interface RecipeAINutrition {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface RecipeAIPreview {
+  name?: string | null;
+  servings?: number | null;
+  final_weight_g?: number | null;
+  ingredients: RecipeAIPreviewIngredient[];
+  ingredient_weight_g: number;
+  calculation_weight_g: number;
+  weight_source:
+    | "explicit_final_weight"
+    | "ingredients_sum";
+  totals: RecipeAINutrition;
+  per_100g: RecipeAINutrition;
+  per_serving?: RecipeAINutrition | null;
+  needs_final_weight_confirmation: boolean;
+  needs_review: boolean;
+  requires_confirmation: boolean;
+}
+
+
+
+
 export interface RecipeWriteInput {
   name: string;
   meal_type?: string | null;
   category?: string | null;
   recipe_servings?: number | null;
+  final_weight_g?: number | null;
   image_url?: string | null;
   notes?: string | null;
   taste_rating?: number | null;
@@ -61,6 +105,23 @@ export interface RecipeWriteInput {
     quantity_g: number;
   }>;
 }
+
+export async function previewRecipeWithAI(
+  text: string,
+  accessToken?: string | null,
+): Promise<{ result: RecipeAIPreview }> {
+  return apiRequest(
+    "/recipes/ai-preview",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({ text }),
+    },
+  );
+}
+
+
+
 
 export async function getRecipes(
   accessToken?: string | null,
