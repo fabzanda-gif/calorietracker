@@ -29,6 +29,7 @@ import {
   applyPlannedActivityAdaptation,
   keepPlannedActivityAdaptation,
   getActivityComment,
+  updateActivity,
   deleteActivity,
   importGpxActivity,
   previewGpxActivity,
@@ -3949,7 +3950,53 @@ export default function ActivitiesPage() {
                 <div className={styles.detailStats}>
                   <div>
                     <span>{copy.date}</span>
-                    <strong>{formatActivityDate(detail.date, displayLocale)}</strong>
+                    <input
+                      type="date"
+                      value={detail.date}
+                      aria-label={copy.date}
+                      onChange={(event) => {
+                        const nextDate = event.target.value;
+                        const activityId = detail.id;
+
+                        if (
+                          !nextDate ||
+                          nextDate === detail.date ||
+                          !accessToken ||
+                          activityId == null
+                        ) {
+                          return;
+                        }
+
+                        void (async () => {
+                          try {
+                            setError(null);
+
+                            const response =
+                              await updateActivity(
+                                activityId,
+                                { date: nextDate },
+                                accessToken,
+                              );
+
+                            setSelectedActivity(
+                              response.item,
+                            );
+                            setSelectedDate(nextDate);
+
+                            const movedDate = new Date(
+                              `${nextDate}T00:00:00`,
+                            );
+                            setMonth(movedDate);
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Non riesco a modificare la data.",
+                            );
+                          }
+                        })();
+                      }}
+                    />
                   </div>
                   <div>
                     <span>{copy.distance}</span>

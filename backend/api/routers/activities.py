@@ -145,6 +145,7 @@ class ActivityCreate(BaseModel):
 
 
 class ActivityUpdate(BaseModel):
+    date: DateType | None = None
     activity_name: str | None = None
     burned_calories: int | None = Field(default=None, ge=0)
 
@@ -2017,6 +2018,9 @@ def update_activity(
     repo: ActivitiesRepository = Depends(get_activities_repository),
 ):
     payload = changes.model_dump(exclude_unset=True)
+
+    if payload.get("date") is not None:
+        payload["date"] = str(payload["date"])
 
     if not payload:
         raise HTTPException(

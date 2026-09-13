@@ -148,6 +148,20 @@ def test_update_activity_is_user_scoped():
     )
 
 
+def test_update_activity_can_change_date():
+    response = client.patch(
+        "/activities/activity-1",
+        json={"date": "2026-09-01"},
+    )
+
+    assert response.status_code == 200
+    assert fake_repo.last_update == (
+        "activity-1",
+        "authenticated-user",
+        {"date": "2026-09-01"},
+    )
+
+
 def test_update_activity_rejects_empty_body():
     response = client.patch("/activities/activity-1", json={})
     assert response.status_code == 400
