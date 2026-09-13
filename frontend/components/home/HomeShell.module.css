@@ -15893,3 +15893,45 @@ details[open] > summary .dailyEntryChevron {
   margin: 6px 0 0;
   line-height: 1.5;
 }
+
+.registeredMealPortionControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 5px;
+  border: 1px solid rgba(21, 51, 84, 0.12);
+  border-radius: 999px;
+  background: #f7f9fb;
+}
+
+.registeredMealPortionControl button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #153354;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.registeredMealPortionControl button:hover {
+  background: #eef3f7;
+}
+
+.registeredMealPortionControl button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.registeredMealPortionControl span {
+  min-width: 22px;
+  text-align: center;
+  color: #153354;
+  font-size: 0.78rem;
+  font-weight: 700;
+}

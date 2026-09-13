@@ -3678,6 +3678,111 @@ export function HomeShell() {
     }
   }
 
+  async function adjustRegisteredMealPortions(
+    meal: LoggedMeal,
+    delta: number,
+  ) {
+    if (
+      !accessToken ||
+      meal.id === null ||
+      meal.id === undefined
+    ) {
+      return;
+    }
+
+    setSavingMealEdit(true);
+    setError(null);
+
+    try {
+      const response = await getMeal(
+        meal.id,
+        accessToken,
+      );
+
+      const detail = response.item;
+
+      const currentPortions = Math.max(
+        1,
+        Number(detail.recipe_servings) || 1,
+      );
+
+      const nextPortions =
+        currentPortions + delta;
+
+      if (nextPortions <= 0) {
+        setSavingMealEdit(false);
+
+        void deleteRegisteredMeal(meal);
+        return;
+      }
+
+      const scale =
+        nextPortions / currentPortions;
+
+      const structured =
+        detail.structured_ingredients ?? [];
+
+      if (structured.length > 0) {
+        await updateMeal(
+          meal.id,
+          {
+            name: detail.name,
+            meal_type: detail.meal_type,
+            quantity: 1,
+            recipe_servings: nextPortions,
+            structured_ingredients:
+              structured.map((item) => {
+                const quantityG =
+                  Math.max(
+                    0.01,
+                    Number(item.quantity_g) || 0,
+                  ) * scale;
+
+                return {
+                  ingredient_id:
+                    item.ingredient_id,
+                  quantity: quantityG,
+                  unit: item.unit || "g",
+                  quantity_g: quantityG,
+                };
+              }),
+          },
+          accessToken,
+        );
+      } else {
+        await updateMeal(
+          meal.id,
+          {
+            recipe_servings: nextPortions,
+            calories:
+              Number(detail.calories || 0) *
+              scale,
+            protein:
+              Number(detail.protein || 0) *
+              scale,
+            carbs:
+              Number(detail.carbs || 0) *
+              scale,
+            fat:
+              Number(detail.fat || 0) *
+              scale,
+          },
+          accessToken,
+        );
+      }
+
+      await refreshHome();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco ad aggiornare le porzioni.",
+      );
+    } finally {
+      setSavingMealEdit(false);
+    }
+  }
+
   async function deleteRegisteredMeal(
     meal: LoggedMeal,
   ) {
@@ -6663,6 +6768,57 @@ export function HomeShell() {
                                     styles.registeredMealRowActions
                                   }
                                 >
+                                  <div
+                                    className={
+                                      styles.registeredMealPortionControl
+                                    }
+                                  >
+                                    <button
+                                      type="button"
+                                      aria-label="Togli una porzione"
+                                      disabled={
+                                        deletingMealId !== null ||
+                                        savingMealEdit
+                                      }
+                                      onClick={() => {
+                                        void adjustRegisteredMealPortions(
+                                          registeredMeal,
+                                          -1,
+                                        );
+                                      }}
+                                    >
+                                      −
+                                    </button>
+
+                                    <span>
+                                      {formatNumber(
+                                        Math.max(
+                                          1,
+                                          Number(
+                                            registeredMeal.recipe_servings,
+                                          ) || 1,
+                                        ),
+                                      )}
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      aria-label="Aggiungi una porzione"
+                                      disabled={
+                                        deletingMealId !== null ||
+                                        savingMealEdit
+                                      }
+                                      onClick={() => {
+                                        void adjustRegisteredMealPortions(
+                                          registeredMeal,
+                                          1,
+                                        );
+                                      }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+
                                   <button
                                     type="button"
                                     disabled={
