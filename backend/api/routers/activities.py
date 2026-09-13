@@ -147,6 +147,11 @@ class ActivityCreate(BaseModel):
 class ActivityUpdate(BaseModel):
     date: DateType | None = None
     activity_name: str | None = None
+    activity_type: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=80,
+    )
     burned_calories: int | None = Field(default=None, ge=0)
 
 

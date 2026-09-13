@@ -1942,7 +1942,7 @@ export default function ActivitiesPage() {
     ? `${String(
         detail.id ??
           `${detail.date}-${detail.activity_name}`,
-      )}:${experienceMode}`
+      )}:${detail.activity_type ?? "Altro"}:${experienceMode}`
     : "";
 
   const activityComment =
@@ -3998,6 +3998,103 @@ export default function ActivitiesPage() {
                       }}
                     />
                   </div>
+                  <div>
+                    <span>{copy.type}</span>
+                    <select
+                      value={detail.activity_type ?? "Altro"}
+                      aria-label={copy.type}
+                      onChange={(event) => {
+                        const nextType = event.target.value;
+                        const activityId = detail.id;
+
+                        if (
+                          !nextType ||
+                          nextType === detail.activity_type ||
+                          !accessToken ||
+                          activityId == null
+                        ) {
+                          return;
+                        }
+
+                        void (async () => {
+                          try {
+                            setError(null);
+
+                            const response =
+                              await updateActivity(
+                                activityId,
+                                {
+                                  activity_type: nextType,
+                                },
+                                accessToken,
+                              );
+
+                            setSelectedActivity(
+                              response.item,
+                            );
+
+                            setActivities((current) =>
+                              current.map((item) =>
+                                item.id === response.item.id
+                                  ? response.item
+                                  : item,
+                              ),
+                            );
+
+                            setRecentActivities((current) =>
+                              current.map((item) =>
+                                item.id === response.item.id
+                                  ? response.item
+                                  : item,
+                              ),
+                            );
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Non riesco a modificare il tipo di attività.",
+                            );
+                          }
+                        })();
+                      }}
+                    >
+                      <option value="Corsa">{copy.run}</option>
+                      <option value="Camminata">{copy.walk}</option>
+                      <option value="Escursione">{copy.hike}</option>
+                      <option value="Bicicletta">{copy.bicycle}</option>
+                      <option value="Nuoto">
+                        {locale === "it"
+                          ? "Nuoto"
+                          : locale === "en"
+                            ? "Swimming"
+                            : locale === "nl"
+                              ? "Zwemmen"
+                              : "Natation"}
+                      </option>
+                      <option value="Palestra">
+                        {locale === "it"
+                          ? "Palestra"
+                          : locale === "en"
+                            ? "Gym / strength"
+                            : locale === "nl"
+                              ? "Sportschool / kracht"
+                              : "Musculation"}
+                      </option>
+                      <option value="Padel">Padel</option>
+                      <option value="Tennis">Tennis</option>
+                      <option value="Calcio">
+                        {locale === "it"
+                          ? "Calcio"
+                          : locale === "en"
+                            ? "Football"
+                            : locale === "nl"
+                              ? "Voetbal"
+                              : "Football"}
+                      </option>
+                      <option value="Altro">{copy.other}</option>
+                    </select>
+                  </div>
+
                   <div>
                     <span>{copy.distance}</span>
                     <strong>

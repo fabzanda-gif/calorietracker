@@ -47,6 +47,7 @@ export interface ActivityCreateInput {
 export interface ActivityUpdateInput {
   date?: string;
   activity_name?: string;
+  activity_type?: string;
   burned_calories?: number;
 }
 
