@@ -206,6 +206,8 @@ export default function RecipesPage() {
 
   const [recipeAiText, setRecipeAiText] =
     useState("");
+  const [recipeAiName, setRecipeAiName] =
+    useState("");
   const [recipeAiPreview, setRecipeAiPreview] =
     useState<RecipeAIPreview | null>(null);
   const [recipeAiLoading, setRecipeAiLoading] =
@@ -412,6 +414,16 @@ export default function RecipesPage() {
       const preview = response.result;
 
       setRecipeAiPreview(preview);
+
+      const proposedName =
+        String(preview.name || "").trim();
+
+      setRecipeAiName(
+        proposedName &&
+        proposedName.toLowerCase() !== "unknown"
+          ? proposedName
+          : "",
+      );
 
       setRecipeAiServings(
         String(preview.servings || 1),
@@ -688,10 +700,17 @@ export default function RecipesPage() {
       setIngredients(available);
 
       setEditingId(null);
-      setName(
-        recipeAiPreview.name ||
-          "Nuova ricetta",
-      );
+      const cleanName =
+        recipeAiName.trim();
+
+      if (!cleanName) {
+        setMessage(
+          "Inserisci un nome per la ricetta prima di continuare.",
+        );
+        return;
+      }
+
+      setName(cleanName);
       setServings(
         String(
           Math.max(
@@ -1741,10 +1760,20 @@ export default function RecipesPage() {
                 <p className={styles.kicker}>
                   Preview
                 </p>
-                <h3>
-                  {recipeAiPreview.name ||
-                    "Ricetta"}
-                </h3>
+                <label
+                  className={styles.recipeAiNameField}
+                >
+                  <span>Nome ricetta</span>
+                  <input
+                    value={recipeAiName}
+                    placeholder="Es. Lasagne al ragù"
+                    onChange={(event) => {
+                      setRecipeAiName(
+                        event.target.value,
+                      );
+                    }}
+                  />
+                </label>
               </div>
             </div>
 
@@ -1995,7 +2024,10 @@ export default function RecipesPage() {
             <button
               type="button"
               className={styles.saveButton}
-              disabled={saving}
+              disabled={
+                saving ||
+                !recipeAiName.trim()
+              }
               onClick={() => {
                 void useRecipeAiPreview();
               }}

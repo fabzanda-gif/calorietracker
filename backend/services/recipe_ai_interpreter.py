@@ -77,7 +77,13 @@ Regole:
 - non dedurre final_weight_g dalla somma degli ingredienti;
 - servings va valorizzato solo se il numero di porzioni è indicato
   chiaramente;
-- name è il nome della ricetta, se ricavabile dal testo.
+- name deve essere un nome breve e naturale della ricetta;
+- se il nome non è scritto esplicitamente, prova a generarne uno sensato
+  dagli ingredienti o dalla descrizione;
+- non restituire mai "unknown", "recipe", "ricetta", "senza nome"
+  o altri placeholder generici;
+- se non è davvero possibile ricavare un nome significativo,
+  restituisci name=null.
 
 Esempio concettuale:
 "Pollo al curry: 500 g pollo, 200 g riso, 20 g olio.

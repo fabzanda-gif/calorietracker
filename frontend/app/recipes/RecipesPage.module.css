@@ -1731,3 +1731,35 @@
     grid-template-columns: 1fr;
   }
 }
+
+.recipeAiNameField {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.recipeAiNameField span {
+  color: #69778a;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.recipeAiNameField input {
+  width: min(100%, 520px);
+  box-sizing: border-box;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #dfe2e4;
+  border-radius: 10px;
+  background: #fafbfa;
+  color: #102846;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.recipeAiNameField input:focus {
+  outline: 2px solid rgba(239, 94, 92, 0.18);
+  outline-offset: 1px;
+  border-color: #ef5e5c;
+}
