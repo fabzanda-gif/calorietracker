@@ -17038,3 +17038,61 @@ details[open] > summary .dailyEntryChevron {
 .mealsSection .dailySummaryHeader button {
   font-weight: 600 !important;
 }
+
+/* ==========================================================
+   DAILY SUMMARY · FINAL HEADER FIX
+   ========================================================== */
+
+/* Titolo più compatto, senza perdere gerarchia */
+.mealsSection .dailySummaryHeader h2 {
+  font-size: 1.55rem !important;
+  line-height: 1.05 !important;
+  font-weight: 580 !important;
+  letter-spacing: -0.025em !important;
+  white-space: nowrap !important;
+}
+
+/* Nasconde completamente l'icona nativa del date picker */
+.mealsSection .dailyDateControl input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+.mealsSection .dailyDateControl input[type="date"]::-webkit-inner-spin-button,
+.mealsSection .dailyDateControl input[type="date"]::-webkit-clear-button {
+  display: none !important;
+}
+
+/* L'input resta presente ma non mostra alcun contenuto/controllo nativo */
+.mealsSection .dailyDateControl input[type="date"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: transparent !important;
+  caret-color: transparent !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Mantiene Oggi ben centrato */
+.mealsSection .dailyDateControl > span {
+  font-weight: 600 !important;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .mealsSection .dailySummaryHeader h2 {
+    font-size: 1.4rem !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .mealsSection .dailySummaryHeader h2 {
+    font-size: 1.3rem !important;
+    white-space: normal !important;
+  }
+}
