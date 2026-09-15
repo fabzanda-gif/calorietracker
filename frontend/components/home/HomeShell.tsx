@@ -351,6 +351,122 @@ function budgetHeroPeriodKey(
   ].join(":");
 }
 
+
+type HeroSvgIconName =
+  | "sun"
+  | "moon"
+  | "flame"
+  | "utensils"
+  | "scale"
+  | "chart"
+  | "activity"
+  | "calendar"
+  | "check"
+  | "chevron";
+
+function HeroSvgIcon({
+  name,
+  className,
+}: {
+  name: HeroSvgIconName;
+  className?: string;
+}) {
+  const common = {
+    width: 24,
+    height: 24,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    className,
+    "aria-hidden": true,
+  };
+
+  if (name === "sun") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" />
+      </svg>
+    );
+  }
+
+  if (name === "moon") {
+    return (
+      <svg {...common}>
+        <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8Z" />
+      </svg>
+    );
+  }
+
+  if (name === "flame") {
+    return (
+      <svg {...common}>
+        <path d="M12 22c4.4 0 8-3.3 8-7.6 0-3-1.8-5.7-5-8.4.2 2.1-.8 3.8-2.2 4.8.2-3.3-1.4-6.1-4.6-8.8.1 3.9-2.9 6.1-4 9.3C2.7 15.6 6 22 12 22Z" />
+        <path d="M9.5 17.5c0-1.5.9-2.7 2.6-4.1.2 1.2.8 2 1.6 2.6.4.3.8.8.8 1.5a2.5 2.5 0 0 1-5 0Z" />
+      </svg>
+    );
+  }
+
+  if (name === "utensils") {
+    return (
+      <svg {...common}>
+        <path d="M3 2v7a3 3 0 0 0 6 0V2M6 2v20M15 2v8a3 3 0 0 0 3 3h1V2M19 13v9" />
+      </svg>
+    );
+  }
+
+  if (name === "scale") {
+    return (
+      <svg {...common}>
+        <rect x="4" y="3" width="16" height="18" rx="3" />
+        <path d="M8 8a4 4 0 0 1 8 0M12 8l2-2" />
+      </svg>
+    );
+  }
+
+  if (name === "chart") {
+    return (
+      <svg {...common}>
+        <path d="M4 20V10M10 20V4M16 20v-7M22 20V8" />
+      </svg>
+    );
+  }
+
+  if (name === "activity") {
+    return (
+      <svg {...common}>
+        <path d="M3 12h4l2-5 4 10 2-5h6" />
+      </svg>
+    );
+  }
+
+  if (name === "calendar") {
+    return (
+      <svg {...common}>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M16 3v4M8 3v4M3 10h18" />
+      </svg>
+    );
+  }
+
+  if (name === "check") {
+    return (
+      <svg {...common}>
+        <path d="m5 12 4 4L19 6" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...common}>
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
 function briefingMoment():
   "morning" | "afternoon" | "evening" {
   const hour = new Date().getHours();
@@ -4918,7 +5034,10 @@ export function HomeShell() {
                         chooseBudgetHeroMode("morning")
                       }
                     >
-                      <span aria-hidden="true">☀</span>
+                      <HeroSvgIcon
+                        name="sun"
+                        className={styles.budgetHeroToggleIcon}
+                      />
                       Mattino
                     </button>
 
@@ -4933,7 +5052,10 @@ export function HomeShell() {
                         chooseBudgetHeroMode("evening")
                       }
                     >
-                      <span aria-hidden="true">☾</span>
+                      <HeroSvgIcon
+                        name="moon"
+                        className={styles.budgetHeroToggleIcon}
+                      />
                       Sera
                     </button>
                   </div>
@@ -4950,7 +5072,10 @@ export function HomeShell() {
                         }`}
                         aria-hidden="true"
                       >
-                        {isEveningHero ? "☾" : "☀"}
+                        <HeroSvgIcon
+                          name={isEveningHero ? "moon" : "sun"}
+                          className={styles.budgetHeroIconSvg}
+                        />
                       </span>
 
                       <span className={styles.budgetHeroKicker}>
@@ -5015,7 +5140,10 @@ export function HomeShell() {
                           className={`${styles.budgetHeroRoundIcon} ${styles.budgetHeroFlameIcon}`}
                           aria-hidden="true"
                         >
-                          ◆
+                          <HeroSvgIcon
+                            name="flame"
+                            className={styles.budgetHeroMainIconSvg}
+                          />
                         </span>
                       ) : null}
 
@@ -5043,7 +5171,10 @@ export function HomeShell() {
                         className={styles.budgetHeroCalloutIcon}
                         aria-hidden="true"
                       >
-                        {isEveningHero ? "▥" : "▣"}
+                        <HeroSvgIcon
+                          name={isEveningHero ? "chart" : "calendar"}
+                          className={styles.budgetHeroCalloutIconSvg}
+                        />
                       </span>
 
                       <p>
@@ -5068,7 +5199,10 @@ export function HomeShell() {
                             className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconBlue}`}
                             aria-hidden="true"
                           >
-                            🍴
+                            <HeroSvgIcon
+                              name="utensils"
+                              className={styles.budgetHeroSideIconSvg}
+                            />
                           </span>
                           <div>
                             <strong>
@@ -5082,7 +5216,10 @@ export function HomeShell() {
                             className={styles.budgetHeroSideChevron}
                             aria-hidden="true"
                           >
-                            ›
+                            <HeroSvgIcon
+                              name="chevron"
+                              className={styles.budgetHeroChevronSvg}
+                            />
                           </span>
                         </div>
 
@@ -5091,7 +5228,10 @@ export function HomeShell() {
                             className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconCoral}`}
                             aria-hidden="true"
                           >
-                            ◆
+                            <HeroSvgIcon
+                              name="flame"
+                              className={styles.budgetHeroSideIconSvg}
+                            />
                           </span>
                           <div>
                             <strong>
@@ -5105,7 +5245,10 @@ export function HomeShell() {
                             className={styles.budgetHeroSideChevron}
                             aria-hidden="true"
                           >
-                            ›
+                            <HeroSvgIcon
+                              name="chevron"
+                              className={styles.budgetHeroChevronSvg}
+                            />
                           </span>
                         </div>
 
@@ -5114,7 +5257,10 @@ export function HomeShell() {
                             className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconGreen}`}
                             aria-hidden="true"
                           >
-                            ⚖
+                            <HeroSvgIcon
+                              name="scale"
+                              className={styles.budgetHeroSideIconSvg}
+                            />
                           </span>
                           <div>
                             <strong>
@@ -5132,7 +5278,10 @@ export function HomeShell() {
                             className={styles.budgetHeroSideChevron}
                             aria-hidden="true"
                           >
-                            ›
+                            <HeroSvgIcon
+                              name="chevron"
+                              className={styles.budgetHeroChevronSvg}
+                            />
                           </span>
                         </div>
                       </>
@@ -5143,7 +5292,10 @@ export function HomeShell() {
                             className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconBlue}`}
                             aria-hidden="true"
                           >
-                            ▥
+                            <HeroSvgIcon
+                              name="chart"
+                              className={styles.budgetHeroSideIconSvg}
+                            />
                           </span>
                           <div>
                             <span>Mantenimento</span>
@@ -5163,7 +5315,10 @@ export function HomeShell() {
                             className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconCoral}`}
                             aria-hidden="true"
                           >
-                            ◆
+                            <HeroSvgIcon
+                              name="flame"
+                              className={styles.budgetHeroSideIconSvg}
+                            />
                           </span>
                           <div>
                             <span>Deficit obiettivo</span>
@@ -5183,7 +5338,10 @@ export function HomeShell() {
                             className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconGreen}`}
                             aria-hidden="true"
                           >
-                            ↗
+                            <HeroSvgIcon
+                              name="activity"
+                              className={styles.budgetHeroSideIconSvg}
+                            />
                           </span>
                           <div>
                             <span>Attività previste</span>

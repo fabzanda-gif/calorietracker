@@ -16599,3 +16599,102 @@ details[open] > summary .dailyEntryChevron {
     height: 54px;
   }
 }
+
+/* ==========================================================
+   HERO ICON POLISH
+   ========================================================== */
+
+.budgetHeroIconSvg {
+  width: 25px;
+  height: 25px;
+}
+
+.budgetHeroToggleIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.budgetHeroMainIconSvg {
+  width: 34px;
+  height: 34px;
+}
+
+.budgetHeroCalloutIconSvg {
+  width: 24px;
+  height: 24px;
+}
+
+.budgetHeroSideIconSvg {
+  width: 23px;
+  height: 23px;
+}
+
+.budgetHeroChevronSvg {
+  width: 20px;
+  height: 20px;
+}
+
+.budgetHeroRoundIcon {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+}
+
+.budgetHeroFlameIcon {
+  width: 82px;
+  height: 82px;
+  min-width: 82px;
+  margin-right: 22px;
+}
+
+.budgetHeroSideIcon {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+}
+
+.budgetHeroSideItem {
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 16px;
+  min-height: 82px;
+}
+
+.budgetHeroSideItem strong {
+  font-size: 1.28rem;
+}
+
+.budgetHeroSideItem span {
+  font-size: 0.82rem;
+}
+
+.budgetHeroSideChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(214, 233, 246, 0.7) !important;
+}
+
+.budgetHeroNumberRow {
+  min-height: 112px;
+}
+
+@media (max-width: 700px) {
+  .budgetHeroRoundIcon {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+  }
+
+  .budgetHeroFlameIcon {
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    margin-right: 14px;
+  }
+
+  .budgetHeroSideIcon {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+  }
+}
