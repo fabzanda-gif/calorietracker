@@ -17096,3 +17096,56 @@ details[open] > summary .dailyEntryChevron {
     white-space: normal !important;
   }
 }
+
+/* ==========================================================
+   DAILY SUMMARY · HARD FIX
+   ========================================================== */
+
+.mealsSection .dailySummaryHeader h2 {
+  font-size: 1.25rem !important;
+  line-height: 1.1 !important;
+  font-weight: 580 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Il date input resta funzionante, ma non deve avere
+   nessuna rappresentazione grafica propria. */
+.mealsSection .dailyDateControl {
+  position: relative;
+}
+
+.mealsSection .dailyDateControl input[type="date"] {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 34% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  opacity: 0 !important;
+  transform: translate(-50%, -50%) !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  cursor: pointer !important;
+  z-index: 3;
+}
+
+.mealsSection
+  .dailyDateControl
+  input[type="date"]::-webkit-calendar-picker-indicator {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+@media (max-width: 900px) {
+  .mealsSection .dailySummaryHeader h2 {
+    font-size: 1.18rem !important;
+  }
+}
