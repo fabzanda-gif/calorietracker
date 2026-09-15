@@ -16994,3 +16994,47 @@ details[open] > summary .dailyEntryChevron {
 .dailySummaryHeader button:last-child {
   font-weight: 600;
 }
+
+/* ==========================================================
+   DAILY SUMMARY · FORCE LIGHT TYPOGRAPHY
+   Override delle vecchie regole !important
+   ========================================================== */
+
+.mealsSection .dailySummaryHeader h2 {
+  font-weight: 600 !important;
+}
+
+.mealsSection .dailySummarySubtitle {
+  font-weight: 400 !important;
+}
+
+.mealsSection .dailyEntryMain strong {
+  font-weight: 560 !important;
+}
+
+.mealsSection .dailyEntryMain > span {
+  font-weight: 400 !important;
+}
+
+.mealsSection .dailyMealCalories,
+.mealsSection .dailyActivityCalories {
+  font-weight: 600 !important;
+}
+
+.mealsSection .pantrySummaryCard strong,
+.mealsSection .pantrySummary strong {
+  font-weight: 560 !important;
+}
+
+.mealsSection .pantrySummaryCard p,
+.mealsSection .pantrySummary p {
+  font-weight: 400 !important;
+}
+
+.mealsSection .dailyDateControl span {
+  font-weight: 600 !important;
+}
+
+.mealsSection .dailySummaryHeader button {
+  font-weight: 600 !important;
+}
