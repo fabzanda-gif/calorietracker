@@ -16698,3 +16698,32 @@ details[open] > summary .dailyEntryChevron {
     min-width: 46px;
   }
 }
+
+/* Keep main kcal metric inside the center column */
+.budgetHeroColumns {
+  grid-template-columns:
+    minmax(0, 0.95fr)
+    minmax(360px, 1.12fr)
+    minmax(270px, 0.83fr);
+}
+
+.budgetHeroNumber {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.budgetHeroNumber strong {
+  font-size: clamp(4rem, 6.2vw, 5.7rem);
+}
+
+.budgetHeroNumber span {
+  flex: 0 0 auto;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .budgetHeroNumber strong {
+    font-size: clamp(3.6rem, 5.7vw, 5.1rem);
+  }
+}
