@@ -36,7 +36,7 @@ def test_order_candidates_are_added_to_candidate_pool():
     assert result[0]["name"] == "Poke"
 
 
-def test_order_candidate_for_other_meal_type_is_ignored():
+def test_lunch_order_candidate_can_be_used_for_dinner():
     result = MealCandidateService().build(
         day_date=date(2026, 9, 1),
         meal_type="Cena",
@@ -53,4 +53,6 @@ def test_order_candidate_for_other_meal_type_is_ignored():
         ],
     )
 
-    assert result == []
+    assert len(result) == 1
+    assert result[0]["name"] == "Poke"
+    assert result[0]["meal_type"] == "Cena"

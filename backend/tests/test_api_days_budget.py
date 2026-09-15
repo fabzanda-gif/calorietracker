@@ -5,6 +5,7 @@ from backend.api.dependencies import (
     CurrentUser,
     get_activities_repository,
     get_current_user,
+    get_daily_logs_repository,
     get_meals_repository,
     get_weight_repository,
 )
@@ -24,6 +25,33 @@ class FakeActivitiesRepository:
         return [
             {"burned_calories": 450},
         ]
+
+
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+    ):
+        # Historical activity baseline for budget tests.
+        # No history is supplied in these endpoint scenarios.
+        return []
+
+class FakeDailyLogsRepository:
+    def get_for_date_compatible(self, user_id, log_date):
+        return {
+            "date": str(log_date),
+            "activity_plan": "Riposo",
+        }
+
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+        columns=None,
+    ):
+        return []
 
 
 class FakeWeightRepository:
@@ -67,6 +95,10 @@ def override_activities_repo():
     return FakeActivitiesRepository()
 
 
+def override_daily_logs_repo():
+    return FakeDailyLogsRepository()
+
+
 def override_weight_repo():
     return fake_weight_repo
 
@@ -76,6 +108,7 @@ def api_overrides():
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_meals_repository] = override_meals_repo
     app.dependency_overrides[get_activities_repository] = override_activities_repo
+    app.dependency_overrides[get_daily_logs_repository] = override_daily_logs_repo
     app.dependency_overrides[get_weight_repository] = override_weight_repo
     yield
     app.dependency_overrides.clear()

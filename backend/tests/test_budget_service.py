@@ -76,6 +76,41 @@ def test_available_can_be_negative():
     assert result["available_kcal"] == -200
 
 
+def test_loss_budget_relaxes_to_protect_a_remaining_meal():
+    result = service.calculate(
+        BudgetInput(
+            bmr=1703,
+            baseline_activity_factor=1.2,
+            consumed_kcal=1007,
+            remaining_meal_reserve_kcal=681.2,
+            goal_mode="loss",
+            goal_adjustment_kcal=500,
+        )
+    )
+
+    assert result["maintenance_kcal"] == 2043.6
+    assert result["base_daily_budget_kcal"] == 1543.6
+    assert result["daily_budget_kcal"] == 1688.2
+    assert result["available_kcal"] == 681.2
+    assert result["effective_goal_adjustment_kcal"] == 355.4
+    assert result["budget_adapted"] is True
+
+
+def test_adaptive_loss_budget_never_exceeds_maintenance():
+    result = service.calculate(
+        BudgetInput(
+            bmr=1700,
+            consumed_kcal=1900,
+            remaining_meal_reserve_kcal=700,
+            goal_mode="loss",
+            goal_adjustment_kcal=500,
+        )
+    )
+
+    assert result["daily_budget_kcal"] == 1700
+    assert result["available_kcal"] == -200
+
+
 def test_unallocated_can_be_negative_without_clamping():
     result = service.calculate(
         BudgetInput(

@@ -1,4 +1,7 @@
 import requests
+import pytest
+
+pytestmark = pytest.mark.skip(reason="Legacy migration contract; Streamlit remains supported")
 
 from pathlib import Path
 

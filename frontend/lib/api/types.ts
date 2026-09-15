@@ -53,20 +53,72 @@ export interface DayResponse {
 export interface DayBudget {
   goal_mode: "loss" | "maintenance" | "gain";
   goal_adjustment_kcal: number;
+  effective_goal_adjustment_kcal: number;
   maintenance_kcal: number;
+  base_daily_budget_kcal: number;
   daily_budget_kcal: number;
   consumed_kcal: number;
   planned_kcal: number;
   available_kcal: number;
   unallocated_kcal: number;
+  remaining_meal_reserve_kcal: number;
+  budget_adapted: boolean;
   protein_consumed_g: number;
   protein_target_g: number | null;
   protein_remaining_g: number | null;
 }
 
+export interface TrainingNutritionRange {
+  min: number;
+  max: number;
+}
+
+export interface TrainingNutritionSession {
+  id?: string | null;
+  title?: string | null;
+  activity_type?: string | null;
+  session_kind?: string | null;
+  scheduled_time?: string | null;
+  distance_meters?: number | null;
+  duration_minutes?: number | null;
+}
+
+export interface TrainingNutritionContext {
+  phase:
+    | "normal"
+    | "pre_race"
+    | "pre_training"
+    | "recovery"
+    | "tomorrow_prep";
+  priority:
+    | "normal"
+    | "low"
+    | "moderate"
+    | "high"
+    | "race";
+  message_key: string;
+  session: TrainingNutritionSession | null;
+  hours_to_start: number | null;
+  carbs_target_g: TrainingNutritionRange | null;
+  protein_target_g: TrainingNutritionRange | null;
+  carb_focus: boolean;
+  protein_focus: boolean;
+  guidance?: string[];
+}
+
+export interface TrainingNutritionResponse {
+  date: string;
+  context: TrainingNutritionContext;
+}
+
 export interface NextMealResponse {
   date: string;
-  next_slot: "breakfast" | "lunch" | "dinner" | null;
+  next_slot:
+    | "breakfast"
+    | "lunch"
+    | "snack"
+    | "dinner"
+    | null;
   next_meal_type: string | null;
 }
 
@@ -76,6 +128,30 @@ export interface DayBudgetResponse {
   budget: DayBudget | null;
   actual: Record<string, unknown>;
   profile: Record<string, unknown>;
+  energy_baseline?: {
+    average_activity_kcal_7d?: number;
+    activity_level?: string | null;
+    activity_buffer_kcal?: number;
+    activity_kcal_for_budget?: number;
+    planned_activity_kcal?: number;
+    planned_activity_count?: number;
+    planned_activity_level?: "moderate" | "high" | null;
+    planned_activities?: Array<{
+      id?: string | null;
+      title?: string | null;
+      activity_type?: string | null;
+      duration_minutes?: number | null;
+      distance_meters?: number | null;
+      estimated_kcal: number;
+    }>;
+    activity_suggestion?: {
+      activity_name: string;
+      burned_calories: number;
+      duration_minutes?: number | null;
+      observations: number;
+      reason: string;
+    } | null;
+  };
 }
 
 export type DecisionMode =
@@ -134,7 +210,8 @@ export interface DayDecisionContext {
     | "tight_budget"
     | "protein_focus"
     | "flexible"
-    | "balanced";
+    | "balanced"
+    | "training_prep";
   title: string;
   message: string;
 }
@@ -142,6 +219,7 @@ export interface DayDecisionContext {
 export type MealReplanningStrategy =
   | "routine"
   | "adapted_routine"
+  | "component_reduction"
   | "alternate_candidate"
   | "adapted_alternative";
 
@@ -152,6 +230,7 @@ export interface MealReplanningContext {
   available_kcal: number | null;
   title: string;
   message: string;
+  removed_components?: string[];
 }
 
 export interface MealReplanningRecommendation {
@@ -162,9 +241,15 @@ export interface MealReplanningRecommendation {
   reason: string;
   adaptation: {
     changed: boolean;
+    type?: "component_reduction";
     original_calories: number;
     recommended_calories: number;
     calorie_delta: number;
+    removed_components?: Array<{
+      name?: string;
+      calories?: number;
+      [key: string]: unknown;
+    }>;
   };
 }
 
