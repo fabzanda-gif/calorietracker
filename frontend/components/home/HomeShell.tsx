@@ -4869,287 +4869,361 @@ export function HomeShell() {
           {budget ? (() => {
             const currentBalanceKcal =
               Math.round(
-                Number(
-                  budget.consumed_kcal,
-                ) -
-                  Number(
-                    maintenanceBudgetKcal,
-                  ),
+                Number(budget.consumed_kcal) -
+                  Number(maintenanceBudgetKcal),
               );
 
             const isDeficit =
               currentBalanceKcal <= 0;
 
             const balanceMagnitude =
-              Math.abs(
-                currentBalanceKcal,
-              );
+              Math.abs(currentBalanceKcal);
 
             const isEveningHero =
-              budgetHeroMode ===
-              "evening";
+              budgetHeroMode === "evening";
+
+            const plannedActivityLabel =
+              todayPlannedActivities.length > 0
+                ? todayPlannedActivities
+                    .map((item) => item.title)
+                    .join(", ")
+                : "Nessuna attività";
 
             return (
               <section
                 className={`${styles.budgetHero} ${
+                  isEveningHero
+                    ? styles.budgetHeroEvening
+                    : styles.budgetHeroMorning
+                } ${
                   budgetExpanded
                     ? styles.budgetHeroExpanded
                     : styles.budgetHeroCollapsed
                 }`}
               >
-                <div
-                  className={
-                    styles.budgetHeroModeBar
-                  }
-                >
+                <div className={styles.budgetHeroModeBar}>
                   <div
-                    className={
-                      styles.budgetHeroModeToggle
-                    }
+                    className={styles.budgetHeroModeToggle}
                     role="group"
                     aria-label="Vista bilancio"
                   >
                     <button
                       type="button"
                       className={
-                        budgetHeroMode ===
-                        "morning"
+                        !isEveningHero
                           ? styles.budgetHeroModeActive
                           : ""
                       }
-                      onClick={() => {
-                        chooseBudgetHeroMode(
-                          "morning",
-                        );
-                      }}
+                      onClick={() =>
+                        chooseBudgetHeroMode("morning")
+                      }
                     >
-                      ☀ Mattino
+                      <span aria-hidden="true">☀</span>
+                      Mattino
                     </button>
 
                     <button
                       type="button"
                       className={
-                        budgetHeroMode ===
-                        "evening"
+                        isEveningHero
                           ? styles.budgetHeroModeActive
                           : ""
                       }
-                      onClick={() => {
-                        chooseBudgetHeroMode(
-                          "evening",
-                        );
-                      }}
+                      onClick={() =>
+                        chooseBudgetHeroMode("evening")
+                      }
                     >
-                      ☾ Sera
+                      <span aria-hidden="true">☾</span>
+                      Sera
                     </button>
                   </div>
                 </div>
 
-                <div
-                  className={
-                    styles.budgetHeroMain
-                  }
-                >
-                  <div
-                    className={
-                      styles.budgetHeroIntro
-                    }
-                  >
-                    <span
-                      className={
-                        styles.budgetEyebrow
-                      }
-                    >
-                      {isEveningHero
-                        ? "IL TUO BILANCIO DI OGGI"
-                        : "IL TUO PIANO DI OGGI"}
-                    </span>
+                <div className={styles.budgetHeroColumns}>
+                  <div className={styles.budgetHeroIntro}>
+                    <div className={styles.budgetHeroKickerRow}>
+                      <span
+                        className={`${styles.budgetHeroRoundIcon} ${
+                          isEveningHero
+                            ? styles.budgetHeroMoonIcon
+                            : styles.budgetHeroSunIcon
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {isEveningHero ? "☾" : "☀"}
+                      </span>
+
+                      <span className={styles.budgetHeroKicker}>
+                        {isEveningHero
+                          ? "SERA"
+                          : "MATTINA"}
+                      </span>
+                    </div>
 
                     <h2>
                       {isEveningHero
-                        ? "Come sei messo oggi"
-                        : "Quanto puoi ancora mangiare oggi?"}
+                        ? "Come sei messo oggi?"
+                        : "Quante puoi mangiare oggi?"}
                     </h2>
 
-                    <p>
+                    <p className={styles.budgetHeroLead}>
                       {isEveningHero
-                        ? (
-                            isDeficit
-                              ? `Se chiudessi la giornata ora, saresti a circa ${formatNumber(
-                                  balanceMagnitude,
-                                )} kcal di deficit.`
-                              : `Se chiudessi la giornata ora, saresti a circa ${formatNumber(
-                                  balanceMagnitude,
-                                )} kcal sopra il mantenimento.`
-                          )
-                        : "Il numero chiave ora è quanto budget ti rimane per la giornata."}
+                        ? "La sera il numero chiave è il bilancio calorico del momento."
+                        : "Il numero chiave al mattino è il budget disponibile per la giornata."}
                     </p>
-                  </div>
 
-                  <div
-                    className={
-                      styles.budgetHeroPrimary
-                    }
-                  >
-                    <span
-                      className={
-                        styles.budgetHeroPrimaryLabel
-                      }
-                    >
-                      {isEveningHero
-                        ? (
-                            isDeficit
-                              ? "Deficit attuale"
-                              : "Surplus attuale"
-                          )
-                        : "Budget disponibile"}
-                    </span>
+                    <div className={styles.budgetHeroSuccess}>
+                      <span
+                        className={styles.budgetHeroSuccessIcon}
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
 
-                    <div
-                      className={
-                        styles.budgetHeroPrimaryValue
-                      }
-                    >
-                      <strong>
-                        {isEveningHero
-                          ? `${
-                              currentBalanceKcal >
-                              0
-                                ? "+"
-                                : ""
-                            }${formatNumber(
-                              currentBalanceKcal,
-                            )}`
-                          : formatNumber(
-                              Math.max(
-                                0,
-                                budget.available_kcal,
-                              ),
-                            )}
-                      </strong>
+                      <div>
+                        <strong>
+                          {isEveningHero
+                            ? isDeficit
+                              ? "Ottimo lavoro oggi!"
+                              : "Giornata sopra il mantenimento"
+                            : "Sei in linea con il tuo piano."}
+                        </strong>
 
-                      <span>kcal</span>
+                        {isEveningHero ? (
+                          <small>
+                            {isDeficit
+                              ? "Sei sotto il mantenimento."
+                              : "Puoi usare questo dato per leggere la giornata."}
+                          </small>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
+
+                  <div className={styles.budgetHeroCenter}>
+                    <span className={styles.budgetHeroCenterLabel}>
+                      {isEveningHero
+                        ? isDeficit
+                          ? "Deficit attuale"
+                          : "Surplus attuale"
+                        : "Budget disponibile oggi"}
+                    </span>
+
+                    <div className={styles.budgetHeroNumberRow}>
+                      {isEveningHero ? (
+                        <span
+                          className={`${styles.budgetHeroRoundIcon} ${styles.budgetHeroFlameIcon}`}
+                          aria-hidden="true"
+                        >
+                          ◆
+                        </span>
+                      ) : null}
+
+                      <div className={styles.budgetHeroNumber}>
+                        <strong>
+                          {isEveningHero
+                            ? `${
+                                currentBalanceKcal > 0
+                                  ? "+"
+                                  : ""
+                              }${formatNumber(currentBalanceKcal)}`
+                            : formatNumber(
+                                Math.max(
+                                  0,
+                                  budget.available_kcal,
+                                ),
+                              )}
+                        </strong>
+                        <span>kcal</span>
+                      </div>
+                    </div>
+
+                    <div className={styles.budgetHeroCallout}>
+                      <span
+                        className={styles.budgetHeroCalloutIcon}
+                        aria-hidden="true"
+                      >
+                        {isEveningHero ? "▥" : "▣"}
+                      </span>
+
+                      <p>
+                        {isEveningHero
+                          ? isDeficit
+                            ? `Se chiudessi la giornata ora, saresti a circa ${formatNumber(
+                                balanceMagnitude,
+                              )} kcal di deficit.`
+                            : `Se chiudessi la giornata ora, saresti a circa ${formatNumber(
+                                balanceMagnitude,
+                              )} kcal sopra il mantenimento.`
+                          : "Pianifica la tua giornata con calma per raggiungere i tuoi obiettivi."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={styles.budgetHeroSide}>
+                    {isEveningHero ? (
+                      <>
+                        <div className={styles.budgetHeroSideItem}>
+                          <span
+                            className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconBlue}`}
+                            aria-hidden="true"
+                          >
+                            🍴
+                          </span>
+                          <div>
+                            <strong>
+                              {formatNumber(
+                                budget.consumed_kcal,
+                              )} kcal
+                            </strong>
+                            <span>Mangiate</span>
+                          </div>
+                          <span
+                            className={styles.budgetHeroSideChevron}
+                            aria-hidden="true"
+                          >
+                            ›
+                          </span>
+                        </div>
+
+                        <div className={styles.budgetHeroSideItem}>
+                          <span
+                            className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconCoral}`}
+                            aria-hidden="true"
+                          >
+                            ◆
+                          </span>
+                          <div>
+                            <strong>
+                              {formatNumber(
+                                maintenanceBudgetKcal,
+                              )} kcal
+                            </strong>
+                            <span>Bruciate</span>
+                          </div>
+                          <span
+                            className={styles.budgetHeroSideChevron}
+                            aria-hidden="true"
+                          >
+                            ›
+                          </span>
+                        </div>
+
+                        <div className={styles.budgetHeroSideItem}>
+                          <span
+                            className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconGreen}`}
+                            aria-hidden="true"
+                          >
+                            ⚖
+                          </span>
+                          <div>
+                            <strong>
+                              {formatNumber(
+                                balanceMagnitude,
+                              )} kcal
+                            </strong>
+                            <span>
+                              {isDeficit
+                                ? "Deficit"
+                                : "Surplus"}
+                            </span>
+                          </div>
+                          <span
+                            className={styles.budgetHeroSideChevron}
+                            aria-hidden="true"
+                          >
+                            ›
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className={styles.budgetHeroSideItem}>
+                          <span
+                            className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconBlue}`}
+                            aria-hidden="true"
+                          >
+                            ▥
+                          </span>
+                          <div>
+                            <span>Mantenimento</span>
+                            <strong>
+                              {formatNumber(
+                                maintenanceBudgetKcal,
+                              )} kcal
+                            </strong>
+                            <small>
+                              il tuo dispendio stimato
+                            </small>
+                          </div>
+                        </div>
+
+                        <div className={styles.budgetHeroSideItem}>
+                          <span
+                            className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconCoral}`}
+                            aria-hidden="true"
+                          >
+                            ◆
+                          </span>
+                          <div>
+                            <span>Deficit obiettivo</span>
+                            <strong>
+                              {formatNumber(
+                                budget.effective_goal_adjustment_kcal,
+                              )} kcal
+                            </strong>
+                            <small>
+                              il tuo obiettivo giornaliero
+                            </small>
+                          </div>
+                        </div>
+
+                        <div className={styles.budgetHeroSideItem}>
+                          <span
+                            className={`${styles.budgetHeroSideIcon} ${styles.budgetHeroSideIconGreen}`}
+                            aria-hidden="true"
+                          >
+                            ↗
+                          </span>
+                          <div>
+                            <span>Attività previste</span>
+                            <strong>
+                              {plannedActivityLabel}
+                            </strong>
+                            {todayPlannedActivities.length > 0 ? (
+                              <small>
+                                +{formatNumber(
+                                  Math.round(
+                                    plannedActivityKcal,
+                                  ),
+                                )} kcal previste
+                              </small>
+                            ) : (
+                              <small>
+                                nessuna attività programmata
+                              </small>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div
-                  className={
-                    styles.budgetHeroStats
-                  }
-                >
-                  <div
-                    className={
-                      styles.budgetHeroStat
-                    }
-                  >
-                    <span>
-                      {isEveningHero
-                        ? "Mangiate"
-                        : "Mangiate finora"}
-                    </span>
-                    <strong>
-                      {formatNumber(
-                        budget.consumed_kcal,
-                      )}{" "}
-                      kcal
-                    </strong>
-                  </div>
-
-                  <div
-                    className={
-                      styles.budgetHeroStat
-                    }
-                  >
-                    <span>
-                      {isEveningHero
-                        ? "Bruciate / dispendio"
-                        : "Budget restante"}
-                    </span>
-                    <strong>
-                      {isEveningHero
-                        ? formatNumber(
-                            maintenanceBudgetKcal,
-                          )
-                        : formatNumber(
-                            Math.max(
-                              0,
-                              budget.available_kcal,
-                            ),
-                          )}{" "}
-                      kcal
-                    </strong>
-                  </div>
-
-                  <div
-                    className={
-                      styles.budgetHeroStat
-                    }
-                  >
-                    <span>
-                      {isEveningHero
-                        ? (
-                            isDeficit
-                              ? "Deficit"
-                              : "Surplus"
-                          )
-                        : "Mantenimento stimato"}
-                    </span>
-                    <strong>
-                      {isEveningHero
-                        ? formatNumber(
-                            balanceMagnitude,
-                          )
-                        : formatNumber(
-                            maintenanceBudgetKcal,
-                          )}{" "}
-                      kcal
-                    </strong>
-                  </div>
-                </div>
-
-                <div
-                  className={
-                    styles.budgetHeroFooter
-                  }
-                >
-                  <span
-                    className={
-                      styles.budgetHeroStatus
-                    }
-                  >
-                    {isEveningHero
-                      ? (
-                          isDeficit
-                            ? "✓ Sei sotto il mantenimento."
-                            : "Bilancio sopra il mantenimento."
-                        )
-                      : (
-                          budget.budget_adapted
-                            ? "✓ Piano adattato alla giornata."
-                            : "✓ Piano pronto per oggi."
-                        )}
-                  </span>
-
+                <div className={styles.budgetHeroBottom}>
                   <button
                     type="button"
-                    className={
-                      styles.budgetToggle
-                    }
-                    aria-expanded={
-                      budgetExpanded
-                    }
+                    className={styles.budgetToggle}
+                    aria-expanded={budgetExpanded}
                     onClick={() =>
                       setBudgetExpanded(
-                        (current) =>
-                          !current,
+                        (current) => !current,
                       )
                     }
                   >
                     {budgetExpanded
                       ? homeCopy.hideCalculation
                       : homeCopy.showCalculation}
-
                     <span
                       className={`${styles.budgetChevron} ${
                         budgetExpanded
@@ -5162,44 +5236,22 @@ export function HomeShell() {
                 </div>
 
                 {budgetExpanded ? (
-                  <div
-                    className={
-                      styles.budgetExpandedPanel
-                    }
-                  >
-                    <div
-                      className={
-                        styles.budgetDetailsGrid
-                      }
-                    >
-                      <div
-                        className={
-                          styles.budgetDetail
-                        }
-                      >
-                        <span>
-                          {homeCopy.bmr}
-                        </span>
+                  <div className={styles.budgetExpandedPanel}>
+                    <div className={styles.budgetDetailsGrid}>
+                      <div className={styles.budgetDetail}>
+                        <span>{homeCopy.bmr}</span>
                         <strong>
                           {bmr > 0
                             ? formatNumber(bmr)
                             : "—"}{" "}
                           kcal
                         </strong>
-                        <small>
-                          {homeCopy.bodyMinimum}
-                        </small>
+                        <small>{homeCopy.bodyMinimum}</small>
                       </div>
 
-                      <div
-                        className={
-                          styles.budgetDetail
-                        }
-                      >
+                      <div className={styles.budgetDetail}>
                         <span>
-                          {
-                            homeCopy.estimatedMaintenance
-                          }
+                          {homeCopy.estimatedMaintenance}
                         </span>
                         <strong>
                           {formatNumber(
@@ -5207,23 +5259,14 @@ export function HomeShell() {
                           )}{" "}
                           kcal
                         </strong>
-                        <small>
-                          {homeCopy.withToday}
-                        </small>
+                        <small>{homeCopy.withToday}</small>
                       </div>
 
-                      <div
-                        className={
-                          styles.budgetDetail
-                        }
-                      >
-                        <span>
-                          Obiettivo deficit
-                        </span>
+                      <div className={styles.budgetDetail}>
+                        <span>Obiettivo deficit</span>
                         <strong>
                           {formatNumber(
-                            budget
-                              .effective_goal_adjustment_kcal,
+                            budget.effective_goal_adjustment_kcal,
                           )}{" "}
                           kcal
                         </strong>
@@ -5234,119 +5277,17 @@ export function HomeShell() {
                         </small>
                       </div>
                     </div>
-
-                    <div
-                      className={
-                        styles.budgetScale
-                      }
-                    >
-                      <div
-                        className={
-                          styles.budgetScaleTrack
-                        }
-                      >
-                        <div
-                          className={
-                            styles.budgetScaleFill
-                          }
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              Math.max(
-                                0,
-                                maintenanceBudgetKcal >
-                                0
-                                  ? (
-                                      budget.consumed_kcal /
-                                      maintenanceBudgetKcal
-                                    ) * 100
-                                  : 0,
-                              ),
-                            )}%`,
-                          }}
-                        />
-
-                        <span
-                          className={
-                            styles.budgetScaleTarget
-                          }
-                          style={{
-                            left:
-                              maintenanceBudgetKcal >
-                              0
-                                ? `${Math.min(
-                                    100,
-                                    Math.max(
-                                      0,
-                                      (
-                                        budget.daily_budget_kcal /
-                                        maintenanceBudgetKcal
-                                      ) * 100,
-                                    ),
-                                  )}%`
-                                : "0%",
-                          }}
-                          aria-hidden="true"
-                        />
-                      </div>
-
-                      <div
-                        className={
-                          styles.budgetScaleLabels
-                        }
-                      >
-                        <span>
-                          {formatNumber(
-                            budget.consumed_kcal,
-                          )}{" "}
-                          {homeCopy.consumed}
-                        </span>
-
-                        <span>
-                          {formatNumber(
-                            budget.daily_budget_kcal,
-                          )}{" "}
-                          {
-                            homeCopy.adaptedTarget
-                          }
-                        </span>
-
-                        <span>
-                          {formatNumber(
-                            maintenanceBudgetKcal,
-                          )}{" "}
-                          {
-                            homeCopy.maintenance
-                          }
-                        </span>
-                      </div>
-                    </div>
-
-                    <div
-                      className={
-                        styles.budgetExplanation
-                      }
-                    >
-                      {
-                        homeCopy.budgetExplanation
-                      }
-                    </div>
                   </div>
                 ) : null}
               </section>
             );
           })() : (
-            <section
-              className={styles.card}
-            >
+            <section className={styles.card}>
               <strong>
                 {homeCopy.budgetUnavailable}
               </strong>
-
               <p className={styles.muted}>
-                {
-                  homeCopy.completeProfileBudget
-                }
+                {homeCopy.completeProfileBudget}
               </p>
             </section>
           )}

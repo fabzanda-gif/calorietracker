@@ -16173,3 +16173,429 @@ details[open] > summary .dailyEntryChevron {
     flex-direction: column;
   }
 }
+
+/* ==========================================================
+   BUDGET HERO · MOCKUP PASS 2
+   ========================================================== */
+
+.budgetHero {
+  position: relative;
+  overflow: hidden;
+  margin: 12px 0 22px;
+  padding: 28px 34px 30px;
+  border: 1px solid rgba(78, 178, 255, 0.26);
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      circle at 38% 0%,
+      rgba(29, 97, 150, 0.19),
+      transparent 40%
+    ),
+    linear-gradient(
+      135deg,
+      #123858 0%,
+      #0b2d4c 48%,
+      #082541 100%
+    );
+  color: #f8fbff;
+  box-shadow:
+    0 18px 44px rgba(1, 18, 34, 0.16);
+}
+
+.budgetHeroModeBar {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 2;
+  margin: 0;
+}
+
+.budgetHeroModeToggle {
+  display: inline-flex;
+  padding: 4px;
+  gap: 2px;
+  border: 1px solid rgba(173, 211, 238, 0.18);
+  border-radius: 999px;
+  background: rgba(7, 28, 49, 0.48);
+}
+
+.budgetHeroModeToggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(229, 240, 249, 0.55);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.budgetHeroModeToggle .budgetHeroModeActive {
+  background: rgba(183, 211, 235, 0.17);
+  color: #ffffff;
+}
+
+.budgetHeroColumns {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.06fr)
+    minmax(300px, 1fr)
+    minmax(270px, 0.86fr);
+  gap: 0;
+  align-items: stretch;
+  padding-top: 26px;
+}
+
+.budgetHeroIntro,
+.budgetHeroCenter,
+.budgetHeroSide {
+  min-width: 0;
+}
+
+.budgetHeroIntro {
+  padding: 8px 34px 4px 0;
+}
+
+.budgetHeroCenter {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 34px;
+  border-left: 1px solid rgba(199, 225, 245, 0.15);
+  border-right: 1px solid rgba(199, 225, 245, 0.15);
+}
+
+.budgetHeroSide {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 0 4px 34px;
+}
+
+.budgetHeroKickerRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.budgetHeroKicker {
+  color: #67c9ff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.budgetHeroRoundIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  font-size: 1.4rem;
+}
+
+.budgetHeroSunIcon {
+  background: rgba(232, 193, 62, 0.17);
+  color: #ffd34d;
+}
+
+.budgetHeroMoonIcon {
+  background: rgba(95, 103, 255, 0.2);
+  color: #a9a8ff;
+}
+
+.budgetHeroFlameIcon {
+  width: 66px;
+  height: 66px;
+  margin-right: 16px;
+  background: rgba(255, 102, 104, 0.16);
+  color: #ff686a;
+  font-size: 1.55rem;
+}
+
+.budgetHeroIntro h2 {
+  max-width: 470px;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(2rem, 3.2vw, 3.35rem);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+  font-weight: 760;
+}
+
+.budgetHeroLead {
+  max-width: 430px;
+  margin: 18px 0 0;
+  color: rgba(228, 239, 248, 0.72);
+  font-size: 1rem;
+  line-height: 1.48;
+}
+
+.budgetHeroSuccess {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 22px;
+}
+
+.budgetHeroSuccessIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 2px solid #59e699;
+  border-radius: 50%;
+  color: #59e699;
+  font-weight: 900;
+}
+
+.budgetHeroSuccess div {
+  display: grid;
+  gap: 2px;
+}
+
+.budgetHeroSuccess strong {
+  color: #67e8a1;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.budgetHeroSuccess small {
+  color: rgba(232, 241, 247, 0.68);
+  font-size: 0.76rem;
+}
+
+.budgetHeroCenterLabel {
+  color: rgba(240, 247, 252, 0.88);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.budgetHeroNumberRow {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.budgetHeroNumber {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.budgetHeroNumber strong {
+  color: #ff6464;
+  font-size: clamp(4.2rem, 7vw, 6.4rem);
+  line-height: 0.88;
+  letter-spacing: -0.075em;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.budgetHeroNumber span {
+  color: rgba(234, 242, 248, 0.77);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.budgetHeroCallout {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px 18px;
+  border: 1px solid rgba(69, 172, 243, 0.25);
+  border-radius: 13px;
+  background: rgba(6, 37, 64, 0.36);
+}
+
+.budgetHeroCalloutIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  color: #65c9ff;
+  font-size: 1.3rem;
+}
+
+.budgetHeroCallout p {
+  margin: 0;
+  color: rgba(244, 249, 253, 0.9);
+  font-size: 0.83rem;
+  line-height: 1.42;
+}
+
+.budgetHeroSideItem {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 72px;
+  padding: 8px 0;
+}
+
+.budgetHeroSideItem + .budgetHeroSideItem {
+  border-top: 1px solid rgba(197, 222, 241, 0.12);
+}
+
+.budgetHeroSideIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.15rem;
+}
+
+.budgetHeroSideIconBlue {
+  background: rgba(31, 133, 204, 0.2);
+  color: #6fd0ff;
+}
+
+.budgetHeroSideIconCoral {
+  background: rgba(255, 99, 99, 0.16);
+  color: #ff7373;
+}
+
+.budgetHeroSideIconGreen {
+  background: rgba(56, 201, 129, 0.16);
+  color: #64e8a5;
+}
+
+.budgetHeroSideItem div {
+  display: grid;
+  gap: 2px;
+}
+
+.budgetHeroSideItem span {
+  color: rgba(224, 236, 245, 0.7);
+  font-size: 0.8rem;
+}
+
+.budgetHeroSideItem strong {
+  color: #ffffff;
+  font-size: 1.12rem;
+  line-height: 1.15;
+  font-weight: 720;
+}
+
+.budgetHeroSideItem small {
+  color: rgba(212, 227, 238, 0.58);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.budgetHeroSideChevron {
+  color: rgba(214, 233, 246, 0.72) !important;
+  font-size: 1.7rem !important;
+}
+
+.budgetHeroBottom {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(199, 225, 245, 0.1);
+}
+
+.budgetHero .budgetToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 0;
+  background: transparent;
+  color: rgba(225, 237, 246, 0.7);
+  font-weight: 700;
+}
+
+.budgetHero .budgetExpandedPanel {
+  margin-top: 18px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(199, 225, 245, 0.12);
+}
+
+@media (max-width: 980px) {
+  .budgetHeroColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .budgetHeroSide {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 24px;
+    padding: 20px 0 0;
+    border-top: 1px solid rgba(199, 225, 245, 0.12);
+  }
+
+  .budgetHeroSideItem,
+  .budgetHeroSideItem + .budgetHeroSideItem {
+    border-top: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .budgetHero {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .budgetHeroModeBar {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+  }
+
+  .budgetHeroColumns {
+    display: block;
+    padding-top: 0;
+  }
+
+  .budgetHeroIntro,
+  .budgetHeroCenter,
+  .budgetHeroSide {
+    padding: 0;
+    border: 0;
+  }
+
+  .budgetHeroCenter,
+  .budgetHeroSide {
+    margin-top: 26px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(199, 225, 245, 0.12);
+  }
+
+  .budgetHeroSide {
+    display: block;
+  }
+
+  .budgetHeroIntro h2 {
+    font-size: 2.25rem;
+  }
+
+  .budgetHeroNumber strong {
+    font-size: clamp(3.8rem, 19vw, 5rem);
+  }
+
+  .budgetHeroFlameIcon {
+    width: 54px;
+    height: 54px;
+  }
+}
