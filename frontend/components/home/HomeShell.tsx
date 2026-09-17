@@ -1109,6 +1109,8 @@ export function HomeShell() {
     useState<string>("Colazione");
   const [mealEditType, setMealEditType] =
     useState("Colazione");
+  const [mealEditDate, setMealEditDate] =
+    useState("");
   const [
     mealEditRecipeServings,
     setMealEditRecipeServings,
@@ -3504,6 +3506,11 @@ export function HomeShell() {
           meal.meal_type ||
           "Colazione",
       );
+      setMealEditDate(
+        response.item.date ||
+          meal.date ||
+          localIsoDate(new Date()),
+      );
 
       if (!structured.length) {
         setMealEditIngredients([]);
@@ -3582,6 +3589,7 @@ export function HomeShell() {
     setSimpleMealEdit(null);
     setSimpleMealQuantity(1);
     setMealEditType("Colazione");
+    setMealEditDate("");
     setMealEditRecipeServings(1);
   }
 
@@ -3749,6 +3757,7 @@ export function HomeShell() {
       await updateMeal(
         meal.id,
         {
+          date: mealEditDate,
           meal_type: mealEditType,
           quantity: simpleMealQuantity,
           calories: nutrition.calories,
@@ -3825,6 +3834,7 @@ export function HomeShell() {
         await updateMeal(
           meal.id,
           {
+            date: mealEditDate,
             meal_type: mealEditType,
           },
           accessToken,
@@ -3834,6 +3844,7 @@ export function HomeShell() {
           meal.id,
           {
             name: meal.name,
+            date: mealEditDate,
             meal_type: mealEditType,
             quantity: 1,
             recipe_servings: 1,
@@ -7528,6 +7539,20 @@ export function HomeShell() {
                               styles.registeredMealEditor
                             }
                           >
+                            <label>
+                              <span>Data</span>
+
+                              <input
+                                type="date"
+                                value={mealEditDate}
+                                onChange={(event) =>
+                                  setMealEditDate(
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+
                             <label
                               className={
                                 styles.registeredMealTypeField

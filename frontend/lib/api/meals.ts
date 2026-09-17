@@ -106,6 +106,7 @@ export interface MealCreateInput {
 }
 
 export interface MealUpdateInput {
+  date?: string;
   meal_type?: string;
   name?: string;
   calories?: number;

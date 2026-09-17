@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+DateType = date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
@@ -179,6 +181,7 @@ class ConversationalMealConfirmRequest(BaseModel):
 
 
 class MealUpdate(BaseModel):
+    date: DateType | None = None
     meal_type: str | None = None
     name: str | None = None
 

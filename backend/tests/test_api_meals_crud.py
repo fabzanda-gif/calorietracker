@@ -170,3 +170,39 @@ def test_update_meal_can_move_to_another_meal_type():
             "meal_type": "Pranzo",
         },
     )
+
+
+def test_update_meal_can_move_to_another_date():
+    response = client.patch(
+        "/meals/meal-1",
+        json={
+            "date": "2026-09-16",
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake_repo.last_update == (
+        "meal-1",
+        "authenticated-user",
+        {
+            "date": "2026-09-16",
+        },
+    )
+
+
+def test_update_meal_can_move_to_another_date():
+    response = client.patch(
+        "/meals/meal-1",
+        json={
+            "date": "2026-09-16",
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake_repo.last_update == (
+        "meal-1",
+        "authenticated-user",
+        {
+            "date": "2026-09-16",
+        },
+    )
