@@ -17269,3 +17269,81 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 0.95rem;
   }
 }
+
+/* ==========================================================
+   REGISTERED MEAL EDITOR · COMPACT SIZE PASS
+   ========================================================== */
+
+.registeredMealEditor {
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.registeredMealEditor label {
+  gap: 6px;
+}
+
+.registeredMealEditor label > span {
+  font-size: 0.76rem;
+  font-weight: 620;
+}
+
+/* Campi più compatti */
+.registeredMealEditor input,
+.registeredMealEditor select {
+  min-height: 42px;
+  padding: 0 13px;
+
+  border-radius: 13px;
+
+  font-size: 0.9rem;
+  font-weight: 580;
+}
+
+/* Data */
+.registeredMealEditor input[type="date"] {
+  min-height: 42px;
+  padding-right: 38px;
+}
+
+/* Select */
+.registeredMealEditor select {
+  padding-right: 38px;
+
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+}
+
+/* Campo quantità/porzioni */
+.registeredMealQuantity input {
+  min-height: 40px;
+}
+
+/* Nutrizione più vicina ai campi */
+.registeredMealNutrition {
+  margin-top: 0;
+  padding-top: 10px;
+}
+
+/* Riduce il respiro verticale complessivo dell'editor */
+.registeredMealEditor > label + label {
+  margin-top: -2px;
+}
+
+@media (max-width: 700px) {
+  .registeredMealEditor {
+    gap: 12px;
+  }
+
+  .registeredMealEditor input,
+  .registeredMealEditor select {
+    min-height: 40px;
+    border-radius: 12px;
+    font-size: 0.88rem;
+  }
+
+  .registeredMealEditor input[type="date"] {
+    min-height: 40px;
+  }
+}
