@@ -17149,3 +17149,123 @@ details[open] > summary .dailyEntryChevron {
     font-size: 1.18rem !important;
   }
 }
+
+/* ==========================================================
+   REGISTERED MEAL EDITOR · MODERN FORM POLISH
+   ========================================================== */
+
+.registeredMealEditor {
+  display: grid;
+  gap: 18px;
+}
+
+.registeredMealEditor label {
+  display: grid;
+  gap: 8px;
+}
+
+.registeredMealEditor label > span {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--ss-text-soft);
+  letter-spacing: 0.01em;
+}
+
+/* Input e select coerenti col resto di SanoSync */
+.registeredMealEditor input,
+.registeredMealEditor select {
+  width: 100%;
+  min-height: 52px;
+
+  padding: 0 16px;
+
+  border: 1px solid rgba(22, 50, 78, 0.14);
+  border-radius: 16px;
+
+  background: #ffffff;
+  color: var(--ss-navy-950);
+
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 600;
+
+  outline: none;
+
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.registeredMealEditor input:hover,
+.registeredMealEditor select:hover {
+  border-color: rgba(22, 50, 78, 0.22);
+}
+
+.registeredMealEditor input:focus,
+.registeredMealEditor select:focus {
+  border-color: rgba(255, 102, 102, 0.62);
+  box-shadow: 0 0 0 4px rgba(255, 102, 102, 0.10);
+}
+
+/* Date input: elimina look da browser anni '90 */
+.registeredMealEditor input[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+
+  min-height: 52px;
+
+  padding-right: 44px;
+
+  background:
+    linear-gradient(#fff, #fff) padding-box;
+}
+
+/* Calendario nativo più discreto */
+.registeredMealEditor
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+  margin-right: 2px;
+}
+
+/* Select più moderno */
+.registeredMealEditor select {
+  appearance: none;
+  -webkit-appearance: none;
+
+  padding-right: 44px;
+
+  background-image:
+    linear-gradient(45deg, transparent 50%, #6f7f91 50%),
+    linear-gradient(135deg, #6f7f91 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) 50%,
+    calc(100% - 15px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* Separa meglio le macro dal form */
+.registeredMealNutrition {
+  margin-top: 4px;
+  padding: 14px 0 0;
+
+  border-top: 1px solid rgba(22, 50, 78, 0.08);
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+  .registeredMealEditor {
+    gap: 16px;
+  }
+
+  .registeredMealEditor input,
+  .registeredMealEditor select {
+    min-height: 50px;
+    border-radius: 14px;
+    font-size: 0.95rem;
+  }
+}
