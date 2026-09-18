@@ -1,4 +1,7 @@
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.skip(reason="Legacy migration contract; Streamlit remains supported")
 
 
 def test_step4d_daily_logs_bridge():

@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from backend.services.decision_feedback import DecisionFeedbackService
+from backend.services.meal_suggestion_policy import (
+    MealSuggestionPolicy,
+)
 
 
 class DecisionRankingService:
@@ -24,6 +27,8 @@ class DecisionRankingService:
         mode: str = "auto",
         preferred_lens: str | None = None,
         preferred_mode: str | None = None,
+        max_main_meal_kcal: float = 1000.0,
+        future_training_context: dict | None = None,
     ) -> dict:
         eligible = [
             self._normalize(item)
@@ -31,6 +36,7 @@ class DecisionRankingService:
             if self._is_eligible(
                 item,
                 available_kcal=available_kcal,
+                max_main_meal_kcal=max_main_meal_kcal,
             )
         ]
 
@@ -41,6 +47,9 @@ class DecisionRankingService:
                 "day_context": self._day_context(
                     available_kcal=available_kcal,
                     protein_remaining_g=protein_remaining_g,
+                    future_training_context=(
+                        future_training_context
+                    ),
                 ),
                 "options": [],
             }
@@ -56,6 +65,9 @@ class DecisionRankingService:
                     mode=mode,
                     preferred_lens=preferred_lens,
                     preferred_mode=preferred_mode,
+                    future_training_context=(
+                        future_training_context
+                    ),
                 ),
                 reverse=True,
             )
@@ -90,6 +102,9 @@ class DecisionRankingService:
                             mode=mode,
                             preferred_lens=preferred_lens,
                             preferred_mode=preferred_mode,
+                            future_training_context=(
+                                future_training_context
+                            ),
                         ),
                         4,
                     ),
@@ -106,6 +121,9 @@ class DecisionRankingService:
             "day_context": self._day_context(
                 available_kcal=available_kcal,
                 protein_remaining_g=protein_remaining_g,
+                future_training_context=(
+                    future_training_context
+                ),
             ),
             "options": selected,
         }
@@ -115,6 +133,7 @@ class DecisionRankingService:
         *,
         available_kcal: float | None,
         protein_remaining_g: float | None,
+        future_training_context: dict | None = None,
     ) -> dict[str, str]:
         if available_kcal is None:
             return {
@@ -135,6 +154,104 @@ class DecisionRankingService:
                 "message": (
                     "Le alternative danno più peso "
                     "alle opzioni leggere."
+                ),
+            }
+
+        future_training = (
+            future_training_context or {}
+        )
+
+        phase = str(
+            future_training.get("phase") or ""
+        )
+
+        if phase:
+            session = (
+                future_training.get("session")
+                or {}
+            )
+
+            title = str(
+                session.get("title")
+                or "allenamento"
+            )
+
+            if phase == "pre_race":
+                return {
+                    "kind": "training_prep",
+                    "title": "Fuel per la gara di oggi",
+                    "message": (
+                        f"{title}: oggi do più peso "
+                        "ai carboidrati e alle opzioni "
+                        "facili da digerire."
+                    ),
+                }
+
+            if phase == "pre_training":
+                return {
+                    "kind": "training_prep",
+                    "title": "Prepara l'allenamento",
+                    "message": (
+                        f"{title}: le alternative "
+                        "favoriscono energia utile "
+                        "prima della sessione."
+                    ),
+                }
+
+            if phase == "recovery":
+                return {
+                    "kind": "training_prep",
+                    "title": "Recupero dopo l'allenamento",
+                    "message": (
+                        "Le alternative favoriscono "
+                        "carboidrati e proteine per "
+                        "supportare il recupero."
+                    ),
+                }
+
+            if phase == "tomorrow_prep":
+                return {
+                    "kind": "training_prep",
+                    "title": (
+                        "Prepara l'allenamento di domani"
+                    ),
+                    "message": (
+                        f"{title}: oggi do più peso "
+                        "ai carboidrati senza ignorare "
+                        "budget e proteine."
+                    ),
+                }
+
+        if (
+            bool(
+                future_training.get(
+                    "carb_focus"
+                )
+            )
+            and available > 500
+        ):
+            primary = (
+                future_training.get(
+                    "primary_session"
+                )
+                or {}
+            )
+
+            title = str(
+                primary.get("title")
+                or "un allenamento"
+            )
+
+            return {
+                "kind": "training_prep",
+                "title": (
+                    "Domani hai carico da preparare"
+                ),
+                "message": (
+                    f"{title}: nella cena di oggi "
+                    "do un po' più di peso ai "
+                    "carboidrati, senza ignorare "
+                    "budget e proteine."
                 ),
             }
 
@@ -180,9 +297,12 @@ class DecisionRankingService:
         mode: str,
         preferred_lens: str | None,
         preferred_mode: str | None,
+        future_training_context: dict | None = None,
     ) -> float:
         calories = item["calories"]
         protein = item["protein_g"]
+        carbs = item["carbs_g"]
+        fat = item["fat_g"]
         taste = item["taste_score"]
 
         calorie_efficiency = self._calorie_efficiency(
@@ -227,6 +347,23 @@ class DecisionRankingService:
                 + 0.10 * waste_bonus
             )
 
+        training_bonus = (
+            self._future_training_bonus(
+                carbs,
+                protein=protein,
+                fat=fat,
+                lens=lens,
+                context=future_training_context,
+            )
+        )
+
+        recipe_priority_bonus = (
+            self._recipe_priority_bonus(
+                item,
+                lens=lens,
+            )
+        )
+
         feedback = DecisionFeedbackService().score_boost(
             candidate=item,
             lens=lens,
@@ -235,13 +372,20 @@ class DecisionRankingService:
             preferred_mode=preferred_mode,
         )
 
-        return base + ready_bonus + feedback
+        return (
+            base
+            + ready_bonus
+            + training_bonus
+            + recipe_priority_bonus
+            + feedback
+        )
 
     @staticmethod
     def _is_eligible(
         item: dict[str, Any],
         *,
         available_kcal: float | None,
+        max_main_meal_kcal: float = 1000.0,
     ) -> bool:
         try:
             calories = float(item.get("calories") or 0)
@@ -256,12 +400,18 @@ class DecisionRankingService:
         ).strip()
 
         if (
-            meal_type in {"Pranzo", "Cena"}
-            and calories < 300.0
+            MealSuggestionPolicy.is_main_meal(meal_type)
+            and not MealSuggestionPolicy.main_meal_calories_are_valid(
+                calories,
+                max_kcal=max_main_meal_kcal,
+            )
         ):
             return False
 
-        if available_kcal is not None:
+        if (
+            available_kcal is not None
+            and not MealSuggestionPolicy.is_main_meal(meal_type)
+        ):
             available = float(available_kcal)
 
             # Calorie availability is a strong preference, not a
@@ -289,6 +439,8 @@ class DecisionRankingService:
 
         result["calories"] = number("calories")
         result["protein_g"] = number("protein_g")
+        result["carbs_g"] = number("carbs_g")
+        result["fat_g"] = number("fat_g")
 
         try:
             taste = float(result.get("taste_score"))
@@ -329,6 +481,184 @@ class DecisionRankingService:
             1.0,
             protein / protein_remaining_g,
         )
+
+    @staticmethod
+    def _future_training_bonus(
+        carbs: float,
+        *,
+        protein: float = 0.0,
+        fat: float = 0.0,
+        lens: str,
+        context: dict | None,
+    ) -> float:
+        training = context or {}
+
+        # New training-nutrition context.
+        phase = str(
+            training.get("phase") or ""
+        )
+
+        if phase:
+            if phase == "normal":
+                return 0.0
+
+            carbs_target = (
+                training.get("carbs_target_g")
+                or {}
+            )
+            protein_target = (
+                training.get("protein_target_g")
+                or {}
+            )
+
+            target_carbs = float(
+                carbs_target.get("min") or 0
+            )
+            target_protein = float(
+                protein_target.get("min") or 0
+            )
+
+            # A single meal is not expected to cover an
+            # entire daily target. Use a bounded meal-scale
+            # target for ranking.
+            meal_carb_target = (
+                min(100.0, max(40.0, target_carbs / 2))
+                if target_carbs > 0
+                else 60.0
+            )
+
+            carb_fit = min(
+                1.0,
+                max(0.0, carbs)
+                / meal_carb_target,
+            )
+
+            protein_fit = (
+                min(
+                    1.0,
+                    max(0.0, protein)
+                    / min(
+                        35.0,
+                        max(
+                            20.0,
+                            target_protein,
+                        ),
+                    ),
+                )
+                if (
+                    phase == "recovery"
+                    or bool(
+                        training.get(
+                            "protein_focus"
+                        )
+                    )
+                )
+                else 0.0
+            )
+
+            bonus = 0.0
+
+            if phase in {
+                "pre_race",
+                "pre_training",
+                "tomorrow_prep",
+            }:
+                if lens == "balanced":
+                    bonus += 0.20 * carb_fit
+                elif lens == "taste":
+                    bonus += 0.07 * carb_fit
+
+                # Close to a race/session, very fatty meals
+                # should not be favoured over easier fuel.
+                hours = training.get(
+                    "hours_to_start"
+                )
+
+                if (
+                    phase in {
+                        "pre_race",
+                        "pre_training",
+                    }
+                    and hours is not None
+                    and float(hours) <= 4
+                    and fat >= 30
+                ):
+                    bonus -= 0.08
+
+            elif phase == "recovery":
+                recovery_fit = (
+                    0.55 * carb_fit
+                    + 0.45 * protein_fit
+                )
+
+                if lens == "balanced":
+                    bonus += 0.22 * recovery_fit
+                elif lens == "taste":
+                    bonus += 0.06 * recovery_fit
+
+            return max(
+                -0.08,
+                min(0.22, bonus),
+            )
+
+        # Backwards compatibility with the original
+        # tomorrow-training context.
+        if not bool(
+            training.get("carb_focus")
+        ):
+            return 0.0
+
+        level = str(
+            training.get("level") or ""
+        )
+
+        target = (
+            80.0
+            if level == "high"
+            else 60.0
+        )
+
+        carb_fit = min(
+            1.0,
+            max(0.0, carbs) / target,
+        )
+
+        if lens == "balanced":
+            weight = (
+                0.16
+                if level == "high"
+                else 0.10
+            )
+        elif lens == "taste":
+            weight = (
+                0.05
+                if level == "high"
+                else 0.03
+            )
+        else:
+            weight = 0.0
+
+        return weight * carb_fit
+
+
+    @staticmethod
+    def _recipe_priority_bonus(
+        item: dict,
+        *,
+        lens: str,
+    ) -> float:
+        if (
+            item.get("source") != "recipe"
+            or item.get("recipe_scope")
+            != "personal"
+        ):
+            return 0.0
+
+        return {
+            "calorie": 0.02,
+            "balanced": 0.08,
+            "taste": 0.04,
+        }.get(lens, 0.0)
 
     @staticmethod
     def _waste_bonus(waste_risk: Any) -> float:
