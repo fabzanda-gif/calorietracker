@@ -3949,13 +3949,51 @@ export function HomeShell() {
         return;
       }
 
-      const scale =
+      const portionScale =
         nextPortions / currentPortions;
 
       const structured =
         detail.structured_ingredients ?? [];
 
       if (structured.length > 0) {
+        /*
+         * getMeal() può restituire gli ingredienti della ricetta
+         * completa quando il pasto non ha ancora snapshot propri.
+         *
+         * Esempio:
+         * - ricetta = 4 porzioni / 1858 kcal
+         * - pasto registrato = 1 porzione / 464 kcal
+         *
+         * Prima normalizziamo quindi gli ingredienti al totale
+         * realmente registrato, poi applichiamo +1 / -1 porzione.
+         */
+        const structuredCalories =
+          structured.reduce(
+            (total, item) =>
+              total +
+              Math.max(
+                0,
+                Number(item.calories) || 0,
+              ),
+            0,
+          );
+
+        const currentMealCalories =
+          Math.max(
+            0,
+            Number(detail.calories) || 0,
+          );
+
+        const sourceToCurrentScale =
+          structuredCalories > 0 &&
+          currentMealCalories > 0
+            ? currentMealCalories /
+              structuredCalories
+            : 1;
+
+        const targetScale =
+          sourceToCurrentScale * portionScale;
+
         await updateMeal(
           meal.id,
           {
@@ -3969,7 +4007,7 @@ export function HomeShell() {
                   Math.max(
                     0.01,
                     Number(item.quantity_g) || 0,
-                  ) * scale;
+                  ) * targetScale;
 
                 return {
                   ingredient_id:
@@ -3989,16 +4027,16 @@ export function HomeShell() {
             recipe_servings: nextPortions,
             calories:
               Number(detail.calories || 0) *
-              scale,
+              portionScale,
             protein:
               Number(detail.protein || 0) *
-              scale,
+              portionScale,
             carbs:
               Number(detail.carbs || 0) *
-              scale,
+              portionScale,
             fat:
               Number(detail.fat || 0) *
-              scale,
+              portionScale,
           },
           accessToken,
         );
