@@ -7997,7 +7997,7 @@ export function HomeShell() {
                       )
                     ) : null}
 
-                    {slot === nextMeal?.next_slot &&
+                    {selectedLogDate === todayIso() &&
                     !summaryMealForSlot(slot) &&
                     meal.state === "predicted" ? (
                       <>
