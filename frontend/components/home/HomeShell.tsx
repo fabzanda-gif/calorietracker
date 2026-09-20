@@ -4509,6 +4509,17 @@ export function HomeShell() {
       }
 
       closeAlternateMeal();
+
+      const updatedSummary =
+        await getMealsForDate(
+          selectedLogDate,
+          accessToken,
+        );
+
+      setSummaryMeals(
+        updatedSummary.items,
+      );
+
       await refreshHome();
     } catch (err) {
       setError(
