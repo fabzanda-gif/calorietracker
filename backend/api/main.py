@@ -47,6 +47,16 @@ app = FastAPI(
 )
 
 
+def _current_rss_mb() -> int | None:
+    """Current Linux process RSS; unlike maxrss, this falls after a restart."""
+    try:
+        with open("/proc/self/statm", encoding="ascii") as statm:
+            resident_pages = int(statm.read().split()[1])
+        return round(resident_pages * os.sysconf("SC_PAGE_SIZE") / (1024 * 1024))
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 _ORIGINAL_HTTPX_SEND = httpx.Client.send
 
 
@@ -163,6 +173,11 @@ async def performance_timing_middleware(
             time.perf_counter() - started_at
         ) * 1000
 
+        memory_fields = (
+            {"rss_mb": _current_rss_mb()}
+            if request.url.path != "/health"
+            else {}
+        )
         log_event(
             "api_request",
             method=request.method,
@@ -173,6 +188,7 @@ async def performance_timing_middleware(
                 if response is not None
                 else "ERR"
             ),
+            **memory_fields,
         )
         reset_request(tokens)
 
