@@ -587,8 +587,6 @@ export default function ActivitiesPage() {
   );
   const [calendarView, setCalendarView] =
     useState<"weekly" | "monthly">("weekly");
-  const [calendarExpanded, setCalendarExpanded] =
-    useState(true);
   const [activities, setActivities] = useState<
     Activity[]
   >([]);
@@ -2054,27 +2052,62 @@ export default function ActivitiesPage() {
             </p>
           </div>
 
-          <div className={styles.monthTotal}>
-            <strong>{rollingTrainingActivities.length}</strong>
-            <span>
-              {copy.last30Activities}
-            </span>
-          </div>
         </header>
 
-        <section className={styles.summarySection}>
-          <div className={styles.summaryHeading}>
+        <section className={styles.nextSession} aria-labelledby="next-session-title">
+          {nextPlannedActivity ? (
+            <>
+              <div>
+                <p className={styles.eyebrow}>{copy.nextActivity}</p>
+                <h2 id="next-session-title">{nextPlannedActivity.title}</h2>
+                <p className={styles.nextActivitySpotlightMeta}>
+                  {plannedDateLabel(
+                    nextPlannedActivity.scheduled_date,
+                    displayLocale,
+                    copy.today,
+                    copy.tomorrow,
+                  )}
+                  {nextPlannedActivity.scheduled_time
+                    ? ` · ${nextPlannedActivity.scheduled_time.slice(0, 5)}`
+                    : ""}
+                  {nextPlannedActivity.duration_minutes
+                    ? ` · ${nextPlannedActivity.duration_minutes} min`
+                    : ""}
+                  {nextPlannedActivity.distance_meters &&
+                  plannedActivitySupportsDistance(nextPlannedActivity.activity_type)
+                    ? ` · ${(nextPlannedActivity.distance_meters / 1000).toLocaleString(
+                        displayLocale,
+                        { maximumFractionDigits: 1 },
+                      )} km`
+                    : ""}
+                </p>
+              </div>
+              <div className={styles.nextActivitySpotlightActions}>
+                <button
+                  type="button"
+                  className={styles.nextActivityConfirm}
+                  disabled={busyPlanId === nextPlannedActivity.id}
+                  onClick={() => void setPlannedStatus(nextPlannedActivity, "completed")}
+                >
+                  {copy.confirmActivity}
+                </button>
+                <button
+                  type="button"
+                  className={styles.nextActivityGpx}
+                  disabled={busyPlanId === nextPlannedActivity.id}
+                  onClick={() => openPlannedGpxPicker(nextPlannedActivity)}
+                >
+                  {copy.uploadGpx}
+                </button>
+              </div>
+            </>
+          ) : (
             <div>
-              <p className={styles.eyebrow}>{copy.yourMovement}</p>
-              <h2>{copy.last30Days}</h2>
+              <p className={styles.eyebrow}>{copy.nextActivity}</p>
+              <h2 id="next-session-title">{copy.noPlanned}</h2>
+              <p><a href="#activity-planner">{planText.planActivity} →</a></p>
             </div>
-          </div>
-          <div className={styles.summaryGrid}>
-            <div><span>{copy.activity}</span><strong>{rollingSummary.workouts}</strong></div>
-            <div><span>{copy.totalTime}</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
-            <div><span>{copy.distance}</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
-            <div><span>{copy.energy}</span><strong>{rollingSummary.calories.toLocaleString(displayLocale)} kcal</strong></div>
-          </div>
+          )}
         </section>
 
         <div className={styles.topGrid}>
@@ -2084,7 +2117,7 @@ export default function ActivitiesPage() {
                 <p className={styles.eyebrow}>
                   {copy.consistency}
                 </p>
-                <h2>{copy.activityCalendar}</h2>
+                <h2>{calendarView === "weekly" ? copy.thisWeek : copy.activityCalendar}</h2>
               </div>
 
               <div className={styles.calendarActions}>
@@ -2108,19 +2141,6 @@ export default function ActivitiesPage() {
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  className={styles.googleCalendarButton}
-                  disabled={calendarSyncing}
-                  onClick={() =>
-                    void syncActivitiesToGoogleCalendar()
-                  }
-                >
-                  {calendarSyncing
-                    ? copy.syncing
-                    : copy.syncCalendar}
-                </button>
-
                 <div className={styles.monthControls}>
                 <button
                   type="button"
@@ -2143,15 +2163,17 @@ export default function ActivitiesPage() {
                 </button>
                 </div>
 
-                <button
-                  type="button"
-                  className={styles.circularToggle}
-                  aria-label={calendarExpanded ? copy.collapseCalendar : copy.expandCalendar}
-                  aria-expanded={calendarExpanded}
-                  onClick={() => setCalendarExpanded((current) => !current)}
-                >
-                  {calendarExpanded ? "−" : "+"}
-                </button>
+                <details className={styles.calendarSettings}>
+                  <summary>{copy.calendarOptions}</summary>
+                  <button
+                    type="button"
+                    className={styles.googleCalendarButton}
+                    disabled={calendarSyncing}
+                    onClick={() => void syncActivitiesToGoogleCalendar()}
+                  >
+                    {calendarSyncing ? copy.syncing : copy.syncCalendar}
+                  </button>
+                </details>
               </div>
             </div>
 
@@ -2161,7 +2183,6 @@ export default function ActivitiesPage() {
               </p>
             )}
 
-            {calendarExpanded ? (
               <div className={styles.calendarBody}>
             <div className={`${styles.calendar} ${calendarView === "weekly" ? styles.weekCalendar : ""}`}>
               {copy.weekdays.map((weekday) => (
@@ -2254,9 +2275,14 @@ export default function ActivitiesPage() {
                       );
                     }}
                   >
+                    {calendarView === "weekly" ? (
+                      <span className={styles.weekDayName}>
+                        {copy.weekdays[index % 7]}
+                      </span>
+                    ) : null}
                     <span>{day.getDate()}</span>
 
-                    {energy ? (
+                    {energy && calendarView === "monthly" ? (
                       <span
                         className={`${styles.energyState} ${
                           energy.state === "deficit"
@@ -2312,6 +2338,12 @@ export default function ActivitiesPage() {
                       </span>
                     ) : null}
 
+                    {calendarView === "weekly" && hasPlanned ? (
+                      <span className={styles.weekDaySession}>
+                        {visiblePlannedActivities[0].title}
+                      </span>
+                    ) : null}
+
                     {!hasPlanned &&
                     hasSkipped ? (
                       <span
@@ -2342,11 +2374,11 @@ export default function ActivitiesPage() {
               })}
             </div>
 
-            <div className={styles.energyLegend}>
+            {calendarView === "monthly" ? <div className={styles.energyLegend}>
               <span className={styles.energyDeficit}>↓ <i>Deficit</i></span>
               <span className={styles.energyMaintenance}>= <i>Mantenimento</i></span>
               <span className={styles.energySurplus}>↑ <i>Surplus</i></span>
-            </div>
+            </div> : null}
 
             {loading ? (
               <p className={styles.loading}>
@@ -2354,7 +2386,6 @@ export default function ActivitiesPage() {
               </p>
             ) : null}
               </div>
-            ) : null}
           </section>
 
           <details className={`${styles.uploadCard} ${styles.utilityCard}`}>
@@ -2407,132 +2438,22 @@ export default function ActivitiesPage() {
         <TrainingProgramLinks />
 
         <details
+          id="activity-planner"
           className={`${styles.plannerSection} ${styles.plannerCollapsible}`}
         >
           <summary className={styles.plannerHeading}>
-            {nextPlannedActivity ? (
-              <>
-                <div className={styles.nextActivitySpotlightCopy}>
-                  <p className={styles.eyebrow}>
-                    {copy.nextActivity}
-                  </p>
-
-                  <h2>{nextPlannedActivity.title}</h2>
-
-                  <p className={styles.nextActivitySpotlightMeta}>
-                    {plannedDateLabel(
-                      nextPlannedActivity.scheduled_date,
-                      displayLocale,
-                      copy.today,
-                      copy.tomorrow,
-                    )}
-
-                    {nextPlannedActivity.scheduled_time
-                      ? ` · ${nextPlannedActivity.scheduled_time.slice(
-                          0,
-                          5,
-                        )}`
-                      : ""}
-
-                    {nextPlannedActivity.duration_minutes
-                      ? ` · ${nextPlannedActivity.duration_minutes} min`
-                      : ""}
-
-                    {nextPlannedActivity.distance_meters &&
-                    plannedActivitySupportsDistance(
-                      nextPlannedActivity.activity_type,
-                    )
-                      ? ` · ${(
-                          nextPlannedActivity.distance_meters /
-                          1000
-                        ).toLocaleString("it-IT", {
-                          maximumFractionDigits: 1,
-                        })} km`
-                      : ""}
-
-                    {` · ${
-                      PLANNED_INTENSITY_LABELS[
-                        nextPlannedActivity.intensity
-                      ]
-                    }`}
-                  </p>
-                </div>
-
-                <div className={styles.nextActivitySpotlightActions}>
-                  <button
-                    type="button"
-                    className={styles.nextActivityConfirm}
-                    disabled={
-                      busyPlanId === nextPlannedActivity.id
-                    }
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-
-                      void setPlannedStatus(
-                        nextPlannedActivity,
-                        "completed",
-                      );
-                    }}
-                  >
-                    {nextPlannedActivity.activity_type
-                      .trim()
-                      .toLocaleLowerCase("it-IT") === "corsa"
-                      ? `✓ ${copy.confirmRun}`
-                      : `✓ ${copy.confirmActivity}`}
-                  </button>
-
-                  <button
-                    type="button"
-                    className={styles.nextActivityGpx}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      openPlannedGpxPicker(
-                        nextPlannedActivity,
-                      );
-                    }}
-                    disabled={
-                      busyPlanId === nextPlannedActivity.id
-                    }
-                  >
-                    {copy.uploadGpx}
-                  </button>
-
-                  <span className={styles.plannerMorePrompt}>
-                    {copy.seeMorePlanned}
-                    <span
-                      className={styles.expandToggle}
-                      aria-hidden="true"
-                    />
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className={styles.eyebrow}>
-                    {planText.plan}
-                  </p>
-                  <h2>{copy.noPlanned}</h2>
-                  <p>
-                    {planText.openToAdd}
-                  </p>
-                </div>
-
-                <span className={styles.plannerMorePrompt}>
-                  {planText.planActivity}
-                  <span
-                    className={styles.expandToggle}
-                    aria-hidden="true"
-                  />
-                </span>
-              </>
-            )}
+            <div>
+              <p className={styles.eyebrow}>{planText.plan}</p>
+              <h2>{copy.moreSessions}</h2>
+              <p>{remainingPlannedActivities.length} {copy.futureActivities} · {copy.manageOrAdd}</p>
+            </div>
+            <span className={styles.expandToggle} aria-hidden="true" />
           </summary>
 
 
           <div className={styles.plannerGrid}>
+            <details className={styles.manualPlan}>
+              <summary>{copy.manualPlan} <span aria-hidden="true">＋</span></summary>
             <div className={styles.plannerForm}>
               <label>
                 {planText.activity}
@@ -2724,6 +2645,8 @@ export default function ActivitiesPage() {
                   : planText.add}
               </button>
             </div>
+
+            </details>
 
             <div className={styles.upcomingList}>
               {visiblePlannedActivities.length ? (
@@ -4160,6 +4083,18 @@ export default function ActivitiesPage() {
             )}
           </section>
         </div>
+        <section className={styles.summarySection}>
+          <div className={styles.summaryHeading}>
+            <p className={styles.eyebrow}>{copy.yourMovement}</p>
+            <h2>{copy.last30Days}</h2>
+          </div>
+          <div className={styles.summaryGrid}>
+            <div><span>{copy.activity}</span><strong>{rollingSummary.workouts}</strong></div>
+            <div><span>{copy.totalTime}</span><strong>{formatDuration(rollingSummary.duration)}</strong></div>
+            <div><span>{copy.distance}</span><strong>{formatDistance(rollingSummary.distance)}</strong></div>
+            <div><span>{copy.energy}</span><strong>{rollingSummary.calories.toLocaleString(displayLocale)} kcal</strong></div>
+          </div>
+        </section>
       </main>
     </>
   );
