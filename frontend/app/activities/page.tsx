@@ -10,8 +10,7 @@ import {
 
 import { ActivityLogger } from "@/components/activity/ActivityLogger";
 import { ActivityMap } from "@/components/activity/ActivityMap";
-import { RunningPlanBuilder } from "@/components/activity/RunningPlanBuilder";
-import { StrengthPlanPanel } from "@/components/activity/StrengthPlanPanel";
+import { TrainingProgramLinks } from "@/components/activity/TrainingProgramLinks";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   useExperienceMode,
@@ -2405,51 +2404,7 @@ export default function ActivitiesPage() {
         </div>
 
 
-        <details
-          className={styles.trainingPrograms}
-        >
-          <summary
-            className={
-              styles.trainingProgramsSummary
-            }
-          >
-            <div>
-              <p className={styles.eyebrow}>
-                {copy.programs}
-              </p>
-
-              <strong>
-                {copy.trainingPrograms}
-              </strong>
-
-              <span>
-                {copy.programsIntro}
-              </span>
-            </div>
-
-            <span
-              className={
-                styles.expandToggle
-              }
-              aria-hidden="true"
-            />
-          </summary>
-
-          <div
-            className={
-              styles.trainingProgramsBody
-            }
-          >
-            <RunningPlanBuilder
-              onCreated={() => {
-                void loadMonth();
-                void loadTrainingPlanActivities();
-              }}
-            />
-
-            <StrengthPlanPanel />
-          </div>
-        </details>
+        <TrainingProgramLinks />
 
         <details
           className={`${styles.plannerSection} ${styles.plannerCollapsible}`}
