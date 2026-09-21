@@ -173,19 +173,23 @@ async def performance_timing_middleware(
             time.perf_counter() - started_at
         ) * 1000
 
-        if request.url.path != "/health":
-            log_event(
-                "api_request",
-                method=request.method,
-                path=request.url.path,
-                duration_ms=round(elapsed_ms),
-                status_code=(
-                    response.status_code
-                    if response is not None
-                    else "ERR"
-                ),
-                rss_mb=_current_rss_mb(),
-            )
+        memory_fields = (
+            {"rss_mb": _current_rss_mb()}
+            if request.url.path != "/health"
+            else {}
+        )
+        log_event(
+            "api_request",
+            method=request.method,
+            path=request.url.path,
+            duration_ms=round(elapsed_ms),
+            status_code=(
+                response.status_code
+                if response is not None
+                else "ERR"
+            ),
+            **memory_fields,
+        )
         reset_request(tokens)
 
 
