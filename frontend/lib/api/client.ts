@@ -20,6 +20,47 @@ type ApiRequestOptions = RequestInit & {
   accessToken?: string | null;
 };
 
+// A dashboard navigation can start dozens of independent reads at once.
+// Keep their peak server-side memory bounded without delaying writes.
+const MAX_CONCURRENT_READS = 6;
+let activeReads = 0;
+const waitingReads: Array<() => void> = [];
+
+function abortError(signal?: AbortSignal | null): unknown {
+  return signal?.reason ?? new DOMException("Request aborted", "AbortError");
+}
+
+async function acquireReadSlot(signal?: AbortSignal | null): Promise<void> {
+  if (signal?.aborted) throw abortError(signal);
+
+  if (activeReads < MAX_CONCURRENT_READS) {
+    activeReads += 1;
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const resume = () => {
+      signal?.removeEventListener("abort", abort);
+      activeReads += 1;
+      resolve();
+    };
+    const abort = () => {
+      const index = waitingReads.indexOf(resume);
+      if (index !== -1) waitingReads.splice(index, 1);
+      reject(abortError(signal));
+    };
+
+    waitingReads.push(resume);
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+  });
+}
+
+function releaseReadSlot(): void {
+  activeReads -= 1;
+  waitingReads.shift()?.();
+}
+
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
@@ -30,35 +71,42 @@ export async function apiRequest<T>(
     ...requestOptions
   } = options;
 
-  const response = await fetch(
-    `${getApiBaseUrl()}${path}`,
-    {
-      ...requestOptions,
-      headers: {
-        Accept: "application/json",
-        ...(requestOptions.body
-          ? { "Content-Type": "application/json" }
-          : {}),
-        ...(accessToken
-          ? { Authorization: `Bearer ${accessToken}` }
-          : {}),
-        ...headers,
+  const isRead = !requestOptions.method || requestOptions.method.toUpperCase() === "GET";
+  if (isRead) await acquireReadSlot(requestOptions.signal);
+
+  try {
+    const response = await fetch(
+      `${getApiBaseUrl()}${path}`,
+      {
+        ...requestOptions,
+        headers: {
+          Accept: "application/json",
+          ...(requestOptions.body
+            ? { "Content-Type": "application/json" }
+            : {}),
+          ...(accessToken
+            ? { Authorization: `Bearer ${accessToken}` }
+            : {}),
+          ...headers,
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  );
-
-  const payload = await readPayload(response);
-
-  if (!response.ok) {
-    throw new ApiError(
-      `SanoSync API request failed (${response.status})`,
-      response.status,
-      payload,
     );
-  }
 
-  return payload as T;
+    const payload = await readPayload(response);
+
+    if (!response.ok) {
+      throw new ApiError(
+        `SanoSync API request failed (${response.status})`,
+        response.status,
+        payload,
+      );
+    }
+
+    return payload as T;
+  } finally {
+    if (isRead) releaseReadSlot();
+  }
 }
 
 async function readPayload(
