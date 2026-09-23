@@ -19,9 +19,11 @@ type ActivityKind =
 
 interface QuickActivityInitialValue {
   name: string;
+  activityType?: string | null;
   calories?: number | null;
   durationMinutes?: number | null;
   distanceKm?: number | null;
+  plannedActivityId?: string | null;
 }
 
 interface QuickActivityFormProps {
@@ -188,7 +190,11 @@ function numberValue(value: string): number {
 function initialKind(
   value?: QuickActivityInitialValue | null,
 ): ActivityKind {
-  const name = value?.name.trim().toLocaleLowerCase("it-IT") ?? "";
+  const name = (
+    value?.activityType ||
+    value?.name ||
+    ""
+  ).trim().toLocaleLowerCase("it-IT");
 
   if (name.includes("elettric")) return "ebike";
   if (name.includes("bici") || name.includes("cicl")) return "bike";
@@ -411,6 +417,12 @@ export default function QuickActivityForm({
               ? {
                   distance_meters:
                     Math.round(distance * 1000),
+                }
+              : {}),
+            ...(initialValue?.plannedActivityId
+              ? {
+                  planned_activity_id:
+                    initialValue.plannedActivityId,
                 }
               : {}),
           },
