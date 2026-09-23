@@ -15872,6 +15872,49 @@ details[open] > summary .dailyEntryChevron {
 
 .trainingNutritionBody {
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.trainingNutritionAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  min-height: 40px;
+  margin-left: auto;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 102, 102, 0.28);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ss-coral-600);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(83, 56, 51, 0.05);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.trainingNutritionAction:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 102, 102, 0.52);
+  box-shadow: 0 8px 18px rgba(83, 56, 51, 0.08);
+}
+
+@media (max-width: 700px) {
+  .trainingNutritionCard {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .trainingNutritionAction {
+    width: 100%;
+    margin-left: 56px;
+  }
 }
 
 .trainingNutritionEyebrow {
