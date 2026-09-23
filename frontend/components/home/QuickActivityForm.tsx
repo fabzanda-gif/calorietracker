@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 
-import { createActivity } from "@/lib/api/activities";
+import {
+  createActivity,
+  importGpxActivity,
+  previewGpxActivity,
+  updatePlannedActivity,
+  type GpxActivityPreview,
+} from "@/lib/api/activities";
 import { updateDailyLog } from "@/lib/api/day";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -86,6 +92,12 @@ const copy = {
     cancel: "Annulla",
     saving: "Registro…",
     addActivity: "Aggiungi attività",
+    uploadFile: "Carica GPX / FIT / TCX",
+    uploadHint: "Importa il file registrato dal tuo orologio o app.",
+    analyzingFile: "Analizzo il file…",
+    fileReady: "File pronto",
+    unsupportedFile: "Formato non supportato. Usa GPX, FIT o TCX.",
+    fileTooLarge: "Il file attività supera il limite di 10 MB.",
   },
   en: {
     steps: "Steps",
@@ -122,6 +134,12 @@ const copy = {
     cancel: "Cancel",
     saving: "Saving…",
     addActivity: "Add activity",
+    uploadFile: "Upload GPX / FIT / TCX",
+    uploadHint: "Import the file recorded by your watch or app.",
+    analyzingFile: "Analyzing file…",
+    fileReady: "File ready",
+    unsupportedFile: "Unsupported format. Use GPX, FIT or TCX.",
+    fileTooLarge: "The activity file exceeds the 10 MB limit.",
   },
   nl: {
     steps: "Stappen",
@@ -158,6 +176,12 @@ const copy = {
     cancel: "Annuleren",
     saving: "Opslaan…",
     addActivity: "Activiteit toevoegen",
+    uploadFile: "GPX / FIT / TCX uploaden",
+    uploadHint: "Importeer het bestand van je horloge of app.",
+    analyzingFile: "Bestand analyseren…",
+    fileReady: "Bestand gereed",
+    unsupportedFile: "Niet ondersteund formaat. Gebruik GPX, FIT of TCX.",
+    fileTooLarge: "Het activiteitenbestand is groter dan 10 MB.",
   },
   fr: {
     steps: "Pas", bike: "Vélo", ebike: "Vélo électrique", run: "Course",
@@ -179,8 +203,28 @@ const copy = {
     caloriesHelper: "Calculées automatiquement lorsque possible ; vous pouvez les modifier.",
     validData: "✓ Données valides", cancel: "Annuler", saving: "Enregistrement…",
     addActivity: "Ajouter l’activité",
+    uploadFile: "Importer GPX / FIT / TCX",
+    uploadHint: "Importez le fichier enregistré par votre montre ou application.",
+    analyzingFile: "Analyse du fichier…",
+    fileReady: "Fichier prêt",
+    unsupportedFile: "Format non pris en charge. Utilisez GPX, FIT ou TCX.",
+    fileTooLarge: "Le fichier d’activité dépasse la limite de 10 Mo.",
   },
 } as const;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = String(reader.result ?? "");
+      const comma = value.indexOf(",");
+      resolve(comma >= 0 ? value.slice(comma + 1) : value);
+    };
+    reader.onerror = () =>
+      reject(new Error("Non riesco a leggere il file attività."));
+    reader.readAsDataURL(file);
+  });
+}
 
 function numberValue(value: string): number {
   const parsed = Number(value.replace(",", "."));
@@ -253,6 +297,14 @@ export default function QuickActivityForm({
       : "",
   );
   const [saving, setSaving] = useState(false);
+  const [activityFile, setActivityFile] =
+    useState<File | null>(null);
+  const [activityFileBase64, setActivityFileBase64] =
+    useState("");
+  const [activityFilePreview, setActivityFilePreview] =
+    useState<GpxActivityPreview | null>(null);
+  const [previewingFile, setPreviewingFile] =
+    useState(false);
 
   const weight = Math.max(1, Number(weightKg) || 75);
 
@@ -296,6 +348,10 @@ export default function QuickActivityForm({
     : estimatedCalories;
 
   const validationMessage = useMemo(() => {
+    if (activityFilePreview) {
+      return null;
+    }
+
     const stepCount = numberValue(steps);
     const duration = numberValue(minutes);
     const distance = numberValue(distanceKm);
@@ -346,7 +402,94 @@ export default function QuickActivityForm({
     pace,
     steps,
     text,
+    activityFilePreview,
   ]);
+
+  async function chooseActivityFile(file: File | null) {
+    setActivityFile(file);
+    setActivityFileBase64("");
+    setActivityFilePreview(null);
+    onError("");
+
+    if (!file) return;
+
+    const extension =
+      file.name.toLowerCase().split(".").pop();
+
+    if (!extension || !["gpx", "fit", "tcx"].includes(extension)) {
+      onError(text.unsupportedFile);
+      setActivityFile(null);
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      onError(text.fileTooLarge);
+      setActivityFile(null);
+      return;
+    }
+
+    setPreviewingFile(true);
+
+    try {
+      const contentBase64 = await fileToBase64(file);
+      const response = await previewGpxActivity(
+        {
+          file_name: file.name,
+          content_base64: contentBase64,
+          activity_type:
+            initialValue?.activityType ||
+            initialValue?.name ||
+            undefined,
+        },
+        accessToken,
+      );
+
+      setActivityFileBase64(contentBase64);
+      setActivityFilePreview(response.preview);
+
+      if (response.preview.distance_meters) {
+        setDistanceKm(
+          String(
+            Number(
+              (response.preview.distance_meters / 1000).toFixed(2),
+            ),
+          ),
+        );
+      }
+
+      if (response.preview.estimated_calories) {
+        setCalories(String(Math.round(response.preview.estimated_calories)));
+        setCaloriesEdited(true);
+      }
+
+      if (
+        response.preview.distance_meters &&
+        response.preview.duration_seconds
+      ) {
+        const distance = response.preview.distance_meters / 1000;
+        if (distance > 0) {
+          const paceSecondsValue =
+            response.preview.duration_seconds / distance;
+          const paceMinutes = Math.floor(paceSecondsValue / 60);
+          const paceSecondsPart = Math.round(paceSecondsValue % 60);
+          setPace(
+            `${paceMinutes}:${String(paceSecondsPart).padStart(2, "0")}`,
+          );
+        }
+      }
+    } catch (error) {
+      onError(
+        error instanceof Error
+          ? error.message
+          : "Non riesco ad analizzare il file attività.",
+      );
+      setActivityFile(null);
+      setActivityFileBase64("");
+      setActivityFilePreview(null);
+    } finally {
+      setPreviewingFile(false);
+    }
+  }
 
   function selectKind(value: ActivityKind) {
     setKind(value);
@@ -369,6 +512,47 @@ export default function QuickActivityForm({
     onError("");
 
     try {
+      if (activityFile && activityFileBase64 && activityFilePreview) {
+        await importGpxActivity(
+          {
+            file_name: activityFile.name,
+            content_base64: activityFileBase64,
+            activity_name:
+              initialValue?.name ||
+              activityFilePreview.activity_name,
+            activity_type:
+              initialValue?.activityType ||
+              activityFilePreview.activity_type ||
+              undefined,
+            activity_date:
+              activityFilePreview.date || date,
+            burned_calories:
+              Math.max(
+                0,
+                Number(
+                  activityFilePreview.estimated_calories ??
+                  effectiveCalories ??
+                  0,
+                ),
+              ),
+            planned_activity_id:
+              initialValue?.plannedActivityId || undefined,
+          },
+          accessToken,
+        );
+
+        if (initialValue?.plannedActivityId) {
+          await updatePlannedActivity(
+            initialValue.plannedActivityId,
+            { status: "completed" },
+            accessToken,
+          );
+        }
+
+        await onSaved();
+        return;
+      }
+
       if (kind === "steps") {
         await updateDailyLog(
           accessToken,
@@ -459,6 +643,44 @@ export default function QuickActivityForm({
   return (
     <>
       <div className={styles.body}>
+        <label className={styles.activityFileUpload}>
+          <input
+            type="file"
+            accept=".gpx,.fit,.tcx,application/gpx+xml,application/xml,application/octet-stream"
+            onChange={(event) => {
+              const file =
+                event.currentTarget.files?.[0] ?? null;
+              void chooseActivityFile(file);
+              event.currentTarget.value = "";
+            }}
+          />
+
+          <span className={styles.activityFileUploadIcon}>↑</span>
+
+          <span className={styles.activityFileUploadCopy}>
+            <strong>
+              {previewingFile
+                ? text.analyzingFile
+                : activityFilePreview
+                  ? text.fileReady
+                  : text.uploadFile}
+            </strong>
+            <small>
+              {activityFile
+                ? activityFile.name
+                : text.uploadHint}
+            </small>
+          </span>
+
+          <span className={styles.activityFileUploadAction}>
+            {activityFilePreview ? "✓" : "Scegli"}
+          </span>
+        </label>
+
+        <div className={styles.activityFileDivider}>
+          <span>oppure inserisci manualmente</span>
+        </div>
+
         <fieldset className={styles.types}>
           <legend>{text.activityType}</legend>
           <div className={styles.typeGrid}>
@@ -628,10 +850,18 @@ export default function QuickActivityForm({
         <button
           type="button"
           className={styles.save}
-          disabled={saving || Boolean(validationMessage)}
+          disabled={
+            saving ||
+            previewingFile ||
+            Boolean(validationMessage)
+          }
           onClick={() => void submit()}
         >
-          {saving ? text.saving : text.addActivity}
+          {saving
+            ? text.saving
+            : activityFilePreview
+              ? text.uploadFile
+              : text.addActivity}
         </button>
       </div>
     </>
