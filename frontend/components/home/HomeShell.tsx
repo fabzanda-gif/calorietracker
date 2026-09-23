@@ -942,8 +942,11 @@ export function HomeShell() {
     setQuickActivityInitialValue,
   ] = useState<{
     name: string;
+    activityType?: string | null;
     calories?: number | null;
     durationMinutes?: number | null;
+    distanceKm?: number | null;
+    plannedActivityId?: string | null;
   } | null>(null);
 
   const [pantryInventory, setPantryInventory] =
@@ -4279,6 +4282,30 @@ export function HomeShell() {
     setQuickAddMode("activity");
   }
 
+  function openPlannedActivity(
+    activity: PlannedActivity,
+  ) {
+    setError(null);
+    setSelectedLogDate(activity.scheduled_date);
+    setQuickActivityInitialValue({
+      name: activity.title,
+      activityType: activity.activity_type,
+      durationMinutes:
+        activity.duration_minutes ?? null,
+      distanceKm:
+        activity.distance_meters
+          ? activity.distance_meters / 1000
+          : null,
+      calories:
+        todayPlannedActivities.length === 1 &&
+        plannedActivityKcal > 0
+          ? Math.round(plannedActivityKcal)
+          : null,
+      plannedActivityId: activity.id,
+    });
+    setQuickAddMode("activity");
+  }
+
   async function openQuickAddWeight() {
     setError(null);
 
@@ -5555,6 +5582,23 @@ export function HomeShell() {
                   )}
                 </p>
               </div>
+
+              {todayPlannedActivities.length > 0 ? (
+                <button
+                  type="button"
+                  className={
+                    styles.trainingNutritionAction
+                  }
+                  onClick={() =>
+                    openPlannedActivity(
+                      todayPlannedActivities[0],
+                    )
+                  }
+                >
+                  <span aria-hidden="true">＋</span>
+                  Registra attività
+                </button>
+              ) : null}
             </section>
           ) : null}
 
