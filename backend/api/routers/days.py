@@ -813,6 +813,9 @@ def get_ranked_meal_options(
         )
 
         training_nutrition_context = None
+        nutrition_planned = []
+        nutrition_actual = []
+        latest_weight = None
 
         try:
             planned_repo = (
@@ -954,6 +957,25 @@ def get_ranked_meal_options(
                 )
             )
 
+        today_meals = [
+            item
+            for item in history
+            if str(item.get("date") or "") == str(day_date)
+        ]
+
+        unified_day_context = DayContextService().build(
+            day_date=day_date,
+            day=day,
+            budget_result=budget_result,
+            meals=today_meals,
+            planned_activities=nutrition_planned,
+            actual_activities=nutrition_actual,
+            training_nutrition=(
+                training_nutrition_context or {}
+            ),
+            weight=latest_weight,
+        )
+
         ranked = DecisionRankingService().rank(
             candidates=feedback["candidates"],
             available_kcal=available_kcal,
@@ -966,6 +988,7 @@ def get_ranked_meal_options(
                 training_nutrition_context
                 or future_training_context
             ),
+            unified_day_context=unified_day_context,
         )
 
         routine_candidate = None
@@ -1054,6 +1077,7 @@ def get_ranked_meal_options(
             "training_nutrition": (
                 training_nutrition_context
             ),
+            "context": unified_day_context,
             **ranked,
         }
 
