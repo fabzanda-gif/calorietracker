@@ -58,7 +58,6 @@ class DecisionRankingService:
                     future_training_context=(
                         effective_training_context
                     ),
-                    unified_day_context=unified_day_context,
                 ),
                 "options": [],
             }
@@ -132,8 +131,9 @@ class DecisionRankingService:
                 available_kcal=available_kcal,
                 protein_remaining_g=protein_remaining_g,
                 future_training_context=(
-                    future_training_context
+                    effective_training_context
                 ),
+                unified_day_context=unified_day_context,
             ),
             "options": selected,
         }
