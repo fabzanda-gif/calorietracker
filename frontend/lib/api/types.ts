@@ -274,6 +274,10 @@ export interface HomeCoreResponse {
   date: string;
   day: DayResponse;
   budget: DayBudgetResponse;
+  latest_weight: {
+    item: import("./weight").WeightEntry | null;
+  };
+  profile: import("./profile").ProfileResponse;
   next_meal: NextMealResponse;
   meals: {
     items: import("./meals").LoggedMeal[];
