@@ -58,6 +58,7 @@ class DecisionRankingService:
                     future_training_context=(
                         effective_training_context
                     ),
+                    unified_day_context=unified_day_context,
                 ),
                 "options": [],
             }
@@ -76,7 +77,6 @@ class DecisionRankingService:
                     future_training_context=(
                         effective_training_context
                     ),
-                    unified_day_context=unified_day_context,
                 ),
                 reverse=True,
             )
