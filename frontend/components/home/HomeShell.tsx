@@ -2620,6 +2620,7 @@ export function HomeShell() {
             .slice(0, 2),
         dayNumber: date.getDate(),
         isToday: iso === todayIso(),
+        isSelected: iso === selectedLogDate,
         mealCount: weeklyMealHistory.filter(
           (meal) => meal.date === iso,
         ).length,
@@ -4815,6 +4816,109 @@ export function HomeShell() {
           </h1>
         </div>
 
+        <div className={styles.homeTopToolbar}>
+          <div
+            className={styles.homeTopDateControl}
+            aria-label={homeCopy.summaryDate}
+          >
+            <button
+              type="button"
+              aria-label={homeCopy.previousDay}
+              onClick={() =>
+                setSelectedLogDate((current) =>
+                  shiftIsoDate(current, -1),
+                )
+              }
+            >
+              ‹
+            </button>
+
+            <label>
+              <span aria-hidden="true">▦</span>
+              <strong>
+                {new Date(
+                  `${selectedLogDate}T12:00:00`,
+                ).toLocaleDateString(
+                  currentLocaleCode,
+                  {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  },
+                )}
+              </strong>
+              <input
+                type="date"
+                value={selectedLogDate}
+                max={todayIso()}
+                aria-label={homeCopy.chooseSummaryDate}
+                onChange={(event) => {
+                  if (event.target.value) {
+                    setSelectedLogDate(
+                      event.target.value,
+                    );
+                  }
+                }}
+              />
+            </label>
+
+            <button
+              type="button"
+              aria-label={homeCopy.nextDay}
+              disabled={selectedLogDate >= todayIso()}
+              onClick={() =>
+                setSelectedLogDate((current) =>
+                  shiftIsoDate(current, 1),
+                )
+              }
+            >
+              ›
+            </button>
+          </div>
+
+          <div
+            className={styles.homeTopDaypartToggle}
+            role="group"
+            aria-label="Vista bilancio"
+          >
+            <button
+              type="button"
+              className={
+                budgetHeroMode === "morning"
+                  ? styles.homeTopDaypartActive
+                  : ""
+              }
+              onClick={() =>
+                chooseBudgetHeroMode("morning")
+              }
+            >
+              <HeroSvgIcon
+                name="sun"
+                className={styles.homeTopDaypartIcon}
+              />
+              Mattino
+            </button>
+
+            <button
+              type="button"
+              className={
+                budgetHeroMode === "evening"
+                  ? styles.homeTopDaypartActive
+                  : ""
+              }
+              onClick={() =>
+                chooseBudgetHeroMode("evening")
+              }
+            >
+              <HeroSvgIcon
+                name="moon"
+                className={styles.homeTopDaypartIcon}
+              />
+              Sera
+            </button>
+          </div>
+        </div>
       </header>
 
       {loading ? (
@@ -9052,13 +9156,24 @@ export function HomeShell() {
 
               <div className={styles.weekDays}>
                 {weekOverviewDays.map((item) => (
-                  <div
+                  <button
                     key={item.iso}
-                    className={
+                    type="button"
+                    disabled={item.iso > todayIso()}
+                    onClick={() => {
+                      setSelectedLogDate(item.iso);
+                    }}
+                    className={[
+                      styles.weekDay,
                       item.isToday
-                        ? `${styles.weekDay} ${styles.weekDayToday}`
-                        : styles.weekDay
-                    }
+                        ? styles.weekDayToday
+                        : "",
+                      item.isSelected
+                        ? styles.weekDaySelected
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     <span
                       className={styles.weekDayName}
@@ -9093,7 +9208,7 @@ export function HomeShell() {
                     >
                       {item.mealCount > 0 ? "✓" : ""}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
 
