@@ -81,12 +81,9 @@ import {
   type MealPrepItem,
 } from "@/lib/api/mealPrep";
 import {
-  getDay,
   getDayBriefing,
-  getDayBudget,
-  getTrainingNutrition,
+  getHomeCore,
   getMealOptions,
-  getNextMeal,
   updateDailyLog,
 } from "@/lib/api/day";
 import type {
@@ -1022,38 +1019,6 @@ export function HomeShell() {
 
   const [plannedActivities, setPlannedActivities] =
     useState<PlannedActivity[]>([]);
-
-  useEffect(() => {
-    if (!accessToken) {
-      setTrainingNutrition(null);
-      return;
-    }
-
-    let active = true;
-
-    void getTrainingNutrition(
-      todayIso(),
-      accessToken,
-    )
-      .then((payload) => {
-        if (active) {
-          setTrainingNutrition(payload);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setTrainingNutrition(null);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [
-    accessToken,
-    actualActivities.length,
-    plannedActivities.length,
-  ]);
 
   const [
     nextRunningSession,
@@ -2121,55 +2086,14 @@ export function HomeShell() {
         }
 
         const [
-          dayPayload,
-          budgetPayload,
-          nextMealPayload,
-          mealsPayload,
-          activitiesPayload,
-          plannedActivitiesPayload,
+          homeCore,
           latestWeightPayload,
           profilePayload,
         ] = await Promise.all([
           timedHomeRequest(
-            "day",
-            getDay(
+            "home-core",
+            getHomeCore(
               date,
-              accessToken,
-            ),
-          ),
-          timedHomeRequest(
-            "budget",
-            getDayBudget(
-              date,
-              accessToken,
-            ),
-          ),
-          timedHomeRequest(
-            "next-meal",
-            getNextMeal(
-              date,
-              accessToken,
-            ),
-          ),
-          timedHomeRequest(
-            "meals",
-            getMealsForDate(
-              date,
-              accessToken,
-            ),
-          ),
-          timedHomeRequest(
-            "activities",
-            getActivitiesForDate(
-              date,
-              accessToken,
-            ),
-          ),
-          timedHomeRequest(
-            "planned-activities",
-            getPlannedActivities(
-              date,
-              futureIso(7),
               accessToken,
             ),
           ),
@@ -2184,6 +2108,16 @@ export function HomeShell() {
             getProfile(accessToken),
           ),
         ]);
+
+        const dayPayload = homeCore.day;
+        const budgetPayload = homeCore.budget;
+        const nextMealPayload =
+          homeCore.next_meal;
+        const mealsPayload = homeCore.meals;
+        const activitiesPayload =
+          homeCore.activities;
+        const plannedActivitiesPayload =
+          homeCore.planned_activities;
 
         console.info(
           `[Home perf] CORE READY: ${(
@@ -2201,6 +2135,9 @@ export function HomeShell() {
             activitiesPayload.items,
           );
           setPlannedActivities(plannedActivitiesPayload.items);
+          setTrainingNutrition(
+            homeCore.training_nutrition,
+          );
 
           setNextRunningSession(
             plannedActivitiesPayload.items
@@ -3357,38 +3294,27 @@ export function HomeShell() {
 
     const date = todayIso();
 
-    const [
-      dayPayload,
-      budgetPayload,
-      nextMealPayload,
-      mealsPayload,
-      activitiesPayload,
-      plannedActivitiesPayload,
-    ] = await Promise.all([
-      getDay(date, accessToken),
-      getDayBudget(date, accessToken),
-      getNextMeal(
-        date,
-        accessToken,
-      ),
-      getMealsForDate(
-        date,
-        accessToken,
-      ),
-      getActivitiesForDate(
-        date,
-        accessToken,
-      ),
-      getPlannedActivities(
-        date,
-        futureIso(7),
-        accessToken,
-      ),
-    ]);
+    const homeCore = await getHomeCore(
+      date,
+      accessToken,
+    );
+
+    const dayPayload = homeCore.day;
+    const budgetPayload = homeCore.budget;
+    const nextMealPayload =
+      homeCore.next_meal;
+    const mealsPayload = homeCore.meals;
+    const activitiesPayload =
+      homeCore.activities;
+    const plannedActivitiesPayload =
+      homeCore.planned_activities;
 
     setDay(dayPayload);
     setBudgetResult(budgetPayload);
     setNextMeal(nextMealPayload);
+    setTrainingNutrition(
+      homeCore.training_nutrition,
+    );
 
     if (nextMealPayload.next_slot) {
       void getMealOptions(
