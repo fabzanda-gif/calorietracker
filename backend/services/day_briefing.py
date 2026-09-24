@@ -330,6 +330,10 @@ def fallback_day_briefing(
     meal_count = int(
         payload.get("meal_count") or 0
     )
+    app_context = payload.get("app_context") or {}
+    app_signals = set(
+        app_context.get("signals") or []
+    )
 
     if language != "it":
         return _localized_fallback(
@@ -344,6 +348,23 @@ def fallback_day_briefing(
         )
 
     if moment == "morning":
+        if (
+            "training_today" in app_signals
+            and meal_count == 0
+        ):
+            if mode == "zero":
+                return (
+                    f"{opening} Oggi c'è un allenamento in programma "
+                    "e per ora nessun pasto registrato. Registra la "
+                    "colazione: almeno il carburante non si allena da solo."
+                )
+
+            return (
+                f"{opening} Oggi hai un allenamento in programma. "
+                "Quando fai colazione, registrala: il resto della "
+                "giornata si adatterà alla sessione."
+            )
+
         if meal_count == 0:
             if mode == "zero":
                 return (
@@ -369,6 +390,20 @@ def fallback_day_briefing(
             f"{opening} La giornata è ancora in corso: "
             "continua a registrare i prossimi pasti. "
             "Valuteremo il bilancio questa sera."
+        )
+
+    if "recovery" in app_signals:
+        if mode == "zero":
+            return (
+                f"{opening} Allenamento registrato: adesso tocca al "
+                "recupero, che purtroppo non si completa con la sola "
+                "soddisfazione morale."
+            )
+
+        return (
+            f"{opening} L'allenamento è registrato: ora la priorità "
+            "è il recupero. Carboidrati e proteine del resto della "
+            "giornata contano più del solito."
         )
 
     if mode == "zero":
