@@ -17558,7 +17558,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 2px;
+  padding-top: 62px;
 }
 
 .homeTopDateControl {
@@ -17782,6 +17782,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .homeTopToolbar {
     justify-content: flex-start;
     flex-wrap: wrap;
+    padding-top: 18px;
   }
 }
 
