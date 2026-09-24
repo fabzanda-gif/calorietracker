@@ -11,6 +11,7 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   getProfile,
+  exportProfileData,
   deleteAccount,
   updateProfile,
   getWeeklySchedule,
@@ -180,6 +181,8 @@ export default function ProfilePage() {
   const [saving, setSaving] =
     useState(false);
   const [deletingAccount, setDeletingAccount] =
+    useState(false);
+  const [exportingData, setExportingData] =
     useState(false);
   const [error, setError] =
     useState<string | null>(null);
@@ -778,6 +781,47 @@ export default function ProfilePage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+
+  async function handleExportData() {
+    if (!accessToken || exportingData) {
+      return;
+    }
+
+    setExportingData(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const payload = await exportProfileData(accessToken);
+      const blob = new Blob(
+        [JSON.stringify(payload, null, 2)],
+        { type: "application/json" },
+      );
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const date = new Date()
+        .toISOString()
+        .slice(0, 10);
+
+      anchor.href = url;
+      anchor.download = `sanosync-export-${date}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+
+      setSuccess("Export dati creato.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossibile esportare i dati.",
+      );
+    } finally {
+      setExportingData(false);
     }
   }
 
@@ -1380,6 +1424,25 @@ export default function ProfilePage() {
                 }}
               >
                 Esci dall’account
+              </button>
+            </section>
+
+
+            <section className={`${styles.card} ${styles.logoutZone}`}>
+              <div className={styles.sectionHeader}>
+                <h2>Esporta i tuoi dati</h2>
+                <p>
+                  Scarica una copia JSON dei dati SanoSync associati al tuo account.
+                  I token OAuth delle integrazioni non vengono inclusi.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.logoutButton}
+                disabled={exportingData}
+                onClick={() => void handleExportData()}
+              >
+                {exportingData ? "Preparazione…" : "Scarica i miei dati"}
               </button>
             </section>
 
