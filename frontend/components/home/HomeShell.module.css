@@ -17540,3 +17540,272 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     min-height: 40px;
   }
 }
+
+
+/* ==========================================================
+   HOME POLISH · DATE / DAYPART / DAILY LOG / WEEK
+   ========================================================== */
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
+}
+
+.homeTopToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.homeTopDateControl {
+  display: inline-grid;
+  grid-template-columns: 30px auto 30px;
+  align-items: center;
+  min-height: 38px;
+  overflow: hidden;
+  border: 1px solid rgba(18, 48, 77, 0.1);
+  border-radius: 999px;
+  background: #f7f8f9;
+  box-shadow: 0 6px 16px rgba(18, 48, 77, 0.045);
+}
+
+.homeTopDateControl > button {
+  width: 30px;
+  min-height: 38px;
+  border: 0;
+  background: transparent;
+  color: #163957;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.homeTopDateControl > button:disabled {
+  color: #b9c1ca;
+  cursor: default;
+}
+
+.homeTopDateControl label {
+  position: relative;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  color: #163957;
+  cursor: pointer;
+}
+
+.homeTopDateControl label > span {
+  color: #587089;
+  font-size: 0.78rem;
+}
+
+.homeTopDateControl label > strong {
+  font-size: 0.71rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.homeTopDateControl input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.homeTopDaypartToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 38px;
+  padding: 3px;
+  border: 1px solid rgba(18, 48, 77, 0.12);
+  border-radius: 999px;
+  background: #f4f6f8;
+}
+
+.homeTopDaypartToggle button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #7b8998;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.homeTopDaypartToggle button.homeTopDaypartActive {
+  background: #173957;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(18, 48, 77, 0.13);
+}
+
+.homeTopDaypartIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.budgetHeroModeBar {
+  display: none !important;
+}
+
+.mealsSection .dailyDateControl {
+  display: none !important;
+}
+
+.mealsSection .dailySummaryHeader {
+  grid-template-columns: 42px minmax(0, 1fr) auto !important;
+}
+
+.mealsSection {
+  gap: 12px;
+}
+
+.mealsSection .mealList {
+  order: 2;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--ss-border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.mealsSection .dailyActivityEntry {
+  order: 3;
+  margin: 0;
+  border-color: var(--ss-border);
+  box-shadow: none;
+}
+
+.mealsSection .dailyActivityEntry::before {
+  content: "Attività";
+  display: block;
+  padding: 8px 13px 6px;
+  border-bottom: 1px solid var(--ss-border);
+  background: #f7f9fb;
+  color: #6f8194;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mealsSection .homePantryCta {
+  order: 4;
+  margin: 2px 0 0;
+  min-height: 52px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.mealsSection .dailyMealEntry {
+  border: 0 !important;
+  border-bottom: 1px solid var(--ss-border) !important;
+  border-radius: 0 !important;
+}
+
+.mealsSection .dailyMealEntry:last-child {
+  border-bottom: 0 !important;
+}
+
+.mealsSection .dailyMealEntry[open] {
+  box-shadow: none !important;
+}
+
+.mealsSection .dailyMealSummary {
+  min-height: 54px !important;
+}
+
+.mealsSection .dailySummaryHeaderCopy h2 {
+  font-size: 1.08rem !important;
+  letter-spacing: -0.025em;
+}
+
+.mealsSection .dailySummarySubtitle {
+  font-size: 0.68rem !important;
+  color: #758496 !important;
+}
+
+.weekDays button.weekDay {
+  appearance: none;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.weekDays button.weekDay:hover:not(:disabled) {
+  border-color: rgba(255, 104, 104, 0.16);
+  background: rgba(255, 104, 104, 0.045);
+}
+
+.weekDays button.weekDay:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.weekDaySelected {
+  border-color: rgba(255, 104, 104, 0.28) !important;
+  background: #fff3f1 !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 104, 104, 0.04);
+}
+
+.weekDaySelected strong {
+  color: #ed6164;
+}
+
+.weekOverviewCard {
+  border-color: rgba(18, 48, 77, 0.09);
+}
+
+@media (max-width: 900px) {
+  .header {
+    grid-template-columns: 1fr;
+  }
+
+  .homeTopToolbar {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 620px) {
+  .homeTopToolbar {
+    width: 100%;
+  }
+
+  .homeTopDateControl {
+    flex: 1 1 100%;
+    width: 100%;
+    grid-template-columns: 34px 1fr 34px;
+  }
+
+  .homeTopDaypartToggle {
+    width: 100%;
+  }
+
+  .homeTopDaypartToggle button {
+    flex: 1 1 50%;
+    justify-content: center;
+  }
+
+  .mealsSection .dailyActivityEntry::before {
+    padding-left: 10px;
+  }
+}
