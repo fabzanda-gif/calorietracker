@@ -51,6 +51,28 @@ export function updateProfile(
   );
 }
 
+
+export interface ProfileDataExport {
+  schema_version: number;
+  exported_at: string;
+  profile: {
+    id: string;
+    metadata: Record<string, unknown>;
+  };
+  data: Record<string, unknown>;
+}
+
+export function exportProfileData(
+  accessToken: string,
+): Promise<ProfileDataExport> {
+  return apiRequest<ProfileDataExport>(
+    "/profile/export",
+    {
+      accessToken,
+    },
+  );
+}
+
 export function deleteAccount(
   accessToken: string,
 ): Promise<{ deleted: boolean }> {
