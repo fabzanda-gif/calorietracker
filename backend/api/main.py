@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 
 from backend.api.dependencies import get_current_user
+from backend.rate_limit import AIRateLimitMiddleware
 from backend.observability import (
     bind_request,
     current_api_path,
@@ -45,6 +46,8 @@ app = FastAPI(
     title="SanoSync API",
     version="0.3.0",
 )
+
+app.add_middleware(AIRateLimitMiddleware)
 
 
 _ORIGINAL_HTTPX_SEND = httpx.Client.send
