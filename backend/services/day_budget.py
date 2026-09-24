@@ -135,71 +135,118 @@ class DayBudgetService:
         day_date: date,
         metadata: Mapping[str, Any],
         current_weight: float | None,
+        low_memory: bool = False,
     ) -> dict:
         # These reads are independent and I/O-bound.
         # Execute them concurrently so Supabase round-trips overlap.
         suggestion_start = day_date - timedelta(days=56)
 
-        with ThreadPoolExecutor(max_workers=7) as executor:
-            metrics_future = executor.submit(
-                self.metrics_service.for_day,
+        if low_memory:
+            metrics = self.metrics_service.for_day(
                 user_id=user_id,
                 day_date=day_date,
             )
-
-            activity_history_future = executor.submit(
-                self.history_service.average_activity_kcal,
-                user_id=user_id,
-                end_date=day_date - timedelta(days=1),
-                lookback_days=7,
+            activity_history = (
+                self.history_service.average_activity_kcal(
+                    user_id=user_id,
+                    end_date=day_date - timedelta(days=1),
+                    lookback_days=7,
+                )
             )
-
-            activity_level_future = executor.submit(
-                self._activity_level,
+            activity_level = self._activity_level(
                 user_id=user_id,
                 day_date=day_date,
             )
-
-            planned_future = (
-                executor.submit(
-                    self.planned_activities_repo.list_range,
+            planned_activities = (
+                self.planned_activities_repo.list_range(
                     user_id,
                     day_date,
                     day_date,
                 )
                 if self.planned_activities_repo is not None
-                else None
+                else []
             )
-
-            suggestion_activities_future = executor.submit(
-                self.activities_repo.list_date_range,
-                user_id,
-                suggestion_start,
-                day_date - timedelta(days=1),
+            suggestion_activities = (
+                self.activities_repo.list_date_range(
+                    user_id,
+                    suggestion_start,
+                    day_date - timedelta(days=1),
+                )
             )
-            suggestion_logs_future = executor.submit(
-                self.daily_logs_repo.list_date_range,
-                user_id,
-                suggestion_start,
-                day_date - timedelta(days=1),
+            suggestion_logs = (
+                self.daily_logs_repo.list_date_range(
+                    user_id,
+                    suggestion_start,
+                    day_date - timedelta(days=1),
+                )
             )
-            today_activities_future = executor.submit(
-                self.activities_repo.list_for_date,
+            today_activities = self.activities_repo.list_for_date(
                 user_id,
                 day_date,
             )
+        else:
+            with ThreadPoolExecutor(max_workers=7) as executor:
+                metrics_future = executor.submit(
+                    self.metrics_service.for_day,
+                    user_id=user_id,
+                    day_date=day_date,
+                )
 
-            metrics = metrics_future.result()
-            activity_history = activity_history_future.result()
-            activity_level = activity_level_future.result()
-            planned_activities = (
-                planned_future.result()
-                if planned_future is not None
-                else []
-            )
-            suggestion_activities = suggestion_activities_future.result()
-            suggestion_logs = suggestion_logs_future.result()
-            today_activities = today_activities_future.result()
+                activity_history_future = executor.submit(
+                    self.history_service.average_activity_kcal,
+                    user_id=user_id,
+                    end_date=day_date - timedelta(days=1),
+                    lookback_days=7,
+                )
+
+                activity_level_future = executor.submit(
+                    self._activity_level,
+                    user_id=user_id,
+                    day_date=day_date,
+                )
+
+                planned_future = (
+                    executor.submit(
+                        self.planned_activities_repo.list_range,
+                        user_id,
+                        day_date,
+                        day_date,
+                    )
+                    if self.planned_activities_repo is not None
+                    else None
+                )
+
+                suggestion_activities_future = executor.submit(
+                    self.activities_repo.list_date_range,
+                    user_id,
+                    suggestion_start,
+                    day_date - timedelta(days=1),
+                )
+                suggestion_logs_future = executor.submit(
+                    self.daily_logs_repo.list_date_range,
+                    user_id,
+                    suggestion_start,
+                    day_date - timedelta(days=1),
+                )
+                today_activities_future = executor.submit(
+                    self.activities_repo.list_for_date,
+                    user_id,
+                    day_date,
+                )
+
+                metrics = metrics_future.result()
+                activity_history = activity_history_future.result()
+                activity_level = activity_level_future.result()
+                planned_activities = (
+                    planned_future.result()
+                    if planned_future is not None
+                    else []
+                )
+                suggestion_activities = (
+                    suggestion_activities_future.result()
+                )
+                suggestion_logs = suggestion_logs_future.result()
+                today_activities = today_activities_future.result()
 
         profile = self.profile_goal_service.build(
             metadata,
