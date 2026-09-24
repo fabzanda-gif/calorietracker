@@ -453,10 +453,27 @@ def get_home_core(
             weight_kg=current_weight,
         )
 
+        profile = {
+            "id": (
+                current_user.authenticated_id
+                or current_user.id
+            ),
+            "metadata": dict(current_user.metadata),
+        }
+        if current_user.read_only:
+            profile.update({
+                "read_only": True,
+                "demo_mode": True,
+            })
+
         return {
             "date": str(day_date),
             "day": day,
             "budget": budget_result,
+            "latest_weight": {
+                "item": latest_weight,
+            },
+            "profile": profile,
             "next_meal": {
                 "date": str(day_date),
                 "next_slot": next_slot,
