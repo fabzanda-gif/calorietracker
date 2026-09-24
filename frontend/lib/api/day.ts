@@ -6,10 +6,23 @@ import type {
   DayBudgetResponse,
   DayResponse,
   DecisionMode,
+  HomeCoreResponse,
   MealOptionsResponse,
   NextMealResponse,
   TrainingNutritionResponse,
 } from "./types";
+
+export function getHomeCore(
+  dayDate: string,
+  accessToken?: string | null,
+): Promise<HomeCoreResponse> {
+  return apiRequest<HomeCoreResponse>(
+    `/days/${encodeURIComponent(dayDate)}/home-core`,
+    {
+      accessToken,
+    },
+  );
+}
 
 export function getDay(
   dayDate: string,
