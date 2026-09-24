@@ -184,7 +184,15 @@ def _supabase_settings() -> tuple[str, str]:
 @lru_cache(maxsize=1)
 def get_supabase_client() -> Client:
     url, key = _supabase_settings()
-    return create_client(url, key)
+    return create_client(
+        url,
+        key,
+        options=ClientOptions(
+            httpx_client=_SHARED_SUPABASE_HTTP,
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
+    )
 
 
 def get_current_user(
