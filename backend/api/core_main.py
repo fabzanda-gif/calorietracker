@@ -20,6 +20,7 @@ from backend.observability import (
 )
 
 from backend.api.routers.daily_logs import router as daily_logs_router
+from backend.api.routers.days import get_home_core
 from backend.api.routers.day_history import router as day_history_router
 from backend.api.routers.decision_learning import router as decision_learning_router
 from backend.api.routers.decision_outcomes import router as decision_outcomes_router
@@ -251,6 +252,12 @@ app.add_middleware(
 
 
 app.include_router(health_router)
+app.add_api_route(
+    "/days/{day_date}/home-core",
+    get_home_core,
+    methods=["GET"],
+    tags=["days-core"],
+)
 app.include_router(profile_router)
 app.include_router(weekly_schedule_router)
 app.include_router(pantry_router)
