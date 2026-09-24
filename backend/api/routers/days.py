@@ -262,6 +262,8 @@ def _build_budget(
     daily_logs_repo: DailyLogsRepository,
     weight_repo: WeightRepository,
     planned_activities_repo: PlannedActivitiesRepository | None = None,
+    current_weight: float | None = None,
+    current_weight_loaded: bool = False,
 ) -> dict:
     if planned_activities_repo is None:
         planned_activities_repo = (
@@ -270,12 +272,13 @@ def _build_budget(
             )
         )
 
-    latest_weight = weight_repo.latest(current_user.id)
-    current_weight = (
-        latest_weight.get("weight")
-        if latest_weight is not None
-        else None
-    )
+    if not current_weight_loaded:
+        latest_weight = weight_repo.latest(current_user.id)
+        current_weight = (
+            latest_weight.get("weight")
+            if latest_weight is not None
+            else None
+        )
 
     return DayBudgetService(
         meals_repo=meals_repo,
@@ -382,6 +385,15 @@ def get_home_core(
             metadata=current_user.metadata,
         )
 
+        latest_weight = weight_repo.latest(
+            current_user.id
+        )
+        current_weight = (
+            latest_weight.get("weight")
+            if latest_weight is not None
+            else None
+        )
+
         budget_result = _build_budget(
             current_user=current_user,
             day_date=day_date,
@@ -390,6 +402,8 @@ def get_home_core(
             daily_logs_repo=daily_logs_repo,
             weight_repo=weight_repo,
             planned_activities_repo=planned_repo,
+            current_weight=current_weight,
+            current_weight_loaded=True,
         )
 
         meals = meals_repo.list_for_date_compatible(
@@ -433,11 +447,7 @@ def get_home_core(
                 }
             ],
             actual_activities=activities,
-            weight_kg=(
-                budget_result.get("profile", {}).get(
-                    "current_weight"
-                )
-            ),
+            weight_kg=current_weight,
         )
 
         return {
