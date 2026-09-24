@@ -8,6 +8,7 @@ def test_core_api_does_not_mount_heavy_routes():
     assert "/profile" in paths
     assert "/pantry" in paths
     assert "/weight" in paths
+    assert "/days/{day_date}/home-core" in paths
 
     assert "/meals/conversational/preview" not in paths
     assert "/meals/photo/preview" not in paths
