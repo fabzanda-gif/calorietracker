@@ -31,7 +31,7 @@ export async function apiRequest<T>(
   } = options;
 
   const response = await fetch(
-    `${getApiBaseUrl()}${path}`,
+    `${getApiBaseUrl(path)}${path}`,
     {
       ...requestOptions,
       headers: {
