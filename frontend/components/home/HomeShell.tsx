@@ -101,13 +101,11 @@ import {
 
 import {
   createWeight,
-  getLatestWeight,
   getWeightHistory,
   updateWeight,
   type WeightEntry,
 } from "@/lib/api/weight";
 import {
-  getProfile,
   type ProfileResponse,
 } from "@/lib/api/profile";
 
@@ -2126,29 +2124,18 @@ export function HomeShell() {
           }
         }
 
-        const [
-          homeCore,
-          latestWeightPayload,
-          profilePayload,
-        ] = await Promise.all([
-          timedHomeRequest(
-            "home-core",
-            getHomeCore(
-              date,
-              accessToken,
-            ),
+        const homeCore = await timedHomeRequest(
+          "home-core",
+          getHomeCore(
+            date,
+            accessToken,
           ),
-          timedHomeRequest(
-            "latest-weight",
-            getLatestWeight(
-              accessToken,
-            ),
-          ),
-          timedHomeRequest(
-            "profile",
-            getProfile(accessToken),
-          ),
-        ]);
+        );
+
+        const latestWeightPayload =
+          homeCore.latest_weight;
+        const profilePayload =
+          homeCore.profile;
 
         const dayPayload = homeCore.day;
         const budgetPayload = homeCore.budget;
@@ -3325,6 +3312,24 @@ export function HomeShell() {
     setNextMeal(nextMealPayload);
     setTrainingNutrition(
       homeCore.training_nutrition,
+    );
+    setLatestWeightEntry(
+      homeCore.latest_weight.item ?? null,
+    );
+    setLatestWeight(
+      homeCore.latest_weight.item?.weight != null
+        ? Number(homeCore.latest_weight.item.weight)
+        : null,
+    );
+    setProfile(homeCore.profile);
+
+    const metadata = homeCore.profile.metadata;
+    setShowWelcomeJourney(
+      metadata.onboarding_completed !== true &&
+        (!metadata.gender ||
+          !metadata.birth_date ||
+          !metadata.height ||
+          homeCore.latest_weight.item?.weight == null),
     );
 
     if (nextMealPayload.next_slot) {
