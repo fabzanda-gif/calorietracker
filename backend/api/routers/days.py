@@ -45,6 +45,7 @@ from backend.repositories.strength_workouts import (
 from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 from backend.services.day import DayService
 from backend.services.day_budget import DayBudgetService
+from backend.services.day_context import DayContextService
 from backend.services.day_briefing import (
     DayBriefingError,
     DayBriefingService,
@@ -447,6 +448,132 @@ def get_training_nutrition(
             status_code=(
                 status.HTTP_502_BAD_GATEWAY
             ),
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/{day_date}/context")
+def get_day_context(
+    day_date: Date,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
+):
+    try:
+        planned_repo = (
+            _planned_repo_from_activities(
+                activities_repo
+            )
+        )
+
+        tomorrow = day_date + timedelta(days=1)
+
+        with ThreadPoolExecutor(
+            max_workers=6,
+            thread_name_prefix="day_context_executor",
+        ) as executor:
+            day_future = executor.submit(
+                _build_day,
+                user_id=current_user.id,
+                day_date=day_date,
+                daily_logs_repo=daily_logs_repo,
+                meals_repo=meals_repo,
+                weekly_schedule_repo=weekly_schedule_repo,
+                metadata=current_user.metadata,
+            )
+
+            budget_future = executor.submit(
+                _build_budget,
+                current_user=current_user,
+                day_date=day_date,
+                meals_repo=meals_repo,
+                activities_repo=activities_repo,
+                daily_logs_repo=daily_logs_repo,
+                weight_repo=weight_repo,
+                planned_activities_repo=planned_repo,
+            )
+
+            meals_future = executor.submit(
+                meals_repo.list_for_date_compatible,
+                current_user.id,
+                day_date,
+            )
+
+            actual_future = executor.submit(
+                activities_repo.list_for_date,
+                current_user.id,
+                day_date,
+            )
+
+            planned_future = (
+                executor.submit(
+                    planned_repo.list_range,
+                    current_user.id,
+                    day_date,
+                    tomorrow,
+                )
+                if planned_repo is not None
+                else None
+            )
+
+            weight_future = executor.submit(
+                weight_repo.latest,
+                current_user.id,
+            )
+
+            day = day_future.result()
+            budget_result = budget_future.result()
+            meals = meals_future.result()
+            actual_activities = actual_future.result()
+            planned_activities = (
+                planned_future.result()
+                if planned_future is not None
+                else []
+            )
+            latest_weight = weight_future.result()
+
+        training_context = (
+            TrainingNutritionService().build(
+                day_date=day_date,
+                planned_activities=planned_activities,
+                actual_activities=actual_activities,
+                weight_kg=(
+                    latest_weight.get("weight")
+                    if latest_weight
+                    else None
+                ),
+            )
+        )
+
+        return DayContextService().build(
+            day_date=day_date,
+            day=day,
+            budget_result=budget_result,
+            meals=meals,
+            planned_activities=planned_activities,
+            actual_activities=actual_activities,
+            training_nutrition=training_context,
+            weight=latest_weight,
+        )
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
 
