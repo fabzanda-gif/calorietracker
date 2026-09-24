@@ -264,6 +264,7 @@ def _build_budget(
     planned_activities_repo: PlannedActivitiesRepository | None = None,
     current_weight: float | None = None,
     current_weight_loaded: bool = False,
+    low_memory: bool = False,
 ) -> dict:
     if planned_activities_repo is None:
         planned_activities_repo = (
@@ -290,6 +291,7 @@ def _build_budget(
         day_date=day_date,
         metadata=current_user.metadata,
         current_weight=current_weight,
+        low_memory=low_memory,
     )
 
 
@@ -404,6 +406,7 @@ def get_home_core(
             planned_activities_repo=planned_repo,
             current_weight=current_weight,
             current_weight_loaded=True,
+            low_memory=True,
         )
 
         meals = meals_repo.list_for_date_compatible(
