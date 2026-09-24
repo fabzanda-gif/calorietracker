@@ -29,7 +29,15 @@ class DecisionRankingService:
         preferred_mode: str | None = None,
         max_main_meal_kcal: float = 1000.0,
         future_training_context: dict | None = None,
+        unified_day_context: dict | None = None,
     ) -> dict:
+        effective_training_context = (
+            future_training_context
+            or self._training_from_unified_context(
+                unified_day_context
+            )
+        )
+
         eligible = [
             self._normalize(item)
             for item in candidates
@@ -48,8 +56,9 @@ class DecisionRankingService:
                     available_kcal=available_kcal,
                     protein_remaining_g=protein_remaining_g,
                     future_training_context=(
-                        future_training_context
+                        effective_training_context
                     ),
+                    unified_day_context=unified_day_context,
                 ),
                 "options": [],
             }
@@ -66,8 +75,9 @@ class DecisionRankingService:
                     preferred_lens=preferred_lens,
                     preferred_mode=preferred_mode,
                     future_training_context=(
-                        future_training_context
+                        effective_training_context
                     ),
+                    unified_day_context=unified_day_context,
                 ),
                 reverse=True,
             )
@@ -103,7 +113,7 @@ class DecisionRankingService:
                             preferred_lens=preferred_lens,
                             preferred_mode=preferred_mode,
                             future_training_context=(
-                                future_training_context
+                                effective_training_context
                             ),
                         ),
                         4,
@@ -134,7 +144,44 @@ class DecisionRankingService:
         available_kcal: float | None,
         protein_remaining_g: float | None,
         future_training_context: dict | None = None,
+        unified_day_context: dict | None = None,
     ) -> dict[str, str]:
+        signals = set(
+            (unified_day_context or {}).get(
+                "signals",
+                [],
+            )
+        )
+
+        if "recovery" in signals:
+            return {
+                "kind": "training_prep",
+                "title": "Recupero dopo l'allenamento",
+                "message": (
+                    "Le alternative tengono conto del "
+                    "recupero e danno più peso a "
+                    "carboidrati e proteine."
+                ),
+            }
+
+        if (
+            "pre_training" in signals
+            or "pre_race" in signals
+        ):
+            return {
+                "kind": "training_prep",
+                "title": (
+                    "Fuel per l'allenamento di oggi"
+                    if "pre_race" not in signals
+                    else "Fuel per la gara di oggi"
+                ),
+                "message": (
+                    "Le alternative tengono conto "
+                    "della sessione prevista e del "
+                    "margine reale della giornata."
+                ),
+            }
+
         if available_kcal is None:
             return {
                 "kind": "balanced",
@@ -286,6 +333,22 @@ class DecisionRankingService:
                 "rimasto, le proteine e le preferenze."
             ),
         }
+
+    @staticmethod
+    def _training_from_unified_context(
+        context: dict | None,
+    ) -> dict | None:
+        if not context:
+            return None
+
+        training = context.get("training") or {}
+        nutrition = training.get("nutrition")
+
+        return (
+            nutrition
+            if isinstance(nutrition, dict)
+            else None
+        )
 
     def _score(
         self,
