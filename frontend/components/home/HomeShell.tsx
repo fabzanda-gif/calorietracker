@@ -1199,19 +1199,60 @@ export function HomeShell() {
     if (!accessToken) return;
     let active = true;
 
-    Promise.allSettled([
-      getRecipes(accessToken),
-      getMealHistory(accessToken),
-      getIngredients(accessToken),
-      getPantry(accessToken),
-      getMealPrepInventory(accessToken, true),
-    ]).then(([
-      recipesResult,
-      historyResult,
-      ingredientsResult,
-      pantryResult,
-      mealPrepResult,
-    ]) => {
+    async function settle<T>(
+      request: Promise<T>,
+    ): Promise<PromiseSettledResult<T>> {
+      try {
+        return {
+          status: "fulfilled",
+          value: await request,
+        };
+      } catch (reason) {
+        return {
+          status: "rejected",
+          reason,
+        };
+      }
+    }
+
+    void (async () => {
+      // History feeds the visible week card, so load it first.
+      const historyResult = await settle(
+        getMealHistory(accessToken),
+      );
+
+      if (!active) return;
+
+      // Secondary inventory data is intentionally staggered. These datasets
+      // are useful for pantry/alternate-meal flows but should not compete
+      // with the core Home request on a 512 MB backend instance.
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 900);
+      });
+
+      if (!active) return;
+
+      const recipesResult = await settle(
+        getRecipes(accessToken),
+      );
+      if (!active) return;
+
+      const ingredientsResult = await settle(
+        getIngredients(accessToken),
+      );
+      if (!active) return;
+
+      const pantryResult = await settle(
+        getPantry(accessToken),
+      );
+      if (!active) return;
+
+      const mealPrepResult = await settle(
+        getMealPrepInventory(
+          accessToken,
+          true,
+        ),
+      );
       if (!active) return;
 
       const recipes =
@@ -1609,7 +1650,7 @@ export function HomeShell() {
       });
 
       setKnownAlternates(items);
-    });
+    })();
 
     return () => { active = false; };
   }, [accessToken]);
