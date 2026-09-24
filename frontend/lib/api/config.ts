@@ -34,6 +34,16 @@ export function getCoreApiBaseUrl(): string {
 }
 
 export function isCoreApiPath(path: string): boolean {
+  const normalizedPath = path.split("?", 1)[0];
+
+  if (
+    /^\/days\/[^/]+\/home-core$/.test(
+      normalizedPath,
+    )
+  ) {
+    return true;
+  }
+
   return CORE_PREFIXES.some(
     (prefix) =>
       path === prefix ||
