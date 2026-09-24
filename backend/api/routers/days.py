@@ -335,6 +335,146 @@ def _build_eating_out_candidates(
     )
 
 
+@router.get("/{day_date}/home-core")
+def get_home_core(
+    day_date: Date,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    daily_logs_repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+    weekly_schedule_repo: WeeklyScheduleRepository = Depends(
+        get_weekly_schedule_repository
+    ),
+):
+    """
+    Low-fan-out Home payload.
+
+    The frontend previously opened several concurrent HTTP requests for
+    overlapping day data. Keep the public feature shape the same while
+    serializing the expensive backend work inside one request. This reduces
+    simultaneous request stacks and memory spikes on small Render instances.
+    """
+    try:
+        planned_repo = _planned_repo_from_activities(
+            activities_repo
+        )
+
+        # Keep the two heaviest builders sequential on purpose. Latency is
+        # slightly less aggressive, but peak memory/concurrency is much lower
+        # than the previous frontend fan-out.
+        day = _build_day(
+            user_id=current_user.id,
+            day_date=day_date,
+            daily_logs_repo=daily_logs_repo,
+            meals_repo=meals_repo,
+            weekly_schedule_repo=weekly_schedule_repo,
+            metadata=current_user.metadata,
+        )
+
+        budget_result = _build_budget(
+            current_user=current_user,
+            day_date=day_date,
+            meals_repo=meals_repo,
+            activities_repo=activities_repo,
+            daily_logs_repo=daily_logs_repo,
+            weight_repo=weight_repo,
+            planned_activities_repo=planned_repo,
+        )
+
+        meals = meals_repo.list_for_date_compatible(
+            current_user.id,
+            day_date,
+        )
+
+        activities = activities_repo.list_for_date(
+            current_user.id,
+            day_date,
+        )
+
+        planned_activities = (
+            planned_repo.list_range(
+                current_user.id,
+                day_date,
+                day_date + timedelta(days=7),
+            )
+            if planned_repo is not None
+            else []
+        )
+
+        logged_meal_types = [
+            str(item.get("meal_type") or "")
+            for item in meals
+        ]
+
+        next_slot = NextMealReplanningService().next_slot(
+            logged_meal_types=logged_meal_types,
+        )
+
+        training_context = TrainingNutritionService().build(
+            day_date=day_date,
+            planned_activities=[
+                item
+                for item in planned_activities
+                if str(item.get("scheduled_date") or "")
+                in {
+                    str(day_date),
+                    str(day_date + timedelta(days=1)),
+                }
+            ],
+            actual_activities=activities,
+            weight_kg=(
+                budget_result.get("profile", {}).get(
+                    "current_weight"
+                )
+            ),
+        )
+
+        return {
+            "date": str(day_date),
+            "day": day,
+            "budget": budget_result,
+            "next_meal": {
+                "date": str(day_date),
+                "next_slot": next_slot,
+                "next_meal_type": (
+                    MEAL_SLOT_TO_TYPE[next_slot]
+                    if next_slot is not None
+                    else None
+                ),
+            },
+            "meals": {
+                "items": meals,
+            },
+            "activities": {
+                "items": activities,
+            },
+            "planned_activities": {
+                "items": planned_activities,
+            },
+            "training_nutrition": {
+                "date": str(day_date),
+                "context": training_context,
+            },
+        }
+
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/{day_date}/next-meal")
 def get_next_meal(
     day_date: Date,
