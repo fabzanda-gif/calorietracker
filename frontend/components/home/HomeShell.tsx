@@ -6102,6 +6102,7 @@ export function HomeShell() {
 
                             <button
                               type="button"
+                              className={styles.conversationRecheckButton}
                               onClick={() =>
                                 void recheckConversationItems(
                                   action.id,
@@ -6286,6 +6287,7 @@ export function HomeShell() {
 
                 <button
                   type="button"
+                  className={styles.conversationRecheckButton}
                   onClick={() =>
                     void recheckConversationItems(
                       "single",
