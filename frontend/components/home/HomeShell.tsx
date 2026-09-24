@@ -2094,7 +2094,7 @@ export function HomeShell() {
       setError(null);
 
       try {
-        const date = todayIso();
+        const date = selectedLogDate;
 
         const homeLoadStartedAt =
           performance.now();
@@ -2296,7 +2296,13 @@ export function HomeShell() {
     return () => {
       active = false;
     };
-  }, [accessToken, experienceMode, briefingHour, locale]);
+  }, [
+    accessToken,
+    selectedLogDate,
+    experienceMode,
+    briefingHour,
+    locale,
+  ]);
 
   const budget =
     budgetResult?.budget ?? null;
@@ -2325,45 +2331,9 @@ export function HomeShell() {
       (isOnboardingTestAccount && !onboardingTestCompleted));
 
   useEffect(() => {
-    if (selectedLogDate === todayIso()) {
-      setSummaryMeals(actualMeals);
-      setSummaryActivities(actualActivities);
-      return;
-    }
-
-    if (!accessToken) {
-      return;
-    }
-
-    let active = true;
-
-    void Promise.all([
-      getMealsForDate(selectedLogDate, accessToken),
-      getActivitiesForDate(selectedLogDate, accessToken),
-    ])
-      .then(([mealsPayload, activitiesPayload]) => {
-        if (!active) {
-          return;
-        }
-
-        setSummaryMeals(mealsPayload.items ?? []);
-        setSummaryActivities(activitiesPayload.items ?? []);
-      })
-      .catch((err) => {
-        if (active) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Non riesco a caricare il resoconto selezionato.",
-          );
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+    setSummaryMeals(actualMeals);
+    setSummaryActivities(actualActivities);
   }, [
-    accessToken,
     selectedLogDate,
     actualMeals,
     actualActivities,
@@ -3333,7 +3303,7 @@ export function HomeShell() {
       return;
     }
 
-    const date = todayIso();
+    const date = selectedLogDate;
 
     const homeCore = await getHomeCore(
       date,
