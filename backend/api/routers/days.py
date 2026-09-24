@@ -1336,18 +1336,83 @@ def get_day_briefing(
     actual = budget_result.get("actual") or {}
     budget = budget_result.get("budget") or {}
 
+    planned_repo = (
+        _planned_repo_from_activities(
+            activities_repo
+        )
+    )
+
     try:
-        day_activities = (
-            activities_repo.list_for_date(
+        with ThreadPoolExecutor(
+            max_workers=4,
+            thread_name_prefix="briefing_context_executor",
+        ) as executor:
+            activities_future = executor.submit(
+                activities_repo.list_for_date,
                 current_user.id,
                 day_date,
             )
-        )
+            meals_future = executor.submit(
+                meals_repo.list_for_date_compatible,
+                current_user.id,
+                day_date,
+            )
+            weight_future = executor.submit(
+                weight_repo.latest,
+                current_user.id,
+            )
+            planned_future = (
+                executor.submit(
+                    planned_repo.list_range,
+                    current_user.id,
+                    day_date,
+                    day_date + timedelta(days=1),
+                )
+                if planned_repo is not None
+                else None
+            )
+
+            day_activities = activities_future.result()
+            day_meals = meals_future.result()
+            latest_weight = weight_future.result()
+            planned_activities = (
+                planned_future.result()
+                if planned_future is not None
+                else []
+            )
     except RepositoryError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
+
+    training_nutrition_context = (
+        TrainingNutritionService().build(
+            day_date=day_date,
+            planned_activities=planned_activities,
+            actual_activities=day_activities,
+            weight_kg=(
+                latest_weight.get("weight")
+                if latest_weight
+                else None
+            ),
+        )
+    )
+
+    unified_day_context = DayContextService().build(
+        day_date=day_date,
+        day=day,
+        budget_result=budget_result,
+        meals=day_meals,
+        planned_activities=planned_activities,
+        actual_activities=day_activities,
+        training_nutrition=training_nutrition_context,
+        weight=latest_weight,
+        now=datetime.combine(
+            day_date,
+            datetime.now().time(),
+        ),
+    )
 
     training_activities = [
         activity
@@ -1396,6 +1461,7 @@ def get_day_briefing(
         "first_name": first_name,
         "moment": moment,
         "daily_context": daily_context,
+        "app_context": unified_day_context,
         "day_type": day.get("context", {}).get("value"),
         "activity_level": (
             budget_result.get("energy_baseline", {}).get(
