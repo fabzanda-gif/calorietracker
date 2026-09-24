@@ -1202,6 +1202,41 @@
   flex-wrap: wrap;
 }
 
+
+.conversationRecheckButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  min-height: 36px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 104, 104, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 104, 104, 0.06);
+  color: #d9575a;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease,
+    opacity 150ms ease;
+}
+
+.conversationRecheckButton:hover:not(:disabled) {
+  border-color: rgba(255, 104, 104, 0.46);
+  background: rgba(255, 104, 104, 0.11);
+  transform: translateY(-1px);
+}
+
+.conversationRecheckButton:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
 .conversationError {
   margin-top: 10px;
   font-size: 0.82rem;
