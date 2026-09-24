@@ -1412,6 +1412,15 @@ def get_day_briefing(
         now=datetime.combine(
             day_date,
             datetime.now().time(),
+        ).replace(
+            hour=(
+                hour
+                if hour is not None
+                else datetime.now().hour
+            ),
+            minute=0,
+            second=0,
+            microsecond=0,
         ),
     )
 
