@@ -268,3 +268,21 @@ export interface MealOptionsResponse {
   decision_preferences: DecisionPreferences;
   empty_reason: string | null;
 }
+
+
+export interface HomeCoreResponse {
+  date: string;
+  day: DayResponse;
+  budget: DayBudgetResponse;
+  next_meal: NextMealResponse;
+  meals: {
+    items: import("./meals").LoggedMeal[];
+  };
+  activities: {
+    items: import("./activities").Activity[];
+  };
+  planned_activities: {
+    items: import("./activities").PlannedActivity[];
+  };
+  training_nutrition: TrainingNutritionResponse;
+}
