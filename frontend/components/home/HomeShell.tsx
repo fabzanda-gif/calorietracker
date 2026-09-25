@@ -2014,6 +2014,10 @@ export function HomeShell() {
         if (active) {
           setNextStrengthSession(null);
         }
+      } finally {
+        if (active) {
+          setStrengthLoading(false);
+        }
       }
     }
 
@@ -4524,10 +4528,6 @@ export function HomeShell() {
 
     setStrengthLoading(true);
     setStrengthLoaded(true);
-
-    window.setTimeout(() => {
-      setStrengthLoading(false);
-    }, 0);
   }
 
   async function requestMealProposal(
