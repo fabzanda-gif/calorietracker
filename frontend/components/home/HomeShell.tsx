@@ -4750,8 +4750,11 @@ export function HomeShell() {
     }
 
     return (
-      requestedMealSlot === slot &&
-      Boolean(nextMealOptions?.recommended)
+      meal.state === "predicted" ||
+      (
+        requestedMealSlot === slot &&
+        Boolean(nextMealOptions?.recommended)
+      )
     );
   }
 
@@ -5006,7 +5009,7 @@ export function HomeShell() {
               >
                 {strengthLoading
                   ? "Carico allenamento…"
-                  : "Carica dettagli palestra"}
+                  : "Mostra prossimo allenamento"}
               </button>
             ) : null}
           </div>
@@ -7454,7 +7457,7 @@ export function HomeShell() {
                             ? "Sto preparando…"
                             : hasMealProposal(slot, meal)
                               ? "◷ Proposta pronta"
-                              : "✦ Richiedi proposta"}
+                              : "✨ Cosa mi consigli?"}
                         </button>
                       ) : (
                         <strong
