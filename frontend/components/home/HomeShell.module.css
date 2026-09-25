@@ -17810,3 +17810,57 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     padding-left: 10px;
   }
 }
+
+
+.homeOnDemandRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 16px;
+}
+
+.homeOnDemandButton,
+.homeOnDemandButtonSecondary,
+.homeOnDemandInline {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.homeOnDemandButton {
+  border: 1px solid rgba(255, 104, 104, 0.22);
+  background: rgba(255, 104, 104, 0.08);
+  color: #df5d60;
+}
+
+.homeOnDemandButtonSecondary {
+  border: 1px solid var(--ss-border);
+  background: #ffffff;
+  color: var(--ss-navy-950);
+}
+
+.homeOnDemandInline {
+  margin: 0 0 14px;
+  border: 0;
+  background: transparent;
+  color: #df5d60;
+  padding-left: 0;
+}
+
+.homeOnDemandButton:disabled,
+.homeOnDemandButtonSecondary:disabled,
+.homeOnDemandInline:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.weekCalendarIcon {
+  border: 1px solid rgba(90, 160, 255, 0.18);
+  background: rgba(90, 160, 255, 0.08);
+  cursor: pointer;
+  font: inherit;
+}
