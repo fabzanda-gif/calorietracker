@@ -792,6 +792,16 @@ export function HomeShell() {
     useState<string | null>(null);
   const [dayBriefing, setDayBriefing] =
     useState<string | null>(null);
+  const [briefingLoading, setBriefingLoading] =
+    useState(false);
+  const [weekDetailsLoading, setWeekDetailsLoading] =
+    useState(false);
+  const [weekDetailsLoaded, setWeekDetailsLoaded] =
+    useState(false);
+  const [strengthLoading, setStrengthLoading] =
+    useState(false);
+  const [strengthLoaded, setStrengthLoaded] =
+    useState(false);
 
   const [briefingHour, setBriefingHour] =
     useState(() => new Date().getHours());
@@ -1198,7 +1208,7 @@ export function HomeShell() {
   );
 
   useEffect(() => {
-    if (!accessToken || loading) return;
+    if (!accessToken || loading || !alternateSlot) return;
     let active = true;
 
     async function settle<T>(
@@ -1655,7 +1665,7 @@ export function HomeShell() {
     })();
 
     return () => { active = false; };
-  }, [accessToken, loading]);
+  }, [accessToken, loading, alternateSlot]);
 
   useEffect(() => {
     if (
@@ -1945,7 +1955,7 @@ export function HomeShell() {
   }, [user]);
 
   useEffect(() => {
-    if (!accessToken || loading) {
+    if (!accessToken || loading || !strengthLoaded) {
       if (!accessToken) {
         setNextStrengthSession(null);
       }
@@ -2012,7 +2022,7 @@ export function HomeShell() {
     return () => {
       active = false;
     };
-  }, [accessToken, loading]);
+  }, [accessToken, loading, strengthLoaded]);
 
 
   const recentWeights = useMemo(() => {
@@ -2225,29 +2235,13 @@ export function HomeShell() {
                 latestWeightPayload.item?.weight == null),
           );
 
-          // The usable home is ready. AI briefing, recommendations and
-          // history are enhancements and must never hold up first paint.
+          // The usable home is ready. Expensive enhancements are now
+          // loaded only after an explicit user action.
           setLoading(false);
-
-          void timedHomeRequest(
-            "AI day-briefing",
-            getDayBriefing(
-              date,
-              briefingMoment(),
-              experienceMode,
-              briefingHour,
-              locale,
-              accessToken,
-            ),
-          ).then((payload) => {
-            if (active) setDayBriefing(payload.message);
-          }).catch(() => undefined);
-
-          void getDayHistory(accessToken)
-            .then((payload) => {
-              if (active) setDayHistory(payload);
-            })
-            .catch(() => undefined);
+          setDayBriefing(null);
+          setDayHistory(null);
+          setWeekDetailsLoaded(false);
+          setStrengthLoaded(false);
         }
       } catch (err) {
         if (active) {
@@ -4471,6 +4465,71 @@ export function HomeShell() {
     }
   }
 
+  async function requestDayBriefing() {
+    if (!accessToken || briefingLoading) {
+      return;
+    }
+
+    setBriefingLoading(true);
+    setError(null);
+
+    try {
+      const payload = await getDayBriefing(
+        selectedLogDate,
+        briefingMoment(),
+        experienceMode,
+        briefingHour,
+        locale,
+        accessToken,
+      );
+      setDayBriefing(payload.message);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a generare il briefing.",
+      );
+    } finally {
+      setBriefingLoading(false);
+    }
+  }
+
+  async function loadWeekDetails() {
+    if (!accessToken || weekDetailsLoading || weekDetailsLoaded) {
+      return;
+    }
+
+    setWeekDetailsLoading(true);
+
+    try {
+      const [history, dayHistoryPayload] = await Promise.all([
+        getMealHistory(accessToken),
+        getDayHistory(accessToken),
+      ]);
+
+      setWeeklyMealHistory(history.items);
+      setDayHistory(dayHistoryPayload);
+      setWeekDetailsLoaded(true);
+    } catch {
+      // Il riepilogo base della Home resta disponibile.
+    } finally {
+      setWeekDetailsLoading(false);
+    }
+  }
+
+  function requestStrengthDetails() {
+    if (strengthLoading || strengthLoaded) {
+      return;
+    }
+
+    setStrengthLoading(true);
+    setStrengthLoaded(true);
+
+    window.setTimeout(() => {
+      setStrengthLoading(false);
+    }, 0);
+  }
+
   async function requestMealProposal(
     slot: string,
   ) {
@@ -4921,6 +4980,36 @@ export function HomeShell() {
               });
             }}
           />
+
+          <div className={styles.homeOnDemandRow}>
+            <button
+              type="button"
+              className={styles.homeOnDemandButton}
+              disabled={briefingLoading}
+              onClick={() => {
+                void requestDayBriefing();
+              }}
+            >
+              {briefingLoading
+                ? "Genero briefing…"
+                : dayBriefing
+                  ? "Rigenera briefing AI"
+                  : "✦ Genera briefing AI"}
+            </button>
+
+            {!strengthLoaded ? (
+              <button
+                type="button"
+                className={styles.homeOnDemandButtonSecondary}
+                disabled={strengthLoading}
+                onClick={requestStrengthDetails}
+              >
+                {strengthLoading
+                  ? "Carico allenamento…"
+                  : "Carica dettagli palestra"}
+              </button>
+            ) : null}
+          </div>
 
           {budgetResult?.energy_baseline?.activity_suggestion ? (
             <section className={styles.activitySuggestion}>
@@ -8854,17 +8943,42 @@ export function HomeShell() {
                   </div>
                 </div>
 
-                <span
+                <button
+                  type="button"
                   className={styles.weekCalendarIcon}
-                  aria-hidden="true"
+                  disabled={weekDetailsLoading}
+                  onClick={() => {
+                    void loadWeekDetails();
+                  }}
                 >
-                  7g
-                </span>
+                  {weekDetailsLoading
+                    ? "…"
+                    : weekDetailsLoaded
+                      ? "7g ✓"
+                      : "7g"}
+                </button>
               </div>
 
               <p className={styles.bottomOverviewIntro}>
-                {homeCopy.weekIntro}
+                {weekDetailsLoaded
+                  ? homeCopy.weekIntro
+                  : "Riepilogo leggero. Carica lo storico solo quando ti serve."}
               </p>
+
+              {!weekDetailsLoaded ? (
+                <button
+                  type="button"
+                  className={styles.homeOnDemandInline}
+                  disabled={weekDetailsLoading}
+                  onClick={() => {
+                    void loadWeekDetails();
+                  }}
+                >
+                  {weekDetailsLoading
+                    ? "Carico settimana…"
+                    : "Apri dettaglio settimana →"}
+                </button>
+              ) : null
 
               <div className={styles.weekKpis}>
                 <div className={styles.weekKpi}>
