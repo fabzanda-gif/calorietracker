@@ -51,6 +51,7 @@ export function createWeight(
     {
       method: "POST",
       accessToken,
+      route: "heavy",
       body: JSON.stringify(input),
     },
   );
@@ -73,6 +74,7 @@ export function updateWeight(
     {
       method: "PATCH",
       accessToken,
+      route: "heavy",
       body: JSON.stringify(input),
     },
   );
