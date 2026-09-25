@@ -61,17 +61,40 @@ export async function apiRequest<T>(
   let response: Response;
 
   try {
-    response = await fetch(
-      `${primaryBaseUrl}${path}`,
-      fetchOptions,
-    );
+    if (
+      canFallbackToHeavy &&
+      !fetchOptions.signal
+    ) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        5000,
+      );
+
+      try {
+        response = await fetch(
+          `${primaryBaseUrl}${path}`,
+          {
+            ...fetchOptions,
+            signal: controller.signal,
+          },
+        );
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    } else {
+      response = await fetch(
+        `${primaryBaseUrl}${path}`,
+        fetchOptions,
+      );
+    }
   } catch (error) {
     if (!canFallbackToHeavy) {
       throw error;
     }
 
     console.warn(
-      "[SanoSync API] Core backend unreachable; retrying on heavy backend.",
+      "[SanoSync API] Core backend unavailable/slow; retrying on heavy backend.",
       path,
     );
 
