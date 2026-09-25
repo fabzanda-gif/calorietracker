@@ -22,6 +22,7 @@ export class ApiError extends Error {
 
 type ApiRequestOptions = RequestInit & {
   accessToken?: string | null;
+  route?: "auto" | "heavy";
 };
 
 export async function apiRequest<T>(
@@ -31,6 +32,7 @@ export async function apiRequest<T>(
   const {
     accessToken,
     headers,
+    route = "auto",
     ...requestOptions
   } = options;
 
@@ -49,7 +51,10 @@ export async function apiRequest<T>(
     cache: "no-store",
   };
 
-  const primaryBaseUrl = getApiBaseUrl(path);
+  const primaryBaseUrl =
+    route === "heavy"
+      ? getHeavyApiBaseUrl()
+      : getApiBaseUrl(path);
   const method = String(
     requestOptions.method ?? "GET",
   ).toUpperCase();
