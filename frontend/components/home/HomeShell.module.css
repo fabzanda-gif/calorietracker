@@ -8795,14 +8795,38 @@
 .dailyMealProposalReady {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 9px;
-  border: 1px solid rgba(255, 104, 104, 0.18);
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 104, 104, 0.28);
   border-radius: 999px;
-  background: rgba(255, 104, 104, 0.08);
-  color: #df5d60;
-  font-size: 0.68rem;
-  font-weight: 750;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 104, 104, 0.13),
+    rgba(255, 178, 122, 0.13)
+  );
+  color: #d94f55;
+  font-size: 0.7rem;
+  font-weight: 850;
+  box-shadow: 0 4px 12px rgba(255, 104, 104, 0.1);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+button.dailyMealProposalReady:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 104, 104, 0.18),
+    rgba(255, 178, 122, 0.17)
+  );
+  box-shadow: 0 7px 16px rgba(255, 104, 104, 0.14);
+}
+
+button.dailyMealProposalReady:disabled {
+  cursor: default;
+  opacity: 0.66;
 }
 
 .mealSuggestionPanel {
