@@ -1194,7 +1194,7 @@ export function HomeShell() {
   );
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || loading) return;
     let active = true;
 
     async function settle<T>(
@@ -1651,7 +1651,7 @@ export function HomeShell() {
     })();
 
     return () => { active = false; };
-  }, [accessToken]);
+  }, [accessToken, loading]);
 
   useEffect(() => {
     if (
@@ -1941,8 +1941,10 @@ export function HomeShell() {
   }, [user]);
 
   useEffect(() => {
-    if (!accessToken) {
-      setNextStrengthSession(null);
+    if (!accessToken || loading) {
+      if (!accessToken) {
+        setNextStrengthSession(null);
+      }
       return;
     }
 
@@ -2006,7 +2008,7 @@ export function HomeShell() {
     return () => {
       active = false;
     };
-  }, [accessToken]);
+  }, [accessToken, loading]);
 
 
   const recentWeights = useMemo(() => {
