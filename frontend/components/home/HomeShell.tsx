@@ -8978,7 +8978,7 @@ export function HomeShell() {
                     ? "Carico settimana…"
                     : "Apri dettaglio settimana →"}
                 </button>
-              ) : null
+              ) : null}
 
               <div className={styles.weekKpis}>
                 <div className={styles.weekKpi}>
