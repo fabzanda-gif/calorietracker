@@ -823,6 +823,10 @@ export function HomeShell() {
   );
   const [nextMealOptions, setNextMealOptions] =
     useState<MealOptionsResponse | null>(null);
+  const [requestedMealSlot, setRequestedMealSlot] =
+    useState<string | null>(null);
+  const [requestingMealSlot, setRequestingMealSlot] =
+    useState<string | null>(null);
   const [dinnerOptions, setDinnerOptions] =
     useState<MealOptionsResponse | null>(null);
   const [nextMeal, setNextMeal] =
@@ -2239,26 +2243,6 @@ export function HomeShell() {
             if (active) setDayBriefing(payload.message);
           }).catch(() => undefined);
 
-          if (nextMealPayload.next_slot) {
-            void timedHomeRequest(
-              "meal-options",
-              getMealOptions(
-                date,
-                nextMealPayload.next_slot,
-                "auto",
-                accessToken,
-              ),
-            ).then((payload) => {
-              if (!active) return;
-              setNextMealOptions(payload);
-              setDinnerOptions(
-                nextMealPayload.next_slot === "dinner"
-                  ? payload
-                  : null,
-              );
-            }).catch(() => undefined);
-          }
-
           void getDayHistory(accessToken)
             .then((payload) => {
               if (active) setDayHistory(payload);
@@ -3334,26 +3318,9 @@ export function HomeShell() {
           homeCore.latest_weight.item?.weight == null),
     );
 
-    if (nextMealPayload.next_slot) {
-      void getMealOptions(
-        date,
-        nextMealPayload.next_slot,
-        "auto",
-        accessToken,
-      )
-        .then((payload) => {
-          setNextMealOptions(payload);
-          setDinnerOptions(
-            nextMealPayload.next_slot === "dinner"
-              ? payload
-              : null,
-          );
-        })
-        .catch(() => undefined);
-    } else {
-      setNextMealOptions(null);
-      setDinnerOptions(null);
-    }
+    setNextMealOptions(null);
+    setDinnerOptions(null);
+    setRequestedMealSlot(null);
     setActualMeals(mealsPayload.items);
     setActualActivities(
       activitiesPayload.items,
@@ -4504,6 +4471,40 @@ export function HomeShell() {
     }
   }
 
+  async function requestMealProposal(
+    slot: string,
+  ) {
+    if (!accessToken || requestingMealSlot) {
+      return;
+    }
+
+    setRequestingMealSlot(slot);
+    setError(null);
+
+    try {
+      const payload = await getMealOptions(
+        selectedLogDate,
+        slot,
+        "auto",
+        accessToken,
+      );
+
+      setRequestedMealSlot(slot);
+      setNextMealOptions(payload);
+      setDinnerOptions(
+        slot === "dinner" ? payload : null,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a preparare la proposta.",
+      );
+    } finally {
+      setRequestingMealSlot(null);
+    }
+  }
+
   async function confirmPredictedMeal(
     slot: string,
   ) {
@@ -4515,7 +4516,7 @@ export function HomeShell() {
 
     try {
       const replannedRecommendation =
-        slot === nextMeal?.next_slot &&
+        requestedMealSlot === slot &&
         nextMealOptions?.recommended
           ? {
               name:
@@ -4649,7 +4650,7 @@ export function HomeShell() {
     fallback?: string | null,
   ): string {
     if (
-      slot === nextMeal?.next_slot &&
+      requestedMealSlot === slot &&
       !actualMealForSlot(slot) &&
       nextMealOptions?.recommended
     ) {
@@ -4664,7 +4665,7 @@ export function HomeShell() {
     fallback?: number | null,
   ): number | null {
     if (
-      slot === nextMeal?.next_slot &&
+      requestedMealSlot === slot &&
       !actualMealForSlot(slot) &&
       nextMealOptions?.recommended
     ) {
@@ -4690,11 +4691,8 @@ export function HomeShell() {
     }
 
     return (
-      meal.state === "predicted" ||
-      (
-        slot === nextMeal?.next_slot &&
-        Boolean(nextMealOptions?.recommended)
-      )
+      requestedMealSlot === slot &&
+      Boolean(nextMealOptions?.recommended)
     );
   }
 
@@ -7326,34 +7324,56 @@ export function HomeShell() {
                         </span>
                       </span>
 
-                      <strong
-                        className={
-                          hasMealProposal(slot, meal)
-                            ? `${styles.dailyMealCalories} ${styles.dailyMealProposalReady}`
-                            : styles.dailyMealCalories
-                        }
-                      >
-                        {summaryMealForSlot(slot)
-                          ? `${formatNumber(
-                              summaryMealsForSlot(
-                                slot,
-                              ).reduce(
-                                (
-                                  total,
-                                  registeredMeal,
-                                ) =>
-                                  total +
-                                  Number(
-                                    registeredMeal.calories ||
-                                      0,
-                                  ),
-                                0,
-                              ),
-                            )} kcal`
-                          : hasMealProposal(slot, meal)
-                            ? "◷ Proposta pronta"
-                            : "—"}
-                      </strong>
+                      {summaryMealForSlot(slot) ? (
+                        <strong
+                          className={styles.dailyMealCalories}
+                        >
+                          {formatNumber(
+                            summaryMealsForSlot(
+                              slot,
+                            ).reduce(
+                              (
+                                total,
+                                registeredMeal,
+                              ) =>
+                                total +
+                                Number(
+                                  registeredMeal.calories ||
+                                    0,
+                                ),
+                              0,
+                            ),
+                          )} kcal
+                        </strong>
+                      ) : selectedLogDate === todayIso() ? (
+                        <button
+                          type="button"
+                          className={
+                            `${styles.dailyMealCalories} ${styles.dailyMealProposalReady}`
+                          }
+                          disabled={requestingMealSlot !== null}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            if (!hasMealProposal(slot, meal)) {
+                              void requestMealProposal(slot);
+                            }
+                          }}
+                        >
+                          {requestingMealSlot === slot
+                            ? "Sto preparando…"
+                            : hasMealProposal(slot, meal)
+                              ? "◷ Proposta pronta"
+                              : "✦ Richiedi proposta"}
+                        </button>
+                      ) : (
+                        <strong
+                          className={styles.dailyMealCalories}
+                        >
+                          —
+                        </strong>
+                      )}
 
                       {summaryMealForSlot(slot) ? (
                         <span
@@ -7414,15 +7434,15 @@ export function HomeShell() {
                         className={
                           summaryMealForSlot(slot)
                             ? styles.registeredMealBadge
-                            : meal.state === "predicted"
+                            : hasMealProposal(slot, meal)
                               ? styles.predictedBadge
                               : styles.unknownBadge
                         }
                       >
                         {summaryMealForSlot(slot)
                           ? homeCopy.logged
-                          : meal.state === "predicted"
-                            ? "Previsto"
+                          : hasMealProposal(slot, meal)
+                            ? "Proposta pronta"
                             : "Da decidere"}
                       </span>
 
@@ -8212,7 +8232,8 @@ export function HomeShell() {
                     {!hasMealProposal(slot, meal) &&
                     selectedLogDate === todayIso() &&
                     !summaryMealForSlot(slot) &&
-                    meal.state === "predicted" ? (
+                    requestedMealSlot === slot &&
+                    Boolean(nextMealOptions?.recommended) ? (
                       <>
                         <div className={styles.mealActions}>
                           <button
@@ -8276,7 +8297,7 @@ export function HomeShell() {
                     ) : null}
 
                     {slot === "dinner" &&
-                    slot === nextMeal?.next_slot &&
+                    requestedMealSlot === slot &&
                     !summaryMealForSlot(slot) &&
                     nextMealOptions?.day_context?.kind ===
                       "training_prep" ? (
