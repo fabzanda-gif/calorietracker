@@ -176,16 +176,14 @@ function paceLabel(
 }
 
 
-export function RunningPlanBuilder({
-  onCreated,
-}: {
-  onCreated?: () => void;
-}) {
+export function RunningPlanBuilder() {
   const { accessToken } = useAuth();
 
   const [plans, setPlans] = useState<
     TrainingPlan[]
   >([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [plansError, setPlansError] = useState<string | null>(null);
 
   const [currentDistance, setCurrentDistance] =
     useState("5");
@@ -251,9 +249,12 @@ export function RunningPlanBuilder({
 
   async function refreshPlans() {
     if (!accessToken) {
+      setLoadingPlans(false);
       return;
     }
 
+    setLoadingPlans(true);
+    setPlansError(null);
     try {
       const response =
         await getTrainingPlans(
@@ -262,8 +263,9 @@ export function RunningPlanBuilder({
 
       setPlans(response.items);
     } catch {
-      // The generic activity page remains usable
-      // even if this optional block cannot load.
+      setPlansError("Non riesco a caricare il piano. Riprova più tardi.");
+    } finally {
+      setLoadingPlans(false);
     }
   }
 
@@ -421,7 +423,6 @@ export function RunningPlanBuilder({
         "Piano eliminato insieme alle sessioni collegate.",
       );
 
-      onCreated?.();
 
     } catch (error) {
       setMessage(
@@ -452,27 +453,18 @@ export function RunningPlanBuilder({
           previewInput,
           accessToken,
           {
-            replaceActive:
-              Boolean(activePlan),
+            replaceActive: false,
           },
         );
 
-      const replaced =
-        Boolean(
-          response.replaced_plan_ids?.length,
-        );
-
       setMessage(
-        replaced
-          ? `Piano sostituito: ${response.plan.total_weeks} settimane, ${response.session_count} nuove sessioni aggiunte al calendario.`
-          : `Piano confermato: ${response.plan.total_weeks} settimane, ${response.session_count} sessioni aggiunte al calendario.`,
+        `Piano confermato: ${response.plan.total_weeks} settimane, ${response.session_count} sessioni aggiunte al calendario.`,
       );
 
       clearPreview();
 
       await refreshPlans();
 
-      onCreated?.();
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -553,8 +545,18 @@ export function RunningPlanBuilder({
 
   useEffect(() => {
     setPlanSessions([]);
-    setShowFullPlan(false);
+    setShowFullPlan(Boolean(activePlan));
   }, [activePlan?.id]);
+
+  const completedSessions = planSessions.filter(
+    (session) => session.status === "completed",
+  ).length;
+  const nextSession = planSessions
+    .filter((session) => session.status === "planned")
+    .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))[0];
+  const progressPercent = planSessions.length
+    ? Math.round(completedSessions / planSessions.length * 100)
+    : 0;
 
 
   const sessionsByWeek =
@@ -663,8 +665,8 @@ export function RunningPlanBuilder({
               }}
             >
               {showFullPlan
-                ? "Nascondi piano"
-                : "Vedi piano completo"}
+                ? "Nascondi settimane"
+                : "Vedi tutte le settimane"}
             </button>
 
             <button
@@ -684,6 +686,39 @@ export function RunningPlanBuilder({
           </div>
         ) : null}
       </div>
+
+      {loadingPlans ? (
+        <p className={styles.message}>Carico il tuo piano…</p>
+      ) : null}
+      {plansError ? (
+        <p className={styles.message} role="alert">{plansError}</p>
+      ) : null}
+
+      {activePlan ? (
+        <div className={styles.progressCard}>
+          <div className={styles.progressHeading}>
+            <div>
+              <small>IL CAMMINO FATTO</small>
+              <strong>{completedSessions} di {planSessions.length} corse completate</strong>
+            </div>
+            <b>{progressPercent}%</b>
+          </div>
+          <progress
+            value={completedSessions}
+            max={Math.max(planSessions.length, 1)}
+            aria-label="Avanzamento del piano di corsa"
+          />
+          <p>
+            {loadingFullPlan
+              ? "Carico le sessioni del tuo percorso…"
+              : nextSession
+                ? `Prossima corsa: ${sessionDateLabel(nextSession.scheduled_date)} · ${nextSession.title}`
+                : planSessions.length
+                  ? "Tutte le sessioni pianificate sono state affrontate."
+                  : "Le sessioni saranno visibili appena disponibili."}
+          </p>
+        </div>
+      ) : null}
 
       {activePlan && showFullPlan ? (
         <section className={styles.fullPlan}>
@@ -912,6 +947,7 @@ export function RunningPlanBuilder({
         </section>
       ) : null}
 
+      {!activePlan && !loadingPlans && !plansError ? (<>
       <div className={styles.columns}>
         <div className={styles.stateCard}>
           <div className={styles.cardTitle}>
@@ -1103,21 +1139,6 @@ export function RunningPlanBuilder({
             </div>
           </div>
 
-          {activePlan ? (
-            <div className={styles.replaceWarning}>
-              <strong>
-                Hai già un piano attivo.
-              </strong>
-
-              <span>
-                Se confermi, il piano attuale
-                e tutte le sue sessioni future
-                verranno sostituiti da questa
-                nuova pianificazione.
-              </span>
-            </div>
-          ) : null}
-
           <div className={styles.previewSessions}>
             {previewSessions
               .slice(0, 6)
@@ -1196,9 +1217,7 @@ export function RunningPlanBuilder({
             >
               {saving
                 ? "Salvo il piano…"
-                : activePlan
-                  ? "Sostituisci piano attivo"
-                  : "Conferma e aggiungi al calendario"}
+                : "Conferma e aggiungi al calendario"}
             </button>
 
             <button
@@ -1215,6 +1234,7 @@ export function RunningPlanBuilder({
           </div>
         </div>
       ) : null}
+      </>) : null}
 
       {message ? (
         <p className={styles.message}>
