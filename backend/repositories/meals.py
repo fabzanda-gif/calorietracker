@@ -139,6 +139,18 @@ class MealsRepository(BaseRepository):
         end_date: Any,
         columns: str = MEAL_COLUMNS,
     ) -> list[dict]:
+        cache_key = (
+            "list_date_range",
+            str(user_id),
+            str(start_date),
+            str(end_date),
+            str(columns),
+        )
+
+        cached = self._cached(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             response = (
                 self.table
@@ -148,7 +160,10 @@ class MealsRepository(BaseRepository):
                 .lte("date", str(end_date))
                 .execute()
             )
-            return self._data(response)
+            return self._store_cache(
+                cache_key,
+                self._data(response),
+            )
         except Exception as exc:
             raise RepositoryError(
                 f"Unable to load meals in date range: {exc}"

@@ -1,11 +1,28 @@
 import { apiRequest } from "./client";
 import type {
+  ActivityMovementSummary,
+} from "./activities";
+import type {
   DayBudgetResponse,
   DayResponse,
   DecisionMode,
+  HomeCoreResponse,
   MealOptionsResponse,
   NextMealResponse,
+  TrainingNutritionResponse,
 } from "./types";
+
+export function getHomeCore(
+  dayDate: string,
+  accessToken?: string | null,
+): Promise<HomeCoreResponse> {
+  return apiRequest<HomeCoreResponse>(
+    `/days/${encodeURIComponent(dayDate)}/home-core`,
+    {
+      accessToken,
+    },
+  );
+}
 
 export function getDay(
   dayDate: string,
@@ -25,6 +42,19 @@ export function getNextMeal(
 ): Promise<NextMealResponse> {
   return apiRequest<NextMealResponse>(
     `/days/${encodeURIComponent(dayDate)}/next-meal`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export function getTrainingNutrition(
+  dayDate: string,
+  accessToken?: string | null,
+): Promise<TrainingNutritionResponse> {
+  return apiRequest<TrainingNutritionResponse>(
+    `/days/${encodeURIComponent(dayDate)}` +
+      `/training-nutrition`,
     {
       accessToken,
     },
@@ -57,6 +87,75 @@ export function getMealOptions(
     `/days/${encodeURIComponent(dayDate)}` +
       `/meals/${encodeURIComponent(mealSlot)}` +
       `/options?${query.toString()}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+export type DailyLogUpdate = {
+  weight?: number | null;
+  steps?: number | null;
+  day_type?: string | null;
+  activity_plan?: string | null;
+};
+
+export async function updateDailyLog(
+  accessToken: string,
+  date: string,
+  changes: DailyLogUpdate,
+) {
+  return apiRequest<{
+    updated: boolean;
+    date: string;
+    item: Record<string, unknown> | null;
+    movement?: ActivityMovementSummary | null;
+  }>(
+    `/daily-logs/${date}`,
+    {
+      method: "PATCH",
+      accessToken,
+      body: JSON.stringify(changes),
+    },
+  );
+}
+
+
+export type DayBriefingMode =
+  | "standard"
+  | "zero";
+
+export type DayBriefingMoment =
+  | "morning"
+  | "afternoon"
+  | "evening";
+
+export type DayBriefingResponse = {
+  date: string;
+  mode: DayBriefingMode;
+  message: string;
+  source: "ai" | "fallback";
+  cached: boolean;
+};
+
+export function getDayBriefing(
+  dayDate: string,
+  moment: DayBriefingMoment,
+  mode: DayBriefingMode = "standard",
+  hour: number = new Date().getHours(),
+  language: "it" | "en" | "nl" | "fr" = "it",
+  accessToken?: string | null,
+): Promise<DayBriefingResponse> {
+  const query = new URLSearchParams({
+    moment,
+    mode,
+    hour: String(hour),
+    language,
+  });
+
+  return apiRequest<DayBriefingResponse>(
+    `/days/${encodeURIComponent(dayDate)}` +
+      `/briefing?${query.toString()}`,
     {
       accessToken,
     },
