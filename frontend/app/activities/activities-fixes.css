@@ -1,0 +1,105 @@
+/* Route-level polish for the Activities page. */
+
+main[class*="ActivitiesPage_page"] {
+  grid-template-columns: minmax(0, 1.18fr) minmax(390px, 0.82fr) !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_uploadCard"],
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loggerCard"],
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"],
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerSection"] {
+  min-width: 0;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] {
+  min-width: 0;
+  align-items: flex-start;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] > div {
+  min-width: 0;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] h2,
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] p {
+  overflow-wrap: anywhere;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
+  flex: 0 1 360px;
+  justify-content: flex-start !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerHeading"] {
+  align-items: flex-start !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] > * {
+  max-width: 100%;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerMorePrompt"] {
+  flex-basis: 100%;
+  margin-left: 0 !important;
+  white-space: normal !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dropZone"] {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailStats"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"][data-stale-hidden="true"] {
+  display: none !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loading"][data-calendar-ready="true"] {
+  display: none !important;
+}
+
+@media (max-width: 1180px) {
+  main[class*="ActivitiesPage_page"] {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "header"
+      "summary"
+      "calendar"
+      "planner"
+      "upload"
+      "programs"
+      "logger"
+      "activities"
+      "detail"
+      "preview" !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerHeading"] {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 720px) {
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerMorePrompt"] {
+    grid-column: 1 / -1;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivityConfirm"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivityGpx"] {
+    width: 100%;
+  }
+}
