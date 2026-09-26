@@ -1,7 +1,8 @@
 /* Route-level polish for the Activities page. */
 
 main[class*="ActivitiesPage_page"] {
-  grid-template-columns: minmax(0, 1.18fr) minmax(390px, 0.82fr) !important;
+  grid-template-columns: minmax(0, 1.25fr) minmax(430px, 1fr) !important;
+  gap: 24px !important;
 }
 
 main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_uploadCard"],
@@ -9,11 +10,43 @@ main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loggerCard"],
 main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"],
 main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerSection"] {
   min-width: 0;
+  overflow: hidden;
 }
 
-main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] {
+/* PLAN / NEXT ACTIVITY */
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerHeading"] {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start !important;
+  gap: 16px !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightCopy"] {
   min-width: 0;
-  align-items: flex-start;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
+  display: grid !important;
+  grid-template-columns: auto auto;
+  justify-content: end !important;
+  gap: 8px !important;
+  min-width: 0;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerMorePrompt"] {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  margin: 2px 0 0 !important;
+  white-space: normal !important;
+}
+
+/* IMPORT CARD: never squeeze file copy into one horizontal line */
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start !important;
+  gap: 14px !important;
+  min-width: 0;
 }
 
 main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] > div {
@@ -25,44 +58,81 @@ main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilitySummary"] p {
   overflow-wrap: anywhere;
 }
 
-main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
-  flex: 0 1 360px;
-  justify-content: flex-start !important;
-}
-
-main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerHeading"] {
-  align-items: flex-start !important;
-}
-
-main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] > * {
-  max-width: 100%;
-}
-
-main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerMorePrompt"] {
-  flex-basis: 100%;
-  margin-left: 0 !important;
-  white-space: normal !important;
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_utilityBody"] {
+  min-width: 0;
 }
 
 main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dropZone"] {
-  min-width: 0;
-  width: 100%;
-  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: 48px minmax(0, 1fr) !important;
+  grid-template-areas:
+    "icon title"
+    "icon hint";
+  align-items: center !important;
+  justify-items: start !important;
+  gap: 4px 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 16px !important;
+  text-align: left !important;
 }
 
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dropZone"] [class*="ActivitiesPage_uploadIcon"] {
+  grid-area: icon;
+  width: 44px !important;
+  height: 44px !important;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dropZone"] strong {
+  grid-area: title;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dropZone"] small {
+  grid-area: hint;
+  justify-self: start !important;
+  white-space: normal !important;
+  line-height: 1.3;
+}
+
+/* LOGGER: keep eyebrow and title on separate lines */
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loggerHeading"] > span:first-child {
+  display: grid !important;
+  gap: 5px;
+  min-width: 0;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loggerHeading"] [class*="ActivitiesPage_eyebrow"] {
+  display: block !important;
+  margin: 0 !important;
+  line-height: 1;
+}
+
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loggerHeading"] strong {
+  display: block;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* DETAIL */
 main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailStats"] {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
-main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"][data-stale-hidden="true"] {
-  display: none !important;
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"] [class*="ActivitiesPage_cardHeading"] {
+  gap: 12px !important;
 }
 
-main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loading"][data-calendar-ready="true"] {
-  display: none !important;
+main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"] h2 {
+  overflow-wrap: anywhere;
 }
 
-@media (max-width: 1180px) {
+/* Switch to a single column before cards become cramped. */
+@media (max-width: 1240px) {
   main[class*="ActivitiesPage_page"] {
     grid-template-columns: 1fr !important;
     grid-template-areas:
@@ -78,28 +148,31 @@ main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_loading"][data-calend
       "preview" !important;
   }
 
-  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
-    width: 100%;
-    flex-basis: 100%;
-  }
-
   main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerHeading"] {
-    flex-wrap: wrap;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 
 @media (max-width: 720px) {
-  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerHeading"] {
+    grid-template-columns: 1fr;
   }
 
-  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerMorePrompt"] {
-    grid-column: 1 / -1;
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
+    grid-template-columns: 1fr 1fr;
+    justify-content: stretch !important;
   }
 
   main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivityConfirm"],
   main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivityGpx"] {
     width: 100%;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_plannerMorePrompt"] {
+    justify-content: flex-start;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dropZone"] {
+    grid-template-columns: 42px minmax(0, 1fr) !important;
   }
 }
