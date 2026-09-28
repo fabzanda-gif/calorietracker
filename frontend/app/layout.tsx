@@ -5,6 +5,7 @@ import { AuthGate } from "@/components/auth/AuthGate";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { ExperienceModeProvider } from "@/components/experience/ExperienceModeProvider";
 import { I18nProvider } from "@/components/i18n/I18nProvider";
+import { QuickAddMealDefaults } from "@/components/home/QuickAddMealDefaults";
 
 import "./globals.css";
 
@@ -62,6 +63,7 @@ export default function RootLayout({
     <html lang="it" suppressHydrationWarning>
       <body>
         <RegisterServiceWorker />
+        <QuickAddMealDefaults />
         <I18nProvider>
           <AuthProvider>
             <ExperienceModeProvider>
