@@ -2498,22 +2498,21 @@ export function HomeShell() {
     `${todayIso()}T12:00:00`,
   );
 
-  const mondayForWeek = new Date(
+  const rollingWeekStart = new Date(
     todayForWeek,
   );
 
-  mondayForWeek.setDate(
-    todayForWeek.getDate() -
-      ((todayForWeek.getDay() + 6) % 7),
+  rollingWeekStart.setDate(
+    todayForWeek.getDate() - 6,
   );
 
   const weekOverviewDays = Array.from(
     { length: 7 },
     (_, index) => {
-      const date = new Date(mondayForWeek);
+      const date = new Date(rollingWeekStart);
 
       date.setDate(
-        mondayForWeek.getDate() + index,
+        rollingWeekStart.getDate() + index,
       );
 
       const iso = [
@@ -8941,7 +8940,7 @@ export function HomeShell() {
                       Ritmo
                     </p>
                     <h2>
-                      {homeCopy.yourWeek}
+                      I tuoi ultimi 7 giorni
                     </h2>
                   </div>
                 </div>
@@ -8964,8 +8963,8 @@ export function HomeShell() {
 
               <p className={styles.bottomOverviewIntro}>
                 {weekDetailsLoaded
-                  ? homeCopy.weekIntro
-                  : "Riepilogo leggero. Carica lo storico solo quando ti serve."}
+                  ? "Una finestra mobile: oggi e i 6 giorni precedenti."
+                  : "Riepilogo leggero degli ultimi 7 giorni. Carica lo storico solo quando ti serve."}
               </p>
 
               {!weekDetailsLoaded ? (
@@ -8978,8 +8977,8 @@ export function HomeShell() {
                   }}
                 >
                   {weekDetailsLoading
-                    ? "Carico settimana…"
-                    : "Apri dettaglio settimana →"}
+                    ? "Carico ultimi 7 giorni…"
+                    : "Apri dettaglio 7 giorni →"}
                 </button>
               ) : null}
 
@@ -9001,7 +9000,7 @@ export function HomeShell() {
                     🍴
                   </span>
                   <div>
-                    <span>{homeCopy.weeklyMeals}</span>
+                    <span>Pasti · 7 giorni</span>
                     <strong>
                       {weeklyMealCount}
                     </strong>
@@ -9323,8 +9322,8 @@ export function HomeShell() {
 
               <p className={styles.weekOverviewNote}>
                 {weeklyMealDays > 0
-                  ? homeCopy.weekLogged(weeklyMealDays)
-                  : homeCopy.weekEmpty}
+                  ? `${weeklyMealDays} giorni con pasti registrati negli ultimi 7.`
+                  : "Gli ultimi 7 giorni inizieranno a prendere forma quando registrerai i pasti."}
               </p>
             </div>
           </section>
