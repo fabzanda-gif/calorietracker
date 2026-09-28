@@ -1668,6 +1668,30 @@ export function HomeShell() {
   }, [accessToken, loading, alternateSlot]);
 
   useEffect(() => {
+    if (!accessToken || loading) {
+      return;
+    }
+
+    let active = true;
+
+    void (async () => {
+      try {
+        const history = await getMealHistory(accessToken);
+
+        if (active) {
+          setWeeklyMealHistory(history.items);
+        }
+      } catch {
+        // La Home resta utilizzabile anche senza lo storico leggero.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [accessToken, loading]);
+
+  useEffect(() => {
     if (
       conversationPreview ||
       conversationDayPreview ||
@@ -4505,12 +4529,8 @@ export function HomeShell() {
     setWeekDetailsLoading(true);
 
     try {
-      const [history, dayHistoryPayload] = await Promise.all([
-        getMealHistory(accessToken),
-        getDayHistory(accessToken),
-      ]);
+      const dayHistoryPayload = await getDayHistory(accessToken);
 
-      setWeeklyMealHistory(history.items);
       setDayHistory(dayHistoryPayload);
       setWeekDetailsLoaded(true);
     } catch {
