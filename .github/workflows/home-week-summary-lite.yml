@@ -1,0 +1,59 @@
+name: Apply lightweight 7-day Home summary
+
+on:
+  push:
+    branches:
+      - codex/landing-redesign
+    paths:
+      - .github/workflows/home-week-summary-lite.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-home:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/landing-redesign
+          fetch-depth: 0
+
+      - name: Load meal history lightly in background
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("frontend/components/home/HomeShell.tsx")
+          text = path.read_text()
+
+          anchor = '''  useEffect(() => {\n    if (\n      conversationPreview ||\n      conversationDayPreview ||\n      conversationText.trim() ||\n      conversationPhoto\n    ) {\n      return;\n    }'''
+
+          effect = '''  useEffect(() => {\n    if (!accessToken || loading) {\n      return;\n    }\n\n    let active = true;\n\n    void (async () => {\n      try {\n        const history = await getMealHistory(accessToken);\n\n        if (active) {\n          setWeeklyMealHistory(history.items);\n        }\n      } catch {\n        // La Home resta utilizzabile anche senza lo storico leggero.\n      }\n    })();\n\n    return () => {\n      active = false;\n    };\n  }, [accessToken, loading]);\n\n'''
+
+          if effect not in text:
+              if anchor not in text:
+                  raise SystemExit("Conversation effect anchor not found")
+              text = text.replace(anchor, effect + anchor, 1)
+
+          old = '''    try {\n      const [history, dayHistoryPayload] = await Promise.all([\n        getMealHistory(accessToken),\n        getDayHistory(accessToken),\n      ]);\n\n      setWeeklyMealHistory(history.items);\n      setDayHistory(dayHistoryPayload);\n      setWeekDetailsLoaded(true);'''
+
+          new = '''    try {\n      const dayHistoryPayload = await getDayHistory(accessToken);\n\n      setDayHistory(dayHistoryPayload);\n      setWeekDetailsLoaded(true);'''
+
+          if old not in text:
+              raise SystemExit("loadWeekDetails block not found")
+
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+
+      - name: Commit Home summary fix
+        run: |
+          if git diff --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/components/home/HomeShell.tsx
+          git commit -m "Populate rolling 7-day Home summary in background"
+          git push origin HEAD:codex/landing-redesign
