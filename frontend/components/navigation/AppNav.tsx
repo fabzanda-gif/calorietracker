@@ -16,7 +16,7 @@ const ITEMS = [
   { href: "/", label: "Home", icon: "⌂" },
   { href: "/plan", label: "Plan", icon: "▣" },
   { href: "/ai", label: "AI", icon: "✦" },
-  { href: "/recipes", label: "Food", icon: "⌑" },
+  { href: "/food", label: "Food", icon: "⌑" },
   {
     href: "/progress",
     label: "Insights",
@@ -40,8 +40,12 @@ function isActive(pathname: string, href: string): boolean {
   }
 
   if (
-    href === "/recipes" &&
-    (pathname.startsWith("/inventory") || pathname.startsWith("/ingredients"))
+    href === "/food" &&
+    (
+      pathname.startsWith("/recipes") ||
+      pathname.startsWith("/inventory") ||
+      pathname.startsWith("/ingredients")
+    )
   ) {
     return true;
   }
