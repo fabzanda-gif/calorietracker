@@ -9,6 +9,7 @@ PLANNED_ACTIVITY_SELECT = (
     "id,user_id,scheduled_date,scheduled_time,"
     "title,activity_type,duration_minutes,"
     "distance_meters,intensity,notes,status,"
+    "suspended_by_special_period_id,"
     "training_plan_id,training_week,session_kind,"
     "created_at,updated_at"
 )
