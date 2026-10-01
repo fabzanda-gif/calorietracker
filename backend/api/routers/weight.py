@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date as Date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from backend.api.dependencies import (
@@ -29,11 +29,28 @@ class WeightUpdate(BaseModel):
 
 @router.get("")
 def get_weight_history(
+    start_date: Date | None = Query(default=None),
+    end_date: Date | None = Query(default=None),
     current_user: CurrentUser = Depends(get_current_user),
     repo: WeightRepository = Depends(get_weight_repository),
 ):
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date and end_date must be provided together",
+        )
+    if start_date is not None and end_date is not None and end_date < start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_date cannot be before start_date",
+        )
+
     try:
-        rows = repo.history(current_user.id)
+        rows = (
+            repo.history_range(current_user.id, start_date, end_date)
+            if start_date is not None and end_date is not None
+            else repo.history(current_user.id)
+        )
         return {"count": len(rows), "items": rows}
     except RepositoryError as exc:
         raise HTTPException(
