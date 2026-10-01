@@ -1,0 +1,16 @@
+.panel {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 70;
+  width: min(460px, calc(100vw - 56px));
+  filter: drop-shadow(0 18px 40px rgba(15, 42, 67, 0.16));
+}
+
+@media (max-width: 720px) {
+  .panel {
+    right: 14px;
+    bottom: 86px;
+    width: calc(100vw - 28px);
+  }
+}
