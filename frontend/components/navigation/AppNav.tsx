@@ -14,7 +14,7 @@ import styles from "./AppNav.module.css";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: "⌂" },
-  { href: "/activities", label: "Plan", icon: "▣" },
+  { href: "/plan", label: "Plan", icon: "▣" },
   { href: "/ai", label: "AI", icon: "✦" },
   { href: "/recipes", label: "Food", icon: "⌑" },
   {
@@ -31,6 +31,13 @@ const ITEMS = [
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
+
+  if (
+    href === "/plan" &&
+    pathname.startsWith("/activities")
+  ) {
+    return true;
+  }
 
   if (
     href === "/recipes" &&
