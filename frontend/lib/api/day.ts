@@ -12,6 +12,84 @@ import type {
   TrainingNutritionResponse,
 } from "./types";
 
+export type HomeSummaryMeal = {
+  id?: string | number | null;
+  meal_type: string;
+  name: string;
+  calories?: number | null;
+  protein?: number | null;
+};
+
+export type HomeSummaryActivity = {
+  id?: string | number | null;
+  date: string;
+  activity_name: string;
+  burned_calories?: number | null;
+  duration_seconds?: number | null;
+  distance_meters?: number | null;
+};
+
+export type HomeSummaryResponse = {
+  date: string;
+  context: string | null;
+  special_period: {
+    id?: string;
+    period_type: "vacation" | "illness";
+    start_date: string;
+    end_date: string;
+    notes?: string | null;
+  } | null;
+  hero: {
+    kind: string;
+    title: string;
+    message: string;
+    icon: string;
+  };
+  budget: {
+    daily_budget_kcal: number;
+    consumed_kcal: number;
+    available_kcal: number;
+    maintenance_kcal: number;
+    protein_consumed_g: number;
+    protein_target_g: number | null;
+    protein_remaining_g: number | null;
+  } | null;
+  profile_goal: {
+    goal_mode: string;
+    goal_adjustment_kcal: number;
+    bmr: number | null;
+    protein_target_g: number | null;
+    profile_complete_for_budget: boolean;
+  };
+  latest_weight: {
+    id?: string | number;
+    date: string;
+    weight: number;
+  } | null;
+  meals: HomeSummaryMeal[];
+  activities: HomeSummaryActivity[];
+  planned_today: Array<Record<string, unknown>>;
+  planned_tomorrow: Array<Record<string, unknown>>;
+  meta: {
+    history_days_used: number;
+    ai_calls: number;
+    average_activity_kcal_7d: number;
+  };
+};
+
+export function getHomeSummary(
+  dayDate: string,
+  accessToken?: string | null,
+): Promise<HomeSummaryResponse> {
+  return apiRequest<HomeSummaryResponse>(
+    `/home-summary/${encodeURIComponent(dayDate)}`,
+    {
+      accessToken,
+      route: "heavy",
+    },
+  );
+}
+
 export function getHomeCore(
   dayDate: string,
   accessToken?: string | null,
