@@ -16,10 +16,15 @@ export type TrainingNotificationSettings = {
   reminder_hour: number;
 };
 
-export async function getPushPublicKey(): Promise<string> {
+export async function getPushPublicKey(
+  accessToken: string,
+): Promise<string> {
   const response = await apiRequest<{ public_key: string }>(
     "/notifications/vapid-public-key",
-    { route: "heavy" },
+    {
+      accessToken,
+      route: "heavy",
+    },
   );
 
   return response.public_key;
