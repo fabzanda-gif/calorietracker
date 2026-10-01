@@ -15,6 +15,7 @@ from backend.services.day_history import DayHistoryService
 from backend.services.memory import MemoryService
 from backend.services.profile_goal import ProfileGoalService
 from backend.services.planned_activity_energy import summarize_planned_activity_energy
+from backend.services.special_periods import active_special_period
 
 
 class DayBudgetService:
@@ -60,6 +61,7 @@ class DayBudgetService:
             profile_goal_service or ProfileGoalService()
         )
         self.budget_service = budget_service or BudgetService()
+        self._special_period_cache: dict[tuple[str, date], dict | None] = {}
 
     @staticmethod
     def _activity_buffer_kcal(activity_level: Any) -> float:
@@ -100,12 +102,47 @@ class DayBudgetService:
 
         return 0.0
 
+    def _special_period(
+        self,
+        *,
+        user_id: str,
+        day_date: date,
+    ) -> dict | None:
+        key = (user_id, day_date)
+        if key in self._special_period_cache:
+            return self._special_period_cache[key]
+
+        supabase = getattr(self.daily_logs_repo, "supabase", None)
+        if supabase is None:
+            self._special_period_cache[key] = None
+            return None
+
+        try:
+            value = active_special_period(
+                supabase,
+                user_id=user_id,
+                on_date=day_date,
+            )
+        except Exception:
+            value = None
+
+        self._special_period_cache[key] = value
+        return value
+
     def _activity_level(
         self,
         *,
         user_id: str,
         day_date: date,
     ) -> str | None:
+        special_period = self._special_period(
+            user_id=user_id,
+            day_date=day_date,
+        )
+
+        if special_period and special_period.get("training_policy") == "suspend":
+            return "rest"
+
         row = self.daily_logs_repo.get_for_date_compatible(
             user_id=user_id,
             log_date=day_date,
@@ -115,6 +152,13 @@ class DayBudgetService:
 
         if explicit is not None and str(explicit).strip():
             return str(explicit).strip()
+
+        if special_period:
+            activity_bias = special_period.get("activity_bias")
+            if activity_bias == "higher":
+                return "moderate"
+            if activity_bias == "lower":
+                return "rest"
 
         prediction = self.memory_service.predict_activity_plan(
             user_id=user_id,
@@ -323,7 +367,15 @@ class DayBudgetService:
             "monday", "tuesday", "wednesday", "thursday",
             "friday", "saturday", "sunday",
         )
-        day_context = today_row.get("day_type")
+        special_period = self._special_period(
+            user_id=user_id,
+            day_date=day_date,
+        )
+        day_context = (
+            "free"
+            if special_period is not None
+            else today_row.get("day_type")
+        )
         if not day_context and isinstance(schedule, Mapping):
             day_context = schedule.get(day_names[day_date.weekday()])
 
@@ -383,6 +435,7 @@ class DayBudgetService:
                 "planned_activity_level": planned_energy["activity_level"],
                 "planned_activities": planned_energy["items"],
                 "activity_suggestion": activity_suggestion,
+                "special_period": special_period,
                 "baseline_activity_factor": 1.0,
                 "history": activity_history,
             },
