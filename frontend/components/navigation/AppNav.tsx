@@ -18,7 +18,7 @@ const ITEMS = [
   { href: "/ai", label: "AI", icon: "✦" },
   { href: "/food", label: "Food", icon: "⌑" },
   {
-    href: "/progress",
+    href: "/insights",
     label: "Insights",
     icon: (
       <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -46,6 +46,13 @@ function isActive(pathname: string, href: string): boolean {
       pathname.startsWith("/inventory") ||
       pathname.startsWith("/ingredients")
     )
+  ) {
+    return true;
+  }
+
+  if (
+    href === "/insights" &&
+    pathname.startsWith("/progress")
   ) {
     return true;
   }
