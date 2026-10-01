@@ -14,6 +14,7 @@ from backend.api.dependencies import (
     get_admin_supabase_client,
     get_current_user,
 )
+from backend.services.special_periods import active_special_period
 
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -232,8 +233,18 @@ def dispatch_training_notifications(
             skipped += 1
             continue
 
-        local_date = now_local.date().isoformat()
+        local_day = now_local.date()
+        local_date = local_day.isoformat()
         if str(subscription.get("last_notified_date") or "") == local_date:
+            skipped += 1
+            continue
+
+        special_period = active_special_period(
+            client,
+            user_id=subscription["user_id"],
+            on_date=local_day,
+        )
+        if special_period and special_period.get("training_policy") == "suspend":
             skipped += 1
             continue
 
