@@ -6,13 +6,13 @@
   padding: 14px;
   border: 1px solid rgba(15, 42, 67, 0.1);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 14px 34px rgba(15, 42, 67, 0.14);
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(15, 42, 67, 0.12);
 }
 
 .copy {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -40,7 +40,8 @@
   line-height: 1.38;
 }
 
-.icon {
+.icon,
+.compactIcon {
   display: grid;
   place-items: center;
   width: 34px;
@@ -49,6 +50,31 @@
   border-radius: 11px;
   background: rgba(255, 104, 104, 0.1);
   font-size: 17px;
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 44px;
+}
+
+.timeRow > span {
+  color: #0f2a43;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.timeRow select {
+  min-height: 34px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid rgba(15, 42, 67, 0.14);
+  border-radius: 9px;
+  background: #fff;
+  color: #0f2a43;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .copy small {
@@ -63,12 +89,20 @@
   font-weight: 650;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .card button {
   flex: 0 0 auto;
-  min-height: 38px;
+  min-height: 36px;
   border-radius: 999px;
   padding: 8px 13px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
@@ -80,10 +114,15 @@
   color: #fff;
 }
 
-.disable {
+.disable,
+.close {
   border: 1px solid rgba(15, 42, 67, 0.14);
   background: #fff;
   color: #0f2a43;
+}
+
+.close {
+  color: #64748b;
 }
 
 .card button:disabled {
@@ -91,20 +130,66 @@
   opacity: 0.58;
 }
 
+.compactCard {
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  padding: 7px;
+  border-radius: 14px;
+}
+
+.compactButton {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 0 !important;
+  padding: 3px 6px 3px 3px !important;
+  border: 0;
+  background: transparent;
+  border-radius: 10px !important;
+}
+
+.compactCopy {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.compactCopy strong {
+  color: #0f2a43;
+  font-size: 0.8rem;
+}
+
+.compactCopy small {
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
 @media (max-width: 720px) {
   .card {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
     gap: 10px;
-    padding: 13px;
+    padding: 12px;
   }
 
-  .card button {
-    width: auto;
-    margin-left: 44px;
-  }
-
-  .copy small {
+  .actions {
+    justify-content: flex-start;
     padding-left: 44px;
+  }
+
+  .copy small,
+  .timeRow {
+    padding-left: 44px;
+  }
+
+  .compactCard {
+    width: auto;
+    margin-left: 0;
+    padding: 7px;
+  }
+
+  .compactButton {
+    width: 100%;
   }
 }
