@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
+import { TrainingNotificationsProfilePanel } from "@/components/pwa/TrainingNotificationsProfilePanel";
 import { ExperienceModeProvider } from "@/components/experience/ExperienceModeProvider";
 import { I18nProvider } from "@/components/i18n/I18nProvider";
 import { QuickAddMealDefaults } from "@/components/home/QuickAddMealDefaults";
@@ -70,6 +71,7 @@ export default function RootLayout({
             <AuthGate>
               {children}
             </AuthGate>
+            <TrainingNotificationsProfilePanel />
             </ExperienceModeProvider>
           </AuthProvider>
         </I18nProvider>
