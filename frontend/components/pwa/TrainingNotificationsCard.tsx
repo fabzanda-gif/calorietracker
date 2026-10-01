@@ -122,7 +122,7 @@ export function TrainingNotificationsCard({ accessToken }: Props) {
 
   async function saveSubscription(hour: number) {
     const registration = await navigator.serviceWorker.ready;
-    const publicKey = await getPushPublicKey();
+    const publicKey = await getPushPublicKey(accessToken);
     let subscription = await registration.pushManager.getSubscription();
 
     if (!subscription) {
