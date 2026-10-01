@@ -1,0 +1,97 @@
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border: 1px solid rgba(15, 42, 67, 0.1);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 104, 104, 0.07), rgba(255, 255, 255, 0.96));
+}
+
+.copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.titleRow > div {
+  display: grid;
+  gap: 3px;
+}
+
+.titleRow strong {
+  color: #0f2a43;
+  font-size: 0.98rem;
+}
+
+.titleRow span {
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 12px;
+  background: rgba(255, 104, 104, 0.12);
+}
+
+.copy small {
+  color: #64748b;
+  padding-left: 48px;
+}
+
+.message {
+  color: #0f2a43 !important;
+  font-weight: 650;
+}
+
+.card button {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.enable {
+  border: 1px solid transparent;
+  background: #0f2a43;
+  color: #fff;
+}
+
+.disable {
+  border: 1px solid rgba(15, 42, 67, 0.14);
+  background: #fff;
+  color: #0f2a43;
+}
+
+.card button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+@media (max-width: 720px) {
+  .card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .card button {
+    width: 100%;
+  }
+
+  .copy small {
+    padding-left: 0;
+  }
+}
