@@ -12,8 +12,23 @@ import {
   type PlannedActivity,
   type PlannedActivityIntensity,
 } from "@/lib/api/activities";
+import {
+  getWeeklySchedule,
+  updateWeeklySchedule,
+  type WeeklyScheduleContext,
+} from "@/lib/api/profile";
 
 import styles from "./PlanPage.module.css";
+
+const WEEK_DAYS = [
+  { key: "monday", label: "Lunedì", number: 1 },
+  { key: "tuesday", label: "Martedì", number: 2 },
+  { key: "wednesday", label: "Mercoledì", number: 3 },
+  { key: "thursday", label: "Giovedì", number: 4 },
+  { key: "friday", label: "Venerdì", number: 5 },
+  { key: "saturday", label: "Sabato", number: 6 },
+  { key: "sunday", label: "Domenica", number: 7 },
+] as const;
 
 function localIsoDate(date: Date): string {
   const year = date.getFullYear();
@@ -30,6 +45,14 @@ function plusDays(days: number): string {
   const date = new Date();
   date.setHours(12, 0, 0, 0);
   date.setDate(date.getDate() + days);
+  return localIsoDate(date);
+}
+
+function weekStartIso(): string {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  const day = date.getDay();
+  date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
   return localIsoDate(date);
 }
 
@@ -66,14 +89,22 @@ export default function PlanPage() {
   const [duration, setDuration] = useState("");
   const [distance, setDistance] = useState("");
   const [intensity, setIntensity] = useState<PlannedActivityIntensity>("moderate");
+  const [weekStart] = useState(weekStartIso());
+  const [weekRoutine, setWeekRoutine] = useState<Record<string, WeeklyScheduleContext> | null>(null);
+  const [weekSaving, setWeekSaving] = useState(false);
+  const [weekMessage, setWeekMessage] = useState<string | null>(null);
 
   async function loadPlan() {
     if (!accessToken) return;
     setLoading(true);
     setError(null);
     try {
-      const response = await getPlannedActivities(todayIso(), plusDays(14), accessToken);
-      setItems(response.items);
+      const [activitiesResponse, weeklyResponse] = await Promise.all([
+        getPlannedActivities(todayIso(), plusDays(14), accessToken),
+        getWeeklySchedule(accessToken, weekStart),
+      ]);
+      setItems(activitiesResponse.items);
+      setWeekRoutine(weeklyResponse.days);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Non riesco a caricare il piano.");
     } finally {
@@ -126,6 +157,32 @@ export default function PlanPage() {
     }
   }
 
+  function setRoutineDay(day: string, value: WeeklyScheduleContext) {
+    setWeekRoutine((current) => current ? { ...current, [day]: value } : current);
+    setWeekMessage(null);
+  }
+
+  async function saveWeekRoutine() {
+    if (!accessToken || !weekRoutine || weekSaving) return;
+    setWeekSaving(true);
+    setWeekMessage(null);
+    try {
+      const response = await updateWeeklySchedule(accessToken, {
+        week_start: weekStart,
+        days: WEEK_DAYS.map((day) => ({
+          day_of_week: day.number,
+          context: weekRoutine[day.key] ?? "home",
+        })),
+      });
+      setWeekRoutine(response.days);
+      setWeekMessage("Routine della settimana aggiornata.");
+    } catch (err) {
+      setWeekMessage(err instanceof Error ? err.message : "Non riesco a salvare la routine.");
+    } finally {
+      setWeekSaving(false);
+    }
+  }
+
   return (
     <>
       <AppNav />
@@ -134,7 +191,7 @@ export default function PlanPage() {
           <div>
             <span className={styles.eyebrow}>PLAN</span>
             <h1>Pianifica la tua vita reale</h1>
-            <p>Allenamenti, cambi di routine, vacanze e malattia nello stesso calendario.</p>
+            <p>Allenamenti, routine, vacanze e malattia nello stesso posto.</p>
           </div>
           <Link href="/activities" className={styles.secondaryAction}>
             Registro attività →
@@ -250,6 +307,39 @@ export default function PlanPage() {
               <Link href="/activities" className={styles.textLink}>Vai al registro attività →</Link>
             </section>
           </aside>
+        </section>
+
+        <section className={styles.routineCard}>
+          <div className={styles.cardHeader}>
+            <div>
+              <span className={styles.cardKicker}>ROUTINE SETTIMANALE</span>
+              <h2>Dove sarai questa settimana?</h2>
+            </div>
+          </div>
+          <p className={styles.muted}>Casa, ufficio o giornata libera: questa informazione guida contesto e suggerimenti senza usare AI.</p>
+          {weekRoutine ? (
+            <div className={styles.routineGrid}>
+              {WEEK_DAYS.map((day) => (
+                <label key={day.key} className={styles.routineDay}>
+                  <span>{day.label}</span>
+                  <select
+                    value={weekRoutine[day.key] ?? "home"}
+                    onChange={(event) => setRoutineDay(day.key, event.target.value as WeeklyScheduleContext)}
+                  >
+                    <option value="home">Casa</option>
+                    <option value="office">Ufficio</option>
+                    <option value="free">Libero</option>
+                  </select>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.muted}>Carico la routine…</p>
+          )}
+          <button type="button" className={styles.primaryAction} disabled={!weekRoutine || weekSaving} onClick={() => void saveWeekRoutine()}>
+            {weekSaving ? "Salvataggio…" : "Salva routine settimana"}
+          </button>
+          {weekMessage ? <p className={styles.routineMessage}>{weekMessage}</p> : null}
         </section>
 
         {accessToken ? (
