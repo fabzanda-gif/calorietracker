@@ -1,0 +1,22 @@
+.panel {
+  width: min(960px, calc(100% - 48px));
+  margin: 18px auto 140px;
+}
+
+@media (min-width: 760px) {
+  .panel {
+    width: min(960px, calc(100% - 236px));
+    margin-left: max(
+      236px,
+      calc((100vw - 960px + 236px) / 2)
+    );
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .panel {
+    width: auto;
+    margin: 18px 16px 130px;
+  }
+}
