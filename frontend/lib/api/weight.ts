@@ -22,6 +22,24 @@ export function getWeightHistory(
   );
 }
 
+export function getWeightHistoryRange(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<WeightHistoryResponse> {
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+  });
+
+  return apiRequest<WeightHistoryResponse>(
+    `/weight?${params.toString()}`,
+    {
+      accessToken,
+    },
+  );
+}
+
 
 export function getLatestWeight(
   accessToken?: string | null,
