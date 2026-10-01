@@ -176,3 +176,84 @@ main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"] h2 {
     grid-template-columns: 42px minmax(0, 1fr) !important;
   }
 }
+
+/* Mobile layout: keep the 7-day calendar and activity detail inside the viewport. */
+@media (max-width: 620px) {
+  main[class*="ActivitiesPage_page"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: clip;
+    padding-bottom: calc(158px + env(safe-area-inset-bottom)) !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_calendarCard"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_calendarBody"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_weekCalendar"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_calendar"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_weekCalendar"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_calendar"] {
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_weekCalendar"] [class*="ActivitiesPage_day"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_weekCalendar"] [class*="ActivitiesPage_emptyDay"] {
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 50px !important;
+    aspect-ratio: auto !important;
+    padding: 0 !important;
+    border-radius: 11px !important;
+    font-size: 0.72rem !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_weekday"] {
+    min-width: 0;
+    padding-inline: 0 !important;
+    font-size: 0.58rem !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_energyState"] {
+    top: 3px !important;
+    right: 4px !important;
+    font-size: 0.72rem !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dayPlannedMarker"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_daySkippedMarker"],
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_dayStrengthMarker"] {
+    width: 15px !important;
+    height: 15px !important;
+    font-size: 0.5rem !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_previewForm"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_previewForm"] input,
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_previewForm"] select {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_mapFrame"],
+  main[class*="ActivitiesPage_page"] .leaflet-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 420px) {
+  main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_nextActivitySpotlightActions"] {
+    grid-template-columns: 1fr !important;
+  }
+}
