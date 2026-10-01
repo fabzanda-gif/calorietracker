@@ -73,6 +73,14 @@ class DayMetricsService:
             for item in activities
         )
 
+        logged_meal_types = sorted(
+            {
+                str(item.get("meal_type") or "").strip()
+                for item in meals
+                if str(item.get("meal_type") or "").strip()
+            }
+        )
+
         return {
             "date": str(day_date),
             "consumed_kcal": round(consumed_kcal, 2),
@@ -80,4 +88,5 @@ class DayMetricsService:
             "actual_activity_kcal": round(actual_activity_kcal, 2),
             "meal_count": len(meals),
             "activity_count": len(activities),
+            "logged_meal_types": logged_meal_types,
         }

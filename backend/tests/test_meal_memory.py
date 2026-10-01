@@ -60,6 +60,17 @@ def test_one_matching_meal_is_low_confidence():
     assert result["confidence"] == 1.0
 
 
+def test_two_recent_matching_meals_are_medium_confidence():
+    result = predict([
+        {"date": "2026-08-30", "meal_type": "Colazione", "name": "Yogurt e frutta"},
+        {"date": "2026-08-31", "meal_type": "Colazione", "name": "Yogurt e frutta"},
+    ])
+
+    assert result["value"] == "Yogurt e frutta"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["observations"] == 2
+
+
 def test_three_identical_weekly_meals_are_medium_confidence():
     result = predict([
         {"date": "2026-08-11", "meal_type": "Colazione", "name": "Colazione Ufficio"},
@@ -82,15 +93,16 @@ def test_four_recent_identical_weekly_meals_are_high_confidence():
     assert result["evidence"]["recent_matches"] == 4
 
 
-def test_only_same_weekday_is_considered():
+def test_sparse_weekday_history_falls_back_to_recent_meals():
     result = predict([
         {"date": "2026-08-24", "meal_type": "Colazione", "name": "Casa"},
         {"date": "2026-08-25", "meal_type": "Colazione", "name": "Ufficio"},
         {"date": "2026-08-26", "meal_type": "Colazione", "name": "Casa"},
     ])
 
-    assert result["value"] == "Ufficio"
-    assert result["evidence"]["observations"] == 1
+    assert result["value"] == "Casa"
+    assert result["evidence"]["observations"] == 3
+    assert result["confidence_level"] == "medium"
 
 
 def test_only_requested_meal_type_is_considered():
@@ -127,25 +139,92 @@ def test_context_filters_meal_history():
     assert result["evidence"]["observations"] == 2
 
 
-def test_context_does_not_fall_back_to_other_contexts():
+def test_office_context_matches_legacy_italian_label():
     result = predict(
         [
+            {
+                "date": "2026-08-18",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+            {
+                "date": "2026-08-25",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+        ],
+        [
+            {"date": "2026-08-18", "day_type": "Ufficio"},
+            {"date": "2026-08-25", "day_type": "Ufficio"},
+        ],
+        context="office",
+    )
+
+    assert result["value"] == "Colazione Ufficio"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["scope"] == "context"
+
+
+def test_explicit_context_can_use_unclassified_legacy_history():
+    result = predict(
+        [
+            {
+                "date": "2026-08-18",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+            {
+                "date": "2026-08-25",
+                "meal_type": "Colazione",
+                "name": "Colazione Ufficio",
+            },
+        ],
+        context="office",
+    )
+
+    assert result["value"] == "Colazione Ufficio"
+    assert result["confidence_level"] == "medium"
+    assert result["evidence"]["scope"] == "unclassified_weekday"
+
+
+def test_explicit_context_never_falls_back_to_another_context():
+    result = predict(
+        [
+            {
+                "date": "2026-08-11",
+                "meal_type": "Colazione",
+                "name": "Colazione Casa",
+            },
+            {
+                "date": "2026-08-18",
+                "meal_type": "Colazione",
+                "name": "Colazione Casa",
+            },
             {
                 "date": "2026-08-25",
                 "meal_type": "Colazione",
                 "name": "Colazione Casa",
-            }
+            },
         ],
         [
             {
+                "date": "2026-08-11",
+                "day_type": "Lavoro da casa",
+            },
+            {
+                "date": "2026-08-18",
+                "day_type": "Lavoro da casa",
+            },
+            {
                 "date": "2026-08-25",
                 "day_type": "Lavoro da casa",
-            }
+            },
         ],
         context="Ufficio",
     )
 
     assert result["state"] == "unknown"
+    assert result["value"] is None
 
 
 def test_estimated_nutrition_uses_matching_routine_average():
@@ -480,3 +559,94 @@ def test_portion_routine_ignores_gram_based_observation_for_nutrition():
     assert result["estimated_quantity"] == 2
     assert result["estimated_calories"] == 695.5
     assert result["estimated_protein_g"] == 40.9
+
+def test_combination_rows_become_one_meal_routine():
+    meals = []
+
+    for day_date in (
+        "2026-08-28",
+        "2026-08-29",
+        "2026-08-30",
+        "2026-08-31",
+    ):
+        meals.extend([
+            {
+                "date": day_date,
+                "meal_type": "Colazione",
+                "name": "Latte macchiato d'avena",
+                "calories": 120,
+                "protein": 2,
+                "carbs": 18,
+                "fat": 4,
+            },
+            {
+                "date": day_date,
+                "meal_type": "Colazione",
+                "name": "Cheesecake",
+                "calories": 283,
+                "protein": 15,
+                "carbs": 25,
+                "fat": 12,
+            },
+        ])
+
+    logs = [
+        {
+            "date": day_date,
+            "day_type": (
+                "home"
+                if index % 2 == 0
+                else "free"
+            ),
+        }
+        for index, day_date in enumerate((
+            "2026-08-28",
+            "2026-08-29",
+            "2026-08-30",
+            "2026-08-31",
+        ))
+    ]
+
+    result = predict(
+        meals,
+        logs,
+        context="home",
+    )
+
+    assert result["value"] == (
+        "Cheesecake + "
+        "Latte macchiato d'avena"
+    )
+    assert result["confidence_level"] == "high"
+    assert result["estimated_calories"] == 403
+    assert len(result["components"]) == 2
+
+
+def test_home_and_free_share_breakfast_context():
+    result = predict(
+        [
+            {
+                "date": "2026-08-30",
+                "meal_type": "Colazione",
+                "name": "Latte d'avena",
+                "calories": 120,
+            },
+            {
+                "date": "2026-08-30",
+                "meal_type": "Colazione",
+                "name": "Cheesecake",
+                "calories": 280,
+            },
+        ],
+        [
+            {
+                "date": "2026-08-30",
+                "day_type": "free",
+            }
+        ],
+        context="home",
+    )
+
+    assert result["state"] == "predicted"
+    assert "Latte d'avena" in result["value"]
+    assert "Cheesecake" in result["value"]

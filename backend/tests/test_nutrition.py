@@ -111,6 +111,23 @@ def test_calculate_bmr_male_is_deterministic():
     assert result == expected
 
 
+def test_calculate_bmr_accepts_lowercase_profile_gender():
+    result = calculate_bmr(
+        78.8,
+        180,
+        "1990-08-21",
+        "male",
+        on_date=date(2026, 8, 21),
+    )
+    expected = round(
+        (10 * 78.8)
+        + (6.25 * 180)
+        - (5 * 36)
+        + 5
+    )
+    assert result == expected
+
+
 def test_calculate_bmr_female_is_deterministic():
     result = calculate_bmr(
         65,

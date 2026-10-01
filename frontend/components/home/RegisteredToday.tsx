@@ -82,17 +82,11 @@ export function RegisteredToday({
     useState<string | null>(null);
 
 
-  const extraMeals =
-    meals.filter(
-      (meal) =>
-        meal.meal_type !== "Colazione" &&
-        meal.meal_type !== "Pranzo" &&
-        meal.meal_type !== "Cena",
-    );
+  const registeredMeals = meals;
 
 
   const hasItems =
-    extraMeals.length > 0 ||
+    registeredMeals.length > 0 ||
     activities.length > 0;
 
 
@@ -472,12 +466,12 @@ export function RegisteredToday({
           </p>
 
           <h2>
-            Extra &amp; attività
+            Resoconto della giornata
           </h2>
 
           <p className={styles.subtitle}>
-            Quello che hai aggiunto oltre ai
-            pasti principali.
+            Tutto quello che hai registrato oggi:
+            pasti, snack e attività.
           </p>
         </div>
       </div>
@@ -489,7 +483,7 @@ export function RegisteredToday({
       ) : null}
 
       <div className={styles.list}>
-        {extraMeals.map((meal) => (
+        {registeredMeals.map((meal) => (
           <article
             key={`meal-${meal.id}`}
             className={styles.item}
@@ -612,7 +606,7 @@ export function RegisteredToday({
             <strong>
               {editing.kind === "activity"
                 ? "Modifica attività"
-                : "Modifica snack"}
+                : "Modifica pasto"}
             </strong>
 
             <button

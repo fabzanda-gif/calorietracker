@@ -7,11 +7,16 @@ export interface ConfirmMealResponse {
 
 export interface ConfirmMealRecommendation {
   name: string;
+  source?: string;
+  source_id?: string | null;
   quantity: number | null;
   calories: number;
   protein_g?: number;
   carbs_g?: number;
   fat_g?: number;
+  strategy?: string;
+  components?: unknown;
+  removed_components?: Array<Record<string, unknown>>;
 }
 
 export function confirmMealPrediction(

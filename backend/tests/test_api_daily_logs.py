@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from backend.api.dependencies import (
     CurrentUser,
+    get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
 )
@@ -37,7 +38,45 @@ class FakeDailyLogsRepository:
         ]
 
 
+class FakeActivitiesRepository:
+    def __init__(self):
+        self.last_step_calories = None
+
+    def list_for_date(
+        self,
+        user_id,
+        log_date,
+    ):
+        return [
+            {
+                "activity_name": "Padel",
+                "activity_type": "Padel",
+                "duration_seconds": 3600,
+                "estimated_steps": 6300,
+                "burned_calories": 500,
+            }
+        ]
+
+    def upsert_named_for_date(
+        self,
+        user_id,
+        log_date,
+        activity_name,
+        burned_calories,
+    ):
+        self.last_step_calories = burned_calories
+
+        return {
+            "id": "steps-activity",
+            "user_id": user_id,
+            "date": str(log_date),
+            "activity_name": activity_name,
+            "burned_calories": burned_calories,
+        }
+
+
 fake_repo = FakeDailyLogsRepository()
+fake_activities_repo = FakeActivitiesRepository()
 
 
 def override_current_user():
@@ -48,10 +87,17 @@ def override_repo():
     return fake_repo
 
 
+def override_activities_repo():
+    return fake_activities_repo
+
+
 @pytest.fixture(autouse=True)
 def api_overrides():
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_daily_logs_repository] = override_repo
+    app.dependency_overrides[get_activities_repository] = (
+        override_activities_repo
+    )
     yield
     app.dependency_overrides.clear()
 
@@ -65,8 +111,27 @@ def test_get_daily_log():
 
 
 def test_update_daily_log_steps():
-    r = client.patch("/daily-logs/2026-08-22", json={"steps": 9000})
+    r = client.patch(
+        "/daily-logs/2026-08-22",
+        json={"steps": 9000},
+    )
+
     assert r.status_code == 200
+    assert r.json()["movement"]["total_steps"] == 7000
+    assert (
+        r.json()["movement"][
+            "estimated_training_steps"
+        ]
+        == 6300
+    )
+    assert (
+        r.json()["movement"]["net_daily_steps"]
+        == 700
+    )
+    assert (
+        fake_activities_repo.last_step_calories
+        == 28
+    )
 
 
 def test_update_daily_log_planning():
@@ -107,3 +172,19 @@ def test_invalid_range_rejected():
         params={"start_date": "2026-08-23", "end_date": "2026-08-22"},
     )
     assert r.status_code == 400
+
+
+def test_planning_update_does_not_recalculate_steps():
+    fake_activities_repo.last_step_calories = None
+
+    response = client.patch(
+        "/daily-logs/2026-08-22",
+        json={
+            "day_type": "Casa",
+            "activity_plan": "Moderata",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["movement"] is None
+    assert fake_activities_repo.last_step_calories is None

@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+DateType = date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
@@ -18,29 +20,52 @@ from backend.services.meal_text_interpreter import (
 from backend.services.groq_meal_interpreter import (
     GroqMealInterpreter,
 )
+from backend.services.groq_day_log_interpreter import (
+    GroqDayLogInterpreter,
+    GroqDayLogInterpreterError,
+)
+from backend.services.activity_movement import (
+    estimated_gpx_calories,
+    normalize_activity_type,
+)
+from backend.services.groq_meal_vision_interpreter import (
+    GroqMealVisionInterpreter,
+)
 
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
     get_ingredients_repository,
     get_meal_ingredients_repository,
+    get_meal_prep_repository,
     get_meals_repository,
     get_recipe_ingredients_repository,
     get_recipes_repository,
+    get_weight_repository,
+    get_pantry_repository,
 )
 from backend.repositories.base import RepositoryError
 from backend.repositories.ingredients import IngredientsRepository
 from backend.repositories.meal_ingredients import (
     MealIngredientsRepository,
 )
+from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
 from backend.repositories.recipe_ingredients import (
     RecipeIngredientsRepository,
 )
 from backend.repositories.recipes import RecipesRepository
+from backend.repositories.weight import WeightRepository
+from backend.repositories.pantry import PantryRepository
 from backend.services.structured_meal import (
     StructuredMealError,
     StructuredMealService,
+)
+from backend.services.pantry_meal_logging import (
+    PantryMealLoggingError,
+    PantryMealItemNotFoundError,
+    PantryMealUnavailableError,
+    PantryMealLoggingService,
 )
 
 
@@ -51,6 +76,13 @@ class StructuredMealIngredient(BaseModel):
     ingredient_id: str
     quantity: float = Field(gt=0)
     unit: str = "g"
+    quantity_g: float = Field(gt=0)
+
+
+class PantryMealLogRequest(BaseModel):
+    date: date
+    meal_type: str = Field(min_length=1)
+    pantry_item_id: str = Field(min_length=1)
     quantity_g: float = Field(gt=0)
 
 
@@ -94,11 +126,35 @@ def interpret_meal_text(
     )
 
 
+def interpret_day_log_text(
+    *,
+    text: str,
+    default_meal_type: str,
+    reference_date: date | None = None,
+) -> dict:
+    return GroqDayLogInterpreter().interpret(
+        text=text,
+        default_meal_type=default_meal_type,
+        reference_date=reference_date,
+    )
+
+
 class ConversationalMealPreviewRequest(BaseModel):
     text: str = Field(min_length=1)
     meal_type: str
 
 
+
+class ConversationalDayPreviewRequest(BaseModel):
+    text: str = Field(min_length=1)
+    default_meal_type: str = "Pranzo"
+    reference_date: date | None = None
+
+
+class PhotoMealPreviewRequest(BaseModel):
+    image_base64: str = Field(min_length=1)
+    mime_type: str = "image/jpeg"
+    meal_type: str
 class ConversationalMealItem(BaseModel):
     name: str = Field(min_length=1)
     quantity: float = Field(gt=0)
@@ -108,6 +164,14 @@ class ConversationalMealItem(BaseModel):
     protein: float = Field(default=0, ge=0)
     carbs: float = Field(default=0, ge=0)
     fat: float = Field(default=0, ge=0)
+    estimated: bool = True
+    uncertainty: str | None = None
+
+
+class ConversationalMealRecheckRequest(BaseModel):
+    meal_type: str = Field(min_length=1)
+    items: list[ConversationalMealItem] = Field(min_length=1)
+    item_indices: list[int] = Field(min_length=1)
 
 
 class ConversationalMealConfirmRequest(BaseModel):
@@ -117,6 +181,7 @@ class ConversationalMealConfirmRequest(BaseModel):
 
 
 class MealUpdate(BaseModel):
+    date: DateType | None = None
     meal_type: str | None = None
     name: str | None = None
 
@@ -150,6 +215,331 @@ class MealUpdate(BaseModel):
 # "history" or "range" could be interpreted as the dynamic date route.
 # ------------------------------------------------------------------
 
+@router.post("/conversational/day-preview")
+def preview_conversational_day(
+    request: ConversationalDayPreviewRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    weight_repo: WeightRepository = Depends(
+        get_weight_repository
+    ),
+):
+    try:
+        interpretation = interpret_day_log_text(
+            text=request.text,
+            default_meal_type=request.default_meal_type,
+            reference_date=request.reference_date,
+        )
+    except GroqDayLogInterpreterError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    intents = list(
+        interpretation.get("intents")
+        or []
+    )
+
+    if not intents:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Non ho trovato pasti, attività o peso "
+                "da registrare."
+            ),
+        )
+
+    latest_weight = None
+
+    if any(
+        item.get("kind") == "activity"
+        for item in intents
+    ):
+        try:
+            latest_weight = weight_repo.latest(
+                current_user.id
+            )
+        except RepositoryError:
+            # La preview resta utilizzabile. Senza peso,
+            # la stima usa il profilo standard dell'attività.
+            latest_weight = None
+
+    actions: list[dict[str, Any]] = []
+
+    valid_meal_types = {
+        "Colazione",
+        "Pranzo",
+        "Snack",
+        "Cena",
+    }
+
+    reference_date = (
+        request.reference_date or date.today()
+    )
+
+    for intent in intents:
+        intent_date = intent.get("log_date") or reference_date
+        action_date = str(intent_date)
+
+        kind = str(
+            intent.get("kind")
+            or ""
+        ).strip()
+
+        if kind == "meal":
+            meal_text = str(
+                intent.get("text")
+                or request.text
+            ).strip()
+
+            if not meal_text:
+                continue
+
+            meal_type = str(
+                intent.get("meal_type")
+                or request.default_meal_type
+            ).strip()
+
+            if meal_type not in valid_meal_types:
+                meal_type = request.default_meal_type
+
+            if meal_type not in valid_meal_types:
+                meal_type = "Pranzo"
+
+            raw_meal = interpret_meal_text(
+                text=meal_text,
+                meal_type=meal_type,
+            )
+
+            normalized = MealTextInterpreter().normalize(
+                raw_meal
+            )
+
+            meal_preview = (
+                ConversationalMealLoggingService()
+                .build_preview(
+                    text=meal_text,
+                    meal_type=normalized["meal_type"],
+                    interpreted_items=normalized["items"],
+                )
+            )
+
+            actions.append(
+                {
+                    "id": (
+                        f"action-{len(actions) + 1}"
+                    ),
+                    "kind": "meal",
+                    "date": action_date,
+                    "text": meal_text,
+                    "meal_type": (
+                        meal_preview["meal_type"]
+                    ),
+                    "items": meal_preview["items"],
+                    "totals": meal_preview["totals"],
+                    "needs_review": bool(
+                        meal_preview["needs_review"]
+                        or intent.get("uncertainty")
+                    ),
+                    "requires_confirmation": True,
+                }
+            )
+            continue
+
+        if kind == "activity":
+            activity_name = str(
+                intent.get("activity_name")
+                or intent.get("activity_type")
+                or "Attività"
+            ).strip()
+
+            activity_type = normalize_activity_type(
+                intent.get("activity_type")
+                or activity_name
+            )
+
+            duration_raw = intent.get(
+                "duration_seconds"
+            )
+            duration_seconds = (
+                max(0, int(duration_raw))
+                if duration_raw is not None
+                else None
+            )
+
+            distance_raw = intent.get(
+                "distance_meters"
+            )
+            distance_meters = (
+                max(0.0, float(distance_raw))
+                if distance_raw is not None
+                else None
+            )
+
+            explicit_calories = intent.get(
+                "burned_calories"
+            )
+
+            calories_estimated = (
+                explicit_calories is None
+            )
+
+            if explicit_calories is None:
+                burned_calories = (
+                    estimated_gpx_calories(
+                        activity_type=activity_type,
+                        duration_seconds=duration_seconds,
+                        distance_meters=distance_meters,
+                        weight_kg=(
+                            (latest_weight or {})
+                            .get("weight")
+                        ),
+                    )
+                )
+            else:
+                burned_calories = max(
+                    0,
+                    round(
+                        float(explicit_calories)
+                    ),
+                )
+
+            needs_review = bool(
+                intent.get("uncertainty")
+                or calories_estimated
+                or burned_calories <= 0
+            )
+
+            actions.append(
+                {
+                    "id": (
+                        f"action-{len(actions) + 1}"
+                    ),
+                    "kind": "activity",
+                    "date": action_date,
+                    "activity_name": activity_name,
+                    "activity_type": activity_type,
+                    "duration_seconds": duration_seconds,
+                    "distance_meters": distance_meters,
+                    "burned_calories": burned_calories,
+                    "calories_estimated": (
+                        calories_estimated
+                    ),
+                    "needs_review": needs_review,
+                    "requires_confirmation": True,
+                }
+            )
+            continue
+
+        if kind == "weight":
+            weight_raw = intent.get(
+                "weight_kg"
+            )
+
+            if weight_raw is None:
+                continue
+
+            weight_kg = float(weight_raw)
+
+            if weight_kg <= 0:
+                continue
+
+            actions.append(
+                {
+                    "id": (
+                        f"action-{len(actions) + 1}"
+                    ),
+                    "kind": "weight",
+                    "date": action_date,
+                    "weight_kg": weight_kg,
+                    "needs_review": bool(
+                        intent.get("uncertainty")
+                    ),
+                    "requires_confirmation": True,
+                }
+            )
+
+    if not actions:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Non ho trovato dati sufficienti "
+                "da registrare."
+            ),
+        )
+
+    return {
+        "status": "preview",
+        "original_text": request.text,
+        "actions": actions,
+        "needs_review": any(
+            bool(action.get("needs_review"))
+            for action in actions
+        ),
+        "requires_confirmation": True,
+    }
+
+
+@router.post("/conversational/recheck")
+def recheck_conversational_meal(
+    request: ConversationalMealRecheckRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    items = [
+        item.model_dump()
+        for item in request.items
+    ]
+
+    indices = sorted(set(request.item_indices))
+
+    if any(
+        index < 0 or index >= len(items)
+        for index in indices
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Indice ingrediente non valido.",
+        )
+
+    for index in indices:
+        current = items[index]
+
+        recheck_text = (
+            "Ricontrolla esclusivamente questo ingrediente, "
+            "senza aggiungere altri alimenti: "
+            f"{current['quantity']} {current['unit']} "
+            f"{current['name']}"
+        )
+
+        raw = interpret_meal_text(
+            text=recheck_text,
+            meal_type=request.meal_type,
+        )
+
+        normalized = MealTextInterpreter().normalize(raw)
+        recalculated = list(normalized.get("items") or [])
+
+        if not recalculated:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Non sono riuscito a ricontrollare "
+                    f"{current['name']}."
+                ),
+            )
+
+        items[index] = recalculated[0]
+
+    return (
+        ConversationalMealLoggingService()
+        .build_preview(
+            text="[ingredient recheck]",
+            meal_type=request.meal_type,
+            interpreted_items=items,
+        )
+    )
+
+
 @router.post("/conversational/preview")
 def preview_conversational_meal(
     request: ConversationalMealPreviewRequest,
@@ -171,6 +561,42 @@ def preview_conversational_meal(
     )
 
 
+
+@router.post("/photo/preview")
+def preview_photo_meal(
+    request: PhotoMealPreviewRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    import base64
+
+    try:
+        image_bytes = base64.b64decode(
+            request.image_base64,
+            validate=True,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid image_base64",
+        ) from exc
+
+    raw_interpretation = (
+        GroqMealVisionInterpreter().interpret(
+            image_bytes=image_bytes,
+            mime_type=request.mime_type,
+            meal_type=request.meal_type,
+        )
+    )
+
+    normalized = MealTextInterpreter().normalize(
+        raw_interpretation
+    )
+
+    return ConversationalMealLoggingService().build_preview(
+        text="[photo]",
+        meal_type=normalized["meal_type"],
+        interpreted_items=normalized["items"],
+    )
 @router.post(
     "/conversational/confirm",
     status_code=status.HTTP_201_CREATED,
@@ -185,6 +611,9 @@ def confirm_conversational_meal(
     meal_ingredients_repo: MealIngredientsRepository = Depends(
         get_meal_ingredients_repository
     ),
+    pantry_repo: PantryRepository = Depends(
+        get_pantry_repository
+    ),
 ):
     items = [item.model_dump() for item in request.items]
     meal_name = " + ".join(item["name"] for item in items)
@@ -194,6 +623,7 @@ def confirm_conversational_meal(
             meals_repo=repo,
             ingredients_repo=ingredients_repo,
             meal_ingredients_repo=meal_ingredients_repo,
+            pantry_repo=pantry_repo,
         ).confirm(
             user_id=current_user.id,
             meal_payload={
@@ -220,7 +650,66 @@ def confirm_conversational_meal(
         "structured": True,
         "item": result["meal"],
         "meal_ingredients": result["meal_ingredients"],
+        "pantry_consumption": result.get(
+            "pantry_consumption",
+            [],
+        ),
     }
+
+
+@router.post(
+    "/pantry-log",
+    status_code=status.HTTP_201_CREATED,
+)
+def log_pantry_meal(
+    data: PantryMealLogRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    pantry_repo: PantryRepository = Depends(
+        get_pantry_repository
+    ),
+    ingredients_repo: IngredientsRepository = Depends(
+        get_ingredients_repository
+    ),
+    meals_repo: MealsRepository = Depends(
+        get_meals_repository
+    ),
+    meal_ingredients_repo: MealIngredientsRepository = Depends(
+        get_meal_ingredients_repository
+    ),
+):
+    try:
+        return PantryMealLoggingService(
+            pantry_repo=pantry_repo,
+            ingredients_repo=ingredients_repo,
+            meals_repo=meals_repo,
+            meal_ingredients_repo=meal_ingredients_repo,
+        ).log(
+            user_id=current_user.id,
+            pantry_item_id=data.pantry_item_id,
+            meal_date=data.date,
+            meal_type=data.meal_type,
+            quantity_g=data.quantity_g,
+        )
+    except PantryMealItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except PantryMealUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except PantryMealLoggingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/history")
@@ -229,7 +718,7 @@ def get_meal_history(
     repo: MealsRepository = Depends(get_meals_repository),
 ):
     try:
-        meals = repo.list_history_compatible(current_user.id)
+        meals, _enhanced = repo.list_history_compatible(current_user.id)
 
         return {
             "count": len(meals),
@@ -645,13 +1134,22 @@ def update_meal(
         None,
     )
 
-    if (
-        "calories" in payload
-        and payload["calories"] is not None
+    # Keep PATCH consistent with POST: the database stores all
+    # nutrition columns as integers, while clients may send floats
+    # after scaling grams or portions.
+    for field in (
+        "calories",
+        "protein",
+        "carbs",
+        "fat",
     ):
-        payload["calories"] = int(
-            round(float(payload["calories"]))
-        )
+        if (
+            field in payload
+            and payload[field] is not None
+        ):
+            payload[field] = int(
+                round(float(payload[field]))
+            )
 
     try:
         if structured is not None:
@@ -713,8 +1211,72 @@ def delete_meal(
     meal_id: str,
     current_user: CurrentUser = Depends(get_current_user),
     repo: MealsRepository = Depends(get_meals_repository),
+    meal_prep_repo: MealPrepRepository = Depends(
+        get_meal_prep_repository
+    ),
 ):
     try:
+        meal = repo.get_by_id(
+            meal_id=meal_id,
+            user_id=current_user.id,
+        )
+
+        if meal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meal not found",
+            )
+
+        is_meal_prep = (
+            meal.get("category") == "meal_prep"
+        )
+
+        batch_id = None
+
+        if is_meal_prep:
+            notes = str(meal.get("notes") or "")
+            prefix = "Meal prep batch: "
+
+            if prefix in notes:
+                batch_id = (
+                    notes.split(prefix, 1)[1]
+                    .split(";", 1)[0]
+                    .strip()
+                )
+
+        restored = False
+
+        if batch_id:
+            batch = meal_prep_repo.get_by_id(
+                batch_id,
+                current_user.id,
+            )
+
+            if batch is not None:
+                remaining = int(
+                    batch.get("portions_remaining") or 0
+                )
+                prepared = int(
+                    batch.get("portions_prepared") or 0
+                )
+
+                new_remaining = min(
+                    prepared,
+                    remaining + 1,
+                )
+
+                updated_batch = meal_prep_repo.update(
+                    batch_id,
+                    current_user.id,
+                    {
+                        "portions_remaining": new_remaining,
+                        "status": "available",
+                    },
+                )
+
+                if updated_batch is not None:
+                    restored = True
+
         repo.delete(
             meal_id=meal_id,
             user_id=current_user.id,
@@ -723,7 +1285,12 @@ def delete_meal(
         return {
             "deleted": True,
             "id": meal_id,
+            "inventory_restored": restored,
+            "meal_prep_batch_id": batch_id,
         }
+
+    except HTTPException:
+        raise
 
     except RepositoryError as exc:
         raise HTTPException(

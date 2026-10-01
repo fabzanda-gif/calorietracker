@@ -38,6 +38,16 @@ class FakeDailyLogsRepository:
 
 
 class FakeActivitiesRepository:
+    def list_date_range(
+        self,
+        user_id,
+        start_date,
+        end_date,
+    ):
+        # These scenarios do not provide historical activity.
+        # Missing days count as zero in the 7-day baseline.
+        return []
+
     def list_for_date(self, user_id, log_date):
         return []
 
@@ -325,3 +335,67 @@ def test_extra_meal_reduces_budget_without_advancing_next_slot():
     )
 
     assert after_available == before_available - 250
+
+def test_component_reduction_confirms_only_remaining_meal():
+    response = client.post(
+        "/days/2026-09-01/meals/dinner/confirm",
+        json={
+            "recommendation": {
+                "name": "Riso con pollo",
+                "quantity": 1,
+                "calories": 520,
+                "protein_g": 42,
+                "carbs_g": 61,
+                "fat_g": 12,
+                "strategy": "component_reduction",
+                "components": [
+                    {
+                        "name": "Riso con pollo",
+                        "calories": 520,
+                        "protein_g": 42,
+                        "carbs_g": 61,
+                        "fat_g": 12,
+                    }
+                ],
+                "removed_components": [
+                    {
+                        "name": "Mela",
+                        "calories": 80,
+                        "protein_g": 0,
+                        "carbs_g": 20,
+                        "fat_g": 0,
+                    }
+                ],
+            }
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+    item = payload["item"]
+    prediction = payload["prediction"]
+
+    assert item["meal_type"] == "Cena"
+    assert item["name"] == "Riso con pollo"
+    assert item["calories"] == 520
+    assert "mela" not in item["name"].lower()
+
+    assert (
+        prediction["replanning_strategy"]
+        == "component_reduction"
+    )
+    assert prediction["components"] == [
+        {
+            "name": "Riso con pollo",
+            "calories": 520,
+            "protein_g": 42,
+            "carbs_g": 61,
+            "fat_g": 12,
+        }
+    ]
+    assert prediction["removed_components"][0]["name"] == "Mela"
+
+    assert len(fake_meals.created) == 1
+    assert fake_meals.created[0]["name"] == "Riso con pollo"
+    assert "mela" not in fake_meals.created[0]["name"].lower()

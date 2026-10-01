@@ -206,3 +206,35 @@ def test_empty_or_incompatible_candidates_returns_empty_options():
     )
 
     assert result["options"] == []
+
+
+def test_unified_day_context_drives_training_summary():
+    result = service.rank(
+        candidates=[
+            candidate("Rice bowl", 600, 35, 7),
+            candidate("Light meal", 420, 30, 6),
+        ],
+        available_kcal=800,
+        protein_remaining_g=45,
+        unified_day_context={
+            "signals": [
+                "training_today",
+                "pre_training",
+            ],
+            "training": {
+                "nutrition": {
+                    "phase": "pre_training",
+                    "carbs_target_g": {
+                        "min": 60,
+                        "max": 100,
+                    },
+                },
+            },
+        },
+    )
+
+    assert result["day_context"]["kind"] == "training_prep"
+    assert (
+        result["day_context"]["title"]
+        == "Fuel per l'allenamento di oggi"
+    )

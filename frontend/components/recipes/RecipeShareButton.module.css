@@ -1,0 +1,654 @@
+.shareButton {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid #d9dde3;
+  border-radius: 12px;
+  background: #fff;
+  color: #173556;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: rgba(10, 24, 40, 0.58);
+
+  /*
+   * Importantissimo:
+   * nessuna transition/animation sul modal.
+   */
+  animation: none !important;
+  transition: none !important;
+}
+
+.dialog {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 48px);
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border-radius: 24px;
+  background: #fff;
+
+  box-shadow:
+    0 24px 80px rgba(10, 24, 40, 0.28);
+
+  animation: none !important;
+  transition: none !important;
+}
+
+.dialogHeader {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 20px 24px;
+
+  border-bottom: 1px solid #e6e9ed;
+}
+
+.dialogHeader div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dialogHeader strong {
+  color: #173556;
+  font-size: 20px;
+}
+
+.dialogHeader span {
+  color: #6d7c91;
+  font-size: 13px;
+}
+
+.closeButton {
+  width: 38px;
+  height: 38px;
+
+  border: 1px solid #d9dde3;
+  border-radius: 50%;
+
+  background: #fff;
+  color: #173556;
+
+  font-size: 25px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.previewArea {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow: auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: #f4f5f6;
+}
+
+/*
+ * FRAME INSTAGRAM
+ *
+ * 4:5 reale.
+ * Nessuna posizione negativa.
+ * Nessun display:none.
+ * Nessuna animazione.
+ */
+.shareCard {
+  flex: 0 0 auto;
+
+  width: 540px;
+  height: 675px;
+
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 32px;
+
+  background: #fff;
+  color: #173556;
+
+  border-radius: 18px;
+
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  animation: none !important;
+  transition: none !important;
+}
+
+.shareTop {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 18px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 34px;
+}
+
+.logo img {
+  display: block;
+  width: auto;
+  height: 34px;
+  max-width: 190px;
+  object-fit: contain;
+}
+
+.recipeLabel {
+  color: #ef5e5c;
+
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.imageFrame {
+  flex: 0 0 auto;
+
+  width: 100%;
+  height: 305px;
+
+  overflow: hidden;
+
+  border-radius: 18px;
+
+  background: #eef1f3;
+}
+
+.imageFrame img {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  animation: none !important;
+  transition: none !important;
+}
+
+.imagePlaceholder {
+  width: 100%;
+  height: 100%;
+
+  display: grid;
+  place-items: center;
+
+  background: #173556;
+  color: #fff;
+
+  font-size: 90px;
+  font-weight: 900;
+}
+
+.shareContent {
+  padding: 23px 4px 0;
+}
+
+.eyebrow {
+  margin-bottom: 8px;
+
+  color: #ef5e5c;
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.shareContent h2 {
+  margin: 0;
+
+  color: #173556;
+
+  font-size: 32px;
+  line-height: 1.04;
+  letter-spacing: -1px;
+}
+
+.stats {
+  display: flex;
+  gap: 34px;
+
+  margin-top: 20px;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stats strong {
+  color: #173556;
+
+  font-size: 20px;
+  line-height: 1;
+}
+
+.stats span {
+  color: #6d7c91;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.servings {
+  display: inline-flex;
+
+  width: fit-content;
+
+  margin-top: 15px;
+  padding: 6px 11px;
+
+  border-radius: 999px;
+
+  background: #fff0ef;
+  color: #ef5e5c;
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.shareFooter {
+  margin-top: auto;
+  padding-top: 13px;
+
+  border-top: 1px solid #edf0f2;
+
+  display: flex;
+  justify-content: space-between;
+
+  color: #6d7c91;
+
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.dialogActions {
+  flex: 0 0 auto;
+
+  display: flex;
+  gap: 10px;
+
+  padding: 16px 24px;
+
+  border-top: 1px solid #e6e9ed;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 46px;
+
+  padding: 0 22px;
+
+  border-radius: 12px;
+
+  font: inherit;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  animation: none !important;
+  transition: none !important;
+}
+
+.primaryButton {
+  flex: 1;
+
+  border: 1px solid #173556;
+
+  background: #173556;
+  color: #fff;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.secondaryButton {
+  border: 1px solid #d9dde3;
+
+  background: #fff;
+  color: #173556;
+}
+
+@media (max-width: 700px) {
+  .overlay {
+    padding: 10px;
+  }
+
+  .dialog {
+    max-height: calc(100vh - 20px);
+    border-radius: 18px;
+  }
+
+  .previewArea {
+    padding: 14px;
+  }
+
+  .shareCard {
+    width: 432px;
+    height: 540px;
+
+    padding: 25px;
+
+    border-radius: 14px;
+  }
+
+  .imageFrame {
+    height: 244px;
+    border-radius: 14px;
+  }
+
+  .shareContent {
+    padding-top: 18px;
+  }
+
+  .shareContent h2 {
+    font-size: 25px;
+  }
+
+  .dialogActions {
+    padding: 12px 16px;
+  }
+}
+
+
+.preparation {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0f2;
+}
+
+.preparationLabel {
+  margin-bottom: 5px;
+  color: #ef5e5c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+.preparation p {
+  margin: 0;
+  color: #d5deea;
+  font-size: 10px;
+  line-height: 1.4;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+
+/* SanoSync brand typography */
+.logo {
+  font-family: "Trebuchet MS", "Arial Rounded MT Bold", sans-serif;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+/* Recipe share frame */
+.shareCard {
+  background: #132f50;
+  color: #ffffff;
+}
+
+.shareCard .recipeLabel {
+  color: #ff6b68;
+}
+
+.shareCard .preparationLabel {
+  color: #ff6b68;
+}
+
+.shareCard .preparation p {
+  color: #d5deea;
+}
+
+
+
+/* ============================================================
+   SANOSYNC SOCIAL FRAME
+   ============================================================ */
+
+.shareCard {
+  background: #132f50 !important;
+  color: #ffffff !important;
+}
+
+.shareCard h1,
+.shareCard h2,
+.shareCard h3,
+.shareCard .recipeTitle {
+  color: #ffffff !important;
+}
+
+.shareCard .nutritionValue {
+  color: #ffffff !important;
+}
+
+.shareCard .nutritionLabel {
+  color: #d5deea !important;
+}
+
+.shareCard .servings {
+  color: #ff6b68 !important;
+  background: #fff1f0 !important;
+}
+
+.shareCard .preparationLabel {
+  color: #ff6b68 !important;
+}
+
+.shareCard .preparation p {
+  color: #d5deea !important;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  height: 38px;
+}
+
+.logo img {
+  display: block;
+  width: auto;
+  height: 38px;
+  max-width: 190px;
+  object-fit: contain;
+}
+
+
+/* ============================================================
+   SANOSYNC SOCIAL FRAME — LIGHT VERSION
+   ============================================================ */
+
+.shareCard {
+  background: #ffffff !important;
+  color: #16365b !important;
+}
+
+/* Header */
+.shareCard .shareTop {
+  background: #ffffff !important;
+}
+
+.shareCard .logo {
+  display: flex;
+  align-items: center;
+  height: 44px;
+}
+
+.shareCard .logo img {
+  display: block;
+  width: auto;
+  height: 44px;
+  max-width: 190px;
+  object-fit: contain;
+}
+
+/* Label RICETTA */
+.shareCard .recipeLabel {
+  color: #f25f5c !important;
+}
+
+/* Eyebrow */
+.shareCard .recipeEyebrow,
+.shareCard .eyebrow,
+.shareCard .preparationLabel {
+  color: #f25f5c !important;
+}
+
+/* Titolo */
+.shareCard h1,
+.shareCard h2,
+.shareCard h3,
+.shareCard .recipeTitle {
+  color: #16365b !important;
+}
+
+/* Valori nutrizionali */
+.shareCard .nutritionValue {
+  color: #16365b !important;
+}
+
+.shareCard .nutritionLabel {
+  color: #6d7d91 !important;
+}
+
+/* Porzioni */
+.shareCard .servings {
+  color: #f25f5c !important;
+  background: #fff0ef !important;
+}
+
+/* Preparazione */
+.shareCard .preparation {
+  color: #16365b !important;
+}
+
+.shareCard .preparation p {
+  color: #6d7d91 !important;
+}
+
+/* Linee divisorie */
+.shareCard hr,
+.shareCard .divider {
+  border-color: #dfe4e9 !important;
+  background: #dfe4e9 !important;
+}
+
+/* Footer */
+.shareCard .footer,
+.shareCard .shareFooter {
+  color: #6d7d91 !important;
+}
+
+
+/* ============================================================
+   SANOSYNC SHARE FRAME — FINAL BRANDING
+   ============================================================ */
+
+.shareCard {
+  background: #16365b !important;
+  color: #ffffff !important;
+}
+
+.shareCard .shareTop {
+  background: #16365b !important;
+}
+
+.shareCard .logo {
+  display: flex;
+  align-items: center;
+  height: 44px;
+}
+
+.shareCard .logo img {
+  display: block;
+  width: auto;
+  height: 44px;
+  max-width: 190px;
+  object-fit: contain;
+}
+
+/* Label e accenti */
+.shareCard .recipeLabel,
+.shareCard .eyebrow,
+.shareCard .preparationLabel {
+  color: #f25f5c !important;
+}
+
+/* Testi principali */
+.shareCard h1,
+.shareCard h2,
+.shareCard h3,
+.shareCard .recipeTitle {
+  color: #ffffff !important;
+}
+
+/* Valori nutrizionali */
+.shareCard .nutritionValue {
+  color: #ffffff !important;
+}
+
+.shareCard .nutritionLabel {
+  color: #d5deea !important;
+}
+
+/* Porzioni */
+.shareCard .servings {
+  color: #f25f5c !important;
+  background: #fff0ef !important;
+}
+
+/* Preparazione */
+.shareCard .preparation {
+  color: #ffffff !important;
+}
+
+.shareCard .preparation p {
+  color: #d5deea !important;
+}
+
+/* Footer */
+.shareCard .shareFooter {
+  color: #d5deea !important;
+}

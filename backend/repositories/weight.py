@@ -32,6 +32,29 @@ class WeightRepository(BaseRepository):
                 f"Unable to load weight history: {exc}"
             ) from exc
 
+    def history_range(
+        self,
+        user_id: str,
+        start_date: Any,
+        end_date: Any,
+    ) -> list[dict]:
+        try:
+            response = (
+                self.table
+                .select("id,date,weight")
+                .eq("user_id", user_id)
+                .not_.is_("weight", "null")
+                .gte("date", str(start_date))
+                .lte("date", str(end_date))
+                .order("date", desc=False)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load ranged weight history: {exc}"
+            ) from exc
+
     def latest(self, user_id: str) -> dict | None:
         try:
             response = (
@@ -167,4 +190,3 @@ class WeightRepository(BaseRepository):
             raise RepositoryError(
                 f"Unable to move weight: {exc}"
             ) from exc
-
