@@ -9,6 +9,7 @@ import { I18nProvider } from "@/components/i18n/I18nProvider";
 import { QuickAddMealDefaults } from "@/components/home/QuickAddMealDefaults";
 
 import "./globals.css";
+import "./mobile-polish.css";
 
 export const metadata: Metadata = {
   title: {
