@@ -31,6 +31,7 @@ from backend.api.routers.auth_events import router as auth_events_router
 from backend.api.routers.learned_insights import router as learned_insights_router
 from backend.api.routers.meal_prep import router as meal_prep_router
 from backend.api.routers.meals import router as meals_router
+from backend.api.routers.notifications import router as notifications_router
 from backend.api.routers.oura import router as oura_router
 from backend.api.routers.google_calendar import router as google_calendar_router
 from backend.api.routers.pantry import router as pantry_router
@@ -272,6 +273,7 @@ app.include_router(auth_events_router)
 app.include_router(meals_router)
 app.include_router(oura_router)
 app.include_router(google_calendar_router)
+app.include_router(notifications_router)
 app.include_router(activities_router)
 app.include_router(weight_router)
 app.include_router(progress_router)
