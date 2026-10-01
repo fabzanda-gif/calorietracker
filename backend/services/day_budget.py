@@ -181,9 +181,9 @@ class DayBudgetService:
         current_weight: float | None,
         low_memory: bool = False,
     ) -> dict:
-        # These reads are independent and I/O-bound.
-        # Execute them concurrently so Supabase round-trips overlap.
-        suggestion_start = day_date - timedelta(days=56)
+        # Keep learning windows bounded: 30 days is enough for recent patterns
+        # and avoids loading almost two months of logs on every budget build.
+        suggestion_start = day_date - timedelta(days=30)
 
         if low_memory:
             metrics = self.metrics_service.for_day(
