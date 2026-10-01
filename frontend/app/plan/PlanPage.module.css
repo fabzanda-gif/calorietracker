@@ -63,14 +63,16 @@
 }
 
 .card,
-.shortcutCard {
+.shortcutCard,
+.routineCard {
   border: 1px solid #e0e1dc;
   border-radius: 28px;
   background: white;
   box-shadow: 0 14px 34px rgba(14, 45, 75, .06);
 }
 
-.card {
+.card,
+.routineCard {
   padding: 26px;
 }
 
@@ -83,7 +85,8 @@
 }
 
 .cardHeader h2,
-.shortcutCard h2 {
+.shortcutCard h2,
+.routineCard h2 {
   margin: 0;
   font-size: 24px;
   letter-spacing: -.025em;
@@ -200,7 +203,8 @@
 }
 
 .formGrid input,
-.formGrid select {
+.formGrid select,
+.routineDay select {
   width: 100%;
   min-width: 0;
   height: 46px;
@@ -255,9 +259,42 @@
   font-weight: 900;
 }
 
+.routineCard,
 .specialPeriods {
   max-width: 1220px;
   margin: 22px auto 0;
+}
+
+.routineGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.routineDay {
+  display: grid;
+  gap: 7px;
+  color: #344c63;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.routineDay select {
+  height: 42px;
+  padding-inline: 10px;
+}
+
+.routineMessage {
+  margin: 10px 0 0;
+  color: #28733d;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .routineGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1000px) {
@@ -296,13 +333,15 @@
     width: fit-content;
   }
 
-  .card {
+  .card,
+  .routineCard {
     padding: 18px;
     border-radius: 22px;
   }
 
   .formGrid,
-  .sideColumn {
+  .sideColumn,
+  .routineGrid {
     grid-template-columns: 1fr;
   }
 
