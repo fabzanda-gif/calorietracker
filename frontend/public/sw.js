@@ -39,8 +39,8 @@ self.addEventListener("push", (event) => {
     body:
       payload.body ||
       "Hai un aggiornamento da SanoSync.",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    icon: "/icons/sanosync-192.png",
+    badge: "/icons/sanosync-192.png",
     tag: payload.date
       ? `training-reminder-${payload.date}`
       : "sanosync-notification",
