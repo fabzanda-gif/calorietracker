@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useExperienceMode } from "@/components/experience/ExperienceModeProvider";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
-import { getProfile } from "@/lib/api/profile";
 
 import styles from "./AppNav.module.css";
 
@@ -62,9 +60,8 @@ function isActive(pathname: string, href: string): boolean {
 
 export function AppNav() {
   const pathname = usePathname();
-  const { user, accessToken, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { t } = useI18n();
-  const [readOnlyDemo, setReadOnlyDemo] = useState(false);
   const { experienceMode, setExperienceMode } = useExperienceMode();
 
   const metadataName =
@@ -90,25 +87,12 @@ export function AppNav() {
   const avatarUrl =
     typeof metadataAvatar === "string" ? metadataAvatar : null;
 
-  useEffect(() => {
-    if (!accessToken) {
-      setReadOnlyDemo(false);
-      return;
-    }
-
-    let active = true;
-    void getProfile(accessToken)
-      .then((profile) => {
-        if (active) setReadOnlyDemo(profile.read_only === true);
-      })
-      .catch(() => {
-        if (active) setReadOnlyDemo(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [accessToken]);
+  const readOnlyDemo = Boolean(
+    user?.user_metadata?.demo_mode === true ||
+    user?.user_metadata?.read_only === true ||
+    user?.app_metadata?.demo_mode === true ||
+    user?.app_metadata?.read_only === true,
+  );
 
   return (
     <>
