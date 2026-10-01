@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from pywebpush import WebPushException, webpush
 
@@ -28,6 +28,7 @@ class PushSubscriptionPayload(BaseModel):
     endpoint: str = Field(min_length=1)
     keys: PushKeys
     timezone: str = Field(default="UTC", min_length=1, max_length=128)
+    reminder_hour: int = Field(default=8, ge=6, le=11)
 
 
 class PushUnsubscribePayload(BaseModel):
@@ -74,6 +75,36 @@ def get_vapid_public_key():
     return {"public_key": _public_key()}
 
 
+@router.get("/training/settings")
+def get_training_notification_settings(
+    endpoint: str = Query(min_length=1),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    result = (
+        get_admin_supabase_client()
+        .table("push_subscriptions")
+        .select("enabled,timezone,reminder_hour")
+        .eq("user_id", current_user.id)
+        .eq("endpoint", endpoint)
+        .limit(1)
+        .execute()
+    )
+    rows = result.data or []
+    if not rows:
+        return {
+            "enabled": False,
+            "timezone": "UTC",
+            "reminder_hour": 8,
+        }
+
+    row = rows[0]
+    return {
+        "enabled": bool(row.get("enabled")),
+        "timezone": str(row.get("timezone") or "UTC"),
+        "reminder_hour": int(row.get("reminder_hour") or 8),
+    }
+
+
 @router.post("/training/subscribe")
 def subscribe_to_training_notifications(
     payload: PushSubscriptionPayload,
@@ -92,7 +123,7 @@ def subscribe_to_training_notifications(
                 "auth": payload.keys.auth,
                 "enabled": True,
                 "timezone": timezone,
-                "reminder_hour": 8,
+                "reminder_hour": payload.reminder_hour,
                 "updated_at": datetime.utcnow().isoformat(),
             },
             on_conflict="endpoint",
@@ -109,7 +140,7 @@ def subscribe_to_training_notifications(
     return {
         "enabled": True,
         "timezone": timezone,
-        "reminder_hour": 8,
+        "reminder_hour": payload.reminder_hour,
     }
 
 
@@ -197,8 +228,6 @@ def dispatch_training_notifications(
         now_local = datetime.now(ZoneInfo(timezone_name))
         reminder_hour = int(subscription.get("reminder_hour") or 8)
 
-        # The job can run hourly. Send on the first run between the configured
-        # morning hour and noon, then never again for that local date.
         if not (reminder_hour <= now_local.hour < 12):
             skipped += 1
             continue
@@ -227,7 +256,7 @@ def dispatch_training_notifications(
             skipped += 1
             continue
 
-        payload = {
+        push_payload = {
             "title": "Allenamento oggi 💪",
             "body": _format_training_body(activities[0]),
             "url": "/activities",
@@ -243,7 +272,7 @@ def dispatch_training_notifications(
                         "auth": subscription["auth"],
                     },
                 },
-                data=json.dumps(payload),
+                data=json.dumps(push_payload),
                 vapid_private_key=private_key,
                 vapid_claims={"sub": subject},
                 ttl=43200,
