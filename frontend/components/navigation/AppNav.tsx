@@ -13,19 +13,13 @@ import { getProfile } from "@/lib/api/profile";
 import styles from "./AppNav.module.css";
 
 const ITEMS = [
-  {
-    href: "/",
-    label: "Oggi",
-    icon: "⌂",
-  },
-  {
-    href: "/activities",
-    label: "Attività",
-    icon: "⌁",
-  },
+  { href: "/", label: "Home", icon: "⌂" },
+  { href: "/activities", label: "Plan", icon: "▣" },
+  { href: "/ai", label: "AI", icon: "✦" },
+  { href: "/recipes", label: "Food", icon: "⌑" },
   {
     href: "/progress",
-    label: "Progressi",
+    label: "Insights",
     icon: (
       <svg aria-hidden="true" viewBox="0 0 24 24">
         <path d="M4 18 9 13l3 3 7-8" />
@@ -33,32 +27,15 @@ const ITEMS = [
       </svg>
     ),
   },
-  {
-    href: "/recipes",
-    label: "Ricette",
-    icon: "⌑",
-  },
-];
-
-const MOBILE_ITEMS = [
-  ...ITEMS.slice(0, 4),
-  {
-    href: "/profile",
-    label: "Profilo",
-    icon: "●",
-  },
-];
+] as const;
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/") {
-    return pathname === "/";
-  }
+  if (href === "/") return pathname === "/";
 
-  if (href === "#") {
-    return false;
-  }
-
-  if (href === "/recipes" && (pathname.startsWith("/inventory") || pathname.startsWith("/ingredients"))) {
+  if (
+    href === "/recipes" &&
+    (pathname.startsWith("/inventory") || pathname.startsWith("/ingredients"))
+  ) {
     return true;
   }
 
@@ -69,12 +46,8 @@ export function AppNav() {
   const pathname = usePathname();
   const { user, accessToken, signOut } = useAuth();
   const { t } = useI18n();
-  const [readOnlyDemo, setReadOnlyDemo] =
-    useState(false);
-  const {
-    experienceMode,
-    setExperienceMode,
-  } = useExperienceMode();
+  const [readOnlyDemo, setReadOnlyDemo] = useState(false);
+  const { experienceMode, setExperienceMode } = useExperienceMode();
 
   const metadataName =
     user?.user_metadata?.full_name ??
@@ -82,8 +55,7 @@ export function AppNav() {
     user?.user_metadata?.first_name;
 
   const displayName =
-    typeof metadataName === "string" &&
-    metadataName.trim()
+    typeof metadataName === "string" && metadataName.trim()
       ? metadataName.trim()
       : user?.email?.split("@")[0] ?? "Profilo";
 
@@ -95,13 +67,10 @@ export function AppNav() {
       .join("") || "S";
 
   const metadataAvatar =
-    user?.user_metadata?.avatar_url ??
-    user?.user_metadata?.picture;
+    user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture;
 
   const avatarUrl =
-    typeof metadataAvatar === "string"
-      ? metadataAvatar
-      : null;
+    typeof metadataAvatar === "string" ? metadataAvatar : null;
 
   useEffect(() => {
     if (!accessToken) {
@@ -112,16 +81,10 @@ export function AppNav() {
     let active = true;
     void getProfile(accessToken)
       .then((profile) => {
-        if (active) {
-          setReadOnlyDemo(
-            profile.read_only === true,
-          );
-        }
+        if (active) setReadOnlyDemo(profile.read_only === true);
       })
       .catch(() => {
-        if (active) {
-          setReadOnlyDemo(false);
-        }
+        if (active) setReadOnlyDemo(false);
       });
 
     return () => {
@@ -129,31 +92,17 @@ export function AppNav() {
     };
   }, [accessToken]);
 
-  const navLabel = (href: string) => {
-    if (href === "/") return t("today");
-    if (href === "/activities") return t("activities");
-    if (href === "/progress") return t("progress");
-    if (href === "/recipes") return t("recipes");
-    return t("profile");
-  };
-
   return (
     <>
       {readOnlyDemo ? (
-        <div
-          className={styles.demoBanner}
-          role="status"
-        >
+        <div className={styles.demoBanner} role="status">
           {t("demoMode")}
         </div>
       ) : null}
 
       <LanguageSwitcher />
 
-      <div
-        className={styles.globalExperienceSwitch}
-        aria-label="Modalità SanoSync"
-      >
+      <div className={styles.globalExperienceSwitch} aria-label="Modalità SanoSync">
         <button
           type="button"
           className={
@@ -165,7 +114,6 @@ export function AppNav() {
         >
           Standard
         </button>
-
         <button
           type="button"
           className={
@@ -194,11 +142,7 @@ export function AppNav() {
                 ? "/assets/LogoZero.png"
                 : "/assets/LogoStandardNavy.png"
             }
-            alt={
-              experienceMode === "zero"
-                ? "SanoSync Zero Mode"
-                : "SanoSync"
-            }
+            alt={experienceMode === "zero" ? "SanoSync Zero Mode" : "SanoSync"}
             className={styles.brandLogo}
           />
         </div>
@@ -206,43 +150,18 @@ export function AppNav() {
         <nav className={styles.desktopLinks}>
           {ITEMS.map((item) => {
             const active = isActive(pathname, item.href);
-
             return (
-              <div key={item.href}>
-                {item.href === "#" ? (
-                  <button
-                    type="button"
-                    className={styles.desktopLink}
-                    onClick={() => undefined}
-                  >
-                    <span
-                      className={styles.desktopIcon}
-                      aria-hidden="true"
-                    >
-                      {item.icon}
-                    </span>
-                    <span>{navLabel(item.href)}</span>
-                  </button>
-                ) : (
-                  <Link
-                    href={item.href}
-                    className={active
-                      ? styles.desktopLinkActive
-                      : styles.desktopLink}
-                    aria-current={
-                      active ? "page" : undefined
-                    }
-                  >
-                    <span
-                      className={styles.desktopIcon}
-                      aria-hidden="true"
-                    >
-                      {item.icon}
-                    </span>
-                    <span>{navLabel(item.href)}</span>
-                  </Link>
-                )}
-              </div>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={active ? styles.desktopLinkActive : styles.desktopLink}
+                aria-current={active ? "page" : undefined}
+              >
+                <span className={styles.desktopIcon} aria-hidden="true">
+                  {item.icon}
+                </span>
+                <span>{item.label}</span>
+              </Link>
             );
           })}
         </nav>
@@ -255,37 +174,22 @@ export function AppNav() {
           >
             <span className={styles.profileAvatar}>
               {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                />
+                <img src={avatarUrl} alt="" referrerPolicy="no-referrer" />
               ) : (
                 initials
               )}
             </span>
-
             <span className={styles.profileDetails}>
               <strong>{displayName}</strong>
-              <small>
-                {user?.email ?? t("manageProfile")}
-              </small>
+              <small>{user?.email ?? t("manageProfile")}</small>
             </span>
-
-            <span
-              className={styles.profileArrow}
-              aria-hidden="true"
-            >
-              ›
-            </span>
+            <span className={styles.profileArrow} aria-hidden="true">›</span>
           </Link>
 
           <button
             type="button"
             className={styles.signOut}
-            onClick={() => {
-              void signOut();
-            }}
+            onClick={() => void signOut()}
           >
             {t("signOut")}
           </button>
@@ -300,30 +204,19 @@ export function AppNav() {
         }
         aria-label={t("primaryNavigation")}
       >
-        {MOBILE_ITEMS.map((item) => {
+        {ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
-
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={
-                active
-                  ? styles.mobileLinkActive
-                  : styles.mobileLink
-              }
-              aria-current={
-                active ? "page" : undefined
-              }
+              className={active ? styles.mobileLinkActive : styles.mobileLink}
+              aria-current={active ? "page" : undefined}
             >
-              <span
-                className={styles.mobileIcon}
-                aria-hidden="true"
-              >
+              <span className={styles.mobileIcon} aria-hidden="true">
                 {item.icon}
               </span>
-
-              <span>{navLabel(item.href)}</span>
+              <span>{item.label}</span>
             </Link>
           );
         })}
