@@ -7,6 +7,13 @@ export type TrainingPushSubscription = {
     auth: string;
   };
   timezone: string;
+  reminder_hour: number;
+};
+
+export type TrainingNotificationSettings = {
+  enabled: boolean;
+  timezone: string;
+  reminder_hour: number;
 };
 
 export async function getPushPublicKey(): Promise<string> {
@@ -18,14 +25,24 @@ export async function getPushPublicKey(): Promise<string> {
   return response.public_key;
 }
 
+export async function getTrainingNotificationSettings(
+  accessToken: string,
+  endpoint: string,
+): Promise<TrainingNotificationSettings> {
+  const params = new URLSearchParams({ endpoint });
+  return apiRequest(
+    `/notifications/training/settings?${params.toString()}`,
+    {
+      accessToken,
+      route: "heavy",
+    },
+  );
+}
+
 export async function subscribeToTrainingNotifications(
   accessToken: string,
   subscription: TrainingPushSubscription,
-): Promise<{
-  enabled: boolean;
-  timezone: string;
-  reminder_hour: number;
-}> {
+): Promise<TrainingNotificationSettings> {
   return apiRequest(
     "/notifications/training/subscribe",
     {
