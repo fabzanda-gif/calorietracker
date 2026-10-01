@@ -72,7 +72,10 @@ def _safe_timezone(value: str) -> str:
 
 
 @router.get("/vapid-public-key")
-def get_vapid_public_key():
+def get_vapid_public_key(
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    _ = current_user
     return {"public_key": _public_key()}
 
 
