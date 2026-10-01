@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import {
   getPushPublicKey,
+  getTrainingNotificationSettings,
   subscribeToTrainingNotifications,
   unsubscribeFromTrainingNotifications,
 } from "@/lib/api/notifications";
@@ -13,6 +14,8 @@ import styles from "./TrainingNotificationsCard.module.css";
 interface Props {
   accessToken: string;
 }
+
+const REMINDER_HOURS = [6, 7, 8, 9, 10, 11] as const;
 
 function urlBase64ToUint8Array(value: string): Uint8Array {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
@@ -51,11 +54,18 @@ function browserSupportsPush(): boolean {
   );
 }
 
+function hourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
 export function TrainingNotificationsCard({ accessToken }: Props) {
   const [supported, setSupported] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [reminderHour, setReminderHour] = useState(8);
+  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [justEnabled, setJustEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,9 +83,28 @@ export function TrainingNotificationsCard({ accessToken }: Props) {
       try {
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
+        const browserEnabled =
+          Boolean(subscription) && Notification.permission === "granted";
 
         if (!cancelled) {
-          setEnabled(Boolean(subscription) && Notification.permission === "granted");
+          setEnabled(browserEnabled);
+          setSettingsOpen(!browserEnabled);
+        }
+
+        if (subscription && browserEnabled) {
+          try {
+            const settings = await getTrainingNotificationSettings(
+              accessToken,
+              subscription.endpoint,
+            );
+            if (!cancelled) {
+              setEnabled(settings.enabled);
+              setReminderHour(settings.reminder_hour || 8);
+              setSettingsOpen(!settings.enabled);
+            }
+          } catch {
+            // La subscription del browser resta comunque valida.
+          }
         }
       } catch {
         if (!cancelled) {
@@ -89,7 +118,34 @@ export function TrainingNotificationsCard({ accessToken }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [accessToken]);
+
+  async function saveSubscription(hour: number) {
+    const registration = await navigator.serviceWorker.ready;
+    const publicKey = await getPushPublicKey();
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+      });
+    }
+
+    const p256dh = keyToBase64(subscription.getKey("p256dh"));
+    const auth = keyToBase64(subscription.getKey("auth"));
+
+    if (!p256dh || !auth) {
+      throw new Error("Il browser non ha restituito una subscription valida.");
+    }
+
+    return subscribeToTrainingNotifications(accessToken, {
+      endpoint: subscription.endpoint,
+      keys: { p256dh, auth },
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      reminder_hour: hour,
+    });
+  }
 
   async function enableNotifications() {
     if (!browserSupportsPush() || busy) {
@@ -109,38 +165,44 @@ export function TrainingNotificationsCard({ accessToken }: Props) {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      const publicKey = await getPushPublicKey();
-      let subscription = await registration.pushManager.getSubscription();
-
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
-        });
-      }
-
-      const p256dh = keyToBase64(subscription.getKey("p256dh"));
-      const auth = keyToBase64(subscription.getKey("auth"));
-
-      if (!p256dh || !auth) {
-        throw new Error("Il browser non ha restituito una subscription valida.");
-      }
-
-      await subscribeToTrainingNotifications(accessToken, {
-        endpoint: subscription.endpoint,
-        keys: { p256dh, auth },
-        timezone:
-          Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      });
-
+      const settings = await saveSubscription(reminderHour);
+      setReminderHour(settings.reminder_hour);
       setEnabled(true);
-      setMessage("Attive: riceverai il promemoria la mattina dei giorni di allenamento.");
+      setJustEnabled(true);
+      setMessage(null);
+
+      window.setTimeout(() => {
+        setJustEnabled(false);
+        setSettingsOpen(false);
+      }, 1600);
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : "Non è stato possibile attivare le notifiche.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveReminderHour() {
+    if (!enabled || busy) {
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+
+    try {
+      const settings = await saveSubscription(reminderHour);
+      setReminderHour(settings.reminder_hour);
+      setMessage(`Orario salvato: ${hourLabel(settings.reminder_hour)}.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Non è stato possibile salvare l'orario.",
       );
     } finally {
       setBusy(false);
@@ -168,7 +230,8 @@ export function TrainingNotificationsCard({ accessToken }: Props) {
       }
 
       setEnabled(false);
-      setMessage("Promemoria allenamento disattivati su questo dispositivo.");
+      setSettingsOpen(true);
+      setMessage("Promemoria disattivati su questo dispositivo.");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -180,22 +243,59 @@ export function TrainingNotificationsCard({ accessToken }: Props) {
     }
   }
 
+  if (enabled && !settingsOpen) {
+    return (
+      <section className={`${styles.card} ${styles.compactCard}`}>
+        <button
+          type="button"
+          className={styles.compactButton}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <span className={styles.compactIcon} aria-hidden="true">🔔</span>
+          <span className={styles.compactCopy}>
+            <strong>Notifiche attive</strong>
+            <small>{hourLabel(reminderHour)} · Modifica</small>
+          </span>
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className={styles.card}>
       <div className={styles.copy}>
         <div className={styles.titleRow}>
           <span className={styles.icon} aria-hidden="true">🔔</span>
           <div>
-            <strong>Promemoria allenamento</strong>
-            <span>Una notifica la mattina quando hai un allenamento pianificato.</span>
+            <strong>
+              {justEnabled ? "Notifiche attive ✓" : "Promemoria allenamento"}
+            </strong>
+            <span>
+              Una notifica nei giorni in cui hai un allenamento pianificato.
+            </span>
           </div>
         </div>
 
+        <label className={styles.timeRow}>
+          <span>Orario</span>
+          <select
+            value={reminderHour}
+            disabled={!supported || busy}
+            onChange={(event) => setReminderHour(Number(event.target.value))}
+          >
+            {REMINDER_HOURS.map((hour) => (
+              <option key={hour} value={hour}>
+                {hourLabel(hour)}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <small>
           {enabled
-            ? "Attive · ore 08:00 · fuso orario del dispositivo"
+            ? `Attive · ${hourLabel(reminderHour)} · fuso orario del dispositivo`
             : supported
-              ? "Disattivate su questo dispositivo"
+              ? "Scegli l'orario e attivale su questo dispositivo"
               : "Push non supportate in questo browser"}
         </small>
 
@@ -212,20 +312,45 @@ export function TrainingNotificationsCard({ accessToken }: Props) {
         )}
       </div>
 
-      <button
-        type="button"
-        className={enabled ? styles.disable : styles.enable}
-        disabled={!supported || busy}
-        onClick={() => {
-          void (enabled ? disableNotifications() : enableNotifications());
-        }}
-      >
-        {busy
-          ? "Attendi…"
-          : enabled
-            ? "Disattiva"
-            : "Attiva notifiche"}
-      </button>
+      <div className={styles.actions}>
+        {enabled ? (
+          <>
+            <button
+              type="button"
+              className={styles.enable}
+              disabled={!supported || busy}
+              onClick={() => void saveReminderHour()}
+            >
+              {busy ? "Attendi…" : "Salva orario"}
+            </button>
+            <button
+              type="button"
+              className={styles.disable}
+              disabled={!supported || busy}
+              onClick={() => void disableNotifications()}
+            >
+              Disattiva
+            </button>
+            <button
+              type="button"
+              className={styles.close}
+              disabled={busy}
+              onClick={() => setSettingsOpen(false)}
+            >
+              Chiudi
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className={styles.enable}
+            disabled={!supported || busy}
+            onClick={() => void enableNotifications()}
+          >
+            {busy ? "Attendi…" : "Attiva notifiche"}
+          </button>
+        )}
+      </div>
     </section>
   );
 }
