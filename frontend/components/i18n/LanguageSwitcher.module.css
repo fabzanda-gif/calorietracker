@@ -1,7 +1,7 @@
 .compact {
   position: fixed;
-  z-index: 42;
-  top: calc(28px + env(safe-area-inset-top));
+  z-index: 1201;
+  top: calc(18px + env(safe-area-inset-top));
   right: 188px;
 }
 .compactButton {
@@ -18,6 +18,8 @@
   background: rgba(255,255,255,.95);
   box-shadow: 0 10px 28px rgba(16,44,75,.11);
   cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .chevron { font-size: .72rem; }
 .menu {
@@ -76,7 +78,7 @@
 @media (max-width: 780px) {
   .compact {
     top: calc(10px + env(safe-area-inset-top));
-    right: 142px;
+    right: 170px;
   }
   .compactButton { min-width: 40px; height: 38px; padding-inline: 8px; }
   .profileToggle { width: 100%; min-width: 0; }
