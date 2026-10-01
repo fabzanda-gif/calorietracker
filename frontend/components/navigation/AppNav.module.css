@@ -602,7 +602,7 @@
 /* GLOBAL EXPERIENCE SWITCH */
 .globalExperienceSwitch {
   position: fixed;
-  top: 18px;
+  top: calc(18px + env(safe-area-inset-top));
   right: 22px;
   z-index: 1200;
   display: inline-flex;
@@ -614,6 +614,7 @@
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 8px 24px rgba(16, 47, 79, 0.08);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .globalExperienceSwitch button {
@@ -640,9 +641,9 @@
 
 @media (max-width: 760px) {
   .globalExperienceSwitch {
-    top: auto;
-    right: 12px;
-    bottom: 82px;
+    top: calc(10px + env(safe-area-inset-top));
+    right: 10px;
+    bottom: auto;
   }
 
   .globalExperienceSwitch button {
@@ -760,159 +761,21 @@
 
     border-radius: 48px 48px 0 0;
 
-    background-position: center 0;
+    background-position: center -8px;
+    background-size: 80px auto;
+  }
+}
+
+/* Standard mobile logo: hide wordmark, keep only the circular S mark. */
+@media (max-width: 759px) {
+  .mobileNav:not(.mobileNavZero)::before {
+    top: -56px;
+    width: 96px;
+    height: 62px;
+    border-radius: 52px 52px 0 0;
+    background-image: url("/assets/LogoCoralMark.png");
+    background-position: center 5px;
     background-size: 78px auto;
-  }
-}
-
-@media (max-width: 759px) {
-  .mobileNavZero::before {
-    top: -78px;
-
-    width: 76px;
-    height: 86px;
-
-    border-radius: 38px 38px 0 0;
-
-    background-position: center -1px;
-    background-size: 68px auto;
-
-    box-shadow:
-      0 -4px 10px rgba(0, 0, 0, 0.22);
-  }
-}
-
-@media (max-width: 759px) {
-  .mobileNavZero {
-    overflow: visible;
-  }
-
-  .mobileNavZero::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: -80px;
-
-    width: 78px;
-    height: 88px;
-
-    transform: translateX(-50%);
-
-    border: 2px solid rgba(150, 32, 32, 0.95);
-    border-bottom: 0;
-    border-radius: 39px 39px 0 0;
-
-    background: #050505;
-
-    box-shadow:
-      0 -4px 10px rgba(0, 0, 0, 0.22);
-
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  .mobileNavZero::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: -76px;
-
-    width: 70px;
-    height: 80px;
-
-    transform: translateX(-50%);
-
-    border-radius: 35px 35px 0 0;
-
-    background-color: #050505;
-    background-image: url("/assets/LogoZero.jpeg");
-    background-repeat: no-repeat;
-    background-position: center -2px;
-    background-size: 64px auto;
-
-    z-index: 1;
-    pointer-events: none;
-  }
-}
-
-
-/* ============================================================
-   FINAL MOBILE BRAND SHAPE — STANDARD + ZERO
-   Same geometry, different theme
-   ============================================================ */
-
-@media (max-width: 759px) {
-  .mobileNav,
-  .mobileNavZero {
-    overflow: visible;
-  }
-
-  /* Shared outer shell */
-  .mobileNav::before,
-  .mobileNavZero::before {
-    content: "";
-
-    position: absolute;
-    left: 50%;
-    top: -72px;
-
-    width: 86px;
-    height: 80px;
-
-    transform: translateX(-50%);
-
-    border: 2px solid rgba(255, 104, 101, 0.72);
-    border-bottom: 0;
-    border-radius: 43px 43px 0 0;
-
-    background: #ffffff;
-
-    box-shadow:
-      0 -4px 12px rgba(16, 40, 70, 0.10);
-
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  /* Shared artwork area */
-  .mobileNav::after,
-  .mobileNavZero::after {
-    content: "";
-
-    position: absolute;
-    left: 50%;
-    top: -68px;
-
-    width: 78px;
-    height: 74px;
-
-    transform: translateX(-50%);
-
-    border-radius: 39px 39px 0 0;
-
-    background-color: #ffffff;
-    background-image: url("/assets/LogoCoral.png");
-    background-repeat: no-repeat;
-    background-position: center 3px;
-    background-size: 62px auto;
-
-    z-index: 1;
-    pointer-events: none;
-  }
-
-  /* ZERO keeps the exact same geometry */
-  .mobileNavZero::before {
-    border-color: rgba(244, 61, 61, 0.72);
-    background: #050505;
-
-    box-shadow:
-      0 -4px 12px rgba(0, 0, 0, 0.28);
-  }
-
-  .mobileNavZero::after {
-    background-color: #050505;
-    background-image: url("/assets/LogoZero.jpeg");
-    background-position: center 0;
-    background-size: 68px auto;
+    overflow: hidden;
   }
 }
