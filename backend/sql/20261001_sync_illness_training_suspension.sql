@@ -39,8 +39,14 @@ end;
 $$;
 
 drop trigger if exists special_period_training_suspension on public.special_periods;
+drop trigger if exists special_period_training_restore_before_delete on public.special_periods;
+
 create trigger special_period_training_suspension
-after insert or update or delete on public.special_periods
+after insert or update on public.special_periods
+for each row execute function public.sync_special_period_training_suspension();
+
+create trigger special_period_training_restore_before_delete
+before delete on public.special_periods
 for each row execute function public.sync_special_period_training_suspension();
 
 create or replace function public.apply_special_period_to_planned_activity()
