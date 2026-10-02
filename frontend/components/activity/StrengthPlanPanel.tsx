@@ -385,6 +385,8 @@ export function StrengthPlanPanel() {
     },
     [detail],
   );
+  const completedWorkoutCount =
+    detail?.workouts.filter((item) => item.status === "completed").length ?? 0;
 
 
   useEffect(() => {
@@ -1125,6 +1127,34 @@ export function StrengthPlanPanel() {
         </div>
       ) : (
         <>
+          <div className={styles.progressCard}>
+            <div className={styles.progressHeading}>
+              <div>
+                <small>IL CAMMINO FATTO</small>
+                <strong>
+                  {completedWorkoutCount}
+                  {" "}di {detail.workout_count} sedute completate
+                </strong>
+              </div>
+              <b>
+                {detail.workout_count
+                  ? Math.round(
+                      completedWorkoutCount / detail.workout_count * 100,
+                    )
+                  : 0}%
+              </b>
+            </div>
+            <progress
+              value={completedWorkoutCount}
+              max={Math.max(detail.workout_count, 1)}
+              aria-label="Avanzamento del programma forza"
+            />
+            <p>
+              {nextWorkout
+                ? `Prossima seduta: ${formatDate(nextWorkout.scheduled_date)} · ${nextWorkout.title}`
+                : "Hai affrontato tutte le sedute in programma."}
+            </p>
+          </div>
           <div className={styles.planSummary}>
             <div>
               <span>Obiettivo</span>
@@ -1186,15 +1216,6 @@ export function StrengthPlanPanel() {
                 : "Interrompi programma"}
             </button>
           </div>
-
-          <StrengthProgramOverview
-            detail={detail}
-            refreshKey={
-              loggedWorkout
-                ? 1
-                : 0
-            }
-          />
 
           {nextWorkout ? (
             <div className={styles.workoutCard}>
@@ -1573,6 +1594,13 @@ export function StrengthPlanPanel() {
           )}
         </>
       )}
+
+      {!loading && detail ? (
+        <StrengthProgramOverview
+          detail={detail}
+          refreshKey={loggedWorkout ? 1 : 0}
+        />
+      ) : null}
 
 
       {loggedWorkout && outcome ? (

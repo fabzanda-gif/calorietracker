@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - main
+      - codex/landing-redesign
 
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
