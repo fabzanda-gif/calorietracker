@@ -1,0 +1,777 @@
+.wrapper{
+  margin:24px 0;
+  padding:26px;
+  border:1px solid #e2e4e0;
+  border-radius:24px;
+  background:#fff;
+}
+
+.heading{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:24px;
+}
+
+.heading p{
+  margin:0 0 6px;
+  color:#ef5e5c;
+  font-size:.7rem;
+  font-weight:900;
+  letter-spacing:.13em;
+}
+
+.heading h2{
+  margin:0;
+  color:#102846;
+  letter-spacing:-.035em;
+}
+
+.heading div > span{
+  display:block;
+  margin-top:6px;
+  color:#718093;
+}
+
+.activePlan{
+  min-width:190px;
+  padding:14px 16px;
+  border-radius:16px;
+  background:#f5f6f4;
+}
+
+.activePlan small,
+.activePlan span{
+  display:block;
+  color:#718093;
+}
+
+.activePlan strong{
+  display:block;
+  margin:4px 0;
+  color:#102846;
+  font-size:1.35rem;
+}
+
+.columns{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-top:22px;
+}
+
+.stateCard,
+.goalCard{
+  padding:18px;
+  border:1px solid #e6e7e4;
+  border-radius:18px;
+  background:#fafbf9;
+}
+
+.cardTitle{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-bottom:16px;
+}
+
+.cardTitle > span{
+  display:grid;
+  place-items:center;
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:#102846;
+  color:#fff;
+  font-size:.68rem;
+  font-weight:900;
+}
+
+.cardTitle strong,
+.cardTitle small{
+  display:block;
+}
+
+.cardTitle strong{
+  color:#102846;
+}
+
+.cardTitle small{
+  margin-top:2px;
+  color:#8993a0;
+}
+
+.fields{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+
+.fields label,
+.preferences label{
+  display:grid;
+  gap:6px;
+  color:#607085;
+  font-size:.75rem;
+  font-weight:800;
+}
+
+.fields input,
+.fields select,
+.preferences select{
+  min-height:44px;
+  box-sizing:border-box;
+  width:100%;
+  padding:0 12px;
+  border:1px solid #dfe1df;
+  border-radius:11px;
+  background:#fff;
+  color:#102846;
+  font:inherit;
+}
+
+.unitInput{
+  position:relative;
+}
+
+.unitInput input{
+  padding-right:66px;
+}
+
+.unitInput span{
+  position:absolute;
+  top:50%;
+  right:11px;
+  transform:translateY(-50%);
+  color:#98a1ad;
+  font-size:.68rem;
+}
+
+.preferences{
+  display:grid;
+  grid-template-columns:180px 210px 1fr;
+  gap:12px;
+  align-items:end;
+  margin-top:14px;
+}
+
+.preferences button{
+  min-height:44px;
+  border:0;
+  border-radius:11px;
+  background:#102846;
+  color:#fff;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.preferences button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+.message{
+  margin:12px 0 0;
+  color:#607085;
+  font-size:.82rem;
+  font-weight:700;
+}
+
+@media(max-width:820px){
+  .heading{
+    flex-direction:column;
+  }
+
+  .columns{
+    grid-template-columns:1fr;
+  }
+
+  .preferences{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .preferences button{
+    grid-column:1/-1;
+  }
+}
+
+@media(max-width:560px){
+  .wrapper{
+    padding:18px;
+  }
+
+  .fields,
+  .preferences{
+    grid-template-columns:1fr;
+  }
+
+  .preferences button{
+    grid-column:auto;
+  }
+}
+
+
+/* RUNNING PLAN PREVIEW START */
+
+.preview{
+  margin-top:18px;
+  padding:18px;
+  border:1px solid #dfe3df;
+  border-radius:18px;
+  background:#f8faf7;
+}
+
+.previewHeading small{
+  color:#ef5e5c;
+  font-size:.66rem;
+  font-weight:900;
+  letter-spacing:.09em;
+}
+
+.previewHeading h3{
+  margin:5px 0;
+  color:#102846;
+}
+
+.previewHeading p{
+  margin:0;
+  color:#718093;
+  font-size:.82rem;
+}
+
+.previewSessions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-top:15px;
+}
+
+.previewSessions article{
+  display:grid;
+  grid-template-columns:100px 1fr;
+  gap:10px;
+  padding:12px;
+  border:1px solid #e3e6e2;
+  border-radius:13px;
+  background:#fff;
+}
+
+.previewSessions article > div{
+  display:grid;
+  align-content:start;
+  gap:3px;
+}
+
+.previewSessions small{
+  color:#8a95a3;
+  font-size:.64rem;
+  font-weight:800;
+  text-transform:uppercase;
+}
+
+.previewSessions strong{
+  color:#102846;
+}
+
+.previewSessions span{
+  color:#718093;
+  font-size:.75rem;
+}
+
+.previewMore{
+  margin:10px 0 0;
+  color:#718093;
+  font-size:.75rem;
+  font-weight:750;
+}
+
+.previewActions{
+  display:flex;
+  gap:9px;
+  margin-top:16px;
+}
+
+.previewActions button{
+  min-height:44px;
+  padding:0 16px;
+  border-radius:11px;
+  font:inherit;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.confirmButton{
+  flex:1;
+  border:0;
+  background:#102846;
+  color:#fff;
+}
+
+.editButton{
+  border:1px solid #d9ded9;
+  background:#fff;
+  color:#607085;
+}
+
+.previewActions button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+@media(max-width:720px){
+  .previewSessions{
+    grid-template-columns:1fr;
+  }
+
+  .previewActions{
+    flex-direction:column;
+  }
+}
+
+@media(max-width:480px){
+  .previewSessions article{
+    grid-template-columns:1fr;
+  }
+}
+
+/* RUNNING PLAN PREVIEW END */
+
+
+/* DELETE RUNNING PLAN START */
+
+.deletePlanButton{
+  width:100%;
+  min-height:34px;
+  margin-top:12px;
+  padding:0 10px;
+  border:1px solid #e2caca;
+  border-radius:9px;
+  background:#fff;
+  color:#a94848;
+  font:inherit;
+  font-size:.72rem;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.deletePlanButton:hover{
+  border-color:#cf8e8e;
+  color:#8f3030;
+}
+
+.deletePlanButton:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+/* DELETE RUNNING PLAN END */
+
+
+/* REPLACE RUNNING PLAN START */
+
+.replaceWarning{
+  display:grid;
+  gap:4px;
+  margin-top:14px;
+  padding:12px 14px;
+  border:1px solid #eed5ae;
+  border-radius:12px;
+  background:#fff9ee;
+}
+
+.replaceWarning strong{
+  color:#7b5420;
+  font-size:.8rem;
+}
+
+.replaceWarning span{
+  color:#8b7558;
+  font-size:.75rem;
+  line-height:1.45;
+}
+
+/* REPLACE RUNNING PLAN END */
+
+
+/* FULL RUNNING PLAN START */
+
+.viewPlanButton{
+  width:100%;
+  min-height:36px;
+  margin-top:12px;
+  padding:0 10px;
+  border:0;
+  border-radius:9px;
+  background:#102846;
+  color:#fff;
+  font:inherit;
+  font-size:.72rem;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.fullPlan{
+  margin-top:22px;
+  padding:20px;
+  border:1px solid #dfe3e2;
+  border-radius:20px;
+  background:#f8faf8;
+}
+
+.fullPlanHeading{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:20px;
+}
+
+.fullPlanHeading small{
+  color:#ef5e5c;
+  font-size:.65rem;
+  font-weight:900;
+  letter-spacing:.09em;
+}
+
+.fullPlanHeading h3{
+  margin:4px 0;
+  color:#102846;
+  font-size:1.35rem;
+}
+
+.fullPlanHeading p{
+  margin:0;
+  color:#788594;
+  font-size:.78rem;
+}
+
+.fullPlanGoal{
+  min-width:150px;
+  padding:11px 13px;
+  border-radius:13px;
+  background:#fff;
+}
+
+.fullPlanGoal small,
+.fullPlanGoal span{
+  display:block;
+  color:#85909d;
+}
+
+.fullPlanGoal strong{
+  display:block;
+  margin:3px 0;
+  color:#102846;
+}
+
+.weekList{
+  display:grid;
+  gap:10px;
+  margin-top:18px;
+}
+
+.weekCard{
+  overflow:hidden;
+  border:1px solid #e0e4e1;
+  border-radius:15px;
+  background:#fff;
+}
+
+.weekHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 14px;
+  border-bottom:1px solid #edf0ed;
+  background:#fafbf9;
+}
+
+.weekHeader > div{
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+}
+
+.weekHeader small{
+  color:#8c97a3;
+  font-size:.61rem;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+
+.weekHeader strong{
+  color:#102846;
+  font-size:1.05rem;
+}
+
+.weekHeader > span{
+  color:#8994a0;
+  font-size:.7rem;
+  font-weight:700;
+}
+
+.weekSessions{
+  display:grid;
+}
+
+.weekSession{
+  display:grid;
+  grid-template-columns:
+    110px minmax(170px,1fr) 120px 90px;
+  gap:14px;
+  align-items:center;
+  min-height:58px;
+  padding:8px 14px;
+  border-bottom:1px solid #eff1ef;
+}
+
+.weekSession:last-child{
+  border-bottom:0;
+}
+
+.weekSessionDate{
+  color:#5e6d7d;
+  font-size:.75rem;
+  font-weight:800;
+  text-transform:capitalize;
+}
+
+.weekSessionType{
+  display:grid;
+  justify-items:start;
+  gap:3px;
+}
+
+.weekSessionType > span{
+  display:inline-flex;
+  min-height:21px;
+  align-items:center;
+  padding:0 7px;
+  border-radius:999px;
+  background:#eef2f5;
+  color:#526478;
+  font-size:.6rem;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.weekSessionType strong{
+  color:#102846;
+  font-size:.8rem;
+}
+
+.weekSessionMetrics{
+  display:grid;
+  gap:2px;
+}
+
+.weekSessionMetrics strong{
+  color:#102846;
+  font-size:.8rem;
+}
+
+.weekSessionMetrics span{
+  color:#87929e;
+  font-size:.69rem;
+}
+
+.weekSessionStatus{
+  justify-self:end;
+  color:#82909c;
+  font-size:.66rem;
+  font-weight:800;
+}
+
+.sessionKind_easy{
+  background:#edf6ef !important;
+  color:#487051 !important;
+}
+
+.sessionKind_recovery{
+  background:#eef5f7 !important;
+  color:#4c6f78 !important;
+}
+
+.sessionKind_tempo{
+  background:#fff4df !important;
+  color:#886426 !important;
+}
+
+.sessionKind_interval{
+  background:#fff0ec !important;
+  color:#9a5040 !important;
+}
+
+.sessionKind_long{
+  background:#eaf0f8 !important;
+  color:#284d7b !important;
+}
+
+.sessionKind_race{
+  background:#fcebec !important;
+  color:#9b3740 !important;
+}
+
+.fullPlanLoading{
+  margin-top:16px;
+  padding:18px;
+  border-radius:13px;
+  background:#fff;
+  color:#7d8997;
+  font-size:.8rem;
+  font-weight:750;
+  text-align:center;
+}
+
+@media(max-width:760px){
+  .fullPlanHeading{
+    flex-direction:column;
+  }
+
+  .weekSession{
+    grid-template-columns:90px 1fr 90px;
+  }
+
+  .weekSessionStatus{
+    display:none;
+  }
+}
+
+@media(max-width:540px){
+  .fullPlan{
+    padding:14px;
+  }
+
+  .weekSession{
+    grid-template-columns:1fr;
+    gap:5px;
+    padding:12px;
+  }
+
+  .weekSessionMetrics{
+    display:flex;
+    gap:8px;
+  }
+}
+
+/* FULL RUNNING PLAN END */
+
+
+/* RUNNING PLAN PHASES START */
+
+.phaseTimeline{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-top:18px;
+}
+
+.phaseTimelineItem{
+  position:relative;
+  overflow:hidden;
+  min-height:92px;
+  padding:12px;
+  border:1px solid #e2e6e3;
+  border-radius:13px;
+  background:#fff;
+}
+
+.phaseTimelineItem::before{
+  content:"";
+  position:absolute;
+  top:0;
+  right:0;
+  left:0;
+  height:4px;
+  background:#cfd7df;
+}
+
+.phaseTimelineTop{
+  display:grid;
+  gap:3px;
+}
+
+.phaseTimelineTop strong{
+  color:#102846;
+  font-size:.78rem;
+}
+
+.phaseTimelineTop span{
+  color:#84909d;
+  font-size:.65rem;
+  font-weight:750;
+}
+
+.phaseTimelineItem p{
+  margin:8px 0 0;
+  color:#748291;
+  font-size:.68rem;
+  line-height:1.4;
+}
+
+.phaseTimeline_base::before{
+  background:#688a72;
+}
+
+.phaseTimeline_build::before{
+  background:#bf8831;
+}
+
+.phaseTimeline_specific::before{
+  background:#b65e4f;
+}
+
+.phaseTimeline_taper::before{
+  background:#536f94;
+}
+
+.weekPhaseBadge{
+  display:inline-flex;
+  align-items:center;
+  min-height:21px;
+  margin-left:5px;
+  padding:0 7px;
+  border-radius:999px;
+  font-size:.58rem;
+  font-weight:900;
+  letter-spacing:.035em;
+  text-transform:uppercase;
+}
+
+.weekPhase_base{
+  background:#edf6ef;
+  color:#487051;
+}
+
+.weekPhase_build{
+  background:#fff4df;
+  color:#886426;
+}
+
+.weekPhase_specific{
+  background:#fff0ec;
+  color:#9a5040;
+}
+
+.weekPhase_taper{
+  background:#eaf0f8;
+  color:#284d7b;
+}
+
+@media(max-width:760px){
+  .phaseTimeline{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:480px){
+  .phaseTimeline{
+    grid-template-columns:1fr;
+  }
+
+  .phaseTimelineItem{
+    min-height:auto;
+  }
+}
+
+/* RUNNING PLAN PHASES END */

@@ -50,14 +50,14 @@ def test_activity_is_exposed_as_positive_budget_context():
     )
 
     assert result == {
-        "direction": "expanded",
+        "direction": "unchanged",
         "driver": "activity",
         "portion_changed": False,
         "available_kcal": 900,
-        "title": "Più margine disponibile",
+        "title": "Attività registrata",
         "message": (
-            "L'attività registrata oggi ha aumentato "
-            "il margine disponibile."
+            "L'attività di oggi resta un dato osservato; "
+            "il budget usa la baseline degli ultimi 7 giorni."
         ),
     }
 
@@ -103,3 +103,41 @@ def test_missing_recommendation_returns_none():
     )
 
     assert result is None
+
+def test_removed_component_has_explicit_context():
+    result = service.build(
+        recommendation={
+            "strategy": "component_reduction",
+            "portion_multiplier": 1.0,
+            "adaptation": {
+                "changed": True,
+                "type": "component_removal",
+                "removed_components": [
+                    {
+                        "name": "Mela",
+                        "calories": 95,
+                    }
+                ],
+            },
+        },
+        actual={
+            "consumed_kcal": 900,
+            "actual_activity_kcal": 0,
+        },
+        budget={
+            "available_kcal": 500,
+        },
+    )
+
+    assert result == {
+        "direction": "reduced",
+        "driver": "food",
+        "portion_changed": False,
+        "available_kcal": 500,
+        "title": "Pasto alleggerito, porzioni invariate",
+        "message": (
+            "Rimuovo Mela e mantengo invariato "
+            "il piatto principale."
+        ),
+        "removed_components": ["Mela"],
+    }

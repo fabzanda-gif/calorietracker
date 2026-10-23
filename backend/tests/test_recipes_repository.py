@@ -96,3 +96,17 @@ def test_delete():
     fake = FakeSupabase([])
     assert RecipesRepository(fake).delete(8, "u1") is True
     assert "delete" in names(fake)
+
+
+def test_get_available_by_id_accepts_personal_or_shared():
+    fake = FakeSupabase(
+        [{"id": 9, "user_id": "u2", "is_shared": True}]
+    )
+
+    row = RecipesRepository(fake).get_available_by_id(
+        9,
+        "u1",
+    )
+
+    assert row["id"] == 9
+    assert "or" in names(fake)

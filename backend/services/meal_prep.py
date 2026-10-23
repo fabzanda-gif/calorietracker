@@ -62,7 +62,7 @@ class MealPrepService:
                 "portions_prepared must be greater than zero"
             )
 
-        recipe = self.recipes_repo.get_personal_by_id(
+        recipe = self.recipes_repo.get_available_by_id(
             recipe_id,
             user_id,
         )
@@ -103,6 +103,44 @@ class MealPrepService:
             ),
             "status": "available",
         }
+
+        existing = (
+            self.meal_prep_repo.find_available_for_recipe_date(
+                user_id,
+                recipe.get("id"),
+                str(prepared_at),
+            )
+        )
+
+        if existing is not None:
+            previous_prepared = int(
+                existing.get("portions_prepared") or 0
+            )
+            previous_remaining = int(
+                existing.get("portions_remaining") or 0
+            )
+
+            merged = {
+                "portions_prepared":
+                    previous_prepared + int(portions_prepared),
+                "portions_remaining":
+                    previous_remaining + int(portions_prepared),
+                "status": "available",
+            }
+
+            if expires_at is not None:
+                merged["expires_at"] = str(expires_at)
+
+            item = self.meal_prep_repo.update(
+                existing["id"],
+                user_id,
+                merged,
+            )
+
+            return item if item is not None else {
+                **existing,
+                **merged,
+            }
 
         item = self.meal_prep_repo.create(payload)
         return item if item is not None else payload

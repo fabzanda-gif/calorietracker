@@ -22,6 +22,24 @@ class BaseRepository:
         if supabase_client is None:
             raise ValueError("supabase_client is required")
         self.supabase = supabase_client
+        # Repository objects are request-scoped in FastAPI.
+        # Cache identical reads only for the lifetime of this instance,
+        # avoiding repeated Supabase round-trips inside one API request.
+        self._request_cache: dict[tuple, Any] = {}
+
+    def _cached(
+        self,
+        key: tuple,
+    ):
+        return self._request_cache.get(key)
+
+    def _store_cache(
+        self,
+        key: tuple,
+        value,
+    ):
+        self._request_cache[key] = value
+        return value
 
     @property
     def table(self):

@@ -25,6 +25,10 @@ from backend.services.structured_recipe import (
     StructuredRecipeError,
     StructuredRecipeService,
 )
+from backend.services.recipe_ai_interpreter import (
+    RecipeAIInterpreter,
+    RecipeAIInterpreterError,
+)
 
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
@@ -42,6 +46,7 @@ class RecipeCreate(BaseModel):
     meal_type: str | None = None
     category: str | None = None
     recipe_servings: float | None = Field(default=None, gt=0)
+    final_weight_g: float | None = Field(default=None, gt=0)
     calories: float = 0
     protein: float = 0
     carbs: float = 0
@@ -51,6 +56,8 @@ class RecipeCreate(BaseModel):
     structured_ingredients: list[StructuredRecipeIngredient] | None = None
     is_shared: bool = False
     image_url: str | None = None
+    taste_rating: int | None = Field(default=None, ge=1, le=5)
+    ease_rating: int | None = Field(default=None, ge=1, le=5)
 
 
 class RecipeUpdate(BaseModel):
@@ -58,6 +65,7 @@ class RecipeUpdate(BaseModel):
     meal_type: str | None = None
     category: str | None = None
     recipe_servings: float | None = Field(default=None, gt=0)
+    final_weight_g: float | None = Field(default=None, gt=0)
     calories: float | None = None
     protein: float | None = None
     carbs: float | None = None
@@ -66,10 +74,43 @@ class RecipeUpdate(BaseModel):
     ingredients_json: Any | None = None
     structured_ingredients: list[StructuredRecipeIngredient] | None = None
     image_url: str | None = None
+    taste_rating: int | None = Field(default=None, ge=1, le=5)
+    ease_rating: int | None = Field(default=None, ge=1, le=5)
 
 
 class RecipeShareUpdate(BaseModel):
     is_shared: bool
+
+
+class RecipeAIPreviewRequest(BaseModel):
+    text: str = Field(
+        min_length=1,
+        max_length=6000,
+    )
+
+
+@router.post("/ai-preview")
+def preview_recipe_ai(
+    request: RecipeAIPreviewRequest,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+):
+    _ = current_user
+
+    try:
+        result = RecipeAIInterpreter().interpret(
+            text=request.text,
+        )
+    except RecipeAIInterpreterError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "result": result,
+    }
 
 
 @router.get("")
@@ -162,7 +203,7 @@ def get_recipe(
     ),
 ):
     try:
-        item = repo.get_personal_by_id(
+        item = repo.get_available_by_id(
             recipe_id,
             current_user.id,
         )

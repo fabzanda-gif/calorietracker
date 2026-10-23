@@ -1,0 +1,270 @@
+.page {
+  min-height: 100vh;
+  padding: 78px 42px 96px 292px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 112, 112, 0.08), transparent 28rem),
+    #f8f8f5;
+  color: #0e3150;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 390px);
+  gap: 24px;
+  align-items: stretch;
+  max-width: 1180px;
+  margin: 0 auto 28px;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #65768a;
+}
+
+.header h1,
+.workflowCard h2,
+.areaCard h2 {
+  margin: 0;
+  color: #0d2f4d;
+}
+
+.header h1 {
+  max-width: 720px;
+  font-size: clamp(2.2rem, 4vw, 4.2rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+.header > div > p {
+  max-width: 720px;
+  margin: 18px 0 0;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: #66758a;
+}
+
+.aiShortcut {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 22px;
+  border-radius: 28px;
+  background: #103553;
+  color: white;
+  text-decoration: none;
+  box-shadow: 0 18px 46px rgba(16, 53, 83, 0.14);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.aiShortcut:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 52px rgba(16, 53, 83, 0.2);
+}
+
+.aiShortcut > span {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 18px;
+  background: #ff6f70;
+  font-size: 1.4rem;
+}
+
+.aiShortcut div {
+  display: grid;
+  gap: 4px;
+}
+
+.aiShortcut small {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #ffb3b1;
+}
+
+.aiShortcut strong {
+  font-size: 1.05rem;
+}
+
+.aiShortcut div > span {
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.primaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.areaCard {
+  display: flex;
+  gap: 18px;
+  min-height: 250px;
+  padding: 26px;
+  border: 1px solid rgba(14, 49, 80, 0.1);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.94);
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 16px 44px rgba(16, 53, 83, 0.06);
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.areaCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 111, 112, 0.55);
+}
+
+.areaIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  border-radius: 20px;
+  background: #fff0ef;
+  font-size: 1.55rem;
+}
+
+.areaCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.areaCopy small {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #718096;
+}
+
+.areaCopy h2 {
+  margin-top: 8px;
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+}
+
+.areaCopy p {
+  margin: 12px 0 22px;
+  line-height: 1.55;
+  color: #6b7888;
+}
+
+.areaCopy > strong {
+  margin-top: auto;
+  color: #ef6264;
+}
+
+.workflowCard {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.75fr) minmax(0, 1.25fr);
+  gap: 28px;
+  max-width: 1180px;
+  margin: 22px auto 0;
+  padding: 28px;
+  border: 1px solid rgba(14, 49, 80, 0.1);
+  border-radius: 30px;
+  background: #fff;
+}
+
+.workflowIntro h2 {
+  font-size: 1.7rem;
+  letter-spacing: -0.03em;
+}
+
+.workflowIntro p {
+  margin: 12px 0 0;
+  line-height: 1.55;
+  color: #6a7888;
+}
+
+.workflowSteps {
+  display: grid;
+  gap: 10px;
+}
+
+.workflowStep {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: #f8f9f7;
+  color: inherit;
+  text-decoration: none;
+}
+
+.workflowStep > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  background: #103553;
+  color: white;
+  font-weight: 900;
+}
+
+.workflowStep div {
+  display: grid;
+  gap: 3px;
+}
+
+.workflowStep small {
+  color: #7b8795;
+}
+
+@media (max-width: 1040px) {
+  .page {
+    padding-left: 274px;
+    padding-right: 24px;
+  }
+
+  .header,
+  .workflowCard {
+    grid-template-columns: 1fr;
+  }
+
+  .primaryGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 92px 16px 112px;
+  }
+
+  .header {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .header h1 {
+    font-size: clamp(2.25rem, 12vw, 3.3rem);
+  }
+
+  .primaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .areaCard {
+    min-height: 0;
+    padding: 22px;
+  }
+
+  .workflowCard {
+    padding: 22px;
+  }
+}

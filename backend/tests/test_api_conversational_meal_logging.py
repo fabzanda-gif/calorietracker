@@ -123,3 +123,186 @@ def test_conversational_preview_builds_preview_from_interpretation(
     }
 
     assert payload["requires_confirmation"] is True
+
+
+def test_photo_preview_route_is_registered():
+    assert (
+        "/meals/photo/preview"
+        in app.openapi()["paths"]
+    )
+
+
+def test_photo_preview_builds_preview_from_interpretation(
+    monkeypatch,
+):
+    import base64
+
+    from backend.api.routers import meals as meals_router
+
+    def fake_interpret(
+        self,
+        *,
+        image_bytes,
+        mime_type,
+        meal_type,
+    ):
+        assert image_bytes == b"fake-image"
+        assert mime_type == "image/jpeg"
+
+        return {
+            "meal_type": meal_type,
+            "items": [
+                {
+                    "name": "Pasta al pomodoro",
+                    "quantity": 250,
+                    "unit": "g",
+                    "calories": 420,
+                    "protein": 14,
+                    "carbs": 72,
+                    "fat": 9,
+                    "estimated": True,
+                    "uncertainty": "photo",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        meals_router.GroqMealVisionInterpreter,
+        "interpret",
+        fake_interpret,
+    )
+
+    response = client.post(
+        "/meals/photo/preview",
+        json={
+            "image_base64": base64.b64encode(
+                b"fake-image"
+            ).decode("utf-8"),
+            "mime_type": "image/jpeg",
+            "meal_type": "Pranzo",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["meal_type"] == "Pranzo"
+    assert len(data["items"]) == 1
+    assert data["items"][0]["name"] == "Pasta al pomodoro"
+    assert data["items"][0]["calories"] == 420
+
+
+def test_photo_preview_rejects_invalid_base64():
+    response = client.post(
+        "/meals/photo/preview",
+        json={
+            "image_base64": "not-valid-base64!!!",
+            "mime_type": "image/jpeg",
+            "meal_type": "Pranzo",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_conversational_recheck_only_updates_selected_items(
+    monkeypatch,
+):
+    from backend.api.routers import meals as meals_router
+
+    calls = []
+
+    def fake_interpret_meal_text(*, text, meal_type):
+        calls.append(
+            {
+                "text": text,
+                "meal_type": meal_type,
+            }
+        )
+
+        return {
+            "meal_type": meal_type,
+            "items": [
+                {
+                    "name": "Mela",
+                    "quantity": 180,
+                    "unit": "g",
+                    "quantity_g": 180,
+                    "calories": 94,
+                    "protein": 0.5,
+                    "carbs": 25,
+                    "fat": 0.3,
+                    "estimated": False,
+                    "uncertainty": None,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        meals_router,
+        "interpret_meal_text",
+        fake_interpret_meal_text,
+        raising=False,
+    )
+
+    original_items = [
+        {
+            "name": "Pasta",
+            "quantity": 100,
+            "unit": "g",
+            "quantity_g": 100,
+            "calories": 350,
+            "protein": 12,
+            "carbs": 70,
+            "fat": 2,
+            "estimated": False,
+            "uncertainty": None,
+        },
+        {
+            "name": "Mela",
+            "quantity": 1,
+            "unit": "pezzo",
+            "quantity_g": 150,
+            "calories": 80,
+            "protein": 0.4,
+            "carbs": 21,
+            "fat": 0.2,
+            "estimated": True,
+            "uncertainty": "quantity",
+        },
+    ]
+
+    response = client.post(
+        "/meals/conversational/recheck",
+        json={
+            "meal_type": "Pranzo",
+            "items": original_items,
+            "item_indices": [1],
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert len(calls) == 1
+    assert calls[0]["meal_type"] == "Pranzo"
+    assert "Mela" in calls[0]["text"]
+    assert "Pasta" not in calls[0]["text"]
+
+    assert payload["items"][0] == original_items[0]
+
+    assert payload["items"][1]["name"] == "Mela"
+    assert payload["items"][1]["quantity"] == 180
+    assert payload["items"][1]["unit"] == "g"
+    assert payload["items"][1]["calories"] == 94
+
+    assert payload["totals"] == {
+        "calories": 444.0,
+        "protein": 12.5,
+        "carbs": 95.0,
+        "fat": 2.3,
+    }
+
+    assert payload["requires_confirmation"] is True

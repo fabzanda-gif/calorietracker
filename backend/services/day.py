@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 from backend.services.memory import MemoryService
+from backend.services.special_periods import active_special_period
 
 
 MEAL_SLOTS = {
     "breakfast": "Colazione",
     "lunch": "Pranzo",
+    "snack": "Snack",
     "dinner": "Cena",
 }
 
@@ -28,6 +31,14 @@ def _known_value(value: Any) -> dict:
         "state": "confirmed",
         "source": "user",
         "confidence": 1.0,
+    }
+
+
+def _unknown_context() -> dict:
+    return {
+        "value": None,
+        "state": "unknown",
+        "source": None,
     }
 
 
@@ -66,35 +77,226 @@ class DayService:
         daily_logs_repo: DailyLogsRepository,
         memory_service: MemoryService | None = None,
         meal_memory_service=None,
+        weekly_schedule_repo: WeeklyScheduleRepository | None = None,
     ):
         self.daily_logs_repo = daily_logs_repo
         self.memory_service = memory_service or MemoryService(daily_logs_repo)
         self.meal_memory_service = meal_memory_service
+        self.weekly_schedule_repo = weekly_schedule_repo
 
-    def build_day(self, user_id: str, day_date: date) -> dict:
+    def _special_period(
+        self,
+        *,
+        user_id: str,
+        day_date: date,
+    ) -> dict | None:
+        supabase = getattr(self.daily_logs_repo, "supabase", None)
+        if supabase is None:
+            return None
+        try:
+            return active_special_period(
+                supabase,
+                user_id=user_id,
+                on_date=day_date,
+            )
+        except Exception:
+            # Special-period context enriches the day but must never make the
+            # base day endpoint unavailable if an older environment has not
+            # received the migration yet.
+            return None
+
+    def _weekly_schedule_context(
+        self,
+        user_id: str,
+        day_date: date,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict:
+        """
+        Use the user's weekly schedule as the primary
+        prediction source for the day context.
+        """
+        day_name = (
+            "monday", "tuesday", "wednesday", "thursday",
+            "friday", "saturday", "sunday",
+        )[day_date.weekday()]
+        stored = (metadata or {}).get("weekly_schedule")
+        if isinstance(stored, dict):
+            value = stored.get(day_name)
+            if value in {"home", "office", "free"}:
+                return {
+                    "value": value,
+                    "state": "predicted",
+                    "source": "profile_weekly_schedule",
+                }
+
+        if self.weekly_schedule_repo is None:
+            return _unknown_context()
+
+        week_start = day_date - timedelta(
+            days=day_date.weekday()
+        )
+
+        rows = self.weekly_schedule_repo.list_for_week(
+            user_id=user_id,
+            week_start=week_start,
+        )
+
+        # weekly_schedule persists ISO-style values:
+        # Monday = 1 ... Sunday = 7
+        target_day = day_date.weekday() + 1
+
+        for row in rows:
+            if row.get("day_of_week") != target_day:
+                continue
+
+            value = row.get("context")
+
+            if value is None:
+                return _unknown_context()
+
+            value = str(value).strip()
+
+            if not value:
+                return _unknown_context()
+
+            return {
+                "value": value,
+                "state": "predicted",
+                "source": "weekly_schedule",
+            }
+
+        return _unknown_context()
+
+    def build_day(
+        self,
+        user_id: str,
+        day_date: date,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict:
         row = self.daily_logs_repo.get_for_date_compatible(
             user_id=user_id,
             log_date=day_date,
         )
         row = row or {}
+        special_period = self._special_period(
+            user_id=user_id,
+            day_date=day_date,
+        )
 
-        context = _known_value(row.get("day_type"))
+        preloaded_daily_logs = None
+
+        # Production repositories support date-range reads. Some lightweight
+        # test doubles intentionally expose only get_for_date_compatible().
+        # Keep the optimization optional so the historical service contract
+        # remains backward-compatible.
+        if hasattr(
+            self.daily_logs_repo,
+            "list_date_range",
+        ):
+            memory_lookback_weeks = int(
+                getattr(
+                    self.memory_service,
+                    "lookback_weeks",
+                    16,
+                )
+            )
+
+            if self.meal_memory_service is not None:
+                memory_lookback_weeks = max(
+                    memory_lookback_weeks,
+                    int(
+                        getattr(
+                            self.meal_memory_service,
+                            "lookback_weeks",
+                            12,
+                        )
+                    ),
+                )
+
+            history_start = day_date - timedelta(
+                weeks=memory_lookback_weeks
+            )
+            history_end = day_date - timedelta(days=1)
+
+            preloaded_daily_logs = (
+                self.daily_logs_repo.list_date_range(
+                    user_id=user_id,
+                    start_date=history_start,
+                    end_date=history_end,
+                )
+            )
+
+        if special_period is not None:
+            context = {
+                "value": "free",
+                "state": "confirmed",
+                "source": f"special_period:{special_period.get('period_type')}",
+                "confidence": 1.0,
+            }
+        else:
+            # Explicit daily choice remains authoritative in normal periods.
+            context = _known_value(row.get("day_type"))
+
+        # If the user has not explicitly chosen today's context,
+        # use the weekly schedule from the profile as the primary
+        # prediction source. The weekly schedule already distinguishes
+        # home / office / free.
         if context["state"] == "unknown":
-            prediction = self.memory_service.predict_context(
+            context = self._weekly_schedule_context(
                 user_id=user_id,
                 day_date=day_date,
+                metadata=metadata,
             )
+
+        # Fall back to historical memory only when the weekly schedule
+        # cannot provide a usable value.
+        if context["state"] == "unknown":
+            if preloaded_daily_logs is None:
+                prediction = self.memory_service.predict_context(
+                    user_id=user_id,
+                    day_date=day_date,
+                )
+            else:
+                prediction = self.memory_service.predict_context(
+                    user_id=user_id,
+                    day_date=day_date,
+                    preloaded_daily_logs=preloaded_daily_logs,
+                )
             if prediction["state"] == "predicted":
                 context = prediction
 
-        activity_plan = _known_value(row.get("activity_plan"))
+        if special_period and special_period.get("period_type") == "illness":
+            activity_plan = {
+                "value": "rest",
+                "state": "confirmed",
+                "source": "special_period:illness",
+                "confidence": 1.0,
+            }
+        else:
+            activity_plan = _known_value(row.get("activity_plan"))
+
         if activity_plan["state"] == "unknown":
-            prediction = self.memory_service.predict_activity_plan(
-                user_id=user_id,
-                day_date=day_date,
-            )
-            if prediction["state"] == "predicted":
-                activity_plan = prediction
+            if special_period and special_period.get("activity_bias") == "higher":
+                activity_plan = {
+                    "value": "moderate",
+                    "state": "predicted",
+                    "source": "special_period:vacation",
+                    "confidence": 0.8,
+                }
+            else:
+                if preloaded_daily_logs is None:
+                    prediction = self.memory_service.predict_activity_plan(
+                        user_id=user_id,
+                        day_date=day_date,
+                    )
+                else:
+                    prediction = self.memory_service.predict_activity_plan(
+                        user_id=user_id,
+                        day_date=day_date,
+                        preloaded_daily_logs=preloaded_daily_logs,
+                    )
+                if prediction["state"] == "predicted":
+                    activity_plan = prediction
 
         meals = {
             slot: _unknown_meal(meal_type)
@@ -103,17 +305,27 @@ class DayService:
 
         if self.meal_memory_service is not None:
             for slot, meal_type in MEAL_SLOTS.items():
-                meals[slot] = self.meal_memory_service.predict_meal(
-                    user_id=user_id,
-                    day_date=day_date,
-                    meal_type=meal_type,
-                    day_context=context.get("value"),
-                )
+                if preloaded_daily_logs is None:
+                    meals[slot] = self.meal_memory_service.predict_meal(
+                        user_id=user_id,
+                        day_date=day_date,
+                        meal_type=meal_type,
+                        day_context=context.get("value"),
+                    )
+                else:
+                    meals[slot] = self.meal_memory_service.predict_meal(
+                        user_id=user_id,
+                        day_date=day_date,
+                        meal_type=meal_type,
+                        day_context=context.get("value"),
+                        preloaded_daily_logs=preloaded_daily_logs,
+                    )
 
         return {
             "date": str(day_date),
             "context": context,
             "activity_plan": activity_plan,
+            "special_period": special_period,
             "meals": meals,
             "actual": {
                 "weight": row.get("weight"),
