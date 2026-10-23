@@ -5,8 +5,9 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from pydantic import BaseModel, Field
+from fastapi.security import APIKeyHeader
 from pywebpush import WebPushException, webpush
 
 from backend.api.dependencies import (
@@ -18,6 +19,10 @@ from backend.services.special_periods import active_special_period
 
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+cron_secret_scheme = APIKeyHeader(
+    name="X-Cron-Secret",
+    auto_error=False,
+)
 
 
 class PushKeys(BaseModel):
@@ -193,7 +198,7 @@ def _format_training_body(activity: dict) -> str:
 
 @router.post("/training/dispatch")
 def dispatch_training_notifications(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+    x_cron_secret: str | None = Security(cron_secret_scheme),
 ):
     expected_secret = os.getenv(
         "TRAINING_NOTIFICATION_CRON_SECRET",
