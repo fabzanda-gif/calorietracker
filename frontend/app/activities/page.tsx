@@ -200,9 +200,28 @@ function isDailyMovement(
   );
 }
 
+function isRaceActivity(
+  activity: Activity,
+): boolean {
+  const label = normalizedActivityLabel(activity);
+
+  return (
+    label.includes("d2d") ||
+    label.includes("marathon") ||
+    label.includes("mezza") ||
+    label.includes("half marathon") ||
+    label.includes("gara") ||
+    label.includes("race")
+  );
+}
+
 function activityIcon(
   activity: Activity,
 ): string {
+  if (isRaceActivity(activity)) {
+    return "🏅";
+  }
+
   const label = normalizedActivityLabel(activity);
 
   if (
@@ -3877,6 +3896,10 @@ export default function ActivitiesPage() {
                     type="button"
                     key={String(activity.id)}
                     className={`${styles.activityRow} ${
+                      isRaceActivity(activity)
+                        ? styles.activityRowRace
+                        : ""
+                    } ${
                       detail?.id === activity.id
                         ? styles.activityRowActive
                         : ""
@@ -3895,6 +3918,11 @@ export default function ActivitiesPage() {
                     <span className={styles.activityInfo}>
                       <strong>
                         {activity.activity_name}
+                        {isRaceActivity(activity) ? (
+                          <span className={styles.raceBadge}>
+                            Gara
+                          </span>
+                        ) : null}
                       </strong>
                       <small>
                         {formatActivityDate(activity.date, displayLocale)} · {activity.activity_type ??
@@ -3923,7 +3951,13 @@ export default function ActivitiesPage() {
             </div>
           </section>
 
-          <section className={styles.detailCard}>
+          <section
+            className={`${styles.detailCard} ${
+              detail && isRaceActivity(detail)
+                ? styles.detailCardRace
+                : ""
+            }`}
+          >
             {detail ? (
               <>
                 <div className={styles.cardHeading}>
