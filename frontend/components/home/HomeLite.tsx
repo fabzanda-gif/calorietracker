@@ -108,6 +108,8 @@ export function HomeLite() {
     return result;
   }, [summary]);
 
+  const returning = summary?.engagement.state === "returning";
+
   const totalActivityKcal = (summary?.activities ?? []).reduce(
     (total, item) => total + Number(item.burned_calories || 0),
     0,
@@ -127,7 +129,7 @@ export function HomeLite() {
         <header className={styles.header}>
           <div>
             <p className={styles.eyebrow}>ADESSO</p>
-            <h1>{greeting()}{firstName ? `, ${firstName}` : ""}</h1>
+            <h1>{returning ? "Bentornato" : greeting()}{firstName ? `, ${firstName}` : ""}</h1>
             <p className={styles.dateLabel}>
               {new Date(`${today}T12:00:00`).toLocaleDateString("it-IT", {
                 weekday: "long",
@@ -157,6 +159,28 @@ export function HomeLite() {
         ) : null}
 
         {summary ? (
+          returning ? (
+            <section className={styles.returningShell}>
+              <div className={styles.returningCard}>
+                <span className={styles.returningIcon} aria-hidden="true">✦</span>
+                <div className={styles.returningCopy}>
+                  <span className={styles.returningEyebrow}>BENTORNATO</span>
+                  <h2>Cominciamo dal primo pasto</h2>
+                  <p>
+                    Registra quello che mangi e SanoSync rimetterà subito in moto la tua giornata.
+                  </p>
+                  <Link href="/ai" className={styles.returningAction}>
+                    + Registra il primo pasto
+                  </Link>
+                  <small>Puoi scriverlo come lo diresti a una persona.</small>
+                </div>
+              </div>
+              <div className={styles.returningHint}>
+                <span>✓</span>
+                <p>Dopo la prima registrazione ritrovi automaticamente la Home completa.</p>
+              </div>
+            </section>
+          ) : (
           <>
             <section className={`${styles.heroCard} ${styles[`hero_${summary.hero.kind}`] ?? ""}`}>
               <div className={styles.heroIcon} aria-hidden="true">{summary.hero.icon}</div>
@@ -291,6 +315,7 @@ export function HomeLite() {
               Home leggera · {summary.meta.history_days_used} giorni usati solo per la baseline attività · {summary.meta.ai_calls} chiamate AI automatiche
             </p>
           </>
+          )
         ) : null}
       </main>
     </>
