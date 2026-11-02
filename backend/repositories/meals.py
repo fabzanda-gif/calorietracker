@@ -49,6 +49,27 @@ class MealsRepository(BaseRepository):
                     f"Unable to load meals for {log_date}: {exc}"
                 ) from exc
 
+    def latest_for_user(
+        self,
+        user_id: str,
+    ) -> dict | None:
+        """Return only the latest meal date/id for lightweight engagement checks."""
+        try:
+            response = (
+                self.table
+                .select("id,date")
+                .eq("user_id", user_id)
+                .order("date", desc=True)
+                .limit(1)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load latest meal: {exc}"
+            ) from exc
+
     # Alias retained for future FastAPI readability.
     def list_for_date(self, user_id: str, log_date: Any) -> list[dict]:
         return self.list_for_date_compatible(user_id, log_date)
