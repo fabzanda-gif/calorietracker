@@ -32,6 +32,10 @@ export type HomeSummaryActivity = {
 export type HomeSummaryResponse = {
   date: string;
   context: string | null;
+  engagement: {
+    state: "active" | "returning";
+    days_since_last_meal: number | null;
+  };
   special_period: {
     id?: string;
     period_type: "vacation" | "illness";
