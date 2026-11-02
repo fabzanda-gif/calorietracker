@@ -11,13 +11,13 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 import styles from "./AppNav.module.css";
 
 const ITEMS = [
-  { href: "/", label: "Home", icon: "⌂" },
-  { href: "/plan", label: "Plan", icon: "▣" },
-  { href: "/ai", label: "AI", icon: "✦" },
-  { href: "/food", label: "Food", icon: "⌑" },
+  { href: "/", key: "home", icon: "⌂" },
+  { href: "/plan", key: "plan", icon: "▣" },
+  { href: "/ai", key: "ai", icon: "✦" },
+  { href: "/food", key: "food", icon: "⌑" },
   {
     href: "/insights",
-    label: "Insights",
+    key: "insights",
     icon: (
       <svg aria-hidden="true" viewBox="0 0 24 24">
         <path d="M4 18 9 13l3 3 7-8" />
@@ -26,6 +26,13 @@ const ITEMS = [
     ),
   },
 ] as const;
+
+const NAV_LABELS = {
+  it: { home: "Home", plan: "Piano", ai: "AI", food: "Cibo", insights: "Progressi" },
+  en: { home: "Home", plan: "Plan", ai: "AI", food: "Food", insights: "Insights" },
+  nl: { home: "Home", plan: "Plan", ai: "AI", food: "Voeding", insights: "Inzichten" },
+  fr: { home: "Accueil", plan: "Plan", ai: "IA", food: "Alimentation", insights: "Progrès" },
+} as const;
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
@@ -61,7 +68,7 @@ function isActive(pathname: string, href: string): boolean {
 export function AppNav() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { experienceMode, setExperienceMode } = useExperienceMode();
 
   const metadataName =
@@ -162,7 +169,7 @@ export function AppNav() {
                 <span className={styles.desktopIcon} aria-hidden="true">
                   {item.icon}
                 </span>
-                <span>{item.label}</span>
+                <span>{NAV_LABELS[locale][item.key]}</span>
               </Link>
             );
           })}
@@ -218,7 +225,7 @@ export function AppNav() {
               <span className={styles.mobileIcon} aria-hidden="true">
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span>{NAV_LABELS[locale][item.key]}</span>
             </Link>
           );
         })}
