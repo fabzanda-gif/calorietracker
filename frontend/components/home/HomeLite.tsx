@@ -134,11 +134,18 @@ function localIsoDate(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function greeting(): string {
+function greeting(locale: AppLocale): string {
   const hour = new Date().getHours();
-  if (hour < 12) return "Buongiorno";
-  if (hour < 18) return "Buon pomeriggio";
-  return "Buonasera";
+  const values: Record<AppLocale, [string, string, string]> = {
+    it: ["Buongiorno", "Buon pomeriggio", "Buonasera"],
+    en: ["Good morning", "Good afternoon", "Good evening"],
+    nl: ["Goedemorgen", "Goedemiddag", "Goedenavond"],
+    fr: ["Bonjour", "Bon après-midi", "Bonsoir"],
+  };
+  const [morning, afternoon, evening] = values[locale];
+  if (hour < 12) return morning;
+  if (hour < 18) return afternoon;
+  return evening;
 }
 
 function mealIcon(label: string): string {
@@ -163,7 +170,7 @@ function activityMeta(item: Record<string, unknown>): string {
   const duration = Number(item.duration_minutes ?? 0);
 
   if (typeof time === "string" && time) pieces.push(time.slice(0, 5));
-  if (distance > 0) pieces.push(`${(distance / 1000).toLocaleString("it-IT", { maximumFractionDigits: 1 })} km`);
+  if (distance > 0) pieces.push(`${(distance / 1000).toLocaleString(copy.localeTag, { maximumFractionDigits: 1 })} km`);
   if (duration > 0) pieces.push(`${Math.round(duration)} min`);
   return pieces.join(" · ");
 }
@@ -191,7 +198,7 @@ export function HomeLite() {
       })
       .catch((err) => {
         if (active) {
-          setError(err instanceof Error ? err.message : "Non riesco a caricare la Home.");
+          setError(err instanceof Error ? err.message : copy.unavailable);
         }
       })
       .finally(() => {
@@ -225,6 +232,54 @@ export function HomeLite() {
 
   const returning = summary?.engagement.state === "returning";
 
+  const heroCopy = useMemo(() => {
+    if (!summary) return null;
+    const kind = summary.hero.kind;
+    const translations: Record<AppLocale, Record<string, { title: string; message: string }>> = {
+      it: {
+        protein: { title: "Proteine ancora basse", message: "Nel prossimo pasto prova a dare priorità a una fonte proteica." },
+        budget: { title: "Budget quasi utilizzato", message: "Per il resto della giornata punta su scelte semplici e sazianti." },
+        normal: { title: "Giornata sotto controllo", message: "Registra quello che fai e mangi: SanoSync aggiorna il quadro senza appesantire la Home." },
+        vacation: { title: "Sei in vacanza", message: "Routine più flessibile: più spazio per pasti fuori, senza sospendere gli allenamenti." },
+        illness: { title: "Priorità al recupero", message: "La giornata è orientata al recupero." },
+      },
+      en: {
+        protein: { title: "Protein is still low", message: "At your next meal, prioritize a good protein source." },
+        budget: { title: "Most of today’s budget is used", message: "For the rest of the day, keep choices simple and filling." },
+        normal: { title: "Your day is on track", message: "Log what you eat and do; SanoSync keeps the picture updated without slowing you down." },
+        vacation: { title: "You’re on vacation", message: "A more flexible routine, with more room for meals out while keeping training in view." },
+        illness: { title: "Recovery comes first", message: "Today is focused on recovery." },
+      },
+      nl: {
+        protein: { title: "Je eiwitten zijn nog laag", message: "Geef bij je volgende maaltijd prioriteit aan een goede eiwitbron." },
+        budget: { title: "Het grootste deel van je budget is gebruikt", message: "Kies voor de rest van de dag eenvoudig en vullend." },
+        normal: { title: "Je dag ligt op koers", message: "Registreer wat je eet en doet; SanoSync houdt het overzicht actueel zonder de Home te vertragen." },
+        vacation: { title: "Je bent op vakantie", message: "Een flexibelere routine, met meer ruimte om buiten de deur te eten en toch te blijven trainen." },
+        illness: { title: "Herstel komt eerst", message: "Vandaag staat in het teken van herstel." },
+      },
+      fr: {
+        protein: { title: "Les protéines sont encore basses", message: "Au prochain repas, privilégiez une bonne source de protéines." },
+        budget: { title: "La majeure partie du budget est utilisée", message: "Pour le reste de la journée, choisissez des aliments simples et rassasiants." },
+        normal: { title: "Votre journée est sur la bonne voie", message: "Enregistrez ce que vous mangez et faites ; SanoSync garde une vue à jour sans alourdir l’accueil." },
+        vacation: { title: "Vous êtes en vacances", message: "Une routine plus flexible, avec plus de place pour les repas à l’extérieur tout en gardant l’entraînement en tête." },
+        illness: { title: "Priorité à la récupération", message: "La journée est orientée vers la récupération." },
+      },
+    };
+    if (kind === "training") {
+      const activity = summary.planned_today[0];
+      const title = activity ? activityTitle(activity) : "";
+      const labels: Record<AppLocale, { prefix: string; message: string }> = {
+        it: { prefix: "Allenamento oggi", message: "Mantieni margine per energia, idratazione e recupero intorno alla sessione." },
+        en: { prefix: "Workout today", message: "Leave room for energy, hydration and recovery around the session." },
+        nl: { prefix: "Training vandaag", message: "Houd ruimte voor energie, hydratatie en herstel rond de training." },
+        fr: { prefix: "Entraînement aujourd’hui", message: "Gardez de la marge pour l’énergie, l’hydratation et la récupération autour de la séance." },
+      };
+      return { title: title ? `${labels[locale].prefix}: ${title}` : labels[locale].prefix, message: labels[locale].message };
+    }
+    return translations[locale][kind] ?? { title: summary.hero.title, message: summary.hero.message };
+  }, [locale, summary]);
+
+
   const totalActivityKcal = (summary?.activities ?? []).reduce(
     (total, item) => total + Number(item.burned_calories || 0),
     0,
@@ -244,7 +299,7 @@ export function HomeLite() {
         <header className={styles.header}>
           <div>
             <p className={styles.eyebrow}>{copy.now}</p>
-            <h1>{returning ? copy.welcomeBack : greeting()}{firstName ? `, ${firstName}` : ""}</h1>
+            <h1>{returning ? copy.welcomeBack : greeting(locale)}{firstName ? `, ${firstName}` : ""}</h1>
             <p className={styles.dateLabel}>
               {new Date(`${today}T12:00:00`).toLocaleDateString(copy.localeTag, {
                 weekday: "long",
@@ -301,8 +356,8 @@ export function HomeLite() {
               <div className={styles.heroIcon} aria-hidden="true">{summary.hero.icon}</div>
               <div className={styles.heroCopy}>
                 <span>{copy.context}</span>
-                <h2>{summary.hero.title}</h2>
-                <p>{summary.hero.message}</p>
+                <h2>{heroCopy?.title ?? summary.hero.title}</h2>
+                <p>{heroCopy?.message ?? summary.hero.message}</p>
               </div>
               {summary.special_period ? (
                 <Link href="/activities" className={styles.heroLink}>
@@ -317,16 +372,16 @@ export function HomeLite() {
                 {summary.budget ? (
                   <>
                     <div className={styles.budgetNumber}>
-                      <strong>{Math.round(remaining).toLocaleString("it-IT")}</strong>
+                      <strong>{Math.round(remaining).toLocaleString(copy.localeTag)}</strong>
                       <span>{copy.kcalRemaining}</span>
                     </div>
                     <div className={styles.progressTrack} aria-label={`${Math.round(budgetPercent)}% del budget utilizzato`}>
                       <span style={{ width: `${budgetPercent}%` }} />
                     </div>
-                    <p>{Math.round(consumed).toLocaleString("it-IT")} / {Math.round(dailyBudget).toLocaleString("it-IT")} {copy.consumed}</p>
+                    <p>{Math.round(consumed).toLocaleString(copy.localeTag)} / {Math.round(dailyBudget).toLocaleString(copy.localeTag)} {copy.consumed}</p>
                   </>
                 ) : (
-                  <p>Completa il profilo per vedere il budget calorico.</p>
+                  <p>{locale === "it" ? "Completa il profilo per vedere il budget calorico." : locale === "en" ? "Complete your profile to see your calorie budget." : locale === "nl" ? "Vul je profiel aan om je caloriebudget te zien." : "Complétez votre profil pour voir votre budget calorique."}</p>
                 )}
               </div>
               <div className={styles.budgetStats}>
@@ -336,7 +391,7 @@ export function HomeLite() {
                 </div>
                 <div>
                   <span>{copy.weight}</span>
-                  <strong>{summary.latest_weight ? `${Number(summary.latest_weight.weight).toLocaleString("it-IT", { maximumFractionDigits: 1 })} kg` : "—"}</strong>
+                  <strong>{summary.latest_weight ? `${Number(summary.latest_weight.weight).toLocaleString(copy.localeTag, { maximumFractionDigits: 1 })} kg` : "—"}</strong>
                 </div>
                 <div>
                   <span>{copy.activity}</span>
@@ -432,7 +487,13 @@ export function HomeLite() {
             </section>
 
             <p className={styles.performanceNote}>
-              Home leggera · {summary.meta.history_days_used} giorni usati solo per la baseline attività · {summary.meta.ai_calls} chiamate AI automatiche
+              {locale === "it"
+                ? `Home leggera · ${summary.meta.history_days_used} giorni usati per la baseline attività · ${summary.meta.ai_calls} chiamate AI automatiche`
+                : locale === "en"
+                  ? `Light Home · ${summary.meta.history_days_used} days used for the activity baseline · ${summary.meta.ai_calls} automatic AI calls`
+                  : locale === "nl"
+                    ? `Lichte Home · ${summary.meta.history_days_used} dagen voor de activiteitsbaseline · ${summary.meta.ai_calls} automatische AI-calls`
+                    : `Accueil léger · ${summary.meta.history_days_used} jours utilisés pour la base d’activité · ${summary.meta.ai_calls} appels IA automatiques`}
             </p>
           </>
           )
