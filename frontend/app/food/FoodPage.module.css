@@ -268,3 +268,79 @@
     padding: 22px;
   }
 }
+
+
+/* ============================================================
+   SanoSync Zero — Food skin
+   Same layout, black/red Zero identity.
+   ============================================================ */
+
+:global(html[data-experience-mode="zero"]) .page {
+  background: #f5f3f1;
+  color: #171717;
+}
+
+:global(html[data-experience-mode="zero"]) .eyebrow {
+  color: #6f6f6f;
+}
+
+:global(html[data-experience-mode="zero"]) .header h1,
+:global(html[data-experience-mode="zero"]) .workflowCard h2,
+:global(html[data-experience-mode="zero"]) .areaCard h2 {
+  color: #171717;
+}
+
+:global(html[data-experience-mode="zero"]) .header > div > p,
+:global(html[data-experience-mode="zero"]) .areaCopy p,
+:global(html[data-experience-mode="zero"]) .workflowIntro p,
+:global(html[data-experience-mode="zero"]) .workflowStep small,
+:global(html[data-experience-mode="zero"]) .areaCopy small {
+  color: #707070;
+}
+
+:global(html[data-experience-mode="zero"]) .aiShortcut {
+  background: #111111;
+  color: #ffffff;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.14);
+}
+
+:global(html[data-experience-mode="zero"]) .aiShortcut:hover {
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.2);
+}
+
+:global(html[data-experience-mode="zero"]) .aiShortcut > span {
+  background: #f43d3d;
+}
+
+:global(html[data-experience-mode="zero"]) .aiShortcut small {
+  color: #ff9d9d;
+}
+
+:global(html[data-experience-mode="zero"]) .areaCard,
+:global(html[data-experience-mode="zero"]) .workflowCard {
+  border-color: #e4dddd;
+  background: #ffffff;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.05);
+}
+
+:global(html[data-experience-mode="zero"]) .areaCard:hover {
+  border-color: rgba(244, 61, 61, 0.5);
+}
+
+:global(html[data-experience-mode="zero"]) .areaIcon {
+  background: #fff0f0;
+}
+
+:global(html[data-experience-mode="zero"]) .areaCopy > strong {
+  color: #f43d3d;
+}
+
+:global(html[data-experience-mode="zero"]) .workflowStep {
+  background: #f6f4f4;
+  color: #171717;
+}
+
+:global(html[data-experience-mode="zero"]) .workflowStep > span {
+  background: #171717;
+  color: #ffffff;
+}
