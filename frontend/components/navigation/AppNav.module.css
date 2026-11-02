@@ -218,13 +218,10 @@
   border: 1px solid rgba(215, 215, 208, 0.95);
   border-radius: 22px;
 
-  background: rgba(255, 255, 255, 0.94);
+  background: #ffffff;
 
   box-shadow:
     0 12px 36px rgba(23, 24, 21, 0.13);
-
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
 }
 
 .mobileLink,
@@ -455,12 +452,7 @@
   .mobileNav {
     border-top: 3px solid #ff6865;
 
-    background:
-      linear-gradient(
-        180deg,
-        rgba(255, 248, 246, 0.98) 0%,
-        rgba(255, 255, 255, 0.97) 42%
-      );
+    background: #fffdfc;
 
     overflow: visible;
   }
@@ -658,12 +650,7 @@
     border-color: #2b2b2b;
     border-top-color: #f43d3d;
 
-    background:
-      linear-gradient(
-        180deg,
-        rgba(15, 15, 15, 0.98) 0%,
-        rgba(5, 5, 5, 0.98) 100%
-      );
+    background: #0b0b0b;
 
     box-shadow:
       0 12px 36px rgba(0, 0, 0, 0.34);
