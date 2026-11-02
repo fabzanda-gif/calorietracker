@@ -102,12 +102,12 @@
   gap: 18px;
   padding: 22px 24px;
   margin-bottom: 18px;
-  background: linear-gradient(120deg, #fff7f5, #ffffff 60%);
+  background: #fff8f6;
 }
 
-.hero_vacation { background: linear-gradient(120deg, #eef9ff, #ffffff 60%); }
-.hero_illness { background: linear-gradient(120deg, #fff3ed, #ffffff 60%); }
-.hero_training { background: linear-gradient(120deg, #f1f7ff, #ffffff 60%); }
+.hero_vacation { background: #f3f9fc; }
+.hero_illness { background: #fff6f1; }
+.hero_training { background: #f4f8fc; }
 
 .heroIcon {
   display: grid;
@@ -385,7 +385,7 @@
   justify-content: space-between;
   gap: 18px;
   padding: 21px 24px;
-  background: linear-gradient(120deg, #fff5f3, #fff);
+  background: #fff7f5;
 }
 
 .aiCard > div {
@@ -437,7 +437,13 @@
   .header { gap: 12px; margin-bottom: 16px; }
   .header h1 { font-size: 31px; }
   .dateLabel { font-size: 13px; }
-  .aiTopAction { padding: 10px 12px; font-size: 12px; }
+  .aiTopAction {
+    max-width: 132px;
+    padding: 9px 12px;
+    font-size: 11px;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
   .heroCard { grid-template-columns: auto 1fr; padding: 17px; border-radius: 20px; }
   .heroIcon { width: 46px; height: 46px; border-radius: 15px; font-size: 23px; }
   .heroCopy h2 { font-size: 19px; }
