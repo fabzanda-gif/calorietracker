@@ -35,6 +35,42 @@ def _meal_totals(meals: list[dict]) -> tuple[float, float]:
     return calories, protein
 
 
+RETURNING_AFTER_DAYS = 5
+
+
+def _engagement_state(
+    *,
+    day_date: Date,
+    meals_today: list[dict],
+    latest_meal: dict | None,
+) -> dict:
+    """Detect a return after a quiet period without treating missing data as failure."""
+    if meals_today or latest_meal is None:
+        return {
+            "state": "active",
+            "days_since_last_meal": 0 if meals_today else None,
+        }
+
+    raw_date = latest_meal.get("date")
+    try:
+        last_meal_date = Date.fromisoformat(str(raw_date))
+    except (TypeError, ValueError):
+        return {
+            "state": "active",
+            "days_since_last_meal": None,
+        }
+
+    days_since_last_meal = max(0, (day_date - last_meal_date).days)
+    return {
+        "state": (
+            "returning"
+            if days_since_last_meal >= RETURNING_AFTER_DAYS
+            else "active"
+        ),
+        "days_since_last_meal": days_since_last_meal,
+    }
+
+
 def _activity_buffer(value: Any) -> float:
     normalized = " ".join(
         str(value or "").strip().casefold().replace("_", " ").split()
@@ -160,6 +196,12 @@ def get_home_summary(
     """
     try:
         meals = meals_repo.list_for_date_compatible(current_user.id, day_date)
+        latest_meal = None if meals else meals_repo.latest_for_user(current_user.id)
+        engagement = _engagement_state(
+            day_date=day_date,
+            meals_today=meals,
+            latest_meal=latest_meal,
+        )
         activity_window = activities_repo.list_date_range(
             current_user.id,
             day_date - timedelta(days=7),
@@ -282,6 +324,7 @@ def get_home_summary(
             "date": str(day_date),
             "context": context,
             "special_period": special_period,
+            "engagement": engagement,
             "hero": _hero(
                 special_period=special_period,
                 planned_today=planned_today,
