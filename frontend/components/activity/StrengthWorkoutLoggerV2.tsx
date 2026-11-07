@@ -15,6 +15,7 @@ import {
   deleteStrengthSet,
   getStrengthProgressionPreview,
   getStrengthSubstitutions,
+  getStrengthWorkoutDetail,
   getStrengthWorkoutOutcome,
   saveStrengthSet,
   skipStrengthWorkout,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/api/exercises";
 
 import styles from "./StrengthWorkoutLoggerV2.module.css";
+import { FreeWorkoutTimeline } from "./FreeWorkoutTimeline";
 
 
 type SetDraft = {
@@ -173,6 +175,7 @@ export function StrengthWorkoutLoggerV2({
     );
   const [autoApplied, setAutoApplied] =
     useState(0);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   useEffect(() => {
     if (
@@ -667,6 +670,36 @@ export function StrengthWorkoutLoggerV2({
     }
   }
 
+  async function resumeFreeWorkout(
+    workoutId: string,
+    date: string,
+  ) {
+    if (!accessToken) return;
+    const response = await getStrengthWorkoutDetail(workoutId, accessToken);
+    if (response.workout.workout_kind !== "free" ||
+        response.workout.status !== "planned" ||
+        response.workout_log?.status === "completed") {
+      throw new Error("Questa seduta non è più modificabile.");
+    }
+    // Set the original date before the session recovery effect runs.
+    setPerformedDate(date);
+    setActiveWorkout(response.workout);
+    setOutcome(null);
+    setProgression(null);
+    setShowAddExercise(false);
+    setMessage("Seduta recuperata: riprendi dalle serie salvate.");
+    setError(null);
+  }
+
+  function closeFreeWorkout() {
+    // The draft and saved sets stay in the backend.
+    setActiveWorkout(workout);
+    setOutcome(null);
+    setProgression(null);
+    setMessage(null);
+    setHistoryRefreshKey((value) => value + 1);
+  }
+
   async function startFreeWorkout() {
     if (!accessToken) {
       return;
@@ -686,6 +719,7 @@ export function StrengthWorkoutLoggerV2({
         );
 
       setActiveWorkout(response.workout);
+      setHistoryRefreshKey((value) => value + 1);
       setShowAddExercise(true);
       setMessage(
         "Workout libero creato. Aggiungi il primo esercizio.",
@@ -804,6 +838,10 @@ export function StrengthWorkoutLoggerV2({
       setMessage(
         "Seduta completata e salvata.",
       );
+      setHistoryRefreshKey((value) => value + 1);
+      if (activeWorkout.workout_kind === "free") {
+        setActiveWorkout(workout);
+      }
 
       if (onCompleted) {
         await onCompleted();
@@ -854,6 +892,7 @@ export function StrengthWorkoutLoggerV2({
 
   if (!activeWorkout) {
     return (
+      <>
       <section className={styles.emptyCard}>
         <div>
           <p className={styles.eyebrow}>
@@ -876,10 +915,19 @@ export function StrengthWorkoutLoggerV2({
           Inizia workout libero
         </button>
       </section>
+      {accessToken && (
+        <FreeWorkoutTimeline
+          accessToken={accessToken}
+          refreshKey={historyRefreshKey}
+          onResume={resumeFreeWorkout}
+        />
+      )}
+      </>
     );
   }
 
   return (
+    <>
     <section className={styles.card}>
       <header className={styles.header}>
         <div>
@@ -1268,6 +1316,16 @@ export function StrengthWorkoutLoggerV2({
       </div>
 
       <div className={styles.footer}>
+        {activeWorkout.workout_kind === "free" && (
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={closeFreeWorkout}
+            disabled={completing}
+          >
+            Chiudi e riprendi più tardi
+          </button>
+        )}
         <button
           type="button"
           className={styles.primaryButton}
@@ -1336,5 +1394,14 @@ export function StrengthWorkoutLoggerV2({
         </div>
       ) : null}
     </section>
+    {accessToken && (
+      <FreeWorkoutTimeline
+        accessToken={accessToken}
+        refreshKey={historyRefreshKey}
+        activeWorkoutId={activeWorkout.id}
+        onResume={resumeFreeWorkout}
+      />
+    )}
+    </>
   );
 }
