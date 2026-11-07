@@ -295,6 +295,7 @@ def _apply_strength_changes(
     workouts_repo: StrengthWorkoutsRepository,
     exercises_repo:
         StrengthWorkoutExercisesRepository,
+    before_state: dict | None = None,
 ) -> dict:
     workout = workouts_repo.get(
         user_id,
@@ -313,7 +314,23 @@ def _apply_strength_changes(
             ),
         )
 
-    updated_exercises = []
+    # Validate the full adjustment before updating any exercise.
+    # This avoids applying only half of an obsolete proposal.
+    if before_state:
+        for field in ("scheduled_date", "focus"):
+            if (
+                field in before_state
+                and workout.get(field) != before_state[field]
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "La seduta è cambiata. "
+                        "Aggiorna il Coach prima di applicare."
+                    ),
+                )
+
+    validated_updates = []
 
     for item in (
         proposed_changes.get(
@@ -353,6 +370,24 @@ def _apply_strength_changes(
                 ),
             )
 
+        # The proposal records the values it was calculated from.
+        # Refuse to overwrite subsequent user edits.
+        for before_field, current_field in (
+            ("before_load_kg", "prescribed_load_kg"),
+            ("before_target_sets", "target_sets"),
+        ):
+            if (
+                before_field in item
+                and exercise.get(current_field) != item[before_field]
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Un esercizio è cambiato. "
+                        "Aggiorna il Coach prima di applicare."
+                    ),
+                )
+
         payload = {}
 
         if (
@@ -374,9 +409,11 @@ def _apply_strength_changes(
                 item["target_sets"]
             )
 
-        if not payload:
-            continue
+        if payload:
+            validated_updates.append((exercise_id, payload))
 
+    updated_exercises = []
+    for exercise_id, payload in validated_updates:
         updated = exercises_repo.update(
             user_id=user_id,
             exercise_id=exercise_id,
@@ -514,6 +551,7 @@ def _apply_adjustment(
             proposed_changes=changes,
             workouts_repo=workouts_repo,
             exercises_repo=exercises_repo,
+            before_state=adjustment.get("before_state"),
         )
 
     if target_kind == "planned_activity":
