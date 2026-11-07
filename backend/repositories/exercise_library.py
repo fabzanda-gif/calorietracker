@@ -83,6 +83,67 @@ class ExerciseLibraryRepository(BaseRepository):
                 f"Unable to audit exercise catalog: {exc}"
             ) from exc
 
+    def list_user_preferences(self, user_id: str) -> list[dict]:
+        try:
+            response = (
+                self.supabase
+                .table("training_exercise_preferences")
+                .select("exercise_id,preference")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load exercise preferences: {exc}"
+            ) from exc
+
+    def save_user_preference(
+        self, user_id: str, exercise_id: str, preference: str
+    ) -> dict:
+        if preference not in ("preferred", "excluded"):
+            raise ValueError("Invalid exercise preference")
+        try:
+            response = (
+                self.supabase
+                .table("training_exercise_preferences")
+                .upsert(
+                    {
+                        "user_id": user_id,
+                        "exercise_id": exercise_id,
+                        "preference": preference,
+                    },
+                    on_conflict="user_id,exercise_id",
+                )
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else {
+                "exercise_id": exercise_id,
+                "preference": preference,
+            }
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to save exercise preference: {exc}"
+            ) from exc
+
+    def remove_user_preference(
+        self, user_id: str, exercise_id: str
+    ) -> None:
+        try:
+            (
+                self.supabase
+                .table("training_exercise_preferences")
+                .delete()
+                .eq("user_id", user_id)
+                .eq("exercise_id", exercise_id)
+                .execute()
+            )
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to remove exercise preference: {exc}"
+            ) from exc
+
     def _candidate_ids_for_search(
         self,
         search: str,
@@ -305,6 +366,7 @@ class ExerciseLibraryRepository(BaseRepository):
         language: str = "it",
         equipment_key: str | None = None,
         limit: int = 20,
+        user_id: str | None = None,
     ) -> list[dict] | None:
         """Return reviewed links; never auto-substitute a workout exercise."""
         source = self.get_exercise(identifier, language=language)
@@ -367,12 +429,19 @@ class ExerciseLibraryRepository(BaseRepository):
                 "substitute": 1,
                 "regression": 2,
             }
+            preferences = {
+                str(item["exercise_id"]): item["preference"]
+                for item in (
+                    self.list_user_preferences(user_id)
+                    if user_id is not None else []
+                )
+            }
             suggestions = []
             for link in links:
                 exercise = hydrated.get(
                     str(link["target_exercise_id"])
                 )
-                if exercise is None:
+                if exercise is None or preferences.get(str(exercise["id"])) == "excluded":
                     continue
                 suggestions.append({
                     "exercise": exercise,
@@ -380,10 +449,12 @@ class ExerciseLibraryRepository(BaseRepository):
                     "similarity_score": link.get("similarity_score"),
                     "rationale": link.get("rationale"),
                     "requires_confirmation": True,
+                    "user_preference": preferences.get(str(exercise["id"])),
                 })
             suggestions.sort(
                 key=lambda item: (
                     priority.get(item["relationship"], 10),
+                    0 if item["user_preference"] == "preferred" else 1,
                     -float(item["similarity_score"] or 0),
                     item["exercise"]["name"],
                 )
