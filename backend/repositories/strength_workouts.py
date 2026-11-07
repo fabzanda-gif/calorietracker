@@ -98,7 +98,41 @@ class StrengthWorkoutsRepository(BaseRepository):
                 .execute()
             )
 
-            return self._data(response)
+            workouts = self._data(response)
+            # A replaced program is paused, not deleted (to preserve
+            # completed workout logs and saved sets). Its future
+            # 'planned' sessions must not remain in active calendars,
+            # Coach overlap checks or nutrition planning.
+            linked = sorted({
+                str(w["strength_plan_id"])
+                for w in workouts
+                if w.get("status") == "planned"
+                and w.get("strength_plan_id")
+            })
+            if not linked:
+                return workouts
+
+            plan_response = (
+                self.supabase.table("strength_plans")
+                .select("id,status")
+                .eq("user_id", user_id)
+                .in_("id", linked)
+                .execute()
+            )
+            plan_status = {
+                str(plan["id"]): plan.get("status")
+                for plan in self._data(plan_response)
+            }
+            return [
+                workout for workout in workouts
+                if not (
+                    workout.get("status") == "planned"
+                    and workout.get("strength_plan_id")
+                    and plan_status.get(
+                        str(workout["strength_plan_id"])
+                    ) != "active"
+                )
+            ]
 
         except Exception as exc:
             raise RepositoryError(
