@@ -539,9 +539,9 @@ def test_recovery_reopens_completed_strength_plan(monkeypatch):
             self.transitions = []
         def get(self, plan_id, user_id):
             return {"id": plan_id, "status": "completed"}
-        def update_status(self, **kwargs):
+        def reopen_completed(self, **kwargs):
             self.transitions.append(kwargs)
-            return {"id": kwargs["plan_id"], "status": kwargs["status"]}
+            return {"id": kwargs["plan_id"], "status": "active"}
 
     monkeypatch.setattr(
         coach_router,
@@ -575,7 +575,7 @@ def test_recovery_reopens_completed_strength_plan(monkeypatch):
     assert result["applied"] is True
     assert result["plan"]["status"] == "active"
     assert len(workouts.updated) == 1
-    assert plans.transitions[0]["status"] == "active"
+    assert plans.transitions[0]["plan_id"] == "plan-1"
 
 
 def test_recovery_rejects_archived_strength_plan(monkeypatch):
@@ -644,7 +644,7 @@ def test_recovery_undoes_strength_change_if_plan_reopen_fails(monkeypatch):
     class PlansRepo:
         def get(self, plan_id, user_id):
             return {"id": plan_id, "status": "completed"}
-        def update_status(self, **kwargs):
+        def reopen_completed(self, **kwargs):
             return None
 
     monkeypatch.setattr(
