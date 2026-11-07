@@ -7520,6 +7520,23 @@ export function HomeShell() {
                               ? "…"
                               : "🗑"}
                           </button>
+                        ) : summaryMealsForSlot(slot).length > 1 ? (
+                          <button
+                            type="button"
+                            className={styles.dailyMealManageButton}
+                            aria-label={`Gestisci ${summaryMealsForSlot(slot).length} record di ${localizedMealLabel(slot)}`}
+                            title="Gestisci i record di questo pasto"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+
+                              event.currentTarget
+                                .closest("details")
+                                ?.setAttribute("open", "");
+                            }}
+                          >
+                            Gestisci {summaryMealsForSlot(slot).length}
+                          </button>
                         ) : null}
 
                         {summaryMealForSlot(slot) ? (
