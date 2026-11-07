@@ -24,6 +24,7 @@ from backend.repositories.ingredients import IngredientsRepository
 from backend.repositories.meal_ingredients import MealIngredientsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
+from backend.repositories.onboarding import OnboardingRepository
 from backend.repositories.pantry import PantryRepository
 from backend.repositories.planned_activities import (
     PlannedActivitiesRepository,
@@ -409,6 +410,12 @@ def get_oura_connections_repository(
     return OuraConnectionsRepository(
         supabase
     )
+
+
+def get_onboarding_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> OnboardingRepository:
+    return OnboardingRepository(supabase)
 
 
 def get_meals_repository(
