@@ -246,10 +246,17 @@ def _coach_context(
         )
         if item.get("status") == "skipped"
     ]
+    recovery_future_end = as_of + timedelta(days=8)
     recovery_alerts = SkippedSessionReviewService().build(
         as_of=as_of,
         running_sessions=skipped_running,
         strength_workouts=skipped_strength,
+        upcoming_running=planned_repo.list_range(
+            user_id, as_of, recovery_future_end,
+        ),
+        upcoming_strength=workouts_repo.list_date_range(
+            user_id, as_of, recovery_future_end,
+        ),
     )
 
     proposals = (
