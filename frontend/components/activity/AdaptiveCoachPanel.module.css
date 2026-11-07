@@ -217,3 +217,18 @@
     flex-direction: column;
   }
 }
+
+.athleteSummary {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 13px 15px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 13px;
+  background: rgba(81, 110, 145, 0.06);
+  line-height: 1.45;
+}
+.athleteSummary span,
+.athleteSummary small {
+  color: rgba(15, 23, 42, 0.66);
+}
