@@ -10,6 +10,7 @@ import {
   getHomeSummary,
   type HomeSummaryResponse,
 } from "@/lib/api/day";
+import { deleteMeal } from "@/lib/api/meals";
 
 import styles from "./HomeLite.module.css";
 
@@ -41,6 +42,9 @@ type HomeCopy = {
   add: string;
   noMeal: string;
   log: string;
+  deleteEntry: string;
+  deleteConfirm: string;
+  deleting: string;
   movement: string;
   trainingActivity: string;
   plan: string;
@@ -88,6 +92,9 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     add: "+ Registra",
     noMeal: "Nessun pasto registrato",
     log: "Registra",
+    deleteEntry: "Elimina",
+    deleteConfirm: "Eliminare questa entry?",
+    deleting: "Elimino…",
     movement: "MOVIMENTO",
     trainingActivity: "Allenamento e attività",
     plan: "Plan →",
@@ -133,6 +140,9 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     add: "+ Log",
     noMeal: "No meal logged",
     log: "Log",
+    deleteEntry: "Delete",
+    deleteConfirm: "Delete this entry?",
+    deleting: "Deleting…",
     movement: "MOVEMENT",
     trainingActivity: "Training and activity",
     plan: "Plan →",
@@ -178,6 +188,9 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     add: "+ Registreren",
     noMeal: "Geen maaltijd geregistreerd",
     log: "Registreren",
+    deleteEntry: "Verwijderen",
+    deleteConfirm: "Deze invoer verwijderen?",
+    deleting: "Verwijderen…",
     movement: "BEWEGING",
     trainingActivity: "Training en activiteit",
     plan: "Plan →",
@@ -223,6 +236,9 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     add: "+ Enregistrer",
     noMeal: "Aucun repas enregistré",
     log: "Enregistrer",
+    deleteEntry: "Supprimer",
+    deleteConfirm: "Supprimer cette entrée ?",
+    deleting: "Suppression…",
     movement: "MOUVEMENT",
     trainingActivity: "Entraînement et activité",
     plan: "Plan →",
@@ -301,6 +317,9 @@ export function HomeLite() {
   const [summary, setSummary] = useState<HomeSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingMealId, setDeletingMealId] = useState<string | number | null>(
+    null,
+  );
 
   const today = useMemo(() => localIsoDate(), []);
 
@@ -328,6 +347,45 @@ export function HomeLite() {
       active = false;
     };
   }, [accessToken, copy.unavailable, today]);
+
+  async function handleDeleteMeal(
+    meal: HomeSummaryResponse["meals"][number],
+  ) {
+    if (!accessToken || meal.id === null || meal.id === undefined) {
+      return;
+    }
+
+    if (!window.confirm(`${copy.deleteConfirm}\n\n${meal.name}`)) {
+      return;
+    }
+
+    setDeletingMealId(meal.id);
+    setError(null);
+
+    try {
+      await deleteMeal(meal.id, accessToken);
+
+      setSummary((current) =>
+        current
+          ? {
+              ...current,
+              meals: current.meals.filter(
+                (item) => String(item.id) !== String(meal.id),
+              ),
+            }
+          : current,
+      );
+
+      const refreshed = await getHomeSummary(today, accessToken);
+      setSummary(refreshed);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : copy.unavailable,
+      );
+    } finally {
+      setDeletingMealId(null);
+    }
+  }
 
   const firstName = useMemo(() => {
     const metadata = user?.user_metadata ?? {};
@@ -607,11 +665,37 @@ export function HomeLite() {
                           </span>
                           <div>
                             <strong>{translatedLabel}</strong>
-                            <span>
-                              {items.length
-                                ? items.map((item) => item.name).join(" · ")
-                                : copy.noMeal}
-                            </span>
+                            {items.length ? (
+                              <div className={styles.mealEntries}>
+                                {items.map((item, index) => (
+                                  <div
+                                    key={String(
+                                      item.id ?? `${label}-${index}`,
+                                    )}
+                                    className={styles.mealEntry}
+                                  >
+                                    <span>{item.name}</span>
+                                    {item.id !== null &&
+                                    item.id !== undefined ? (
+                                      <button
+                                        type="button"
+                                        className={styles.mealDeleteButton}
+                                        disabled={deletingMealId !== null}
+                                        onClick={() => {
+                                          void handleDeleteMeal(item);
+                                        }}
+                                      >
+                                        {deletingMealId === item.id
+                                          ? copy.deleting
+                                          : copy.deleteEntry}
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span>{copy.noMeal}</span>
+                            )}
                           </div>
                           {items.length ? (
                             <strong>{Math.round(kcal)} kcal</strong>

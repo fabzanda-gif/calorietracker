@@ -301,6 +301,52 @@
   font-size: 13px;
 }
 
+.mealEntries {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.mealEntry {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mealEntry > span {
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0 !important;
+  overflow: hidden;
+  color: #778493;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mealDeleteButton {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: #fff0ef;
+  color: #df5558;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.mealDeleteButton:hover:not(:disabled) {
+  background: #ffe3e1;
+}
+
+.mealDeleteButton:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
 .mealRow > strong {
   color: #506478;
   font-size: 13px;
@@ -598,6 +644,15 @@
 :global(html[data-experience-mode="zero"]) .mealRow > a,
 :global(html[data-experience-mode="zero"]) .trainingCard div > span {
   color: #f43d3d;
+}
+
+:global(html[data-experience-mode="zero"]) .mealDeleteButton {
+  background: #fff0f0;
+  color: #f43d3d;
+}
+
+:global(html[data-experience-mode="zero"]) .mealDeleteButton:hover:not(:disabled) {
+  background: #ffe1e1;
 }
 
 :global(html[data-experience-mode="zero"]) .mealRow div span,
