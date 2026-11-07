@@ -20,6 +20,8 @@ import {
   type CoachPriority,
 } from "@/lib/api/coach";
 
+import { getAthleteState, type AthleteState } from "@/lib/api/athlete-state";
+
 import styles from "./AdaptiveCoachPanel.module.css";
 
 
@@ -121,6 +123,7 @@ export function AdaptiveCoachPanel({
     useState<string | null>(null);
   const [events, setEvents] =
     useState<CoachLoadEvent[]>([]);
+  const [athlete, setAthlete] = useState<AthleteState | null>(null);
   const [adjustments, setAdjustments] =
     useState<CoachAdjustment[]>([]);
   const [recoveryAlerts, setRecoveryAlerts] =
@@ -158,6 +161,14 @@ export function AdaptiveCoachPanel({
         setAdjustments(
           response.adjustments,
         );
+        // Athlete State is descriptive context only. Its absence must
+        // not turn a Coach analysis into a failed or unsafe write.
+        try {
+          const snapshot = await getAthleteState(accessToken);
+          setAthlete(snapshot);
+        } catch {
+          setAthlete(null);
+        }
       } catch (err) {
         setError(
           err instanceof Error
@@ -411,6 +422,29 @@ export function AdaptiveCoachPanel({
           {error}
         </div>
       ) : null}
+
+      <div className={styles.athleteSummary} role="status">
+        <strong>Contesto dallo storico palestra</strong>
+        {athlete ? (
+          <span>
+            {athlete.last_28_days.completed_sessions} sedute e{" "}
+            {athlete.last_28_days.total_sets} serie negli ultimi 28 giorni.
+            {" "}
+            {athlete.data_status === "limited"
+              ? "Dati ancora limitati: nessuna conclusione automatica sul recupero."
+              : "Le proposte restano soggette alla tua conferma."}
+          </span>
+        ) : (
+          <span>
+            Storico atleta non disponibile: il Coach usa solo le attività
+            registrate e le sedute pianificate verificabili.
+          </span>
+        )}
+        <small>
+          Nessuna riduzione di carico o ripianificazione viene applicata
+          semplicemente aprendo questa schermata.
+        </small>
+      </div>
 
       {events.length ? (
         <div className={styles.eventStrip}>
