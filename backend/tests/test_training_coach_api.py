@@ -477,6 +477,7 @@ def test_recovery_requires_skipped_status():
             ),
             planned_repo=CompletedPlannedRepo(),
             workouts_repo=object(),
+            plans_repo=object(),
         )
 
     assert exc.value.status_code == 409
@@ -507,6 +508,105 @@ def test_recovery_rejects_non_running_activity():
             ),
             planned_repo=CyclingRepo(),
             workouts_repo=object(),
+            plans_repo=object(),
+        )
+
+    assert exc.value.status_code == 409
+
+
+def test_recovery_reopens_completed_strength_plan(monkeypatch):
+    from datetime import date
+
+    class SkippedWorkoutRepo:
+        def __init__(self):
+            self.updated = []
+        def get(self, user_id, workout_id):
+            return {
+                "id": workout_id,
+                "status": "skipped",
+                "scheduled_date": "2026-11-06",
+                "strength_plan_id": "plan-1",
+            }
+        def reschedule_skipped(self, **kwargs):
+            self.updated.append(kwargs)
+            return {"id": kwargs["workout_id"], "status": "planned"}
+
+    class PlansRepo:
+        def __init__(self):
+            self.transitions = []
+        def get(self, plan_id, user_id):
+            return {"id": plan_id, "status": "completed"}
+        def update_status(self, **kwargs):
+            self.transitions.append(kwargs)
+            return {"id": kwargs["plan_id"], "status": kwargs["status"]}
+
+    monkeypatch.setattr(
+        coach_router,
+        "_coach_context",
+        lambda **kwargs: {
+            "recovery_alerts": [{
+                "kind": "strength_workout",
+                "session_id": "gym-1",
+                "suggested_date": "2026-11-09",
+            }],
+        },
+    )
+    workouts = SkippedWorkoutRepo()
+    plans = PlansRepo()
+    result = apply_skipped_session_recovery(
+        kind="strength_workout",
+        session_id="gym-1",
+        request=CoachRecoveryApplyRequest(
+            original_date=date(2026, 11, 6),
+            suggested_date=date(2026, 11, 9),
+        ),
+        current_user=CurrentUser(id="user-1", access_token="token"),
+        planned_repo=object(),
+        workouts_repo=workouts,
+        plans_repo=plans,
+        activities_repo=object(),
+        workout_logs_repo=object(),
+        exercises_repo=object(),
+        set_logs_repo=object(),
+    )
+    assert result["applied"] is True
+    assert result["plan"]["status"] == "active"
+    assert len(workouts.updated) == 1
+    assert plans.transitions[0]["status"] == "active"
+
+
+def test_recovery_rejects_archived_strength_plan(monkeypatch):
+    from datetime import date
+
+    class SkippedWorkoutRepo:
+        def get(self, user_id, workout_id):
+            return {
+                "id": workout_id,
+                "status": "skipped",
+                "scheduled_date": "2026-11-06",
+                "strength_plan_id": "plan-1",
+            }
+
+    class PlansRepo:
+        def get(self, plan_id, user_id):
+            return {"id": plan_id, "status": "cancelled"}
+
+    with pytest.raises(HTTPException) as exc:
+        apply_skipped_session_recovery(
+            kind="strength_workout",
+            session_id="gym-1",
+            request=CoachRecoveryApplyRequest(
+                original_date=date(2026, 11, 6),
+                suggested_date=date(2026, 11, 9),
+            ),
+            current_user=CurrentUser(id="user-1", access_token="token"),
+            planned_repo=object(),
+            workouts_repo=SkippedWorkoutRepo(),
+            plans_repo=PlansRepo(),
+            activities_repo=object(),
+            workout_logs_repo=object(),
+            exercises_repo=object(),
+            set_logs_repo=object(),
         )
 
     assert exc.value.status_code == 409
