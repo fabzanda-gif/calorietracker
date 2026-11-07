@@ -8792,6 +8792,32 @@
   white-space: nowrap;
 }
 
+.dailyMealDeleteButton {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(170, 41, 41, 0.16);
+  border-radius: 9px;
+  background: #fff7f7;
+  color: #aa2929;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.dailyMealDeleteButton:hover:not(:disabled) {
+  background: #ffecec;
+  border-color: rgba(170, 41, 41, 0.28);
+}
+
+.dailyMealDeleteButton:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
 .dailyMealProposalReady {
   display: inline-flex;
   align-items: center;
