@@ -19,6 +19,7 @@ from backend.observability import (
 )
 
 from backend.api.routers.activities import router as activities_router
+from backend.api.routers.coach import router as coach_router
 from backend.api.routers.daily_logs import router as daily_logs_router
 from backend.api.routers.exercises import router as exercises_router
 from backend.api.routers.day_history import router as day_history_router
@@ -279,6 +280,7 @@ app.include_router(oura_router)
 app.include_router(google_calendar_router)
 app.include_router(notifications_router)
 app.include_router(activities_router)
+app.include_router(coach_router)
 app.include_router(weight_router)
 app.include_router(progress_router)
 app.include_router(profile_router)
