@@ -675,9 +675,21 @@ export function getRecentFreeStrengthWorkouts(
 export function getStrengthWorkoutDetail(
   workoutId: string,
   accessToken: string,
-): Promise<{ workout: StrengthWorkout }> {
-  return apiRequest<{ workout: StrengthWorkout }>(
+): Promise<StrengthWorkoutDetailResponse> {
+  return apiRequest<StrengthWorkoutDetailResponse>(
     `/strength/workouts/${encodeURIComponent(workoutId)}/detail`,
     { accessToken },
   );
+}
+
+export interface StrengthWorkoutDetailResponse {
+  workout: StrengthWorkout;
+  workout_log: {
+    id: string;
+    performed_date: string;
+    status: "draft" | "completed";
+    duration_minutes: number | null;
+    notes: string | null;
+  } | null;
+  sets: StrengthSavedSet[];
 }
