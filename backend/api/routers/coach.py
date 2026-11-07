@@ -262,6 +262,7 @@ def _coach_context(
         upcoming_strength=workouts_repo.list_date_range(
             user_id, as_of, recovery_future_end,
         ),
+        recent_events=events,
     )
 
     proposals = (
@@ -927,6 +928,18 @@ def apply_skipped_session_recovery(
     workouts_repo: StrengthWorkoutsRepository = Depends(
         get_strength_workouts_repository
     ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+    exercises_repo: StrengthWorkoutExercisesRepository = Depends(
+        get_strength_workout_exercises_repository
+    ),
+    set_logs_repo: StrengthSetLogsRepository = Depends(
+        get_strength_set_logs_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
 ):
     # Recompute a suggestion on the server. The client cannot select
     # an unchecked date or move a different user's session.
@@ -960,33 +973,17 @@ def apply_skipped_session_recovery(
         )
 
     try:
-        running = planned_repo.list_range(
-            current_user.id, recent_start, as_of,
-        )
-        strength = workouts_repo.list_date_range(
-            current_user.id, recent_start, as_of,
-        )
-        future_running = planned_repo.list_range(
-            current_user.id, as_of, future_end,
-        )
-        future_strength = workouts_repo.list_date_range(
-            current_user.id, as_of, future_end,
-        )
-
-        alerts = SkippedSessionReviewService().build(
+        context = _coach_context(
+            user_id=current_user.id,
             as_of=as_of,
-            running_sessions=[
-                item for item in running
-                if item.get("status") == "skipped"
-                and _is_running_planned(item)
-            ],
-            strength_workouts=[
-                item for item in strength
-                if item.get("status") == "skipped"
-            ],
-            upcoming_running=future_running,
-            upcoming_strength=future_strength,
+            activities_repo=activities_repo,
+            planned_repo=planned_repo,
+            workouts_repo=workouts_repo,
+            exercises_repo=exercises_repo,
+            workout_logs_repo=workout_logs_repo,
+            set_logs_repo=set_logs_repo,
         )
+        alerts = context["recovery_alerts"]
         match = next(
             (
                 item for item in alerts
