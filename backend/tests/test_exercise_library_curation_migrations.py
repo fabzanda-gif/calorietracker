@@ -26,8 +26,8 @@ def test_phase1_second_curation_batch_is_bounded_and_non_approving():
         curated,
         re.MULTILINE,
     )
-    assert len(exercise_ids) == 43
-    assert len(set(exercise_ids)) == 43
+    assert len(exercise_ids) == 44
+    assert len(set(exercise_ids)) == 44
 
     relations = sql.split("with reviewed_pairs(", 1)[1].split(
         "),\nresolved as", 1
@@ -93,7 +93,7 @@ def test_phase1_third_batch_is_bounded_and_does_not_approve():
 def test_phase1_curation_batches_cover_154_unique_exercises_without_approval():
     files = (
         ("20261107210000_curate_exercise_library_phase1_batch1.sql", 18),
-        ("20261107211000_curate_exercise_library_phase1_batch2.sql", 43),
+        ("20261107211000_curate_exercise_library_phase1_batch2.sql", 44),
         ("20261107212000_curate_exercise_library_phase1_batch3.sql", 53),
         ("20261107213000_curate_exercise_library_phase1_batch4.sql", 30),
     )
@@ -125,7 +125,7 @@ def test_phase1_curation_batches_cover_154_unique_exercises_without_approval():
         "1435", "0025", "0334", "0464", "0553",
         "0198", "0314", "0208", "1723", "0289"
     )
-    assert len(all_ids) == 144
-    assert len(set(all_ids)) == 144
+    assert len(all_ids) == 145
+    assert len(set(all_ids)) == 145
     assert not set(all_ids).intersection(golden)
-    assert len(set(all_ids).union(golden)) == 154
+    assert len(set(all_ids).union(golden)) == 155
