@@ -6,7 +6,7 @@
 .search { display: grid; gap: 8px; }
 .search label { font-weight: 750; }
 .searchRow { display: flex; gap: 8px; flex-wrap: wrap; }
-.searchRow input { flex: 1 1 200px; min-width: 0; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font: inherit; }
+.searchRow input, .searchRow select { flex: 1 1 200px; min-width: 0; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font: inherit; }
 .panel button { border: 1px solid #102846; background: #102846; color: #fff; font: inherit; font-weight: 700; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
 .panel button:disabled { opacity: .5; cursor: wait; }
 .panel button[aria-pressed="true"] { border-color: #c95d52; background: #fff0ed; color: #a33d39; }
