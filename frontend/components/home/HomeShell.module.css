@@ -18045,3 +18045,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     min-width: 12px !important;
   }
 }
+
+
+.dailyMealManageButton {
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 104, 104, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 104, 104, 0.07);
+  color: #d9585c;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dailyMealManageButton:hover {
+  background: rgba(255, 104, 104, 0.12);
+}
+
+@media (max-width: 759px) {
+  .dailyMealManageButton {
+    min-height: 26px;
+    padding: 4px 7px;
+    font-size: 0.58rem;
+  }
+}
