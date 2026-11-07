@@ -73,6 +73,47 @@ def test_empty_history_is_explicitly_limited_not_a_fatigue_score():
     assert "recupero fisiologico" in result["note"]
 
 
+
+def test_completed_session_without_sets_downgrades_data_quality():
+    history = {
+        "logs": [
+            log("a", "2026-11-07"),
+            log("b", "2026-11-05"),
+            log("c", "2026-11-03"),
+        ],
+        "sets": [
+            {"strength_workout_log_id": "a", "reps": 8, "load_kg": 40},
+            {"strength_workout_log_id": "b", "reps": 8, "load_kg": 40},
+        ],
+        "exercises": [],
+    }
+    state = AthleteStateService().build(
+        history=history, as_of=date(2026, 11, 7),
+    )
+    assert state["quality"]["sessions_without_sets"] == 1
+    assert state["data_status"] == "limited"
+
+
+def test_old_sessions_and_future_sets_never_leak_into_recent_windows():
+    history = {
+        "logs": [
+            log("old", "2026-08-01"),
+            log("now", "2026-11-07"),
+        ],
+        "sets": [
+            {"strength_workout_log_id": "old", "reps": 1000, "load_kg": 1000},
+            {"strength_workout_log_id": "now", "reps": 5, "load_kg": 10},
+            {"strength_workout_log_id": "outside", "reps": 500, "load_kg": 100},
+        ],
+        "exercises": [],
+    }
+    state = AthleteStateService().build(
+        history=history, as_of=date(2026, 11, 7),
+    )
+    assert state["last_56_days"]["volume_load_kg"] == 50.0
+    assert state["last_56_days"]["total_sets"] == 1
+
+
 class FakeRepository:
     def __init__(self):
         self.request = None
