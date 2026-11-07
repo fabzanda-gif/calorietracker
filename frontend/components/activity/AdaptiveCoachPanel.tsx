@@ -12,8 +12,10 @@ import {
   applyCoachAdjustment,
   dismissCoachAdjustment,
   reconcileTrainingCoach,
+  updateCoachPreferences,
   type CoachAdjustment,
   type CoachLoadEvent,
+  type CoachPriority,
 } from "@/lib/api/coach";
 
 import styles from "./AdaptiveCoachPanel.module.css";
@@ -75,6 +77,21 @@ function actionLabel(
 }
 
 
+function priorityLabel(
+  value: CoachPriority,
+): string {
+  if (value === "gym") {
+    return "Palestra";
+  }
+
+  if (value === "running") {
+    return "Corsa";
+  }
+
+  return "Bilanciato";
+}
+
+
 function intensityLabel(
   value: CoachLoadEvent["intensity"],
 ): string {
@@ -106,6 +123,12 @@ export function AdaptiveCoachPanel({
     useState<CoachAdjustment[]>([]);
   const [busyId, setBusyId] =
     useState<string | null>(null);
+  const [priority, setPriority] =
+    useState<CoachPriority>("balanced");
+  const [
+    savingPriority,
+    setSavingPriority,
+  ] = useState(false);
 
   const load = useCallback(
     async () => {
@@ -123,6 +146,7 @@ export function AdaptiveCoachPanel({
             accessToken,
           );
 
+        setPriority(response.policy);
         setEvents(
           response.load_events,
         );
@@ -204,6 +228,44 @@ export function AdaptiveCoachPanel({
     }
   }
 
+  async function changePriority(
+    nextPriority: CoachPriority,
+  ) {
+    if (
+      !accessToken ||
+      nextPriority === priority
+    ) {
+      return;
+    }
+
+    setSavingPriority(true);
+    setError(null);
+
+    try {
+      const response =
+        await updateCoachPreferences(
+          nextPriority,
+          accessToken,
+        );
+
+      setPriority(response.priority);
+      await load();
+
+      if (onChanged) {
+        await onChanged();
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Non riesco a salvare la priorità.",
+      );
+    } finally {
+      setSavingPriority(false);
+    }
+  }
+
+
   async function dismiss(
     adjustment: CoachAdjustment,
   ) {
@@ -250,9 +312,41 @@ export function AdaptiveCoachPanel({
             Carico condiviso palestra + corsa
           </h3>
           <p>
-            Bilanciato · guarda le ultime 72 ore
-            e protegge le prossime sedute.
+            {priorityLabel(priority)}
+            {" · guarda le ultime 72 ore e "}
+            protegge le prossime sedute.
           </p>
+
+          <div
+            className={styles.priorityControl}
+            aria-label="Priorità Coach"
+          >
+            {(
+              [
+                "gym",
+                "balanced",
+                "running",
+              ] as CoachPriority[]
+            ).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={
+                  value === priority
+                    ? styles.priorityActive
+                    : styles.priorityButton
+                }
+                disabled={
+                  savingPriority || loading
+                }
+                onClick={() => {
+                  void changePriority(value);
+                }}
+              >
+                {priorityLabel(value)}
+              </button>
+            ))}
+          </div>
         </div>
 
         <button

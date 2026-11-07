@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from backend.api.dependencies import (
     CurrentUser,
     get_activities_repository,
+    get_authenticated_supabase,
     get_current_user,
     get_daily_logs_repository,
     get_meals_repository,
@@ -118,6 +119,91 @@ def _with_activity_defaults(activity: dict) -> dict:
         item["duration_seconds"] = 90 * 60
 
     return item
+
+
+def _reconcile_coach_after_activity(
+    *,
+    current_user: CurrentUser,
+    activity_date: date,
+) -> dict:
+    try:
+        from backend.api.routers.coach import (
+            CoachReconcileRequest,
+            reconcile_training_coach,
+        )
+        from backend.repositories.strength_logs import (
+            StrengthSetLogsRepository,
+            StrengthWorkoutLogsRepository,
+        )
+        from backend.repositories.strength_workouts import (
+            StrengthWorkoutExercisesRepository,
+            StrengthWorkoutsRepository,
+        )
+        from backend.repositories.training_coach_adjustments import (
+            TrainingCoachAdjustmentsRepository,
+        )
+        from backend.repositories.training_coach_preferences import (
+            TrainingCoachPreferencesRepository,
+        )
+
+        supabase = get_authenticated_supabase(
+            current_user
+        )
+
+        result = reconcile_training_coach(
+            request=CoachReconcileRequest(
+                as_of=activity_date,
+            ),
+            current_user=current_user,
+            activities_repo=
+                ActivitiesRepository(supabase),
+            planned_repo=
+                PlannedActivitiesRepository(
+                    supabase
+                ),
+            workouts_repo=
+                StrengthWorkoutsRepository(
+                    supabase
+                ),
+            exercises_repo=
+                StrengthWorkoutExercisesRepository(
+                    supabase
+                ),
+            workout_logs_repo=
+                StrengthWorkoutLogsRepository(
+                    supabase
+                ),
+            set_logs_repo=
+                StrengthSetLogsRepository(
+                    supabase
+                ),
+            adjustment_repo=
+                TrainingCoachAdjustmentsRepository(
+                    supabase
+                ),
+            preferences_repo=
+                TrainingCoachPreferencesRepository(
+                    supabase
+                ),
+        )
+
+        return {
+            "available": True,
+            **result,
+        }
+
+    except (
+        HTTPException,
+        RepositoryError,
+        RuntimeError,
+    ):
+        return {
+            "available": False,
+            "message": (
+                "Attività salvata. Il Coach sarà "
+                "ricalcolato al prossimo aggiornamento."
+            ),
+        }
 
 
 class ActivityCreate(BaseModel):
@@ -1663,14 +1749,24 @@ def import_gpx_activity(
             day_date=payload["date"],
         )
 
+        stored_item = (
+            item
+            if item is not None
+            else payload
+        )
+
+        coach = (
+            _reconcile_coach_after_activity(
+                current_user=current_user,
+                activity_date=effective_date,
+            )
+        )
+
         return {
             "created": True,
-            "item": (
-                item
-                if item is not None
-                else payload
-            ),
+            "item": stored_item,
             "movement": movement,
+            "coach": coach,
         }
     except RepositoryError as exc:
         raise HTTPException(
@@ -2003,10 +2099,27 @@ def create_activity(
             day_date=payload["date"],
         )
 
+        stored_item = (
+            item if item is not None else payload
+        )
+
+        coach = None
+
+        if _is_training_activity(
+            stored_item
+        ):
+            coach = _reconcile_coach_after_activity(
+                current_user=current_user,
+                activity_date=date.fromisoformat(
+                    payload["date"]
+                ),
+            )
+
         return {
             "created": True,
-            "item": item if item is not None else payload,
+            "item": stored_item,
             "movement": movement,
+            "coach": coach,
         }
     except RepositoryError as exc:
         raise HTTPException(

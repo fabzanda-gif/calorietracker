@@ -162,6 +162,14 @@ def test_apply_running_changes_only_allows_coach_fields():
 
 
 
+class PreferencesRepo:
+    def __init__(self, priority="balanced"):
+        self.priority = priority
+
+    def get_priority(self, user_id):
+        return self.priority
+
+
 class AdjustmentRepo:
     def __init__(self):
         self.created = []
@@ -244,6 +252,7 @@ def test_reconcile_does_not_stack_auto_guard(
         workout_logs_repo=object(),
         set_logs_repo=object(),
         adjustment_repo=adjustments,
+        preferences_repo=PreferencesRepo(),
     )
 
     assert adjustments.created == []

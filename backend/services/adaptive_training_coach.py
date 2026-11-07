@@ -36,7 +36,9 @@ class AdaptiveTrainingCoachService:
             list[dict[str, Any]],
         ],
         upcoming_running: list[dict[str, Any]],
+        priority: str = "balanced",
     ) -> list[dict[str, Any]]:
+        priority = self._priority(priority)
         candidates: list[dict[str, Any]] = []
 
         for event in recent_events:
@@ -46,12 +48,14 @@ class AdaptiveTrainingCoachService:
                     workouts=upcoming_strength,
                     exercises_by_workout=
                         strength_exercises,
+                    priority=priority,
                 )
             )
             candidates.extend(
                 self._running_conflicts(
                     event=event,
                     sessions=upcoming_running,
+                    priority=priority,
                 )
             )
 
@@ -64,6 +68,7 @@ class AdaptiveTrainingCoachService:
         workouts: list[dict[str, Any]],
         exercises_by_workout:
             dict[str, list[dict[str, Any]]],
+        priority: str,
     ) -> list[dict[str, Any]]:
         if event.get("scope") not in {
             "lower",
@@ -117,39 +122,65 @@ class AdaptiveTrainingCoachService:
             )
 
             if severity == "high":
-                load_change = self._load_guard(
-                    workout=workout,
-                    exercises=exercises,
-                )
-                if load_change:
-                    result.append(
-                        self._proposal(
-                            event=event,
-                            target_kind=
-                                "strength_workout",
-                            target=workout,
-                            action="reduce_load",
-                            severity=severity,
-                            scope=target_scope,
-                            title=(
-                                "Carico protetto dopo "
-                                "l'allenamento recente"
-                            ),
-                            message=(
-                                self._source_message(
-                                    event
-                                )
-                                + " è abbastanza vicino a "
-                                "questa seduta gambe. "
-                                "Ridurrò del 5% solo i carichi "
-                                "già prescritti, senza "
-                                "cambiare la struttura."
-                            ),
-                            proposed_changes=
-                                load_change,
-                            auto_apply=True,
-                        )
+                multiplier = (
+                    self._strength_load_multiplier(
+                        priority
                     )
+                )
+
+                if multiplier is not None:
+                    load_change = self._load_guard(
+                        workout=workout,
+                        exercises=exercises,
+                        multiplier=multiplier,
+                    )
+
+                    if load_change:
+                        reduction_pct = int(
+                            round(
+                                (
+                                    1.0
+                                    - multiplier
+                                )
+                                * 100
+                            )
+                        )
+                        result.append(
+                            self._proposal(
+                                event=event,
+                                target_kind=
+                                    "strength_workout",
+                                target=workout,
+                                action="reduce_load",
+                                severity=severity,
+                                scope=target_scope,
+                                title=(
+                                    "Carico protetto dopo "
+                                    "l'allenamento recente"
+                                ),
+                                message=(
+                                    self._source_message(
+                                        event
+                                    )
+                                    + " è abbastanza vicino a "
+                                    "questa seduta gambe. "
+                                    + "Ridurrò del "
+                                    + str(reduction_pct)
+                                    + "% solo i carichi "
+                                    + "già prescritti, senza "
+                                    + "cambiare la struttura."
+                                ),
+                                proposed_changes=
+                                    load_change,
+                                auto_apply=True,
+                            )
+                        )
+
+            if (
+                priority == "gym"
+                and severity != "high"
+            ):
+                continue
 
             volume_change = self._volume_guard(
                 workout=workout,
@@ -195,6 +226,7 @@ class AdaptiveTrainingCoachService:
         *,
         event: dict[str, Any],
         sessions: list[dict[str, Any]],
+        priority: str,
     ) -> list[dict[str, Any]]:
         if event.get("modality") != "strength":
             return []
@@ -259,14 +291,19 @@ class AdaptiveTrainingCoachService:
                 continue
 
             reduction = (
-                0.15
-                if severity == "high"
-                else 0.10
+                self._running_reduction(
+                    priority=priority,
+                    severity=severity,
+                )
             )
 
             changes = self._running_guard(
                 session=session,
                 reduction=reduction,
+                lower_intensity=(
+                    severity == "high"
+                    or priority != "running"
+                ),
             )
 
             if not changes:
@@ -303,6 +340,7 @@ class AdaptiveTrainingCoachService:
         *,
         workout: dict[str, Any],
         exercises: list[dict[str, Any]],
+        multiplier: float,
     ) -> dict[str, Any]:
         updates = []
 
@@ -326,7 +364,7 @@ class AdaptiveTrainingCoachService:
                 continue
 
             proposed = self._round_load(
-                current * 0.95
+                current * multiplier
             )
 
             if proposed >= current:
@@ -348,7 +386,7 @@ class AdaptiveTrainingCoachService:
 
         return {
             "exercise_updates": updates,
-            "load_multiplier": 0.95,
+            "load_multiplier": multiplier,
         } if updates else {}
 
     def _volume_guard(
@@ -403,6 +441,7 @@ class AdaptiveTrainingCoachService:
         *,
         session: dict[str, Any],
         reduction: float,
+        lower_intensity: bool = True,
     ) -> dict[str, Any]:
         changes: dict[str, Any] = {}
 
@@ -427,10 +466,14 @@ class AdaptiveTrainingCoachService:
                 ),
             )
 
-        if str(
-            session.get("intensity")
-            or ""
-        ).strip().casefold() == "hard":
+        if (
+            lower_intensity
+            and str(
+                session.get("intensity")
+                or ""
+            ).strip().casefold()
+            == "hard"
+        ):
             changes["intensity"] = "moderate"
 
         return changes
@@ -647,6 +690,49 @@ class AdaptiveTrainingCoachService:
             + "” ha generato un carico "
             + str(event.get("intensity"))
         )
+
+    @staticmethod
+    def _priority(value: str) -> str:
+        normalized = str(
+            value or "balanced"
+        ).strip().casefold()
+
+        if normalized in {
+            "gym",
+            "balanced",
+            "running",
+        }:
+            return normalized
+
+        return "balanced"
+
+    @staticmethod
+    def _strength_load_multiplier(
+        priority: str,
+    ) -> float | None:
+        if priority == "gym":
+            return None
+
+        if priority == "running":
+            return 0.925
+
+        return 0.95
+
+    @staticmethod
+    def _running_reduction(
+        *,
+        priority: str,
+        severity: str,
+    ) -> float:
+        high = severity == "high"
+
+        if priority == "gym":
+            return 0.20 if high else 0.15
+
+        if priority == "running":
+            return 0.10 if high else 0.05
+
+        return 0.15 if high else 0.10
 
     @staticmethod
     def _round_load(value: float) -> float:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import (
     APIRouter,
@@ -21,6 +22,7 @@ from backend.api.dependencies import (
     get_strength_workout_logs_repository,
     get_strength_workouts_repository,
     get_training_coach_adjustments_repository,
+    get_training_coach_preferences_repository,
 )
 from backend.repositories.activities import (
     ActivitiesRepository,
@@ -40,6 +42,9 @@ from backend.repositories.strength_workouts import (
 from backend.repositories.training_coach_adjustments import (
     TrainingCoachAdjustmentsRepository,
 )
+from backend.repositories.training_coach_preferences import (
+    TrainingCoachPreferencesRepository,
+)
 from backend.services.adaptive_training_coach import (
     AdaptiveTrainingCoachService,
 )
@@ -56,6 +61,14 @@ router = APIRouter(
 
 class CoachReconcileRequest(BaseModel):
     as_of: date | None = None
+
+
+class CoachPreferencesUpdate(BaseModel):
+    priority: Literal[
+        "gym",
+        "balanced",
+        "running",
+    ]
 
 
 RUNNING_TYPES = {
@@ -99,6 +112,7 @@ def _coach_context(
     workout_logs_repo:
         StrengthWorkoutLogsRepository,
     set_logs_repo: StrengthSetLogsRepository,
+    priority: str = "balanced",
 ) -> dict:
     recent_start = as_of - timedelta(days=3)
     future_end = as_of + timedelta(days=3)
@@ -221,6 +235,7 @@ def _coach_context(
             strength_exercises=
                 strength_exercises,
             upcoming_running=upcoming_running,
+            priority=priority,
         )
     )
 
@@ -495,6 +510,68 @@ def _apply_adjustment(
     )
 
 
+@router.get("/preferences")
+def get_training_coach_preferences(
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    preferences_repo:
+        TrainingCoachPreferencesRepository = Depends(
+            get_training_coach_preferences_repository
+        ),
+):
+    try:
+        return {
+            "priority":
+                preferences_repo.get_priority(
+                    current_user.id
+                ),
+        }
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+
+@router.put("/preferences")
+def update_training_coach_preferences(
+    request: CoachPreferencesUpdate,
+    current_user: CurrentUser = Depends(
+        get_current_user
+    ),
+    preferences_repo:
+        TrainingCoachPreferencesRepository = Depends(
+            get_training_coach_preferences_repository
+        ),
+):
+    try:
+        item = preferences_repo.upsert(
+            user_id=current_user.id,
+            priority=request.priority,
+            updated_at=datetime.now(
+                timezone.utc
+            ).isoformat(),
+        )
+
+        return {
+            "priority": (
+                item.get("priority")
+                if item
+                else request.priority
+            ),
+        }
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=str(exc),
+        ) from exc
+
+
 @router.post("/reconcile")
 def reconcile_training_coach(
     request: CoachReconcileRequest,
@@ -529,10 +606,18 @@ def reconcile_training_coach(
         TrainingCoachAdjustmentsRepository = Depends(
             get_training_coach_adjustments_repository
         ),
+    preferences_repo:
+        TrainingCoachPreferencesRepository = Depends(
+            get_training_coach_preferences_repository
+        ),
 ):
     as_of = request.as_of or date.today()
 
     try:
+        priority = preferences_repo.get_priority(
+            current_user.id
+        )
+
         context = _coach_context(
             user_id=current_user.id,
             as_of=as_of,
@@ -543,6 +628,7 @@ def reconcile_training_coach(
             workout_logs_repo=
                 workout_logs_repo,
             set_logs_repo=set_logs_repo,
+            priority=priority,
         )
 
         resolved = []
@@ -564,7 +650,47 @@ def reconcile_training_coach(
             )
 
             if existing:
-                resolved.append(existing)
+                if (
+                    existing.get("decision")
+                    == "proposed"
+                ):
+                    refreshed = (
+                        adjustment_repo.update(
+                            adjustment_id=
+                                existing["id"],
+                            user_id=current_user.id,
+                            payload={
+                                "severity":
+                                    proposal[
+                                        "severity"
+                                    ],
+                                "scope":
+                                    proposal["scope"],
+                                "title":
+                                    proposal["title"],
+                                "message":
+                                    proposal["message"],
+                                "proposed_changes":
+                                    proposal[
+                                        "proposed_changes"
+                                    ],
+                                "before_state":
+                                    proposal.get(
+                                        "before_state"
+                                    ),
+                                "updated_at":
+                                    datetime.now(
+                                        timezone.utc
+                                    ).isoformat(),
+                            },
+                        )
+                    )
+                    resolved.append(
+                        refreshed or existing
+                    )
+                else:
+                    resolved.append(existing)
+
                 continue
 
             if proposal.get("auto_apply"):
@@ -650,7 +776,7 @@ def reconcile_training_coach(
         )
 
         return {
-            "policy": "balanced",
+            "policy": priority,
             "as_of": context["as_of"],
             "window": {
                 "recent_start":
