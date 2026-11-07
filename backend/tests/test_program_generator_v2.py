@@ -117,14 +117,14 @@ def test_v2_respects_exclusions_and_approved_equipment():
 
 def test_missing_equipment_metadata_cannot_bypass_equipment_filter():
     items = catalog()
-    items[0]["equipment"] = []
+    for item in items:
+        if item["movement_pattern"] == "squat":
+            item["equipment"] = []
     result = ProgramGeneratorV2().preview(
         config=config(), catalog=items,
     )
     assert result["ready_for_activation"] is False
-    assert "squat" in result["missing_movement_patterns"] or (
-        len(result["workouts"][0]["exercises"]) < 5
-    )
+    assert "squat" in result["missing_movement_patterns"]
 
 
 def test_v2_prefers_user_selection_without_unapproved_exercises():
