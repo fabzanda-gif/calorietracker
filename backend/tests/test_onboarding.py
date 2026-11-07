@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from backend.api.dependencies import CurrentUser
 from backend.api.core_main import app as core_app
 from backend.api.routers import onboarding
