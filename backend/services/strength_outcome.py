@@ -166,10 +166,20 @@ class StrengthOutcomeService:
             for item in relevant_sets
         ]
 
-        known_rirs = [
-            float(item["rir"])
+        effective_rirs = [
+            value
             for item in relevant_sets
-            if item.get("rir") is not None
+            if (
+                value := self._effective_rir(
+                    item
+                )
+            ) is not None
+        ]
+
+        feelings = [
+            str(item["feeling"])
+            for item in relevant_sets
+            if item.get("feeling")
         ]
 
         volume_load = round(
@@ -192,11 +202,11 @@ class StrengthOutcomeService:
 
         average_rir = (
             round(
-                sum(known_rirs)
-                / len(known_rirs),
+                sum(effective_rirs)
+                / len(effective_rirs),
                 2,
             )
-            if known_rirs
+            if effective_rirs
             else None
         )
 
@@ -221,16 +231,16 @@ class StrengthOutcomeService:
 
         elif (
             target_rir is not None
-            and known_rirs
+            and effective_rirs
             and any(
                 value < target_rir - 1
-                for value in known_rirs
+                for value in effective_rirs
             )
         ):
             outcome = UNDER_TARGET
             reasons.append(
                 "Lo sforzo è stato molto "
-                "più alto del target RIR."
+                "più alto del target."
             )
 
         elif self._is_over_target(
@@ -274,11 +284,29 @@ class StrengthOutcomeService:
             "target_rir": target_rir,
             "average_reps": average_reps,
             "average_rir": average_rir,
+            "feelings": feelings,
             "volume_load": volume_load,
         }
 
     @staticmethod
+    def _effective_rir(
+        item: dict,
+    ) -> float | None:
+        if item.get("rir") is not None:
+            return float(item["rir"])
+
+        feeling = item.get("feeling")
+        mapping = {
+            "easy": 4.0,
+            "right": 2.0,
+            "hard": 1.0,
+            "too_hard": 0.0,
+        }
+        return mapping.get(str(feeling))
+
+    @classmethod
     def _is_over_target(
+        cls,
         *,
         target_sets: int,
         reps_max: int,
@@ -297,14 +325,20 @@ class StrengthOutcomeService:
         ):
             return False
 
-        if not all(
-            item.get("rir") is not None
+        effective = [
+            cls._effective_rir(item)
             for item in relevant_sets
+        ]
+
+        if any(
+            value is None
+            for value in effective
         ):
             return False
 
         return all(
-            float(item["rir"])
+            float(value)
             >= target_rir + 1
-            for item in relevant_sets
+            for value in effective
+            if value is not None
         )

@@ -222,16 +222,31 @@ class StrengthProgressionService:
             target_rir_raw
         )
 
-        known_rirs = [
-            float(item["rir"])
-            for item in relevant
-            if item.get("rir") is not None
-        ]
+        effort_values = []
+
+        for item in relevant:
+            if item.get("rir") is not None:
+                effort_values.append(
+                    float(item["rir"])
+                )
+                continue
+
+            mapping = {
+                "easy": 4.0,
+                "right": 2.0,
+                "hard": 1.0,
+                "too_hard": 0.0,
+            }
+            value = mapping.get(
+                str(item.get("feeling"))
+            )
+            if value is not None:
+                effort_values.append(value)
 
         return bool(
-            known_rirs
+            effort_values
             and any(
                 value < target_rir - 1
-                for value in known_rirs
+                for value in effort_values
             )
         )

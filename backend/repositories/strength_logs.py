@@ -8,13 +8,15 @@ from .base import BaseRepository, RepositoryError
 STRENGTH_WORKOUT_LOG_SELECT = (
     "id,user_id,strength_workout_id,"
     "performed_date,duration_minutes,"
-    "notes,created_at,updated_at"
+    "notes,status,started_at,completed_at,"
+    "created_at,updated_at"
 )
 
 STRENGTH_SET_LOG_SELECT = (
     "id,user_id,strength_workout_log_id,"
     "strength_workout_exercise_id,"
-    "set_index,reps,load_kg,rir,created_at"
+    "set_index,reps,load_kg,rir,feeling,"
+    "created_at,updated_at"
 )
 
 
@@ -74,6 +76,28 @@ class StrengthWorkoutLogsRepository(
                 f"workout log: {exc}"
             ) from exc
 
+    def update(
+        self,
+        log_id: Any,
+        user_id: str,
+        payload: dict[str, Any],
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update(payload)
+                .eq("id", log_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to update strength "
+                f"workout log: {exc}"
+            ) from exc
+
     def delete(
         self,
         log_id: Any,
@@ -101,6 +125,62 @@ class StrengthSetLogsRepository(
     BaseRepository
 ):
     table_name = "strength_set_logs"
+
+    def upsert_set(
+        self,
+        payload: dict[str, Any],
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .upsert(
+                    payload,
+                    on_conflict=(
+                        "strength_workout_log_id,"
+                        "strength_workout_exercise_id,"
+                        "set_index"
+                    ),
+                )
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to save strength set: "
+                f"{exc}"
+            ) from exc
+
+    def delete_set(
+        self,
+        *,
+        user_id: str,
+        workout_log_id: Any,
+        exercise_id: Any,
+        set_index: int,
+    ) -> bool:
+        try:
+            (
+                self.table
+                .delete()
+                .eq("user_id", user_id)
+                .eq(
+                    "strength_workout_log_id",
+                    workout_log_id,
+                )
+                .eq(
+                    "strength_workout_exercise_id",
+                    exercise_id,
+                )
+                .eq("set_index", set_index)
+                .execute()
+            )
+            return True
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to delete strength set: "
+                f"{exc}"
+            ) from exc
 
     def create_many(
         self,

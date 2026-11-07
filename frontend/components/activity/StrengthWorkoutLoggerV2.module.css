@@ -1,0 +1,343 @@
+.card,
+.emptyCard {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 20px;
+  background: #fff;
+}
+
+.emptyCard,
+.header,
+.exerciseHeader,
+.footer,
+.exerciseActions,
+.setActions {
+  display: flex;
+}
+
+.emptyCard,
+.header,
+.exerciseHeader {
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.header h3,
+.emptyCard h3,
+.exerciseHeader h4 {
+  margin: 0;
+}
+
+.header p,
+.emptyCard p {
+  margin: 6px 0 0;
+  color: rgba(15, 23, 42, 0.62);
+}
+
+.autosave {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.08);
+  color: #166534;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.error,
+.message {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.error {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.message {
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.exerciseList {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.exerciseCard {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.035);
+}
+
+.exerciseHeader small {
+  display: block;
+  margin-top: 5px;
+  color: rgba(15, 23, 42, 0.58);
+}
+
+.exerciseActions,
+.setActions,
+.footer {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exerciseActions button,
+.setActions button,
+.secondaryButton,
+.addExercise button,
+.searchBox button {
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  padding: 8px 11px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.demo {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.demo video,
+.demo img {
+  width: min(100%, 520px);
+  max-height: 360px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: #0f172a;
+}
+
+.demo p {
+  margin: 0;
+  max-width: 720px;
+  color: rgba(15, 23, 42, 0.68);
+  line-height: 1.5;
+}
+
+.substitutionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.substitutionList strong {
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.substitutionList button {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: white;
+  cursor: pointer;
+}
+
+.setHeader,
+.setRow {
+  display: grid;
+  grid-template-columns:
+    48px minmax(64px, 0.7fr)
+    minmax(70px, 0.8fr)
+    minmax(130px, 1.2fr)
+    28px;
+  gap: 8px;
+  align-items: center;
+}
+
+.setHeader {
+  margin-top: 12px;
+  color: rgba(15, 23, 42, 0.52);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.setRow {
+  margin-top: 7px;
+}
+
+.setRow > strong {
+  text-align: center;
+}
+
+.setRow input,
+.setRow select,
+.meta input,
+.searchBox input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}
+
+.saved,
+.saving,
+.unsaved {
+  text-align: center;
+  font-weight: 900;
+}
+
+.saved {
+  color: #15803d;
+}
+
+.saving {
+  color: #64748b;
+}
+
+.setActions {
+  margin-top: 10px;
+}
+
+.addExercise {
+  margin-top: 16px;
+}
+
+.searchBox {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.035);
+}
+
+.searchBox > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.searchResult {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.searchResult span {
+  color: rgba(15, 23, 42, 0.58);
+  font-size: 0.78rem;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns:
+    minmax(140px, 0.45fr)
+    minmax(120px, 0.35fr)
+    minmax(220px, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.meta label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.footer {
+  margin-top: 16px;
+}
+
+.primaryButton {
+  border: 0;
+  border-radius: 11px;
+  padding: 10px 15px;
+  background: #111827;
+  color: white;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.coachCard {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 104, 101, 0.08);
+}
+
+.coachCard p {
+  margin: 0;
+}
+
+.coachCard small {
+  display: block;
+  color: rgba(15, 23, 42, 0.68);
+}
+
+@media (max-width: 720px) {
+  .emptyCard,
+  .header,
+  .exerciseHeader {
+    flex-direction: column;
+  }
+
+  .setHeader {
+    display: none;
+  }
+
+  .setRow {
+    grid-template-columns:
+      36px minmax(0, 1fr)
+      minmax(0, 1fr);
+  }
+
+  .setRow select {
+    grid-column: 2 / 4;
+  }
+
+  .setRow > span {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .meta {
+    grid-template-columns: 1fr;
+  }
+
+  .footer {
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .exerciseActions {
+    width: 100%;
+  }
+}
