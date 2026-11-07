@@ -355,7 +355,19 @@ export function HomeLite() {
       return;
     }
 
-    if (!window.confirm(`${copy.deleteConfirm}\n\n${meal.name}`)) {
+    const mealCalories =
+      meal.calories === null || meal.calories === undefined
+        ? null
+        : Math.round(Number(meal.calories));
+
+    const mealDetails = [
+      meal.name,
+      mealCalories !== null ? `${mealCalories} kcal` : null,
+    ]
+      .filter(Boolean)
+      .join(" — ");
+
+    if (!window.confirm(`${copy.deleteConfirm}\n\n${mealDetails}`)) {
       return;
     }
 
@@ -674,7 +686,12 @@ export function HomeLite() {
                                     )}
                                     className={styles.mealEntry}
                                   >
-                                    <span>{item.name}</span>
+                                    <span className={styles.mealEntryName}>
+                                      {item.name}
+                                    </span>
+                                    <span className={styles.mealEntryCalories}>
+                                      {Math.round(Number(item.calories || 0))} kcal
+                                    </span>
                                     {item.id !== null &&
                                     item.id !== undefined ? (
                                       <button

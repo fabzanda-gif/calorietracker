@@ -314,7 +314,7 @@
   gap: 8px;
 }
 
-.mealEntry > span {
+.mealEntryName {
   min-width: 0;
   flex: 1 1 auto;
   margin: 0 !important;
@@ -322,6 +322,15 @@
   color: #778493;
   font-size: 13px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mealEntryCalories {
+  flex: 0 0 auto;
+  margin: 0 !important;
+  color: #506478 !important;
+  font-size: 12px !important;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -505,6 +514,9 @@
   .cardHeader h2, .aiCard h2 { font-size: 20px; }
   .mealRow { grid-template-columns: auto 1fr; }
   .mealRow > strong, .mealRow > a { grid-column: 2; justify-self: start; }
+  .mealEntry { gap: 6px; }
+  .mealEntryCalories { font-size: 11px !important; }
+  .mealDeleteButton { padding: 3px 6px; font-size: 10px; }
   .aiCard { align-items: flex-start; flex-direction: column; padding: 18px; border-radius: 20px; }
   .aiCard > a { width: 100%; text-align: center; }
   .performanceNote { display: none; }
