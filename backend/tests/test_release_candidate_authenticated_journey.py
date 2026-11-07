@@ -485,11 +485,12 @@ def test_complete_authenticated_two_user_journey(http_journey):
     store.hinge_approved = True
     reopened = call(client, "POST", "/strength/plans/v2/preview", json=inp)
     assert reopened.status_code == 200, reopened.text
-    assert reopened.json()["ready_for_activation"] is True
+    assert reopened.json()["ready_for_activation"] is False
+    assert "horizontal_push" in reopened.json()["missing_movement_patterns"]
     assert all(
         x["exercise_id"] != "library-horizontal_push"
         for w in reopened.json()["workouts"] for x in w["exercises"]
-    ) is False  # User exclusion can make preview incomplete, never ignored.
+    )
     store.exercise_prefs[A].clear()
     reopened = call(client, "POST", "/strength/plans/v2/preview", json=inp)
     assert reopened.status_code == 200, reopened.text
