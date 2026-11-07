@@ -91,7 +91,7 @@ resolved as (
     select src.id as source_exercise_id,
            dst.id as target_exercise_id,
            p.relationship,
-           p.similarity_score,
+           p.similarity_score::numeric as similarity_score,
            p.rationale
     from reviewed_pairs p
     join public.exercises src
