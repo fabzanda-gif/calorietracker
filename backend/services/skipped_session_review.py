@@ -44,8 +44,26 @@ class SkippedSessionReviewService:
         strength_workouts: list[dict[str, Any]],
         upcoming_running: list[dict[str, Any]] | None = None,
         upcoming_strength: list[dict[str, Any]] | None = None,
+        recent_events: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         calendar: list[tuple[date, int]] = []
+        # Completed workouts take precedence over projected load.
+        # Only lower-body/cardio events affect cross-training spacing.
+        for event in recent_events or []:
+            performed = self._date(event.get("date"))
+            scope = str(event.get("scope") or "").casefold()
+            intensity = str(event.get("intensity") or "").casefold()
+            if performed is None or performed > as_of:
+                continue
+            if scope not in {"lower", "full_body", "cardio"}:
+                continue
+            if intensity == "high":
+                separation = 2
+            elif intensity == "moderate":
+                separation = 1
+            else:
+                separation = 0
+            calendar.append((performed, separation))
         for kind, sessions in (
             ("planned_activity", upcoming_running or []),
             ("strength_workout", upcoming_strength or []),
