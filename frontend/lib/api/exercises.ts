@@ -130,3 +130,43 @@ export function getExercise(
     { accessToken },
   );
 }
+
+export type ExerciseRelationship =
+  | "close_substitute"
+  | "substitute"
+  | "regression";
+
+export interface ExerciseAlternative {
+  exercise: ExerciseLibraryItem;
+  relationship: ExerciseRelationship;
+  similarity_score: number | null;
+  rationale: string | null;
+  requires_confirmation: true;
+}
+
+export interface ExerciseAlternativesResponse {
+  items: ExerciseAlternative[];
+  count: number;
+}
+
+/**
+ * Suggestions only: the client must obtain user confirmation before
+ * changing any planned or in-progress strength workout.
+ */
+export function getExerciseAlternatives(
+  accessToken: string,
+  identifier: string,
+  options: {
+    language?: string;
+    equipment?: string;
+    limit?: number;
+  } = {},
+): Promise<ExerciseAlternativesResponse> {
+  const params = new URLSearchParams();
+  if (options.language) params.set("language", options.language);
+  if (options.equipment) params.set("equipment", options.equipment);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  const query = params.toString();
+  const url = `/exercises/${encodeURIComponent(identifier)}/alternatives${query ? `?${query}` : ""}`;
+  return apiRequest<ExerciseAlternativesResponse>(url, { accessToken });
+}
