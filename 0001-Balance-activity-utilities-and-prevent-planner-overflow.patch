@@ -1,0 +1,81 @@
+From 33cc7a8225c0fa9c52753a201e2fddf22a306a40 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 9 Sep 2026 09:26:05 +0200
+Subject: [PATCH] Balance activity utilities and prevent planner overflow
+
+---
+ .../app/activities/ActivitiesPage.module.css  | 39 +++++++++++++++++--
+ 1 file changed, 35 insertions(+), 4 deletions(-)
+
+diff --git a/frontend/app/activities/ActivitiesPage.module.css b/frontend/app/activities/ActivitiesPage.module.css
+index 89252e0..91e7361 100644
+--- a/frontend/app/activities/ActivitiesPage.module.css
++++ b/frontend/app/activities/ActivitiesPage.module.css
+@@ -2491,10 +2491,8 @@ summary.loggerHeading {
+     "summary summary"
+     "calendar calendar"
+     "activities detail"
+-    "activities planner"
+-    "activities upload"
+-    "activities programs"
+-    "activities logger"
++    "planner upload"
++    "programs logger"
+     "preview preview";
+   gap: 20px;
+ }
+@@ -2529,6 +2527,10 @@ summary.loggerHeading {
+   align-self: start;
+ }
+ 
++.detailCard .detailStats {
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++}
++
+ .plannerSection {
+   grid-area: planner;
+   align-self: start;
+@@ -2682,6 +2684,20 @@ details[open] > summary .expandToggle {
+   margin-top: 18px;
+ }
+ 
++.plannerSection .plannerGrid {
++  grid-template-columns: 1fr;
++}
++
++.plannerSection .upcomingCard {
++  grid-template-columns: minmax(92px, 0.35fr) minmax(0, 1fr);
++}
++
++.plannerSection .upcomingActions button,
++.plannerSection .upcomingActions label {
++  max-width: 100%;
++  box-sizing: border-box;
++}
++
+ .calendarBody {
+   margin-top: 4px;
+ }
+@@ -2761,4 +2777,19 @@ details[open] > summary .expandToggle {
+   .calendarCard .emptyDay {
+     min-height: 52px;
+   }
++
++  .plannerSection .upcomingCard {
++    grid-template-columns: 1fr;
++  }
++
++  .plannerSection .upcomingActions {
++    display: grid;
++    grid-template-columns: 1fr 1fr;
++  }
++
++  .plannerSection .upcomingActions > * {
++    width: 100%;
++    min-width: 0;
++    text-align: center;
++  }
+ }
+-- 
+2.51.1
+

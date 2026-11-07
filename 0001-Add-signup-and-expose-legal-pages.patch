@@ -1,0 +1,281 @@
+From 2771188254c33df895649dce179d376480c43c21 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 14:19:17 +0300
+Subject: [PATCH] Add signup and expose legal pages
+
+---
+ frontend/components/auth/AuthGate.tsx         |  6 ++
+ frontend/components/auth/AuthProvider.tsx     | 24 ++++++
+ frontend/components/auth/LoginCard.module.css |  7 ++
+ frontend/components/auth/LoginCard.tsx        | 84 +++++++++++++++++--
+ .../onboarding/WelcomeJourney.module.css      |  1 +
+ .../components/onboarding/WelcomeJourney.tsx  |  5 +-
+ 6 files changed, 118 insertions(+), 9 deletions(-)
+
+diff --git a/frontend/components/auth/AuthGate.tsx b/frontend/components/auth/AuthGate.tsx
+index d5ad043..8061505 100644
+--- a/frontend/components/auth/AuthGate.tsx
++++ b/frontend/components/auth/AuthGate.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+ import type { ReactNode } from "react";
++import { usePathname } from "next/navigation";
+ 
+ import { useAuth } from "./AuthProvider";
+ import { LoginCard } from "./LoginCard";
+@@ -12,6 +13,11 @@ export function AuthGate({
+   children: ReactNode;
+ }) {
+   const { loading, user } = useAuth();
++  const pathname = usePathname();
++
++  if (pathname === "/privacy" || pathname === "/terms") {
++    return children;
++  }
+ 
+   if (loading) {
+     return (
+diff --git a/frontend/components/auth/AuthProvider.tsx b/frontend/components/auth/AuthProvider.tsx
+index 1f4f2ba..12918d3 100644
+--- a/frontend/components/auth/AuthProvider.tsx
++++ b/frontend/components/auth/AuthProvider.tsx
+@@ -25,6 +25,10 @@ interface AuthContextValue {
+     password: string,
+   ) => Promise<void>;
+   signInWithGoogle: () => Promise<void>;
++  signUpWithPassword: (
++    email: string,
++    password: string,
++  ) => Promise<boolean>;
+   signOut: () => Promise<void>;
+ }
+ 
+@@ -118,6 +122,26 @@ export function AuthProvider({
+         }
+       },
+ 
++      async signUpWithPassword(
++        email: string,
++        password: string,
++      ) {
++        const { data, error } =
++          await supabase.auth.signUp({
++            email,
++            password,
++            options: {
++              emailRedirectTo: window.location.origin,
++            },
++          });
++
++        if (error) {
++          throw error;
++        }
++
++        return data.session == null;
++      },
++
+       async signOut() {
+         const { error } =
+           await supabase.auth.signOut();
+diff --git a/frontend/components/auth/LoginCard.module.css b/frontend/components/auth/LoginCard.module.css
+index 9860a3c..3b686ec 100644
+--- a/frontend/components/auth/LoginCard.module.css
++++ b/frontend/components/auth/LoginCard.module.css
+@@ -223,6 +223,12 @@
+ .field input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255, 105, 100, 0.12); }
+ .button { margin-top: 3px; color: #fff; background: var(--navy); }
+ .error { margin: 0; padding: 10px 12px; border-radius: 10px; color: #9f3030; background: #fff0ee; font-size: 0.82rem; line-height: 1.4; }
++.success { margin: 0; padding: 10px 12px; border-radius: 10px; color: #28633b; background: #edf8ef; font-size: 0.82rem; line-height: 1.4; }
++.legalConsent { display: grid; grid-template-columns: 18px 1fr; gap: 9px; align-items: start; color: #687587; font-size: .75rem; line-height: 1.45; }
++.legalConsent input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--coral); }
++.legalConsent a, .legalFooter a { color: var(--navy); font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
++.authSwitch { margin: -8px 0 0; display: flex; justify-content: center; gap: 6px; color: #667287; font-size: .82rem; }
++.authSwitch button { padding: 0; border: 0; background: transparent; color: var(--coral); font: inherit; font-weight: 850; cursor: pointer; }
+ .securityNote {
+   margin: -3px 0 0;
+   display: flex;
+@@ -233,6 +239,7 @@
+   font-size: 0.72rem;
+ }
+ .securityNote span { color: #4d9f68; font-weight: 900; }
++.legalFooter { margin-top: -12px; display: flex; justify-content: center; gap: 8px; color: #9a9b96; font-size: .7rem; }
+ 
+ @media (max-width: 1050px) {
+   .page { padding-inline: 28px; }
+diff --git a/frontend/components/auth/LoginCard.tsx b/frontend/components/auth/LoginCard.tsx
+index de21442..9090aba 100644
+--- a/frontend/components/auth/LoginCard.tsx
++++ b/frontend/components/auth/LoginCard.tsx
+@@ -71,20 +71,45 @@ function ProductPreview() {
+ }
+ 
+ export function LoginCard() {
+-  const { signInWithPassword, signInWithGoogle } = useAuth();
++  const {
++    signInWithPassword,
++    signInWithGoogle,
++    signUpWithPassword,
++  } = useAuth();
++  const [mode, setMode] = useState<"login" | "signup">("login");
+   const [email, setEmail] = useState("");
+   const [password, setPassword] = useState("");
+   const [submitting, setSubmitting] = useState(false);
+   const [error, setError] = useState<string | null>(null);
++  const [message, setMessage] = useState<string | null>(null);
+ 
+   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+     setSubmitting(true);
+     setError(null);
++    setMessage(null);
+     try {
+-      await signInWithPassword(email.trim(), password);
++      if (mode === "signup") {
++        const needsConfirmation = await signUpWithPassword(
++          email.trim(),
++          password,
++        );
++        if (needsConfirmation) {
++          setMessage(
++            "Controlla la tua email e conferma l’account per iniziare.",
++          );
++        }
++      } else {
++        await signInWithPassword(email.trim(), password);
++      }
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : "Accesso non riuscito");
++      setError(
++        err instanceof Error
++          ? err.message
++          : mode === "signup"
++          ? "Registrazione non riuscita"
++          : "Accesso non riuscito",
++      );
+     } finally {
+       setSubmitting(false);
+     }
+@@ -93,6 +118,7 @@ export function LoginCard() {
+   async function handleGoogleSignIn() {
+     setSubmitting(true);
+     setError(null);
++    setMessage(null);
+     try {
+       await signInWithGoogle();
+     } catch (err) {
+@@ -139,11 +165,22 @@ export function LoginCard() {
+         <section className={styles.loginPanel} aria-labelledby="login-title">
+           <p className={styles.brand}>SANOSYNC</p>
+           <div className={styles.heading}>
+-            <h2 id="login-title">Bentornato.</h2>
+-            <p>Accedi con lo stesso account che usi su SanoSync.</p>
++            <h2 id="login-title">
++              {mode === "signup" ? "Inizia da qui." : "Bentornato."}
++            </h2>
++            <p>
++              {mode === "signup"
++                ? "Crea il tuo account e configura il tuo primo piano."
++                : "Accedi con lo stesso account che usi su SanoSync."}
++            </p>
+           </div>
+           <button className={styles.googleButton} type="button" disabled={submitting} onClick={handleGoogleSignIn}>
+-            <GoogleIcon /><span>Continua con Google</span>
++            <GoogleIcon />
++            <span>
++              {mode === "signup"
++                ? "Registrati con Google"
++                : "Continua con Google"}
++            </span>
+           </button>
+           <div className={styles.divider}><span>oppure</span></div>
+           <form className={styles.form} onSubmit={handleSubmit}>
+@@ -153,17 +190,48 @@ export function LoginCard() {
+             </label>
+             <label className={styles.field}>
+               <span>Password</span>
+-              <input type="password" autoComplete="current-password" placeholder="La tua password" required value={password} onChange={(event) => setPassword(event.target.value)} />
++              <input type="password" minLength={8} autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder={mode === "signup" ? "Almeno 8 caratteri" : "La tua password"} required value={password} onChange={(event) => setPassword(event.target.value)} />
+             </label>
++            {mode === "signup" ? (
++              <label className={styles.legalConsent}>
++                <input type="checkbox" required />
++                <span>
++                  Accetto i <Link href="/terms">Termini e condizioni</Link>
++                  {" "}e dichiaro di aver letto la
++                  {" "}<Link href="/privacy">Privacy Policy</Link>.
++                </span>
++              </label>
++            ) : null}
+             {error ? <p className={styles.error} role="alert">{error}</p> : null}
++            {message ? <p className={styles.success} role="status">{message}</p> : null}
+             <button className={styles.button} type="submit" disabled={submitting}>
+-              {submitting ? "Accesso…" : "Accedi"}
++              {submitting
++                ? mode === "signup" ? "Creazione account…" : "Accesso…"
++                : mode === "signup" ? "Crea account" : "Accedi"}
+             </button>
+           </form>
++          <p className={styles.authSwitch}>
++            {mode === "signup" ? "Hai già un account?" : "Non hai ancora un account?"}
++            <button
++              type="button"
++              onClick={() => {
++                setMode(mode === "signup" ? "login" : "signup");
++                setError(null);
++                setMessage(null);
++              }}
++            >
++              {mode === "signup" ? "Accedi" : "Registrati"}
++            </button>
++          </p>
+           <p className={styles.securityNote}>
+             <span aria-hidden="true">✓</span>
+             I tuoi dati restano privati e sotto il tuo controllo.
+           </p>
++          <footer className={styles.legalFooter}>
++            <Link href="/privacy">Privacy Policy</Link>
++            <span aria-hidden="true">·</span>
++            <Link href="/terms">Termini e condizioni</Link>
++          </footer>
+         </section>
+       </div>
+     </main>
+diff --git a/frontend/components/onboarding/WelcomeJourney.module.css b/frontend/components/onboarding/WelcomeJourney.module.css
+index 2e7760f..6485343 100644
+--- a/frontend/components/onboarding/WelcomeJourney.module.css
++++ b/frontend/components/onboarding/WelcomeJourney.module.css
+@@ -42,6 +42,7 @@
+ .actions .back { background: transparent; color: #102846; border: 1px solid #dcd9d2; }
+ .error { margin: 16px 0 0; padding: 12px; border-radius: 12px; background: #fff0ef; color: #a52d2a; }
+ .consent { margin: 14px 0 0; color: #7b8490; text-align: right; font-size: 0.72rem; }
++.consent a { color: #d94d4a; font-weight: 800; }
+ 
+ @media (max-width: 600px) {
+   .backdrop { align-items: start; padding: 12px; }
+diff --git a/frontend/components/onboarding/WelcomeJourney.tsx b/frontend/components/onboarding/WelcomeJourney.tsx
+index eb70c64..1e0d79b 100644
+--- a/frontend/components/onboarding/WelcomeJourney.tsx
++++ b/frontend/components/onboarding/WelcomeJourney.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+ import { useState } from "react";
++import Link from "next/link";
+ 
+ import { updateProfile } from "@/lib/api/profile";
+ import { createWeight } from "@/lib/api/weight";
+@@ -176,7 +177,9 @@ export function WelcomeJourney({
+               </button>
+             </div>
+             <p className={styles.consent}>
+-              Continuando confermi di aver letto Privacy e Termini.
++              Continuando confermi di aver letto la
++              {" "}<Link href="/privacy">Privacy Policy</Link> e i
++              {" "}<Link href="/terms">Termini e condizioni</Link>.
+             </p>
+           </form>
+         )}
+-- 
+2.51.1
+

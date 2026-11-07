@@ -1,0 +1,372 @@
+From c936a39eb615285c1f8e918f75dfc5c7a392ed04 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 17:40:24 +0300
+Subject: [PATCH] Load home progressively and persist briefings
+
+---
+ backend/api/dependencies.py                |  8 +-
+ backend/api/routers/days.py                | 55 ++++++++++++--
+ backend/repositories/day_briefings.py      | 34 +++++++++
+ backend/sql/20260902_add_day_briefings.sql | 23 ++++++
+ frontend/components/home/HomeShell.tsx     | 87 +++++++++++-----------
+ 5 files changed, 155 insertions(+), 52 deletions(-)
+ create mode 100644 backend/repositories/day_briefings.py
+ create mode 100644 backend/sql/20260902_add_day_briefings.sql
+
+diff --git a/backend/api/dependencies.py b/backend/api/dependencies.py
+index 8ff28ce..429148a 100644
+--- a/backend/api/dependencies.py
++++ b/backend/api/dependencies.py
+@@ -16,6 +16,7 @@ from supabase import Client, create_client
+ 
+ from backend.repositories.activities import ActivitiesRepository
+ from backend.repositories.daily_logs import DailyLogsRepository
++from backend.repositories.day_briefings import DayBriefingsRepository
+ from backend.repositories.decision_selections import DecisionSelectionsRepository
+ from backend.repositories.ingredients import IngredientsRepository
+ from backend.repositories.meal_ingredients import MealIngredientsRepository
+@@ -242,6 +243,12 @@ def get_daily_logs_repository(
+     return DailyLogsRepository(supabase)
+ 
+ 
++def get_day_briefings_repository(
++    supabase: Client = Depends(get_authenticated_supabase),
++) -> DayBriefingsRepository:
++    return DayBriefingsRepository(supabase)
++
++
+ def get_recipes_repository(
+     supabase: Client = Depends(get_authenticated_supabase),
+ ) -> RecipesRepository:
+@@ -292,4 +299,3 @@ def get_weekly_schedule_repository(
+     supabase: Client = Depends(get_authenticated_supabase),
+ ) -> WeeklyScheduleRepository:
+     return WeeklyScheduleRepository(supabase)
+-
+diff --git a/backend/api/routers/days.py b/backend/api/routers/days.py
+index 72d6e75..b94e6e2 100644
+--- a/backend/api/routers/days.py
++++ b/backend/api/routers/days.py
+@@ -2,6 +2,8 @@ from __future__ import annotations
+ 
+ from datetime import date as Date
+ from datetime import datetime
++import hashlib
++import json
+ import time
+ 
+ from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+@@ -11,6 +13,7 @@ from backend.api.dependencies import (
+     get_activities_repository,
+     get_current_user,
+     get_daily_logs_repository,
++    get_day_briefings_repository,
+     get_optional_decision_selections_repository,
+     get_meal_prep_repository,
+     get_meals_repository,
+@@ -21,6 +24,7 @@ from backend.api.dependencies import (
+ from backend.repositories.activities import ActivitiesRepository
+ from backend.repositories.base import RepositoryError
+ from backend.repositories.daily_logs import DailyLogsRepository
++from backend.repositories.day_briefings import DayBriefingsRepository
+ from backend.repositories.decision_selections import DecisionSelectionsRepository
+ from backend.repositories.meal_prep import MealPrepRepository
+ from backend.repositories.meals import MealsRepository
+@@ -788,6 +792,9 @@ def get_day_briefing(
+     weight_repo: WeightRepository = Depends(
+         get_weight_repository
+     ),
++    briefing_repo: DayBriefingsRepository = Depends(
++        get_day_briefings_repository
++    ),
+ ):
+     try:
+         day = _build_day(
+@@ -904,24 +911,42 @@ def get_day_briefing(
+         ),
+     }
+ 
+-    effective_hour = (
+-        hour
+-        if hour is not None
+-        else datetime.now().hour
+-    )
+-
+     activity_signature = (
+         _briefing_activity_signature(
+             training_activities
+         )
+     )
+ 
++    input_signature = hashlib.sha256(
++        json.dumps(
++            {**payload, "activity_signature": activity_signature},
++            sort_keys=True,
++            ensure_ascii=False,
++            default=str,
++        ).encode("utf-8")
++    ).hexdigest()
++
++    try:
++        persisted = briefing_repo.get(
++            current_user.id, day_date, moment, mode
++        )
++    except RepositoryError:
++        persisted = None
++
++    if persisted and persisted.get("input_signature") == input_signature:
++        return {
++            "date": str(day_date),
++            "mode": mode,
++            "message": persisted.get("message") or "",
++            "source": persisted.get("source") or "fallback",
++            "cached": True,
++        }
++
+     cache_key = (
+         current_user.id,
+         str(day_date),
+         mode,
+         moment,
+-        effective_hour,
+         payload["day_type"],
+         payload["activity_level"],
+         payload["status_hint"],
+@@ -977,6 +1002,22 @@ def get_day_briefing(
+         "cached": False,
+     }
+ 
++    try:
++        briefing_repo.save({
++            "user_id": current_user.id,
++            "date": str(day_date),
++            "moment": moment,
++            "mode": mode,
++            "input_signature": input_signature,
++            "message": message,
++            "source": source,
++            "updated_at": datetime.utcnow().isoformat(),
++        })
++    except RepositoryError:
++        # Briefings remain available even before/while the cache migration is
++        # deployed; the in-process cache below is the graceful fallback.
++        pass
++
+     if len(_DAY_BRIEFING_CACHE) >= 512:
+         _DAY_BRIEFING_CACHE.clear()
+ 
+diff --git a/backend/repositories/day_briefings.py b/backend/repositories/day_briefings.py
+new file mode 100644
+index 0000000..4f304e7
+--- /dev/null
++++ b/backend/repositories/day_briefings.py
+@@ -0,0 +1,34 @@
++from __future__ import annotations
++
++from .base import BaseRepository, RepositoryError
++
++
++class DayBriefingsRepository(BaseRepository):
++    table_name = "day_briefings"
++
++    def get(self, user_id: str, day_date, moment: str, mode: str):
++        try:
++            response = (
++                self.table.select("*")
++                .eq("user_id", user_id)
++                .eq("date", str(day_date))
++                .eq("moment", moment)
++                .eq("mode", mode)
++                .limit(1)
++                .execute()
++            )
++            rows = self._data(response)
++            return rows[0] if rows else None
++        except Exception as exc:
++            raise RepositoryError(f"Unable to load day briefing: {exc}") from exc
++
++    def save(self, payload: dict):
++        try:
++            response = self.table.upsert(
++                payload,
++                on_conflict="user_id,date,moment,mode",
++            ).execute()
++            rows = self._data(response)
++            return rows[0] if rows else None
++        except Exception as exc:
++            raise RepositoryError(f"Unable to save day briefing: {exc}") from exc
+diff --git a/backend/sql/20260902_add_day_briefings.sql b/backend/sql/20260902_add_day_briefings.sql
+new file mode 100644
+index 0000000..cab4a70
+--- /dev/null
++++ b/backend/sql/20260902_add_day_briefings.sql
+@@ -0,0 +1,23 @@
++create table if not exists public.day_briefings (
++    id uuid primary key default gen_random_uuid(),
++    user_id uuid not null references auth.users(id) on delete cascade,
++    date date not null,
++    moment text not null check (moment in ('morning', 'afternoon', 'evening')),
++    mode text not null check (mode in ('standard', 'zero')),
++    input_signature text not null,
++    message text not null,
++    source text not null check (source in ('ai', 'fallback')),
++    updated_at timestamptz not null default now(),
++    unique (user_id, date, moment, mode)
++);
++
++alter table public.day_briefings enable row level security;
++
++drop policy if exists "Users manage own day briefings" on public.day_briefings;
++create policy "Users manage own day briefings"
++    on public.day_briefings
++    for all
++    using (auth.uid() = user_id)
++    with check (auth.uid() = user_id);
++
++notify pgrst, 'reload schema';
+diff --git a/frontend/components/home/HomeShell.tsx b/frontend/components/home/HomeShell.tsx
+index ffa326f..5ed247b 100644
+--- a/frontend/components/home/HomeShell.tsx
++++ b/frontend/components/home/HomeShell.tsx
+@@ -845,13 +845,10 @@ export function HomeShell() {
+         const [
+           dayPayload,
+           budgetPayload,
+-          briefingPayload,
+           nextMealPayload,
+           mealsPayload,
+           activitiesPayload,
+           latestWeightPayload,
+-          weightHistoryPayload,
+-          dayHistoryPayload,
+           profilePayload,
+         ] = await Promise.all([
+           getDay(
+@@ -862,13 +859,6 @@ export function HomeShell() {
+             date,
+             accessToken,
+           ),
+-          getDayBriefing(
+-            date,
+-            briefingMoment(),
+-            experienceMode,
+-            briefingHour,
+-            accessToken,
+-          ).catch(() => null),
+           getNextMeal(
+             date,
+             accessToken,
+@@ -884,41 +874,13 @@ export function HomeShell() {
+           getLatestWeight(
+             accessToken,
+           ),
+-          getWeightHistory(
+-            accessToken,
+-          ).catch(() => ({
+-            count: 0,
+-            items: [],
+-          })),
+-          getDayHistory(
+-            accessToken,
+-          ),
+           getProfile(accessToken),
+         ]);
+ 
+-        const nextMealOptionsPayload =
+-          nextMealPayload.next_slot
+-            ? await getMealOptions(
+-                date,
+-                nextMealPayload.next_slot,
+-                "auto",
+-                accessToken,
+-              )
+-            : null;
+-
+         if (active) {
+           setDay(dayPayload);
+           setBudgetResult(budgetPayload);
+-          setDayBriefing(
+-            briefingPayload?.message ?? null,
+-          );
+           setNextMeal(nextMealPayload);
+-          setNextMealOptions(nextMealOptionsPayload);
+-          setDinnerOptions(
+-            nextMealPayload.next_slot === "dinner"
+-              ? nextMealOptionsPayload
+-              : null,
+-          );
+           setActualMeals(mealsPayload.items);
+           setActualActivities(
+             activitiesPayload.items,
+@@ -929,18 +891,12 @@ export function HomeShell() {
+               ? Number(latestWeightPayload.item.weight)
+               : null,
+           );
+-          setWeightHistory(
+-            weightHistoryPayload.items,
+-          );
+           setActualDinner(
+             mealsPayload.items.find(
+               (meal) => meal.meal_type === "Cena",
+             ) ?? null,
+           );
+ 
+-          setDayHistory(
+-            dayHistoryPayload,
+-          );
+           setProfile(profilePayload);
+ 
+           const metadata = profilePayload.metadata;
+@@ -951,6 +907,49 @@ export function HomeShell() {
+               !metadata.goal_mode ||
+               latestWeightPayload.item?.weight == null,
+           );
++
++          // The usable home is ready. AI briefing, recommendations and
++          // history are enhancements and must never hold up first paint.
++          setLoading(false);
++
++          void getDayBriefing(
++            date,
++            briefingMoment(),
++            experienceMode,
++            briefingHour,
++            accessToken,
++          ).then((payload) => {
++            if (active) setDayBriefing(payload.message);
++          }).catch(() => undefined);
++
++          if (nextMealPayload.next_slot) {
++            void getMealOptions(
++              date,
++              nextMealPayload.next_slot,
++              "auto",
++              accessToken,
++            ).then((payload) => {
++              if (!active) return;
++              setNextMealOptions(payload);
++              setDinnerOptions(
++                nextMealPayload.next_slot === "dinner"
++                  ? payload
++                  : null,
++              );
++            }).catch(() => undefined);
++          }
++
++          void getWeightHistory(accessToken)
++            .then((payload) => {
++              if (active) setWeightHistory(payload.items);
++            })
++            .catch(() => undefined);
++
++          void getDayHistory(accessToken)
++            .then((payload) => {
++              if (active) setDayHistory(payload);
++            })
++            .catch(() => undefined);
+         }
+       } catch (err) {
+         if (active) {
+-- 
+2.51.1
+

@@ -2083,6 +2083,181 @@ def get_daily_totals(target_date):
 
 
 
+def _plain_secret_mapping(value):
+    """Convert Streamlit secret containers to ordinary nested mappings."""
+    try:
+        if hasattr(value, "to_dict"):
+            return value.to_dict()
+    except Exception:
+        pass
+
+    try:
+        if isinstance(value, dict):
+            return value
+    except Exception:
+        pass
+
+    return {}
+
+
+def _find_secret_recursively(mapping, wanted_name):
+    """
+    Find a secret by normalized key name at any nesting level.
+
+    This also tolerates accidental whitespace/case differences in the key name,
+    without exposing any secret values.
+    """
+    wanted = str(wanted_name or "").strip().upper()
+    if not wanted:
+        return None, None
+
+    if not isinstance(mapping, dict):
+        return None, None
+
+    for raw_key, raw_value in mapping.items():
+        normalized = str(raw_key or "").strip().upper()
+        if normalized == wanted:
+            if raw_value is not None and str(raw_value).strip():
+                return str(raw_value).strip(), str(raw_key)
+
+    for raw_key, raw_value in mapping.items():
+        nested = _plain_secret_mapping(raw_value)
+        if nested:
+            found, found_key = _find_secret_recursively(
+                nested,
+                wanted,
+            )
+            if found:
+                return found, f"{raw_key}.{found_key}"
+
+    return None, None
+
+
+def get_streamlit_secret(name, default=None, return_source=False):
+    """
+    Robust Streamlit secret reader.
+
+    Search order:
+      1. exact st.secrets[name];
+      2. st.secrets.get(name);
+      3. recursive search through st.secrets.to_dict(), including nested groups;
+      4. environment variable.
+
+    `return_source=True` returns (value, source) for safe diagnostics.
+    Secret values are never displayed.
+    """
+    key = str(name or "").strip()
+    if not key:
+        return (default, None) if return_source else default
+
+    # 1. Exact mapping access.
+    try:
+        value = st.secrets[key]
+        if value is not None and str(value).strip():
+            result = str(value).strip()
+            return (result, "st.secrets[]") if return_source else result
+    except Exception:
+        pass
+
+    # 2. Mapping .get().
+    try:
+        value = st.secrets.get(key)
+        if value is not None and str(value).strip():
+            result = str(value).strip()
+            return (result, "st.secrets.get") if return_source else result
+    except Exception:
+        pass
+
+    # 3. Recursive/nested lookup.
+    try:
+        secrets_mapping = _plain_secret_mapping(st.secrets)
+        value, found_path = _find_secret_recursively(
+            secrets_mapping,
+            key,
+        )
+        if value:
+            source = (
+                f"st.secrets:{found_path}"
+                if found_path
+                else "st.secrets:recursive"
+            )
+            return (value, source) if return_source else value
+    except Exception:
+        pass
+
+    # 4. Environment fallback.
+    try:
+        value = os.environ.get(key)
+        if value is not None and str(value).strip():
+            result = str(value).strip()
+            return (result, "environment") if return_source else result
+    except Exception:
+        pass
+
+    return (default, None) if return_source else default
+
+
+def get_groq_secret_diagnostic():
+    """
+    Return only safe metadata about Groq configuration.
+    Never includes secret values.
+    """
+    api_value, api_source = get_streamlit_secret(
+        "GROQ_API_KEY",
+        return_source=True,
+    )
+    model_value, model_source = get_streamlit_secret(
+        "GROQ_TEXT_MODEL",
+        return_source=True,
+    )
+
+    groq_key_paths = []
+
+    def _collect(mapping, prefix=""):
+        if not isinstance(mapping, dict):
+            return
+        for raw_key, raw_value in mapping.items():
+            key_name = str(raw_key)
+            path = f"{prefix}.{key_name}" if prefix else key_name
+            if "GROQ" in key_name.strip().upper():
+                groq_key_paths.append(path)
+            nested = _plain_secret_mapping(raw_value)
+            if nested:
+                _collect(nested, path)
+
+    try:
+        _collect(_plain_secret_mapping(st.secrets))
+    except Exception:
+        pass
+
+    return {
+        "api_key_present": bool(api_value),
+        "api_key_source": api_source,
+        "text_model_present": bool(model_value),
+        "text_model_source": model_source,
+        "groq_key_paths": sorted(set(groq_key_paths)),
+    }
+
+
+def require_groq_api_key():
+    """
+    Return the configured Groq API key or raise a safe, actionable error.
+    """
+    api_key = get_streamlit_secret("GROQ_API_KEY")
+    if api_key:
+        return api_key
+
+    diag = get_groq_secret_diagnostic()
+    paths = diag.get("groq_key_paths") or []
+    detected = ", ".join(paths) if paths else "nessuna chiave GROQ rilevata"
+
+    raise RuntimeError(
+        "GROQ_API_KEY non leggibile da questa istanza Streamlit. "
+        f"Diagnostica sicura: {detected}. "
+        "Il valore della chiave non viene mostrato."
+    )
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def get_groq_available_model_ids():
     """
@@ -2091,7 +2266,7 @@ def get_groq_available_model_ids():
     We use the REST /models endpoint directly instead of depending on a specific
     openai-python client version.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = get_streamlit_secret("GROQ_API_KEY")
     if not api_key:
         return []
 
@@ -2119,23 +2294,29 @@ def get_groq_available_model_ids():
 
 def resolve_groq_text_model():
     """
-    Pick a text model that this specific Groq project can actually use.
+    Pick a text model available to this Groq project.
 
-    Preference intentionally starts with current GPT-OSS production models,
-    because the user's project has returned model_not_found for both Llama
-    production IDs.
+    GROQ_TEXT_MODEL from Streamlit Secrets is honored first when present.
     """
     available = set(get_groq_available_model_ids())
+    configured_model = get_streamlit_secret("GROQ_TEXT_MODEL")
 
-    preferred = [
+    if configured_model and not available:
+        return configured_model
+
+    preferred = []
+    if configured_model:
+        preferred.append(configured_model)
+
+    preferred.extend([
+        "qwen/qwen3.6-27b",
         "openai/gpt-oss-20b",
         "openai/gpt-oss-120b",
-        "qwen/qwen3.6-27b",
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
         "groq/compound-mini",
         "groq/compound",
-    ]
+    ])
 
     for model_id in preferred:
         if model_id in available:
@@ -2166,10 +2347,18 @@ def resolve_groq_text_model():
 def resolve_groq_vision_model():
     """Pick an actually available multimodal/vision model."""
     available = set(get_groq_available_model_ids())
+    configured_model = get_streamlit_secret("GROQ_TEXT_MODEL")
 
-    preferred = [
+    if configured_model and not available:
+        return configured_model
+
+    preferred = []
+    if configured_model:
+        preferred.append(configured_model)
+
+    preferred.extend([
         "qwen/qwen3.6-27b",
-    ]
+    ])
     for model_id in preferred:
         if model_id in available:
             return model_id
@@ -2538,7 +2727,7 @@ def generate_sanosync_coach_message(
     Generate wording only. All nutrition math is performed by SanoSync.
     Uses Groq through the already-installed OpenAI-compatible client.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = require_groq_api_key()
     if not api_key:
         return None
 
@@ -2788,7 +2977,7 @@ def generate_can_i_eat_advice(
     Nutrition numbers for the user's day are deterministic; only the requested
     food estimate is delegated to AI.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
+    api_key = require_groq_api_key()
     if not api_key:
         raise RuntimeError("GROQ_API_KEY non configurata.")
 
@@ -10141,11 +10330,7 @@ def analyze_food_photo_with_ai(uploaded_file, language="Italiano"):
     o non parsabili che possono verificarsi leggendo response.output_text
     dalla Responses API beta.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "GROQ_API_KEY non configurata nei Secrets di Streamlit."
-        )
+    api_key = require_groq_api_key()
 
     image_bytes = uploaded_file.getvalue()
     if not image_bytes:
@@ -10623,9 +10808,7 @@ def regenerate_ai_recipe_if_empty(
     Second-pass fallback used only when the first AI result has no valid ingredients.
     Keeps the user's calorie target, but prioritizes a coherent recipe over strict ±10%.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
+    api_key = require_groq_api_key()
 
     client = OpenAI(
         api_key=api_key,
@@ -10755,9 +10938,7 @@ def generate_ai_recipe_with_groq(
     Groq creates the recipe AND estimates nutrition.
     Open Food Facts is intentionally not used for this feature.
     """
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("GROQ_API_KEY non configurata nei Secrets di Streamlit.")
+    api_key = require_groq_api_key()
 
     language_name = _ai_recipe_language_name(language)
     pantry_text = ", ".join(AI_RECIPE_PANTRY_BASICS)
@@ -10979,11 +11160,7 @@ def transcribe_ingredient_audio_with_groq(audio_file, language="Italiano"):
     if audio_file is None:
         return ""
 
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "GROQ_API_KEY non configurata nei Secrets di Streamlit."
-        )
+    api_key = require_groq_api_key()
 
     audio_bytes = audio_file.getvalue()
     if not audio_bytes:
@@ -11211,11 +11388,7 @@ def parse_recipe_ingredients_with_ai(ingredient_text, language="Italiano"):
     if not raw_text:
         return []
 
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "GROQ_API_KEY non configurata nei Secrets di Streamlit."
-        )
+    api_key = require_groq_api_key()
 
     language_name = {
         "Italiano": "Italian",

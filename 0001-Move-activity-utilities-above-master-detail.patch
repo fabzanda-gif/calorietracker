@@ -1,0 +1,27 @@
+From 3336fa09b21c3121499908204812271cb2fab469 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 9 Sep 2026 14:48:00 +0200
+Subject: [PATCH] Move activity utilities above master detail
+
+---
+ frontend/app/activities/ActivitiesPage.module.css | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/frontend/app/activities/ActivitiesPage.module.css b/frontend/app/activities/ActivitiesPage.module.css
+index 91e7361..ca7b3bd 100644
+--- a/frontend/app/activities/ActivitiesPage.module.css
++++ b/frontend/app/activities/ActivitiesPage.module.css
+@@ -2490,9 +2490,9 @@ summary.loggerHeading {
+     "header header"
+     "summary summary"
+     "calendar calendar"
+-    "activities detail"
+     "planner upload"
+     "programs logger"
++    "activities detail"
+     "preview preview";
+   gap: 20px;
+ }
+-- 
+2.51.1
+

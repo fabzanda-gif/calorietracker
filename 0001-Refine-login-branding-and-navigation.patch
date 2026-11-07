@@ -1,0 +1,102 @@
+From 4d6791ded69af8733706f210dc96a1f1d29bfb53 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 13:30:15 +0300
+Subject: [PATCH] Refine login branding and navigation
+
+---
+ frontend/components/auth/LoginCard.module.css | 22 +++++++++----------
+ frontend/components/auth/LoginCard.tsx        | 16 +++++++++-----
+ 2 files changed, 21 insertions(+), 17 deletions(-)
+
+diff --git a/frontend/components/auth/LoginCard.module.css b/frontend/components/auth/LoginCard.module.css
+index d31cf99..9860a3c 100644
+--- a/frontend/components/auth/LoginCard.module.css
++++ b/frontend/components/auth/LoginCard.module.css
+@@ -20,16 +20,15 @@
+   justify-content: space-between;
+ }
+ 
+-.logo { display: inline-flex; align-items: center; gap: 10px; font-size: 1.2rem; }
+-.logo > span {
+-  width: 36px;
+-  height: 36px;
+-  display: grid;
+-  place-items: center;
+-  border: 2px solid var(--coral);
+-  border-radius: 50%;
+-  color: var(--coral);
+-  font-weight: 850;
++.logo {
++  width: 72px;
++  height: 71px;
++  display: block;
++}
++.logo img {
++  width: 100%;
++  height: 100%;
++  object-fit: contain;
+ }
+ .topbar nav { display: flex; gap: 28px; font-size: 0.9rem; font-weight: 650; }
+ .topbar nav a:hover { color: var(--coral); }
+@@ -248,8 +247,7 @@
+   .page { padding: 18px 18px 30px; overflow: visible; }
+   .topbar { min-height: 42px; }
+   .topbar nav { gap: 16px; font-size: 0.78rem; }
+-  .logo { font-size: 1rem; }
+-  .logo > span { width: 30px; height: 30px; }
++  .logo { width: 58px; height: 57px; }
+   .shell { min-height: auto; margin-top: 32px; grid-template-columns: 1fr; gap: 32px; }
+   .hero { display: grid; justify-items: center; text-align: center; }
+   .eyebrow { font-size: 0.67rem; }
+diff --git a/frontend/components/auth/LoginCard.tsx b/frontend/components/auth/LoginCard.tsx
+index ef248a7..de21442 100644
+--- a/frontend/components/auth/LoginCard.tsx
++++ b/frontend/components/auth/LoginCard.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+ import Link from "next/link";
++import Image from "next/image";
+ import { FormEvent, useState } from "react";
+ 
+ import { useAuth } from "./AuthProvider";
+@@ -22,10 +23,9 @@ function ProductPreview() {
+     <div className={styles.preview} aria-label="Anteprima della dashboard SanoSync">
+       <div className={styles.previewNav}>
+         <strong>SanoSync</strong>
+-        <span className={styles.previewNavActive}>Panoramica</span>
+-        <span>Alimentazione</span>
++        <span className={styles.previewNavActive}>Oggi</span>
++        <span>Ricette</span>
+         <span>Attività</span>
+-        <span>Peso</span>
+         <span>Progressi</span>
+       </div>
+       <div className={styles.previewContent}>
+@@ -105,7 +105,13 @@ export function LoginCard() {
+     <main className={styles.page}>
+       <header className={styles.topbar}>
+         <a className={styles.logo} href="#" aria-label="SanoSync">
+-          <span aria-hidden="true">S</span><strong>SanoSync</strong>
++          <Image
++            src="/assets/LogoCoral.png"
++            alt="SanoSync"
++            width={72}
++            height={71}
++            priority
++          />
+         </a>
+         <nav aria-label="Link legali">
+           <Link href="/privacy">Privacy</Link><Link href="/terms">Termini</Link>
+@@ -116,7 +122,7 @@ export function LoginCard() {
+         <section className={styles.hero}>
+           <div className={styles.heroCopy}>
+             <p className={styles.eyebrow}>IL TUO BENESSERE, IN SINCRONIA</p>
+-            <h1>Mangia meglio.<br />Muoviti con più consapevolezza.</h1>
++            <h1>Tutto sotto controllo.</h1>
+             <p className={styles.intro}>
+               SanoSync unisce alimentazione, attività, peso e routine
+               quotidiane in un piano che si adatta davvero a te.
+-- 
+2.51.1
+

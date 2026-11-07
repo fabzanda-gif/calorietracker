@@ -1,0 +1,119 @@
+From 12f9aecace290b862be5fac0bd07fec88e3b035f Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 15:54:57 +0300
+Subject: [PATCH] Prevent known meal lookup from hanging
+
+---
+ frontend/components/home/QuickAdd.tsx | 82 ++++++++++++++++++++-------
+ 1 file changed, 61 insertions(+), 21 deletions(-)
+
+diff --git a/frontend/components/home/QuickAdd.tsx b/frontend/components/home/QuickAdd.tsx
+index d3c8b60..3600efe 100644
+--- a/frontend/components/home/QuickAdd.tsx
++++ b/frontend/components/home/QuickAdd.tsx
+@@ -65,6 +65,45 @@ type KnownMeal = {
+   source: "Ricetta" | "Cronologia";
+ };
+ 
++function withTimeout<T>(promise: Promise<T>, timeoutMs = 12000): Promise<T> {
++  return new Promise((resolve, reject) => {
++    const timeout = window.setTimeout(
++      () => reject(new Error("Tempo di caricamento scaduto")),
++      timeoutMs,
++    );
++
++    promise.then(
++      (value) => {
++        window.clearTimeout(timeout);
++        resolve(value);
++      },
++      (error) => {
++        window.clearTimeout(timeout);
++        reject(error);
++      },
++    );
++  });
++}
++
++function mergeKnownMeals(current: KnownMeal[], incoming: KnownMeal[]): KnownMeal[] {
++  const seen = new Set<string>();
++
++  return [...current, ...incoming]
++    .sort((a, b) =>
++      Number(b.source === "Ricetta") - Number(a.source === "Ricetta"),
++    )
++    .filter((meal) => {
++      const key = meal.name.trim().toLocaleLowerCase("it");
++
++      if (!key || seen.has(key)) {
++        return false;
++      }
++
++      seen.add(key);
++      return true;
++    });
++}
++
+ function recipeKnownMeal(recipe: Recipe): KnownMeal {
+   const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
+ 
+@@ -290,34 +329,35 @@ export function QuickAdd({
+ 
+     async function loadKnownMeals() {
+       setKnownMealsLoading(true);
++      setKnownMealsLoaded(false);
++      setKnownMeals([]);
+ 
+-      const [recipes, history] = await Promise.all([
+-        getAvailableRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
+-        getMealHistory(accessToken).catch(() => ({ count: 0, items: [] })),
+-      ]);
++      let settled = 0;
+ 
+-      if (!active) {
+-        return;
+-      }
++      function finish(items: KnownMeal[]) {
++        if (!active) {
++          return;
++        }
+ 
+-      const seen = new Set<string>();
+-      const choices = [
+-        ...recipes.items.map(recipeKnownMeal),
+-        ...history.items.map(historyKnownMeal),
+-      ].filter((meal) => {
+-        const key = meal.name.trim().toLocaleLowerCase("it");
++        settled += 1;
+ 
+-        if (!key || seen.has(key)) {
+-          return false;
++        if (items.length) {
++          setKnownMeals((current) => mergeKnownMeals(current, items));
++          setKnownMealsLoading(false);
++          setKnownMealsLoaded(true);
++        } else if (settled === 2) {
++          setKnownMealsLoading(false);
++          setKnownMealsLoaded(true);
+         }
++      }
+ 
+-        seen.add(key);
+-        return true;
+-      });
++      void withTimeout(getAvailableRecipes(accessToken))
++        .then((response) => finish(response.items.map(recipeKnownMeal)))
++        .catch(() => finish([]));
+ 
+-      setKnownMeals(choices);
+-      setKnownMealsLoaded(true);
+-      setKnownMealsLoading(false);
++      void withTimeout(getMealHistory(accessToken))
++        .then((response) => finish(response.items.map(historyKnownMeal)))
++        .catch(() => finish([]));
+     }
+ 
+     void loadKnownMeals();
+-- 
+2.51.1
+

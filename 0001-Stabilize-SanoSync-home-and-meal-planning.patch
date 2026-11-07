@@ -1,0 +1,1247 @@
+From e764685c8a9e9862288922f75f6b71d9d018ae04 Mon Sep 17 00:00:00 2001
+From: OpenAI Codex <codex@openai.com>
+Date: Thu, 3 Sep 2026 12:09:53 +0200
+Subject: [PATCH] Stabilize onboarding navigation and meal planning
+
+---
+ backend/api/routers/days.py                   |   4 +
+ backend/api/routers/profile.py                |   1 +
+ backend/services/decision_ranking.py          |  10 +-
+ backend/services/meal_candidates.py           |  43 ++++-
+ backend/services/meal_replanning.py           |  16 +-
+ backend/tests/test_meal_candidates.py         |  34 ++++
+ backend/tests/test_meal_replanning.py         |  65 +++++---
+ .../ingredients/IngredientsPage.module.css    |   1 +
+ frontend/app/ingredients/page.tsx             | 109 +++++++++++++
+ frontend/app/recipes/page.tsx                 |   6 +
+ frontend/components/home/HomeShell.module.css |   9 +-
+ frontend/components/home/HomeShell.tsx        | 152 ++++++++++++++++--
+ .../components/navigation/AppNav.module.css   | 152 +++++++++++++++++-
+ frontend/components/navigation/AppNav.tsx     | 100 +++++++++++-
+ .../components/onboarding/WelcomeJourney.tsx  |   1 +
+ frontend/lib/api/ingredients.ts               |  22 +++
+ frontend/lib/api/profile.ts                   |   1 +
+ 17 files changed, 663 insertions(+), 63 deletions(-)
+ create mode 100644 frontend/app/ingredients/IngredientsPage.module.css
+ create mode 100644 frontend/app/ingredients/page.tsx
+
+diff --git a/backend/api/routers/days.py b/backend/api/routers/days.py
+index b94e6e2..3214b71 100644
+--- a/backend/api/routers/days.py
++++ b/backend/api/routers/days.py
+@@ -405,6 +405,8 @@ def get_ranked_meal_options(
+         protein_remaining_g = budget.get(
+             "protein_remaining_g"
+         )
++        maintenance_kcal = float(budget.get("maintenance_kcal") or 0)
++        max_main_meal_kcal = 1400.0 if maintenance_kcal >= 2800 else 1000.0
+ 
+         normalized_mode = str(mode or "auto").strip().lower()
+ 
+@@ -520,6 +522,7 @@ def get_ranked_meal_options(
+             mode=mode_result["mode"],
+             preferred_lens=feedback["preferred_lens"],
+             preferred_mode=feedback["preferred_mode"],
++            max_main_meal_kcal=max_main_meal_kcal,
+         )
+ 
+         routine_candidate = None
+@@ -538,6 +541,7 @@ def get_ranked_meal_options(
+             routine_candidate=routine_candidate,
+             ranked_options=ranked["options"],
+             available_kcal=available_kcal,
++            max_main_meal_kcal=max_main_meal_kcal,
+         )
+ 
+         replanning_context = MealReplanningContextService().build(
+diff --git a/backend/api/routers/profile.py b/backend/api/routers/profile.py
+index f982718..e1a7acd 100644
+--- a/backend/api/routers/profile.py
++++ b/backend/api/routers/profile.py
+@@ -17,6 +17,7 @@ class ProfileUpdate(BaseModel):
+     model_config = ConfigDict(extra="forbid")
+ 
+     name: str | None = None
++    onboarding_completed: bool | None = None
+     gender: str | None = None
+     birth_date: str | None = None
+     height: float | None = Field(default=None, gt=0)
+diff --git a/backend/services/decision_ranking.py b/backend/services/decision_ranking.py
+index 4126b89..45b2e73 100644
+--- a/backend/services/decision_ranking.py
++++ b/backend/services/decision_ranking.py
+@@ -24,6 +24,7 @@ class DecisionRankingService:
+         mode: str = "auto",
+         preferred_lens: str | None = None,
+         preferred_mode: str | None = None,
++        max_main_meal_kcal: float = 1000.0,
+     ) -> dict:
+         eligible = [
+             self._normalize(item)
+@@ -31,6 +32,7 @@ class DecisionRankingService:
+             if self._is_eligible(
+                 item,
+                 available_kcal=available_kcal,
++                max_main_meal_kcal=max_main_meal_kcal,
+             )
+         ]
+ 
+@@ -242,6 +244,7 @@ class DecisionRankingService:
+         item: dict[str, Any],
+         *,
+         available_kcal: float | None,
++        max_main_meal_kcal: float = 1000.0,
+     ) -> bool:
+         try:
+             calories = float(item.get("calories") or 0)
+@@ -257,11 +260,14 @@ class DecisionRankingService:
+ 
+         if (
+             meal_type in {"Pranzo", "Cena"}
+-            and calories < 300.0
++            and (
++                calories < 500.0
++                or calories > max_main_meal_kcal
++            )
+         ):
+             return False
+ 
+-        if available_kcal is not None:
++        if available_kcal is not None and meal_type not in {"Pranzo", "Cena"}:
+             available = float(available_kcal)
+ 
+             # Calorie availability is a strong preference, not a
+diff --git a/backend/services/meal_candidates.py b/backend/services/meal_candidates.py
+index dd69831..5121e03 100644
+--- a/backend/services/meal_candidates.py
++++ b/backend/services/meal_candidates.py
+@@ -129,11 +129,13 @@ class MealCandidateService:
+                 }
+             )
+ 
++        compatible_meal_types = self._compatible_meal_types(meal_type)
++
+         for recipe in recipes:
+             recipe_meal_type = recipe.get("meal_type")
+             if (
+                 recipe_meal_type
+-                and recipe_meal_type != meal_type
++                and recipe_meal_type not in compatible_meal_types
+             ):
+                 continue
+ 
+@@ -151,6 +153,7 @@ class MealCandidateService:
+                     "source_id": recipe.get("id"),
+                     "name": recipe.get("name"),
+                     "meal_type": meal_type,
++                    "source_meal_type": recipe_meal_type,
+                     "calories": self._number(
+                         recipe.get("calories")
+                     ) / servings,
+@@ -176,12 +179,15 @@ class MealCandidateService:
+             if meal.get("is_reusable") is not False
+         ]
+ 
+-        historical_events = (
+-            LegacyMealEventService().build(
+-                meals=reusable_historical_meals,
+-                meal_type=meal_type,
++        historical_events = []
++        for compatible_type in compatible_meal_types:
++            historical_events.extend(
++                LegacyMealEventService().build(
++                    meals=reusable_historical_meals,
++                    meal_type=compatible_type,
++                )
+             )
+-        )
++        historical_events.sort(key=lambda item: item["date"], reverse=True)
+ 
+         historical_by_name: dict[
+             str,
+@@ -189,6 +195,16 @@ class MealCandidateService:
+         ] = {}
+ 
+         for event in historical_events:
++            # Legacy rows grouped only by date and slot are ambiguous: a
++            # handful of small entries can look like one dinner. Structured
++            # meals and recipes remain reusable, but inferred multi-row
++            # composites are deliberately excluded from main-meal planning.
++            if (
++                meal_type in {"Pranzo", "Cena"}
++                and int(event.get("component_count") or 0) > 1
++            ):
++                continue
++
+             name = str(
+                 event.get("name") or ""
+             ).strip()
+@@ -224,6 +240,7 @@ class MealCandidateService:
+                     "source_id": None,
+                     "name": name,
+                     "meal_type": meal_type,
++                    "source_meal_type": latest.get("meal_type"),
+                     "calories": self._average(
+                         events,
+                         "calories",
+@@ -251,12 +268,22 @@ class MealCandidateService:
+             )
+ 
+         for order in order_candidates or []:
+-            if order.get("meal_type") != meal_type:
++            if order.get("meal_type") not in compatible_meal_types:
+                 continue
+-            candidates.append(dict(order))
++            candidate = dict(order)
++            candidate["source_meal_type"] = candidate.get("meal_type")
++            candidate["meal_type"] = meal_type
++            candidates.append(candidate)
+ 
+         return self._deduplicate(candidates)
+ 
++    @staticmethod
++    def _compatible_meal_types(meal_type: str) -> set[str]:
++        """Lunch and dinner may swap; snacks never leak into main meals."""
++        if meal_type in {"Pranzo", "Cena"}:
++            return {"Pranzo", "Cena"}
++        return {meal_type}
++
+     @staticmethod
+     def _deduplicate(
+         candidates: list[dict],
+diff --git a/backend/services/meal_replanning.py b/backend/services/meal_replanning.py
+index ed31360..0eac9b4 100644
+--- a/backend/services/meal_replanning.py
++++ b/backend/services/meal_replanning.py
+@@ -27,6 +27,7 @@ class MealReplanningService:
+         routine_candidate: dict[str, Any] | None,
+         ranked_options: list[dict[str, Any]],
+         available_kcal: float | None,
++        max_main_meal_kcal: float = 1000.0,
+     ) -> dict[str, Any] | None:
+         """
+         Prefer the normal routine when it fits.
+@@ -42,6 +43,7 @@ class MealReplanningService:
+             if self._fits_budget(
+                 routine_candidate,
+                 available_kcal,
++                max_main_meal_kcal,
+             ):
+                 return self._recommendation(
+                     candidate=dict(routine_candidate),
+@@ -50,7 +52,7 @@ class MealReplanningService:
+                     original_candidate=routine_candidate,
+                 )
+ 
+-        if isinstance(routine_candidate, dict):
++        if isinstance(routine_candidate, dict) and str(routine_candidate.get("meal_type")) not in {"Pranzo", "Cena"}:
+             adapted = (
+                 MealComponentAdaptationService().adapt(
+                     candidate=routine_candidate,
+@@ -75,6 +77,7 @@ class MealReplanningService:
+             if not self._fits_budget(
+                 candidate,
+                 available_kcal,
++                max_main_meal_kcal,
+             ):
+                 continue
+ 
+@@ -92,14 +95,17 @@ class MealReplanningService:
+         cls,
+         candidate: dict[str, Any],
+         available_kcal: float | None,
++        max_main_meal_kcal: float = 1000.0,
+     ) -> bool:
++        meal_type = str(candidate.get("meal_type") or "").strip()
++        calories = cls._number(candidate.get("calories"))
++
++        if meal_type in {"Pranzo", "Cena"}:
++            return 500.0 <= calories <= max_main_meal_kcal
++
+         if available_kcal is None:
+             return True
+ 
+-        calories = cls._number(
+-            candidate.get("calories")
+-        )
+-
+         available = cls._number(
+             available_kcal
+         )
+diff --git a/backend/tests/test_meal_candidates.py b/backend/tests/test_meal_candidates.py
+index 2869cb4..c79a678 100644
+--- a/backend/tests/test_meal_candidates.py
++++ b/backend/tests/test_meal_candidates.py
+@@ -101,6 +101,40 @@ def test_recipe_with_other_meal_type_is_filtered():
+     assert result[0]["name"] == "Lunch bowl"
+ 
+ 
++def test_lunch_and_dinner_are_interchangeable_but_snacks_are_not():
++    result = MealCandidateService().build(
++        day_date=DAY,
++        meal_type="Cena",
++        meal_prep_items=[],
++        routine_prediction=None,
++        recipes=[
++            {"id": "lunch", "name": "Pasta", "meal_type": "Pranzo", "calories": 650},
++            {"id": "snack", "name": "Yogurt", "meal_type": "Spuntino", "calories": 180},
++        ],
++    )
++
++    assert [item["name"] for item in result] == ["Pasta"]
++    assert result[0]["meal_type"] == "Cena"
++    assert result[0]["source_meal_type"] == "Pranzo"
++
++
++def test_main_meal_does_not_reuse_legacy_multi_row_composites():
++    result = MealCandidateService().build(
++        day_date=DAY,
++        meal_type="Cena",
++        meal_prep_items=[],
++        routine_prediction=None,
++        recipes=[],
++        historical_meals=[
++            {"date": "2026-08-20", "meal_type": "Cena", "name": "Yogurt", "calories": 180},
++            {"date": "2026-08-20", "meal_type": "Cena", "name": "Crackers", "calories": 220},
++            {"date": "2026-08-20", "meal_type": "Cena", "name": "Frutta", "calories": 120},
++        ],
++    )
++
++    assert result == []
++
++
+ def test_missing_taste_defaults_to_five():
+     result = MealCandidateService().build(
+         day_date=DAY,
+diff --git a/backend/tests/test_meal_replanning.py b/backend/tests/test_meal_replanning.py
+index 3082770..3171bde 100644
+--- a/backend/tests/test_meal_replanning.py
++++ b/backend/tests/test_meal_replanning.py
+@@ -64,7 +64,7 @@ def test_keeps_routine_when_it_fits():
+     assert result["strategy"] == "routine"
+ 
+ 
+-def test_does_not_shrink_routine_to_fit():
++def test_keeps_real_main_meal_even_above_remaining_budget():
+     routine = candidate(
+         "Lasagna Fit",
+         700,
+@@ -80,13 +80,13 @@ def test_does_not_shrink_routine_to_fit():
+     )
+ 
+     assert result is not None
+-    assert result["candidate"]["name"] == "Chicken Bowl"
+-    assert result["candidate"]["calories"] == 500
++    assert result["candidate"]["name"] == "Lasagna Fit"
++    assert result["candidate"]["calories"] == 700
+     assert result["portion_multiplier"] == 1.0
+-    assert result["strategy"] == "alternate_candidate"
++    assert result["strategy"] == "routine"
+ 
+ 
+-def test_uses_ranked_alternative_at_original_portion():
++def test_rejects_ranked_main_meal_below_minimum():
+     routine = candidate(
+         "Huge Lasagna",
+         1200,
+@@ -106,14 +106,10 @@ def test_uses_ranked_alternative_at_original_portion():
+         available_kcal=500,
+     )
+ 
+-    assert result is not None
+-    assert result["candidate"]["name"] == "Chicken Bowl"
+-    assert result["candidate"]["calories"] == 480
+-    assert result["portion_multiplier"] == 1.0
+-    assert result["strategy"] == "alternate_candidate"
++    assert result is None
+ 
+ 
+-def test_does_not_adapt_alternative_portion():
++def test_uses_realistic_alternative_even_above_remaining_budget():
+     routine = candidate(
+         "Huge Lasagna",
+         1400,
+@@ -133,7 +129,10 @@ def test_does_not_adapt_alternative_portion():
+         available_kcal=470,
+     )
+ 
+-    assert result is None
++    assert result is not None
++    assert result["candidate"]["name"] == "Salmon Bowl"
++    assert result["candidate"]["calories"] == 650
++    assert result["strategy"] == "alternate_candidate"
+ 
+ 
+ def test_returns_none_when_nothing_is_compatible():
+@@ -154,6 +153,29 @@ def test_returns_none_when_nothing_is_compatible():
+     assert result is None
+ 
+ 
++def test_main_meal_is_not_shrunk_to_tiny_remaining_budget():
++    dinner = candidate("Real dinner", 700, source="routine")
++
++    result = service.recommend(
++        routine_candidate=dinner,
++        ranked_options=[],
++        available_kcal=196,
++    )
++
++    assert result is not None
++    assert result["candidate"]["calories"] == 700
++
++
++def test_main_meal_never_falls_below_five_hundred_kcal():
++    result = service.recommend(
++        routine_candidate=None,
++        ranked_options=[option(candidate("Snack plate", 499))],
++        available_kcal=196,
++    )
++
++    assert result is None
++
++
+ def test_does_not_mutate_routine_or_ranked_candidate():
+     routine = candidate(
+         "Lasagna Fit",
+@@ -179,7 +201,7 @@ def test_does_not_mutate_routine_or_ranked_candidate():
+     assert alternative["calories"] == 500
+     assert "portion_multiplier" not in alternative
+ 
+-def test_removes_optional_apple_before_changing_main_meal():
++def test_does_not_dismantle_a_valid_main_meal():
+     routine = candidate(
+         "Pollo e riso + Mela",
+         600,
+@@ -209,13 +231,10 @@ def test_removes_optional_apple_before_changing_main_meal():
+     )
+ 
+     assert result is not None
+-    assert result["strategy"] == "component_reduction"
+-    assert result["candidate"]["name"] == "Pollo e riso"
+-    assert result["candidate"]["calories"] == 500
+-    assert (
+-        result["adaptation"]["removed_components"][0]["name"]
+-        == "Mela"
+-    )
++    assert result["strategy"] == "routine"
++    assert result["candidate"]["name"] == "Pollo e riso + Mela"
++    assert result["candidate"]["calories"] == 600
++    assert result["adaptation"]["removed_components"] == []
+     assert result["portion_multiplier"] == 1.0
+ 
+ 
+@@ -248,7 +267,7 @@ def test_does_not_remove_oat_latte_from_breakfast():
+     assert result is None
+ 
+ 
+-def test_optional_removal_must_be_enough_to_fit():
++def test_valid_main_meal_wins_over_too_small_alternative():
+     routine = candidate(
+         "Pollo e riso + Mela",
+         700,
+@@ -279,8 +298,8 @@ def test_optional_removal_must_be_enough_to_fit():
+     )
+ 
+     assert result is not None
+-    assert result["strategy"] == "alternate_candidate"
+-    assert result["candidate"]["name"] == "Piatto alternativo"
++    assert result["strategy"] == "routine"
++    assert result["candidate"]["name"] == "Pollo e riso + Mela"
+ 
+ 
+ def test_component_adaptation_does_not_mutate_routine():
+diff --git a/frontend/app/ingredients/IngredientsPage.module.css b/frontend/app/ingredients/IngredientsPage.module.css
+new file mode 100644
+index 0000000..0817367
+--- /dev/null
++++ b/frontend/app/ingredients/IngredientsPage.module.css
+@@ -0,0 +1 @@
++.page{width:min(1160px,calc(100% - 32px));margin:0 auto;padding:46px 0 100px;color:#102846}.page header p,.editor p,.libraryHead p{margin:0;color:#ef5e5c;font-size:.72rem;font-weight:900;letter-spacing:.16em}.page header h1{margin:7px 0;font-size:clamp(3rem,6vw,5rem);letter-spacing:-.065em}.page header span{color:#718093}.editor,.library{margin-top:28px;padding:24px;border:1px solid #e4e4df;border-radius:24px;background:#fff;box-shadow:0 14px 34px #1028460b}.editor h2,.library h2{margin:5px 0 0}.editor form{display:grid;grid-template-columns:2fr repeat(4,1fr) auto auto;gap:10px;align-items:end;margin-top:18px}.editor label{display:grid;gap:6px;color:#607085;font-size:.75rem;font-weight:750}.editor input,.libraryHead input{min-height:44px;box-sizing:border-box;padding:0 12px;border:1px solid #dfe1df;border-radius:11px;background:#fafbf9;color:#102846}.editor button{min-height:44px;padding:0 16px;border:0;border-radius:11px;background:#ef5e5c;color:#fff;font-weight:800;cursor:pointer}.editor .cancel{border:1px solid #dfe1df;background:#fff;color:#102846}.message{padding:12px 15px;border-radius:12px;background:#fff0ee;color:#b33d39}.libraryHead{display:flex;justify-content:space-between;gap:20px;align-items:end}.libraryHead input{width:min(320px,100%)}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.grid article{padding:18px;border:1px solid #e5e6e3;border-radius:17px;background:#fafbf9}.grid h3{margin:0 0 7px}.grid strong{color:#ef5e5c}.grid dl{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.grid dl div{display:grid;gap:3px}.grid dt{color:#84909e;font-size:.68rem}.grid dd{margin:0;font-weight:800}.grid footer{display:flex;gap:8px;margin-top:14px}.grid footer button{padding:7px 10px;border:1px solid #dfe1df;border-radius:9px;background:#fff;color:#102846;cursor:pointer}@media(min-width:760px){.page{width:min(1160px,calc(100% - 268px));margin-left:max(252px,calc((100vw - 1160px + 236px)/2));margin-right:0}}@media(max-width:1000px){.editor form{grid-template-columns:repeat(2,1fr)}.name{grid-column:1/-1}.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.page{width:calc(100% - 24px);padding-top:24px}.editor form,.grid{grid-template-columns:1fr}.libraryHead{align-items:stretch;flex-direction:column}.libraryHead input{width:100%}}
+diff --git a/frontend/app/ingredients/page.tsx b/frontend/app/ingredients/page.tsx
+new file mode 100644
+index 0000000..b39bddc
+--- /dev/null
++++ b/frontend/app/ingredients/page.tsx
+@@ -0,0 +1,109 @@
++"use client";
++
++import { type FormEvent, useEffect, useMemo, useState } from "react";
++import { AppNav } from "@/components/navigation/AppNav";
++import { useAuth } from "@/components/auth/AuthProvider";
++import {
++  createIngredient,
++  deleteIngredient,
++  getIngredients,
++  updateIngredient,
++  type Ingredient,
++} from "@/lib/api/ingredients";
++import styles from "./IngredientsPage.module.css";
++
++const EMPTY = { name: "", calories: "", protein: "", carbs: "", fat: "", unit: "g" };
++
++export default function IngredientsPage() {
++  const { accessToken } = useAuth();
++  const [items, setItems] = useState<Ingredient[]>([]);
++  const [query, setQuery] = useState("");
++  const [form, setForm] = useState(EMPTY);
++  const [editingId, setEditingId] = useState<string | null>(null);
++  const [loading, setLoading] = useState(true);
++  const [saving, setSaving] = useState(false);
++  const [message, setMessage] = useState<string | null>(null);
++
++  async function refresh() {
++    if (!accessToken) return;
++    setLoading(true);
++    try {
++      const response = await getIngredients(accessToken);
++      setItems(response.items);
++    } catch (error) {
++      setMessage(error instanceof Error ? error.message : "Impossibile caricare gli ingredienti.");
++    } finally { setLoading(false); }
++  }
++
++  useEffect(() => { void refresh(); }, [accessToken]);
++
++  const visible = useMemo(() => {
++    const normalized = query.trim().toLocaleLowerCase("it");
++    return items.filter((item) => !normalized || item.name.toLocaleLowerCase("it").includes(normalized));
++  }, [items, query]);
++
++  function edit(item: Ingredient) {
++    setEditingId(item.id);
++    setForm({
++      name: item.name,
++      calories: String(item.calories_per_100g),
++      protein: String(item.protein_per_100g),
++      carbs: String(item.carbs_per_100g),
++      fat: String(item.fat_per_100g),
++      unit: item.default_unit || "g",
++    });
++    window.scrollTo({ top: 0, behavior: "smooth" });
++  }
++
++  async function save(event: FormEvent) {
++    event.preventDefault();
++    if (!accessToken || !form.name.trim()) return;
++    const payload = {
++      name: form.name.trim(),
++      calories_per_100g: Number(form.calories) || 0,
++      protein_per_100g: Number(form.protein) || 0,
++      carbs_per_100g: Number(form.carbs) || 0,
++      fat_per_100g: Number(form.fat) || 0,
++      default_unit: form.unit || "g",
++    };
++    setSaving(true);
++    setMessage(null);
++    try {
++      if (editingId) await updateIngredient(editingId, payload, accessToken);
++      else await createIngredient(payload, accessToken);
++      setForm(EMPTY);
++      setEditingId(null);
++      await refresh();
++    } catch (error) {
++      setMessage(error instanceof Error ? error.message : "Impossibile salvare l'ingrediente.");
++    } finally { setSaving(false); }
++  }
++
++  async function remove(item: Ingredient) {
++    if (!accessToken || !window.confirm(`Eliminare “${item.name}”?`)) return;
++    try {
++      await deleteIngredient(item.id, accessToken);
++      await refresh();
++    } catch (error) {
++      setMessage(error instanceof Error ? error.message : "Impossibile eliminare l'ingrediente.");
++    }
++  }
++
++  return <><AppNav /><main className={styles.page}>
++    <header><p>LIBRERIA</p><h1>Ingredienti</h1><span>La base nutrizionale delle tue ricette.</span></header>
++    <section className={styles.editor}>
++      <div><p>{editingId ? "MODIFICA" : "NUOVO"}</p><h2>{editingId ? "Aggiorna ingrediente" : "Aggiungi ingrediente"}</h2></div>
++      <form onSubmit={save}>
++        <label className={styles.name}>Nome<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
++        {(["calories", "protein", "carbs", "fat"] as const).map((field) => <label key={field}>{({calories:"Kcal",protein:"Proteine",carbs:"Carboidrati",fat:"Grassi"})[field]} / 100 g<input type="number" min="0" step="0.1" value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })} /></label>)}
++        <button disabled={saving}>{saving ? "Salvataggio…" : editingId ? "Salva modifiche" : "Aggiungi"}</button>
++        {editingId ? <button type="button" className={styles.cancel} onClick={() => { setEditingId(null); setForm(EMPTY); }}>Annulla</button> : null}
++      </form>
++    </section>
++    {message ? <p className={styles.message}>{message}</p> : null}
++    <section className={styles.library}>
++      <div className={styles.libraryHead}><div><p>ARCHIVIO</p><h2>I tuoi ingredienti</h2></div><input placeholder="Cerca ingrediente…" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
++      {loading ? <p>Caricamento…</p> : <div className={styles.grid}>{visible.map((item) => <article key={item.id}><h3>{item.name}</h3><strong>{Math.round(item.calories_per_100g)} kcal</strong><dl><div><dt>Proteine</dt><dd>{item.protein_per_100g} g</dd></div><div><dt>Carboidrati</dt><dd>{item.carbs_per_100g} g</dd></div><div><dt>Grassi</dt><dd>{item.fat_per_100g} g</dd></div></dl><footer><button onClick={() => edit(item)}>Modifica</button><button onClick={() => void remove(item)}>Elimina</button></footer></article>)}</div>}
++    </section>
++  </main></>;
++}
+diff --git a/frontend/app/recipes/page.tsx b/frontend/app/recipes/page.tsx
+index 707f0c8..1a830cb 100644
+--- a/frontend/app/recipes/page.tsx
++++ b/frontend/app/recipes/page.tsx
+@@ -949,6 +949,12 @@ export default function RecipesPage() {
+             >
+               Apri dispensa
+             </Link>
++            <Link
++              href="/ingredients"
++              className={styles.inventoryLink}
++            >
++              Gestisci ingredienti
++            </Link>
+ 
+           <p className={styles.headerSubtitle}>
+             I piatti che conosci già, pronti da registrare
+diff --git a/frontend/components/home/HomeShell.module.css b/frontend/components/home/HomeShell.module.css
+index 0f250c4..b2cdd1a 100644
+--- a/frontend/components/home/HomeShell.module.css
++++ b/frontend/components/home/HomeShell.module.css
+@@ -530,7 +530,8 @@
+   font-weight: 700;
+ }
+ 
+-.alternateMealForm input {
++.alternateMealForm input,
++.alternateMealForm select {
+   width: 100%;
+   min-height: 42px;
+   box-sizing: border-box;
+@@ -542,6 +543,12 @@
+   font: inherit;
+ }
+ 
++.manualMealLabel {
++  color: #8a8a83;
++  font-size: 0.68rem;
++  font-weight: 600;
++}
++
+ .alternateMealNumbers {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+diff --git a/frontend/components/home/HomeShell.tsx b/frontend/components/home/HomeShell.tsx
+index 5ed247b..6e60388 100644
+--- a/frontend/components/home/HomeShell.tsx
++++ b/frontend/components/home/HomeShell.tsx
+@@ -35,6 +35,7 @@ import {
+   confirmConversationalMeal,
+   deleteMeal,
+   getMeal,
++  getMealHistory,
+   getMealsForDate,
+   previewConversationalMeal,
+   previewPhotoMeal,
+@@ -43,6 +44,10 @@ import {
+   type LoggedMeal,
+   type StructuredMealIngredient,
+ } from "@/lib/api/meals";
++import {
++  getAvailableRecipes,
++  type Recipe,
++} from "@/lib/api/recipes";
+ import {
+   getDay,
+   getDayBriefing,
+@@ -385,6 +390,15 @@ export function HomeShell() {
+     useState("");
+   const [alternateFat, setAlternateFat] =
+     useState("");
++  const [knownAlternates, setKnownAlternates] = useState<Array<{
++    key: string;
++    name: string;
++    mealType: string;
++    calories: number;
++    protein: number;
++    carbs: number;
++    fat: number;
++  }>>([]);
+   const [savingAlternate, setSavingAlternate] =
+     useState(false);
+   const [commitMessage, setCommitMessage] =
+@@ -472,6 +486,62 @@ export function HomeShell() {
+     [actualMeals],
+   );
+ 
++  useEffect(() => {
++    if (!accessToken) return;
++    let active = true;
++
++    Promise.allSettled([
++      getAvailableRecipes(accessToken),
++      getMealHistory(accessToken),
++    ]).then(([recipesResult, historyResult]) => {
++      if (!active) return;
++
++      const recipes = recipesResult.status === "fulfilled"
++        ? recipesResult.value.items
++        : [];
++      const history = historyResult.status === "fulfilled"
++        ? historyResult.value.items
++        : [];
++      const seen = new Set<string>();
++      const items = [
++        ...recipes.map((recipe: Recipe) => {
++          const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
++          return {
++            key: `recipe:${recipe.id}`,
++            name: recipe.name,
++            mealType: recipe.meal_type || "Pranzo",
++            calories: Number(recipe.calories || 0) / servings,
++            protein: Number(recipe.protein || 0) / servings,
++            carbs: Number(recipe.carbs || 0) / servings,
++            fat: Number(recipe.fat || 0) / servings,
++          };
++        }),
++        ...history.map((meal) => {
++          const quantity = Math.max(0.01, Number(meal.quantity) || 1);
++          const factor = meal.is_per_100g ? 100 / quantity : 1 / quantity;
++          return {
++            key: `history:${meal.id ?? `${meal.date}:${meal.name}`}`,
++            name: meal.base_name || meal.name,
++            mealType: meal.meal_type || "Pranzo",
++            calories: Number(meal.base_calories ?? Number(meal.calories || 0) * factor),
++            protein: Number(meal.base_protein ?? Number(meal.protein || 0) * factor),
++            carbs: Number(meal.base_carbs ?? Number(meal.carbs || 0) * factor),
++            fat: Number(meal.base_fat ?? Number(meal.fat || 0) * factor),
++          };
++        }),
++      ].filter((item) => {
++        const key = item.name.trim().toLocaleLowerCase("it");
++        if (!key || seen.has(key)) return false;
++        seen.add(key);
++        return true;
++      });
++
++      setKnownAlternates(items);
++    });
++
++    return () => { active = false; };
++  }, [accessToken]);
++
+   useEffect(() => {
+     if (
+       conversationPreview ||
+@@ -901,11 +971,11 @@ export function HomeShell() {
+ 
+           const metadata = profilePayload.metadata;
+           setShowWelcomeJourney(
+-            !metadata.gender ||
+-              !metadata.birth_date ||
+-              !metadata.height ||
+-              !metadata.goal_mode ||
+-              latestWeightPayload.item?.weight == null,
++            metadata.onboarding_completed !== true &&
++              (!metadata.gender ||
++                !metadata.birth_date ||
++                !metadata.height ||
++                latestWeightPayload.item?.weight == null),
+           );
+ 
+           // The usable home is ready. AI briefing, recommendations and
+@@ -977,19 +1047,32 @@ export function HomeShell() {
+     budgetResult?.budget ?? null;
+ 
+   const bmr = Number(budgetResult?.profile?.bmr ?? 0);
+-  const onboardingTestEmail =
+-    process.env.NEXT_PUBLIC_ONBOARDING_TEST_EMAIL
+-      ?.trim()
+-      .toLowerCase();
++  const onboardingTestEmails = [
++    process.env.NEXT_PUBLIC_ONBOARDING_TEST_EMAIL,
++    process.env.NEXT_PUBLIC_ONBOARDING_TEST_EMAILS,
++  ]
++    .filter(Boolean)
++    .flatMap((value) => String(value).split(","))
++    .map((value) => value.trim().toLowerCase())
++    .filter(Boolean);
++  const onboardingTestIds = String(
++    process.env.NEXT_PUBLIC_ONBOARDING_TEST_USER_IDS ??
++      process.env.NEXT_PUBLIC_ONBOARDING_TEST_USER_ID ??
++      "",
++  )
++    .split(",")
++    .map((value) => value.trim())
++    .filter(Boolean);
+   const isOnboardingTestAccount = Boolean(
+-    onboardingTestEmail &&
+-      user?.email?.trim().toLowerCase() ===
+-        onboardingTestEmail,
++    (user?.email &&
++      onboardingTestEmails.includes(user.email.trim().toLowerCase())) ||
++      (user?.id && onboardingTestIds.includes(user.id)),
+   );
+   const needsWelcomeJourney =
+-    showWelcomeJourney ||
+-    budgetResult?.status === "profile_incomplete" ||
+-    (isOnboardingTestAccount && !onboardingTestCompleted);
++    (((showWelcomeJourney ||
++      budgetResult?.status === "profile_incomplete") &&
++      profile?.metadata.onboarding_completed !== true) ||
++      (isOnboardingTestAccount && !onboardingTestCompleted));
+ 
+   const burnedCalories = actualActivities.reduce(
+     (total, activity) =>
+@@ -1215,6 +1298,17 @@ export function HomeShell() {
+     setDayPlannerSaving(true);
+     setDayPlannerMessage(null);
+ 
++    const previousDay = day;
++    setDay((current) => current ? {
++      ...current,
++      context: changes.day_type
++        ? { ...current.context, value: changes.day_type, state: "confirmed", source: "user" }
++        : current.context,
++      activity_plan: changes.activity_plan
++        ? { ...current.activity_plan, value: changes.activity_plan, state: "confirmed", source: "user" }
++        : current.activity_plan,
++    } : current);
++
+     try {
+       await updateDailyLog(
+         accessToken,
+@@ -1224,8 +1318,9 @@ export function HomeShell() {
+ 
+       setDayPlannerMessage("Giornata aggiornata.");
+ 
+-      await refreshHome();
++      void refreshHome().catch(() => undefined);
+     } catch (err) {
++      setDay(previousDay);
+       setDayPlannerMessage(
+         err instanceof Error
+           ? err.message
+@@ -3486,6 +3581,31 @@ export function HomeShell() {
+                           <div className={styles.alternateMealForm}>
+                             <label>
+                               Cosa hai mangiato?
++                              <select
++                                value=""
++                                onChange={(event) => {
++                                  const selected = knownAlternates.find(
++                                    (item) => item.key === event.target.value,
++                                  );
++                                  if (!selected) return;
++                                  setAlternateName(selected.name);
++                                  setAlternateCalories(String(Math.round(selected.calories)));
++                                  setAlternateProtein(String(Math.round(selected.protein)));
++                                  setAlternateCarbs(String(Math.round(selected.carbs)));
++                                  setAlternateFat(String(Math.round(selected.fat)));
++                                }}
++                              >
++                                <option value="">Scegli da ricette e pasti recenti…</option>
++                                {knownAlternates
++                                  .filter((item) => {
++                                    const isSnack = ["spuntino", "snack"].includes(item.mealType.toLowerCase());
++                                    return slot === "snack" ? isSnack : !isSnack;
++                                  })
++                                  .map((item) => (
++                                    <option key={item.key} value={item.key}>{item.name}</option>
++                                  ))}
++                              </select>
++                              <span className={styles.manualMealLabel}>oppure scrivi manualmente</span>
+                               <input
+                                 type="text"
+                                 value={alternateName}
+diff --git a/frontend/components/navigation/AppNav.module.css b/frontend/components/navigation/AppNav.module.css
+index efc2023..1d37cda 100644
+--- a/frontend/components/navigation/AppNav.module.css
++++ b/frontend/components/navigation/AppNav.module.css
+@@ -178,7 +178,7 @@
+   );
+ 
+   display: grid;
+-  grid-template-columns: repeat(4, 1fr);
++  grid-template-columns: repeat(5, 1fr);
+ 
+   min-height: 64px;
+   padding: 6px;
+@@ -214,6 +214,11 @@
+   font-weight: 750;
+ 
+   text-decoration: none;
++
++  border: 0;
++  background: transparent;
++  font-family: inherit;
++  cursor: pointer;
+ }
+ 
+ .mobileLinkActive {
+@@ -228,12 +233,155 @@
+   line-height: 1;
+ }
+ 
++.mobileAvatar {
++  display: grid;
++  place-items: center;
++  width: 20px;
++  height: 20px;
++  overflow: hidden;
++  border-radius: 50%;
++  background: #153354;
++  color: #ffffff;
++  font-size: 0.55rem;
++  font-weight: 850;
++}
++
++.mobileAvatar img {
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++}
++
++.mobileLinkActive .mobileAvatar {
++  background: #ffffff;
++  color: #153354;
++}
++
++.mobileAccountBackdrop {
++  position: fixed;
++  z-index: 108;
++  inset: 0;
++  border: 0;
++  background: rgba(16, 40, 70, 0.3);
++  backdrop-filter: blur(2px);
++  -webkit-backdrop-filter: blur(2px);
++}
++
++.mobileAccountSheet {
++  position: fixed;
++  z-index: 110;
++  left: 12px;
++  right: 12px;
++  bottom: calc(88px + env(safe-area-inset-bottom));
++  display: grid;
++  gap: 12px;
++  padding: 18px;
++  border: 1px solid #e2e1db;
++  border-radius: 22px;
++  background: #ffffff;
++  box-shadow: 0 22px 60px rgba(16, 40, 70, 0.22);
++}
++
++.mobileAccountHeader {
++  display: grid;
++  grid-template-columns: 42px minmax(0, 1fr) 34px;
++  align-items: center;
++  gap: 10px;
++  padding-bottom: 14px;
++  border-bottom: 1px solid #eeeeea;
++}
++
++.mobileAccountHeader > button {
++  width: 34px;
++  height: 34px;
++  border: 0;
++  border-radius: 50%;
++  background: #f5f5f2;
++  color: #536276;
++  font-size: 1.35rem;
++  cursor: pointer;
++}
++
++.mobileProfileAction {
++  display: grid;
++  grid-template-columns: 36px minmax(0, 1fr) auto;
++  align-items: center;
++  gap: 10px;
++  padding: 12px;
++  border-radius: 15px;
++  background: #f7f8f7;
++  color: #102846;
++  text-decoration: none;
++}
++
++.mobileProfileAction > span:first-child {
++  display: grid;
++  place-items: center;
++  width: 36px;
++  height: 36px;
++  border-radius: 50%;
++  background: #fff0ef;
++  color: #ff5b57;
++}
++
++.mobileProfileAction > span:nth-child(2) {
++  display: grid;
++  gap: 3px;
++}
++
++.mobileProfileAction strong {
++  font-size: 0.84rem;
++}
++
++.mobileProfileAction small {
++  color: #777771;
++  font-size: 0.68rem;
++}
++
++.mobileProfileAction > span:last-child {
++  color: #718096;
++  font-size: 1.35rem;
++}
++
++.mobileSignOut {
++  min-height: 48px;
++  border: 1px solid #ff6865;
++  border-radius: 999px;
++  background: #ff6865;
++  color: #ffffff;
++  font: inherit;
++  font-size: 0.8rem;
++  font-weight: 800;
++  cursor: pointer;
++}
++
++.mobileAccountSheetZero {
++  border-color: #343434;
++  background: #151515;
++  color: #ffffff;
++}
++
++.mobileAccountSheetZero .mobileAccountHeader {
++  border-bottom-color: #333333;
++}
++
++.mobileAccountSheetZero .mobileProfileAction {
++  background: #222222;
++  color: #ffffff;
++}
++
++.mobileAccountSheetZero .mobileProfileAction small {
++  color: #aaaaaa;
++}
++
+ @media (min-width: 760px) {
+   .desktopNav {
+     display: flex;
+   }
+ 
+-  .mobileNav {
++  .mobileNav,
++  .mobileAccountBackdrop,
++  .mobileAccountSheet {
+     display: none;
+   }
+ }
+diff --git a/frontend/components/navigation/AppNav.tsx b/frontend/components/navigation/AppNav.tsx
+index 2369c18..0db2e0d 100644
+--- a/frontend/components/navigation/AppNav.tsx
++++ b/frontend/components/navigation/AppNav.tsx
+@@ -2,6 +2,7 @@
+ 
+ import Link from "next/link";
+ import { usePathname } from "next/navigation";
++import { useEffect, useState } from "react";
+ 
+ import { useAuth } from "@/components/auth/AuthProvider";
+ 
+@@ -33,6 +34,18 @@ const ITEMS = [
+     label: "Ricette",
+     icon: "⌑",
+   },
++  {
++    href: "/inventory",
++    label: "Dispensa",
++    icon: "·",
++    subLink: true,
++  },
++  {
++    href: "/ingredients",
++    label: "Ingredienti",
++    icon: "·",
++    subLink: true,
++  },
+ ];
+ 
+ const MOBILE_ITEMS = ITEMS;
+@@ -46,6 +59,14 @@ function isActive(pathname: string, href: string): boolean {
+     return false;
+   }
+ 
++  if (
++    href === "/recipes" &&
++    (pathname.startsWith("/inventory") ||
++      pathname.startsWith("/ingredients"))
++  ) {
++    return true;
++  }
++
+   return pathname === href || pathname.startsWith(`${href}/`);
+ }
+ 
+@@ -58,6 +79,19 @@ export function AppNav({
+ }: AppNavProps) {
+   const pathname = usePathname();
+   const { user, signOut } = useAuth();
++  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
++
++  useEffect(() => {
++    setMobileAccountOpen(false);
++  }, [pathname]);
++
++  async function handleSignOut() {
++    window.sessionStorage.removeItem(
++      "sanosync-onboarding-test-completed",
++    );
++    setMobileAccountOpen(false);
++    await signOut();
++  }
+ 
+   const metadataName =
+     user?.user_metadata?.full_name ??
+@@ -115,7 +149,7 @@ export function AppNav({
+         <nav className={styles.desktopLinks}>
+           {ITEMS.map((item, index) => {
+             const active = isActive(pathname, item.href);
+-            const separatorBefore = index === 5;
++            const separatorBefore = index === 4;
+ 
+             return (
+               <div key={item.label}>
+@@ -144,7 +178,7 @@ export function AppNav({
+                   <Link
+                     href={item.href}
+                     className={
+-                      item.href === "/inventory"
++                      "subLink" in item && item.subLink
+                         ? active
+                           ? styles.desktopSubLinkActive
+                           : styles.desktopSubLink
+@@ -207,10 +241,7 @@ export function AppNav({
+             type="button"
+             className={styles.signOut}
+             onClick={() => {
+-              window.sessionStorage.removeItem(
+-                "sanosync-onboarding-test-completed",
+-              );
+-              void signOut();
++              void handleSignOut();
+             }}
+           >
+             Esci
+@@ -218,6 +249,47 @@ export function AppNav({
+         </div>
+       </aside>
+ 
++      {mobileAccountOpen ? (
++        <>
++          <button
++            type="button"
++            className={styles.mobileAccountBackdrop}
++            aria-label="Chiudi il menu account"
++            onClick={() => setMobileAccountOpen(false)}
++          />
++          <section
++            id="mobile-account-menu"
++            className={
++              experienceMode === "zero"
++                ? `${styles.mobileAccountSheet} ${styles.mobileAccountSheetZero}`
++                : styles.mobileAccountSheet
++            }
++            aria-label="Account"
++          >
++            <div className={styles.mobileAccountHeader}>
++              <span className={styles.profileAvatar}>
++                {avatarUrl ? (
++                  <img src={avatarUrl} alt="" referrerPolicy="no-referrer" />
++                ) : initials}
++              </span>
++              <span className={styles.profileDetails}>
++                <strong>{displayName}</strong>
++                <small>{user?.email ?? "Gestisci il profilo"}</small>
++              </span>
++              <button type="button" aria-label="Chiudi" onClick={() => setMobileAccountOpen(false)}>×</button>
++            </div>
++            <Link href="/profile" className={styles.mobileProfileAction}>
++              <span aria-hidden="true">◯</span>
++              <span><strong>Profilo</strong><small>Dati personali, integrazioni e account</small></span>
++              <span aria-hidden="true">›</span>
++            </Link>
++            <button type="button" className={styles.mobileSignOut} onClick={() => void handleSignOut()}>
++              Esci dall’account
++            </button>
++          </section>
++        </>
++      ) : null}
++
+       <nav
+         className={styles.mobileNav}
+         aria-label="Navigazione principale"
+@@ -249,6 +321,22 @@ export function AppNav({
+             </Link>
+           );
+         })}
++        <button
++          type="button"
++          className={
++            pathname.startsWith("/profile") || mobileAccountOpen
++              ? styles.mobileLinkActive
++              : styles.mobileLink
++          }
++          aria-expanded={mobileAccountOpen}
++          aria-controls="mobile-account-menu"
++          onClick={() => setMobileAccountOpen((current) => !current)}
++        >
++          <span className={styles.mobileAvatar} aria-hidden="true">
++            {avatarUrl ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" /> : initials}
++          </span>
++          <span>Profilo</span>
++        </button>
+       </nav>
+     </>
+   );
+diff --git a/frontend/components/onboarding/WelcomeJourney.tsx b/frontend/components/onboarding/WelcomeJourney.tsx
+index c7a4ffa..88bcc7e 100644
+--- a/frontend/components/onboarding/WelcomeJourney.tsx
++++ b/frontend/components/onboarding/WelcomeJourney.tsx
+@@ -99,6 +99,7 @@ export function WelcomeJourney({
+     setError(null);
+     try {
+       await updateProfile(accessToken, {
++        onboarding_completed: true,
+         name: name.trim() || null,
+         gender,
+         birth_date: birthDate,
+diff --git a/frontend/lib/api/ingredients.ts b/frontend/lib/api/ingredients.ts
+index b1d789c..7901ea3 100644
+--- a/frontend/lib/api/ingredients.ts
++++ b/frontend/lib/api/ingredients.ts
+@@ -54,3 +54,25 @@ export async function createIngredient(
+     },
+   );
+ }
++
++export async function updateIngredient(
++  ingredientId: string,
++  input: Partial<IngredientCreateInput>,
++  accessToken?: string | null,
++): Promise<{ item: Ingredient }> {
++  return apiRequest(`/ingredients/${encodeURIComponent(ingredientId)}`, {
++    method: "PATCH",
++    accessToken,
++    body: JSON.stringify(input),
++  });
++}
++
++export async function deleteIngredient(
++  ingredientId: string,
++  accessToken?: string | null,
++): Promise<{ deleted: boolean }> {
++  return apiRequest(`/ingredients/${encodeURIComponent(ingredientId)}`, {
++    method: "DELETE",
++    accessToken,
++  });
++}
+diff --git a/frontend/lib/api/profile.ts b/frontend/lib/api/profile.ts
+index 110eb9c..86d2da7 100644
+--- a/frontend/lib/api/profile.ts
++++ b/frontend/lib/api/profile.ts
+@@ -6,6 +6,7 @@ export interface ProfileResponse {
+ }
+ 
+ export interface ProfileUpdate {
++  onboarding_completed?: boolean | null;
+   name?: string | null;
+   gender?: string | null;
+   birth_date?: string | null;
+-- 
+2.51.1
+

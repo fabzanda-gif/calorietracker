@@ -1,0 +1,376 @@
+From b4deeccad9d97220fd84f6eba639d104cbd5a234 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 9 Sep 2026 10:38:01 +0200
+Subject: [PATCH] Simplify contextual meal logging
+
+---
+ frontend/components/home/HomeShell.module.css |  98 ++++++++
+ frontend/components/home/HomeShell.tsx        | 221 ++++++------------
+ 2 files changed, 168 insertions(+), 151 deletions(-)
+
+diff --git a/frontend/components/home/HomeShell.module.css b/frontend/components/home/HomeShell.module.css
+index caf8117..c647073 100644
+--- a/frontend/components/home/HomeShell.module.css
++++ b/frontend/components/home/HomeShell.module.css
+@@ -15032,6 +15032,104 @@ details[open] > summary .dailyEntryChevron {
+   }
+ }
+ 
++.quickMealChoicesHeader {
++  display: flex;
++  align-items: flex-end;
++  justify-content: space-between;
++  gap: 12px;
++  margin-bottom: 9px;
++}
++
++.quickMealChoicesHeader > div {
++  display: grid;
++  gap: 2px;
++}
++
++.quickMealChoicesHeader strong {
++  color: #173957;
++  font-size: .78rem;
++  font-weight: 900;
++}
++
++.quickMealChoicesHeader span {
++  color: #718296;
++  font-size: .65rem;
++  font-weight: 650;
++}
++
++.quickMealChoices {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 8px;
++  margin-bottom: 12px;
++}
++
++.quickMealChoice {
++  min-width: 0;
++  min-height: 58px;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 8px;
++  padding: 9px 10px;
++  border: 1px solid rgba(23, 57, 87, .11);
++  border-radius: 12px;
++  background: #fff;
++  color: #173957;
++  font: inherit;
++  text-align: left;
++  cursor: pointer;
++  transition: border-color 120ms ease, background 120ms ease;
++}
++
++.quickMealChoice:hover,
++.quickMealChoice[data-selected="true"] {
++  border-color: rgba(255, 104, 104, .5);
++  background: #fff7f6;
++}
++
++.quickMealChoice > span:first-child {
++  min-width: 0;
++  display: grid;
++  gap: 3px;
++}
++
++.quickMealChoice strong {
++  overflow: hidden;
++  font-size: .7rem;
++  font-weight: 850;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.quickMealChoice small {
++  color: #718296;
++  font-size: .61rem;
++  font-weight: 650;
++}
++
++.quickMealChoice > span:last-child {
++  flex: 0 0 auto;
++  color: #e45f5c;
++  font-weight: 900;
++}
++
++.quickMealChoicesEmpty {
++  margin: 0 0 12px;
++  padding: 10px 12px;
++  border-radius: 10px;
++  background: #f6f8fa;
++  color: #718296;
++  font-size: .68rem;
++  font-weight: 650;
++}
++
++@media (max-width: 900px) {
++  .quickMealChoices {
++    grid-template-columns: 1fr;
++  }
++}
++
+ 
+ 
+ /* ==========================================================
+diff --git a/frontend/components/home/HomeShell.tsx b/frontend/components/home/HomeShell.tsx
+index 4aebede..101a047 100644
+--- a/frontend/components/home/HomeShell.tsx
++++ b/frontend/components/home/HomeShell.tsx
+@@ -3320,10 +3320,7 @@ export function HomeShell() {
+         requested === "breakfast" ||
+         requested === "snack"
+       ) {
+-        return (
+-          normalized === "breakfast" ||
+-          normalized === "snack"
+-        );
++        return normalized === requested;
+       }
+ 
+       if (
+@@ -3357,6 +3354,27 @@ export function HomeShell() {
+     );
+   }
+ 
++  function quickMealAlternatesForSlot(
++    slot: string,
++  ): typeof knownAlternates {
++    const sourcePriority = {
++      history: 0,
++      recipe: 1,
++      meal_prep: 2,
++      pantry: 3,
++      ingredient: 4,
++    } as const;
++
++    return knownAlternates
++      .filter((item) =>
++        quickMealFitsSlot(item, slot),
++      )
++      .sort((left, right) =>
++        sourcePriority[left.source] -
++        sourcePriority[right.source],
++      );
++  }
++
+ 
+   function selectQuickMealAlternate(
+     key: string,
+@@ -6943,153 +6961,54 @@ export function HomeShell() {
+                             id={`home-add-meal-${slot}`}
+                             className={`${styles.alternateMealForm} ${styles.alternateMealFormActive}`}
+                           >
+-                            <label>
+-                              Cosa hai mangiato?
+-                              <select
+-                                value=""
+-                                onChange={(event) => {
+-                                  const selected =
+-                                    knownAlternates.find(
+-                                      (item) =>
+-                                        item.key ===
+-                                        event.target.value,
+-                                    );
+-
+-                                  if (!selected) {
+-                                    setAlternateSelectedKey(null);
+-                                    setAlternateQuantity(1);
+-                                    return;
+-                                  }
+-
+-                                  setAlternateSelectedKey(
+-                                    selected.key,
+-                                  );
+-                                  setAlternateQuantity(1);
+-
+-                                  setAlternateName(
+-                                    selected.name,
+-                                  );
+-                                  setAlternateCalories(
+-                                    String(
+-                                      Math.round(
+-                                        selected.calories,
+-                                      ),
+-                                    ),
+-                                  );
+-                                  setAlternateProtein(
+-                                    String(
+-                                      Math.round(
+-                                        selected.protein,
+-                                      ),
+-                                    ),
+-                                  );
+-                                  setAlternateCarbs(
+-                                    String(
+-                                      Math.round(
+-                                        selected.carbs,
+-                                      ),
+-                                    ),
+-                                  );
+-                                  setAlternateFat(
+-                                    String(
+-                                      Math.round(
+-                                        selected.fat,
+-                                      ),
+-                                    ),
+-                                  );
+-                                }}
+-                              >
+-                                <option value="">
+-                                  Scegli da ricette, recenti e alimenti…
+-                                </option>
++                            <div>
++                              <div className={styles.quickMealChoicesHeader}>
++                                <div>
++                                  <strong>
++                                    Scelte recenti per {mealLabel(slot).toLocaleLowerCase("it")}
++                                  </strong>
++                                  <span>
++                                    Solo proposte adatte a questo pasto.
++                                  </span>
++                                </div>
++                              </div>
+ 
+-                                {knownAlternates.some(
+-                                  (item) =>
+-                                    item.source === "recipe" &&
+-                                    item.mealType &&
+-                                    mealFitsSlot(
+-                                      item.mealType,
+-                                      slot,
+-                                    ),
+-                                ) ? (
+-                                  <optgroup label="Ricette">
+-                                    {knownAlternates
+-                                      .filter(
+-                                        (item) =>
+-                                          item.source ===
+-                                            "recipe" &&
+-                                          item.mealType &&
+-                                          mealFitsSlot(
+-                                            item.mealType,
+-                                            slot,
+-                                          ),
+-                                      )
+-                                      .map((item) => (
+-                                        <option
+-                                          key={item.key}
+-                                          value={item.key}
+-                                        >
+-                                          {item.name}
+-                                        </option>
+-                                      ))}
+-                                  </optgroup>
+-                                ) : null}
+-
+-                                {knownAlternates.some(
+-                                  (item) =>
+-                                    item.source === "history" &&
+-                                    item.mealType &&
+-                                    mealFitsSlot(
+-                                      item.mealType,
+-                                      slot,
+-                                    ),
+-                                ) ? (
+-                                  <optgroup label="Pasti recenti">
+-                                    {knownAlternates
+-                                      .filter(
+-                                        (item) =>
+-                                          item.source ===
+-                                            "history" &&
+-                                          item.mealType &&
+-                                          mealFitsSlot(
+-                                            item.mealType,
+-                                            slot,
+-                                          ),
+-                                      )
+-                                      .map((item) => (
+-                                        <option
+-                                          key={item.key}
+-                                          value={item.key}
+-                                        >
+-                                          {item.name}
+-                                        </option>
+-                                      ))}
+-                                  </optgroup>
+-                                ) : null}
+-
+-                                {knownAlternates.some(
+-                                  (item) =>
+-                                    item.source ===
+-                                    "ingredient",
+-                                ) ? (
+-                                  <optgroup label="Alimenti">
+-                                    {knownAlternates
+-                                      .filter(
+-                                        (item) =>
+-                                          item.source ===
+-                                          "ingredient",
+-                                      )
+-                                      .map((item) => (
+-                                        <option
+-                                          key={item.key}
+-                                          value={item.key}
+-                                        >
+-                                          {item.name}
+-                                        </option>
+-                                      ))}
+-                                  </optgroup>
+-                                ) : null}
+-                              </select>
++                              {quickMealAlternatesForSlot(slot).length ? (
++                                <div className={styles.quickMealChoices}>
++                                  {quickMealAlternatesForSlot(slot)
++                                    .slice(0, 6)
++                                    .map((item) => (
++                                      <button
++                                        key={item.key}
++                                        type="button"
++                                        className={styles.quickMealChoice}
++                                        data-selected={
++                                          alternateSelectedKey === item.key
++                                            ? "true"
++                                            : "false"
++                                        }
++                                        onClick={() =>
++                                          selectQuickMealAlternate(item.key)
++                                        }
++                                      >
++                                        <span>
++                                          <strong>{item.name}</strong>
++                                          <small>
++                                            {Math.round(item.calories)} kcal
++                                            {item.protein > 0
++                                              ? ` · ${Math.round(item.protein)} g proteine`
++                                              : ""}
++                                          </small>
++                                        </span>
++                                        <span aria-hidden="true">→</span>
++                                      </button>
++                                    ))}
++                                </div>
++                              ) : (
++                                <p className={styles.quickMealChoicesEmpty}>
++                                  Nessuna scelta recente per questo pasto.
++                                </p>
++                              )}
+ 
+                               {alternateSelectedKey?.startsWith(
+                                 "recipe:",
+@@ -7184,7 +7103,7 @@ export function HomeShell() {
+                                   );
+                                 }}
+                               />
+-                            </label>
++                            </div>
+ 
+                             <div className={styles.alternateMealNumbers}>
+                               <label>
+-- 
+2.51.1
+

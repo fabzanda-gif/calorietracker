@@ -1,0 +1,605 @@
+From 4542034806a3089a5cd04eaa185bb38aed7b3502 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Thu, 3 Sep 2026 14:21:57 +0100
+Subject: [PATCH] Streamline meal activity and goal logging
+
+---
+ backend/api/routers/activities.py             | 39 ++++++++--
+ backend/tests/test_api_activities_crud.py     | 14 ++++
+ frontend/app/activities/page.tsx              |  2 -
+ frontend/app/profile/ProfilePage.module.css   |  6 ++
+ frontend/app/profile/page.tsx                 | 73 +++++++++++-------
+ .../activity/ActivityLogger.module.css        |  6 ++
+ .../components/activity/ActivityLogger.tsx    | 75 +++----------------
+ frontend/components/home/HomeShell.tsx        | 31 +++++++-
+ frontend/components/home/QuickAdd.tsx         | 37 +++++++--
+ frontend/components/navigation/AppNav.tsx     | 34 +--------
+ .../components/onboarding/WelcomeJourney.tsx  |  4 +-
+ 11 files changed, 173 insertions(+), 148 deletions(-)
+
+diff --git a/backend/api/routers/activities.py b/backend/api/routers/activities.py
+index a958cb9..8119c08 100644
+--- a/backend/api/routers/activities.py
++++ b/backend/api/routers/activities.py
+@@ -45,10 +45,24 @@ def _is_training_activity(activity: dict) -> bool:
+     name = str(activity.get("activity_name") or "").strip().casefold()
+     return not any(
+         name == prefix or name.startswith(f"{prefix} ") or name.startswith(f"{prefix} (")
+-        for prefix in ("passi", "steps", "bici", "bicicletta")
++        for prefix in ("passi", "steps")
+     )
+ 
+ 
++def _with_activity_defaults(activity: dict) -> dict:
++    """Fill safe display defaults for legacy rows without changing storage."""
++    item = dict(activity)
++    activity_type = normalize_activity_type(
++        item.get("activity_type") or item.get("activity_name")
++    )
++    item["activity_type"] = activity_type
++
++    if activity_type == "Padel" and not item.get("duration_seconds"):
++        item["duration_seconds"] = 90 * 60
++
++    return item
++
++
+ class ActivityCreate(BaseModel):
+     date: date
+     activity_name: str = Field(min_length=1)
+@@ -101,7 +115,10 @@ def get_activity_overview(
+         raise HTTPException(status_code=400, detail="Invalid overview date range")
+ 
+     try:
+-        activities = repo.list_date_range(current_user.id, start_date, end_date)
++        activities = [
++            _with_activity_defaults(item)
++            for item in repo.list_date_range(current_user.id, start_date, end_date)
++        ]
+         meals = meals_repo.list_date_range(
+             current_user.id, start_date, end_date,
+             columns="date,calories",
+@@ -167,11 +184,14 @@ def get_activities_for_range(
+         )
+ 
+     try:
+-        rows = repo.list_date_range(
+-            user_id=current_user.id,
+-            start_date=start_date,
+-            end_date=end_date,
+-        )
++        rows = [
++            _with_activity_defaults(item)
++            for item in repo.list_date_range(
++                user_id=current_user.id,
++                start_date=start_date,
++                end_date=end_date,
++            )
++        ]
+ 
+         return {
+             "start_date": str(start_date),
+@@ -411,7 +431,10 @@ def get_activities_for_date(
+     repo: ActivitiesRepository = Depends(get_activities_repository),
+ ):
+     try:
+-        rows = repo.list_for_date(current_user.id, activity_date)
++        rows = [
++            _with_activity_defaults(item)
++            for item in repo.list_for_date(current_user.id, activity_date)
++        ]
+         return {
+             "date": str(activity_date),
+             "count": len(rows),
+diff --git a/backend/tests/test_api_activities_crud.py b/backend/tests/test_api_activities_crud.py
+index f570f97..7a1c3cb 100644
+--- a/backend/tests/test_api_activities_crud.py
++++ b/backend/tests/test_api_activities_crud.py
+@@ -9,6 +9,10 @@ from backend.api.dependencies import (
+     get_weight_repository,
+ )
+ from backend.api.main import app
++from backend.api.routers.activities import (
++    _is_training_activity,
++    _with_activity_defaults,
++)
+ 
+ 
+ class FakeActivitiesRepository:
+@@ -102,6 +106,16 @@ def api_overrides():
+ client = TestClient(app)
+ 
+ 
++def test_legacy_padel_gets_default_duration_and_bikes_are_training():
++    padel = _with_activity_defaults(
++        {"activity_name": "Padel", "duration_seconds": None}
++    )
++
++    assert padel["duration_seconds"] == 90 * 60
++    assert _is_training_activity({"activity_name": "Bicicletta"}) is True
++    assert _is_training_activity({"activity_name": "Passi"}) is False
++
++
+ def test_list_activities():
+     response = client.get("/activities/2026-08-22")
+     assert response.status_code == 200
+diff --git a/frontend/app/activities/page.tsx b/frontend/app/activities/page.tsx
+index 510fc17..e5790d7 100644
+--- a/frontend/app/activities/page.tsx
++++ b/frontend/app/activities/page.tsx
+@@ -152,8 +152,6 @@ function isDailyMovement(
+   return [
+     "passi",
+     "steps",
+-    "bici",
+-    "bicicletta",
+   ].some(
+     (prefix) =>
+       name === prefix ||
+diff --git a/frontend/app/profile/ProfilePage.module.css b/frontend/app/profile/ProfilePage.module.css
+index c394e10..061f922 100644
+--- a/frontend/app/profile/ProfilePage.module.css
++++ b/frontend/app/profile/ProfilePage.module.css
+@@ -116,6 +116,12 @@
+   font-weight: 600;
+ }
+ 
++.fieldHint {
++  color: #737a84;
++  font-size: 0.76rem;
++  line-height: 1.4;
++}
++
+ .grid input,
+ .grid select {
+   width: 100%;
+diff --git a/frontend/app/profile/page.tsx b/frontend/app/profile/page.tsx
+index 1b7a9b7..a3ce044 100644
+--- a/frontend/app/profile/page.tsx
++++ b/frontend/app/profile/page.tsx
+@@ -106,6 +106,33 @@ const EMPTY_FORM: FormState = {
+   },
+ };
+ 
++const DEFICIT_BY_PLAN = {
++  slow: 100,
++  balanced: 300,
++  fast: 500,
++} as const;
++
++function deficitPlanFromCalories(value: unknown): keyof typeof DEFICIT_BY_PLAN {
++  const calories = Number(value);
++  if (calories <= 150) return "slow";
++  if (calories >= 400) return "fast";
++  return "balanced";
++}
++
++function normalizedDeficitPlan(
++  value: unknown,
++  calories?: unknown,
++): keyof typeof DEFICIT_BY_PLAN {
++  if (value === "slow" || value === "balanced" || value === "fast") {
++    return value;
++  }
++  return deficitPlanFromCalories(calories);
++}
++
++function deficitCalories(value: unknown): number {
++  return DEFICIT_BY_PLAN[normalizedDeficitPlan(value)];
++}
++
+ function stringValue(
+   value: unknown,
+ ): string {
+@@ -238,8 +265,10 @@ export default function ProfilePage() {
+           goal_mode:
+             stringValue(metadata.goal_mode),
+           deficit_plan:
+-            stringValue(metadata.deficit_plan) ||
+-            "balanced",
++            normalizedDeficitPlan(
++              metadata.deficit_plan,
++              metadata.goal_adjustment_kcal ?? metadata.deficit_target_kcal,
++            ),
+           goal_adjustment_kcal:
+             numberString(
+               metadata.goal_adjustment_kcal ??
+@@ -499,7 +528,11 @@ export default function ProfilePage() {
+       goal_mode:
+         form.goal_mode || null,
+       goal_adjustment_kcal:
+-        form.goal_adjustment_kcal
++        form.goal_mode === "loss"
++          ? deficitCalories(form.deficit_plan)
++          : form.goal_mode === "maintenance"
++          ? 0
++          : form.goal_adjustment_kcal
+           ? Number(form.goal_adjustment_kcal)
+           : null,
+       protein_goal_enabled:
+@@ -785,38 +818,20 @@ export default function ProfilePage() {
+                         }
+                       >
+                         <option value="slow">
+-                          Lenta
++                          Lento
+                         </option>
+                         <option value="balanced">
+-                          Bilanciata
++                          Bilanciato
+                         </option>
+                         <option value="fast">
+-                          Rapida
++                          Rapido
+                         </option>
+                       </select>
+-                    </label>
+-                  )}
+-
+-                  {form.goal_mode === "loss" && (
+-                    <label>
+-                      <span>
+-                        Deficit calorico (kcal)
+-                      </span>
+-                      <input
+-                        type="number"
+-                        min="0"
+-                        step="1"
+-                        value={
+-                          form.goal_adjustment_kcal
+-                        }
+-                        onChange={(event) =>
+-                          updateField(
+-                            "goal_adjustment_kcal",
+-                            event.target.value,
+-                          )
+-                        }
+-                        placeholder="Es. 300"
+-                      />
++                      <small className={styles.fieldHint}>
++                        Verrà applicato un deficit di{" "}
++                        {deficitCalories(form.deficit_plan)}{" "}
++                        kcal, adattabile nelle giornate reali.
++                      </small>
+                     </label>
+                   )}
+ 
+diff --git a/frontend/components/activity/ActivityLogger.module.css b/frontend/components/activity/ActivityLogger.module.css
+index b1ed71d..ec7797a 100644
+--- a/frontend/components/activity/ActivityLogger.module.css
++++ b/frontend/components/activity/ActivityLogger.module.css
+@@ -155,6 +155,12 @@
+   background: transparent;
+ }
+ 
++.compact .movementPanel {
++  order: -1;
++  border-color: #ffd0cd;
++  background: #fff8f7;
++}
++
+ .compact .formGrid {
+   grid-template-columns: repeat(3, 1fr);
+ }
+diff --git a/frontend/components/activity/ActivityLogger.tsx b/frontend/components/activity/ActivityLogger.tsx
+index f338123..e85e760 100644
+--- a/frontend/components/activity/ActivityLogger.tsx
++++ b/frontend/components/activity/ActivityLogger.tsx
+@@ -31,52 +31,16 @@ const ACTIVITY_OPTIONS = [
+     defaultMinutes: 90,
+   },
+   {
+-    value: "Corsa",
+-    label: "🏃 Corsa",
+-    kcalPerHour: 650,
+-    defaultMinutes: 60,
++    value: "Bicicletta",
++    label: "🚴 Bici",
++    kcalPerHour: 420,
++    defaultMinutes: 45,
+   },
+   {
+-    value: "Tennis",
+-    label: "🎾 Tennis",
+-    kcalPerHour: 480,
+-    defaultMinutes: 60,
+-  },
+-  {
+-    value: "Palestra",
+-    label: "🏋️ Palestra",
+-    kcalPerHour: 350,
+-    defaultMinutes: 60,
+-  },
+-  {
+-    value: "Calcio",
+-    label: "⚽ Calcio",
+-    kcalPerHour: 600,
+-    defaultMinutes: 60,
+-  },
+-  {
+-    value: "Nuoto",
+-    label: "🏊 Nuoto",
+-    kcalPerHour: 500,
+-    defaultMinutes: 60,
+-  },
+-  {
+-    value: "Escursione",
+-    label: "🥾 Escursione",
+-    kcalPerHour: 400,
+-    defaultMinutes: 120,
+-  },
+-  {
+-    value: "Camminata",
+-    label: "🚶 Camminata",
+-    kcalPerHour: 280,
+-    defaultMinutes: 60,
+-  },
+-  {
+-    value: "Altro",
+-    label: "🔥 Altro",
+-    kcalPerHour: 300,
+-    defaultMinutes: 60,
++    value: "Bici elettrica",
++    label: "⚡ E-bike",
++    kcalPerHour: 250,
++    defaultMinutes: 45,
+   },
+ ];
+ 
+@@ -110,8 +74,6 @@ export function ActivityLogger({
+ }: ActivityLoggerProps) {
+   const [activityType, setActivityType] =
+     useState("Padel");
+-  const [customName, setCustomName] =
+-    useState("");
+   const [durationMinutes, setDurationMinutes] =
+     useState("90");
+   const [calories, setCalories] =
+@@ -205,10 +167,7 @@ export function ActivityLogger({
+ 
+     const minutes = Number(durationMinutes);
+     const burned = Number(calories);
+-    const name =
+-      activityType === "Altro"
+-        ? customName.trim()
+-        : activityType;
++    const name = activityType;
+ 
+     if (!name) {
+       setError("Inserisci il nome dell’attività.");
+@@ -254,7 +213,6 @@ export function ActivityLogger({
+       }
+ 
+       setMessage(`${name} registrato.`);
+-      setCustomName("");
+       await onSaved();
+     } catch (err) {
+       setError(
+@@ -366,21 +324,6 @@ export function ActivityLogger({
+             </select>
+           </label>
+ 
+-          {activityType === "Altro" ? (
+-            <label>
+-              <span>Nome attività</span>
+-              <input
+-                value={customName}
+-                placeholder="Es. Arrampicata"
+-                onChange={(event) =>
+-                  setCustomName(
+-                    event.target.value,
+-                  )
+-                }
+-              />
+-            </label>
+-          ) : null}
+-
+           <label>
+             <span>Durata in minuti</span>
+             <input
+diff --git a/frontend/components/home/HomeShell.tsx b/frontend/components/home/HomeShell.tsx
+index 7a22112..d92351e 100644
+--- a/frontend/components/home/HomeShell.tsx
++++ b/frontend/components/home/HomeShell.tsx
+@@ -150,6 +150,32 @@ function mealIcon(slot: string): string {
+   }[slot] ?? "•";
+ }
+ 
++function normalizedMealSlot(value: string):
++  "breakfast" | "lunch" | "dinner" | "snack" | "unknown" {
++  const normalized = value.trim().toLocaleLowerCase("it");
++
++  if (["colazione", "breakfast"].includes(normalized)) return "breakfast";
++  if (["pranzo", "lunch"].includes(normalized)) return "lunch";
++  if (["cena", "dinner"].includes(normalized)) return "dinner";
++  if (["spuntino", "snack"].includes(normalized)) return "snack";
++  return "unknown";
++}
++
++function mealFitsSlot(candidate: string, selected: string): boolean {
++  const candidateSlot = normalizedMealSlot(candidate);
++  const selectedSlot = normalizedMealSlot(selected);
++
++  if (selectedSlot === "breakfast" || selectedSlot === "snack") {
++    return candidateSlot === selectedSlot;
++  }
++
++  if (selectedSlot === "lunch" || selectedSlot === "dinner") {
++    return candidateSlot === "lunch" || candidateSlot === "dinner";
++  }
++
++  return false;
++}
++
+ function roundNumber(value: number): string {
+   return Math.round(value).toLocaleString("it-IT");
+ }
+@@ -3412,10 +3438,7 @@ export function HomeShell() {
+                               >
+                                 <option value="">Scegli da ricette e pasti recenti…</option>
+                                 {knownAlternates
+-                                  .filter((item) => {
+-                                    const isSnack = ["spuntino", "snack"].includes(item.mealType.toLowerCase());
+-                                    return slot === "snack" ? isSnack : !isSnack;
+-                                  })
++                                  .filter((item) => mealFitsSlot(item.mealType, slot))
+                                   .map((item) => (
+                                     <option key={item.key} value={item.key}>{item.name}</option>
+                                   ))}
+diff --git a/frontend/components/home/QuickAdd.tsx b/frontend/components/home/QuickAdd.tsx
+index 3600efe..d895e7f 100644
+--- a/frontend/components/home/QuickAdd.tsx
++++ b/frontend/components/home/QuickAdd.tsx
+@@ -65,6 +65,32 @@ type KnownMeal = {
+   source: "Ricetta" | "Cronologia";
+ };
+ 
++function normalizedMealSlot(value: string):
++  "breakfast" | "lunch" | "dinner" | "snack" | "unknown" {
++  const normalized = value.trim().toLocaleLowerCase("it");
++
++  if (["colazione", "breakfast"].includes(normalized)) return "breakfast";
++  if (["pranzo", "lunch"].includes(normalized)) return "lunch";
++  if (["cena", "dinner"].includes(normalized)) return "dinner";
++  if (["spuntino", "snack"].includes(normalized)) return "snack";
++  return "unknown";
++}
++
++function mealFitsSlot(candidate: string, selected: string): boolean {
++  const candidateSlot = normalizedMealSlot(candidate);
++  const selectedSlot = normalizedMealSlot(selected);
++
++  if (selectedSlot === "breakfast" || selectedSlot === "snack") {
++    return candidateSlot === selectedSlot;
++  }
++
++  if (selectedSlot === "lunch" || selectedSlot === "dinner") {
++    return candidateSlot === "lunch" || candidateSlot === "dinner";
++  }
++
++  return false;
++}
++
+ function withTimeout<T>(promise: Promise<T>, timeoutMs = 12000): Promise<T> {
+   return new Promise((resolve, reject) => {
+     const timeout = window.setTimeout(
+@@ -305,20 +331,16 @@ export function QuickAdd({
+ 
+   const knownMealSuggestions = useMemo(() => {
+     const query = name.trim().toLocaleLowerCase("it");
++    const selectedSlot = mode === "snack" ? "Snack" : mealType;
+ 
+     return knownMeals
+       .filter((meal) => {
+-        const snack = ["spuntino", "snack"].includes(
+-          meal.mealType.toLocaleLowerCase("it"),
+-        );
+-        const compatible = mode === "snack" ? snack : !snack;
+-
+-        return compatible && (
++        return mealFitsSlot(meal.mealType, selectedSlot) && (
+           !query || meal.name.toLocaleLowerCase("it").includes(query)
+         );
+       })
+       .slice(0, 8);
+-  }, [knownMeals, mode, name]);
++  }, [knownMeals, mealType, mode, name]);
+ 
+   useEffect(() => {
+     if ((mode !== "meal" && mode !== "snack") || !accessToken) {
+@@ -1694,6 +1716,7 @@ export function QuickAdd({
+             date={date}
+             accessToken={accessToken}
+             compact
++            showMovement
+             onSaved={async () => {
+               setMode(null);
+               await onSaved();
+diff --git a/frontend/components/navigation/AppNav.tsx b/frontend/components/navigation/AppNav.tsx
+index 0db2e0d..8a2ae6d 100644
+--- a/frontend/components/navigation/AppNav.tsx
++++ b/frontend/components/navigation/AppNav.tsx
+@@ -34,18 +34,6 @@ const ITEMS = [
+     label: "Ricette",
+     icon: "⌑",
+   },
+-  {
+-    href: "/inventory",
+-    label: "Dispensa",
+-    icon: "·",
+-    subLink: true,
+-  },
+-  {
+-    href: "/ingredients",
+-    label: "Ingredienti",
+-    icon: "·",
+-    subLink: true,
+-  },
+ ];
+ 
+ const MOBILE_ITEMS = ITEMS;
+@@ -147,19 +135,11 @@ export function AppNav({
+         </div>
+ 
+         <nav className={styles.desktopLinks}>
+-          {ITEMS.map((item, index) => {
++          {ITEMS.map((item) => {
+             const active = isActive(pathname, item.href);
+-            const separatorBefore = index === 4;
+ 
+             return (
+               <div key={item.label}>
+-                {separatorBefore && (
+-                  <div
+-                    className={styles.separator}
+-                    aria-hidden="true"
+-                  />
+-                )}
+-
+                 {item.href === "#" ? (
+                   <button
+                     type="button"
+@@ -177,15 +157,9 @@ export function AppNav({
+                 ) : (
+                   <Link
+                     href={item.href}
+-                    className={
+-                      "subLink" in item && item.subLink
+-                        ? active
+-                          ? styles.desktopSubLinkActive
+-                          : styles.desktopSubLink
+-                        : active
+-                        ? styles.desktopLinkActive
+-                        : styles.desktopLink
+-                    }
++                    className={active
++                      ? styles.desktopLinkActive
++                      : styles.desktopLink}
+                     aria-current={
+                       active ? "page" : undefined
+                     }
+diff --git a/frontend/components/onboarding/WelcomeJourney.tsx b/frontend/components/onboarding/WelcomeJourney.tsx
+index 88bcc7e..50109e5 100644
+--- a/frontend/components/onboarding/WelcomeJourney.tsx
++++ b/frontend/components/onboarding/WelcomeJourney.tsx
+@@ -68,7 +68,7 @@ export function WelcomeJourney({
+   const [weight, setWeight] = useState("");
+   const [targetWeight, setTargetWeight] = useState("");
+   const [goalMode, setGoalMode] = useState("loss");
+-  const [adjustment, setAdjustment] = useState("500");
++  const [adjustment, setAdjustment] = useState("300");
+   const [saving, setSaving] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+ 
+@@ -214,7 +214,7 @@ export function WelcomeJourney({
+           ) : step === 2 ? (
+             <form onSubmit={continueFromGoal} className={styles.form}>
+               <label className={styles.full}><span>Il tuo obiettivo</span><select value={goalMode} onChange={(e) => setGoalMode(e.target.value)}><option value="loss">Perdere peso</option><option value="maintenance">Mantenere il peso</option><option value="gain">Aumentare il peso</option></select></label>
+-              {goalMode !== "maintenance" ? <label className={styles.full}><span>{goalMode === "loss" ? "Deficit giornaliero" : "Surplus giornaliero"}</span><select value={adjustment} onChange={(e) => setAdjustment(e.target.value)}><option value="250">Graduale · 250 kcal</option><option value="500">Bilanciato · 500 kcal</option><option value="750">Deciso · 750 kcal</option></select></label> : null}
++              {goalMode !== "maintenance" ? <label className={styles.full}><span>{goalMode === "loss" ? "Velocità di perdita" : "Surplus giornaliero"}</span><select value={adjustment} onChange={(e) => setAdjustment(e.target.value)}>{goalMode === "loss" ? <><option value="100">Lento · deficit di 100 kcal</option><option value="300">Bilanciato · deficit di 300 kcal</option><option value="500">Rapido · deficit di 500 kcal</option></> : <><option value="100">Lento · surplus di 100 kcal</option><option value="300">Bilanciato · surplus di 300 kcal</option><option value="500">Rapido · surplus di 500 kcal</option></>}</select></label> : null}
+               {error ? <p className={styles.error}>{error}</p> : null}
+               <div className={styles.actions}><button type="button" className={styles.secondary} onClick={() => setStep(1)}>Indietro</button><button className={styles.primary} type="submit">Continua</button></div>
+             </form>
+-- 
+2.51.1
+

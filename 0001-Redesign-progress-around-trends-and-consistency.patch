@@ -1,0 +1,423 @@
+From 098120fe4eaf9b6de58836ab63ba679a815f759e Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 22:17:43 +0200
+Subject: [PATCH] Redesign progress around trends and consistency
+
+---
+ frontend/app/progress/ProgressPage.module.css | 134 +++++++++++
+ frontend/app/progress/page.tsx                | 209 +++++++++---------
+ 2 files changed, 237 insertions(+), 106 deletions(-)
+
+diff --git a/frontend/app/progress/ProgressPage.module.css b/frontend/app/progress/ProgressPage.module.css
+index 39081db..d37280f 100644
+--- a/frontend/app/progress/ProgressPage.module.css
++++ b/frontend/app/progress/ProgressPage.module.css
+@@ -1231,6 +1231,140 @@
+     var(--ss-navy-900, #153354);
+ }
+ 
++/* SANOSYNC PROGRESS STORY V3 */
++.hero {
++  grid-template-columns: minmax(180px, .55fr) minmax(360px, 1.25fr) minmax(250px, .62fr);
++  align-items: center;
++  gap: 26px;
++  background: #102f50;
++}
++
++.heroSummary { min-width: 0; }
++.hero .changeDown,
++.hero .changeUp,
++.hero .changeNeutral {
++  display: inline-flex;
++  padding: 7px 11px;
++  border-radius: 999px;
++  background: rgba(89, 190, 112, .22);
++  color: #dff6e4;
++}
++
++.directionNote {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  margin-top: 18px;
++  color: #fff;
++}
++.directionNote > span {
++  display: grid;
++  place-items: center;
++  width: 34px;
++  height: 34px;
++  border: 1px solid rgba(255, 102, 102, .72);
++  border-radius: 50%;
++  color: #ff7373;
++}
++.directionNote div { display: grid; gap: 2px; }
++.directionNote strong { font-size: .78rem; }
++.directionNote small { color: rgba(255,255,255,.62); font-size: .67rem; }
++
++.heroChartWrap { min-width: 0; color: #fff; }
++.heroChartWrap svg { display: block; width: 100%; height: 150px; overflow: visible; }
++.heroChartTitle { display: flex; justify-content: space-between; gap: 15px; font-size: .74rem; }
++.heroChartTitle span { color: rgba(255,255,255,.72); }
++.heroChartTitle strong { color: #fff; }
++.heroGridLine { stroke: rgba(255,255,255,.13); stroke-width: 1; stroke-dasharray: 3 5; }
++.heroTrendLine { stroke: #ff6868; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
++.heroTrendPoint { fill: #ff6868; stroke: #fff; stroke-width: 2; }
++.heroChartDates { display: flex; justify-content: space-between; color: rgba(255,255,255,.55); font-size: .65rem; }
++.heroChartEmpty { display: grid; place-items: center; min-height: 150px; color: rgba(255,255,255,.66); text-align: center; }
++
++.topStatsGrid {
++  display: grid;
++  grid-template-columns: repeat(4, minmax(0, 1fr));
++  gap: 12px;
++  margin-top: 14px;
++}
++.topStatsGrid article {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  min-width: 0;
++  padding: 15px 17px;
++  border: 1px solid #e2e5e4;
++  border-radius: 16px;
++  background: #fff;
++  box-shadow: 0 7px 20px rgba(16, 40, 70, .035);
++}
++.topStatsGrid article div { display: grid; gap: 3px; min-width: 0; }
++.topStatsGrid strong { color: #102846; font-size: 1.18rem; }
++.topStatsGrid article div > span { overflow: hidden; color: #718093; font-size: .69rem; text-overflow: ellipsis; white-space: nowrap; }
++.statIcon { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; background: #eaf4eb; color: #448a51; font-weight: 900; }
++.statIconWarm { background: #fff3dc; color: #d89c25; }
++.statIconLilac { background: #f1edfb; color: #7863ae; }
++
++.overviewSection {
++  margin-top: 16px;
++  padding: 24px;
++  border: 1px solid #e2e5e4;
++  border-radius: 20px;
++  background: #fff;
++  box-shadow: 0 8px 24px rgba(16, 40, 70, .035);
++}
++.overviewSection .sectionHeader { align-items: start; }
++.overviewGrid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(270px, .7fr); gap: 24px; }
++.overviewChart { min-width: 0; padding-right: 22px; border-right: 1px solid #e7e9e8; }
++.insightPanel { min-width: 0; }
++.insightPanel h3 { margin: 0 0 18px; color: #102846; font-size: 1.3rem; letter-spacing: -.035em; }
++.insightPanel article { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid #edf0ef; }
++.insightPanel article > span { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 50%; background: #eaf4eb; color: #448a51; font-weight: 900; }
++.insightPanel article:nth-of-type(2) > span { background: #f1edfb; color: #7863ae; }
++.insightPanel article:nth-of-type(3) > span { background: #fff3dc; color: #d89c25; }
++.insightPanel article div { display: grid; gap: 4px; }
++.insightPanel article strong { color: #153354; font-size: .8rem; line-height: 1.25; }
++.insightPanel article p { margin: 0; color: #718093; font-size: .69rem; line-height: 1.4; }
++.insightLink { display: flex; justify-content: center; margin-top: 17px; padding: 10px 14px; border: 1px solid #ff6868; border-radius: 999px; color: #ef5e5c; font-size: .72rem; font-weight: 800; }
++
++.analyticsSection { scroll-margin-top: 22px; }
++.consistencySection {
++  display: grid;
++  grid-template-columns: minmax(220px, .55fr) minmax(0, 1.45fr);
++  align-items: center;
++  gap: 24px;
++  margin-top: 18px;
++  padding: 22px 24px;
++  border: 1px solid #e2e5e4;
++  border-radius: 20px;
++  background: #fff;
++}
++.consistencySection h2 { margin: 0; color: #102846; font-size: 1.45rem; letter-spacing: -.04em; }
++.consistencyDays { display: grid; grid-template-columns: repeat(7, minmax(56px, 1fr)); gap: 9px; }
++.consistencyDays article { display: grid; justify-items: center; gap: 4px; color: #153354; }
++.consistencyDays strong { font-size: .69rem; text-transform: capitalize; }
++.consistencyDays small { color: #8490a0; font-size: .6rem; }
++.dayRing { display: grid; place-items: center; width: 45px; height: 45px; border: 4px solid #dfe4e2; border-radius: 50%; color: #87918d; font-weight: 900; }
++.dayRing_deficit { border-color: #55aa65; color: #448a51; }
++.dayRing_maintenance { border-color: #edbd4c; color: #c9941e; }
++.dayRing_surplus { border-color: #ff6868; color: #ef5e5c; }
++
++@media (max-width: 1050px) {
++  .hero { grid-template-columns: minmax(180px, .65fr) 1fr; }
++  .heroChartWrap { order: 3; grid-column: 1 / -1; }
++  .overviewGrid { grid-template-columns: 1fr; }
++  .overviewChart { padding-right: 0; border-right: 0; border-bottom: 1px solid #e7e9e8; padding-bottom: 18px; }
++}
++
++@media (max-width: 759px) {
++  .hero { grid-template-columns: 1fr; }
++  .heroChartWrap { grid-column: auto; }
++  .topStatsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++  .overviewSection { padding: 17px; }
++  .consistencySection { grid-template-columns: 1fr; padding: 18px; }
++  .consistencyDays { overflow-x: auto; grid-template-columns: repeat(7, 70px); padding-bottom: 5px; }
++}
++
+ 
+ /* SANOSYNC PROGRESS INSIGHTS V2 */
+ 
+diff --git a/frontend/app/progress/page.tsx b/frontend/app/progress/page.tsx
+index cc975ff..1d06df2 100644
+--- a/frontend/app/progress/page.tsx
++++ b/frontend/app/progress/page.tsx
+@@ -434,6 +434,50 @@ function WeightChart({
+   );
+ }
+ 
++function HeroWeightChart({ items }: { items: WeightEntry[] }) {
++  if (items.length < 2) {
++    return (
++      <div className={styles.heroChartEmpty}>
++        Registra almeno due pesate per vedere la direzione.
++      </div>
++    );
++  }
++
++  const width = 560;
++  const height = 170;
++  const padding = 18;
++  const values = items.map((item) => Number(item.weight));
++  const minimum = Math.min(...values);
++  const maximum = Math.max(...values);
++  const spread = Math.max(1, maximum - minimum);
++  const xFor = (index: number) =>
++    padding + (index / (items.length - 1)) * (width - padding * 2);
++  const yFor = (value: number) =>
++    padding + (1 - (value - minimum) / spread) * (height - padding * 2);
++  const points = values
++    .map((value, index) => `${xFor(index)},${yFor(value)}`)
++    .join(" ");
++
++  return (
++    <div className={styles.heroChartWrap}>
++      <div className={styles.heroChartTitle}>
++        <span>Andamento peso · ultimi 90 giorni</span>
++        <strong>{formatWeight(values[0])} → {formatWeight(values[values.length - 1])} kg</strong>
++      </div>
++      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Trend del peso negli ultimi 90 giorni">
++        {[0.25, 0.5, 0.75].map((ratio) => (
++          <line key={ratio} x1={padding} x2={width - padding} y1={height * ratio} y2={height * ratio} className={styles.heroGridLine} />
++        ))}
++        <polyline points={points} fill="none" className={styles.heroTrendLine} />
++        {items.map((item, index) => (
++          <circle key={`${item.id}-hero`} cx={xFor(index)} cy={yFor(Number(item.weight))} r="3.5" className={styles.heroTrendPoint} />
++        ))}
++      </svg>
++      <div className={styles.heroChartDates}><span>90 giorni fa</span><span>Oggi</span></div>
++    </div>
++  );
++}
++
+ function DailyMetricsChart({
+   items,
+   metric,
+@@ -1719,9 +1763,9 @@ export default function ProgressPage() {
+       ) : null}
+ 
+       <section className={styles.hero}>
+-        <div>
++        <div className={styles.heroSummary}>
+           <p className={styles.kicker}>
+-            Peso
++            Peso attuale
+           </p>
+ 
+           <div className={styles.currentWeight}>
+@@ -1749,8 +1793,17 @@ export default function ProgressPage() {
+               Nessuna misurazione disponibile.
+             </p>
+           )}
++          <div className={styles.directionNote}>
++            <span aria-hidden="true">↘</span>
++            <div>
++              <strong>{stats && stats.change < 0 ? "Direzione costante" : "Il trend prende forma"}</strong>
++              <small>Conta la direzione, non la singola giornata.</small>
++            </div>
++          </div>
+         </div>
+ 
++        <HeroWeightChart items={visibleItems} />
++
+         <form
+           className={styles.weightForm}
+           onSubmit={(event) => {
+@@ -1796,13 +1849,21 @@ export default function ProgressPage() {
+         </form>
+       </section>
+ 
+-      <section className={styles.chartSection}>
++      <section className={styles.topStatsGrid}>
++        <article><span className={styles.statIcon}>↗</span><div><strong>{stats ? `${stats.change > 0 ? "+" : ""}${formatWeight(stats.change)} kg` : "—"}</strong><span>Variazione nel periodo</span></div></article>
++        <article><span className={styles.statIcon}>▣</span><div><strong>{stats?.count ?? 0}</strong><span>Misurazioni totali</span></div></article>
++        <article><span className={`${styles.statIcon} ${styles.statIconWarm}`}>◎</span><div><strong>{nutritionStats?.days_with_budget ? `${nutritionStats.days_within_budget}/${nutritionStats.days_with_budget}` : "—"}</strong><span>Giorni nel budget</span></div></article>
++        <article><span className={`${styles.statIcon} ${styles.statIconLilac}`}>◇</span><div><strong>{macroStats ? `${roundKcal(macroStats.protein)} g` : "—"}</strong><span>Proteine medie</span></div></article>
++      </section>
++
++      <section className={styles.overviewSection}>
+         <div className={styles.sectionHeader}>
+           <div>
+             <p className={styles.kicker}>
+-              Andamento
++              La tua storia
+             </p>
+-            <h2>Il tuo peso nel tempo</h2>
++            <h2>Il quadro completo</h2>
++            <p className={styles.sectionSubtitle}>Peso, bilancio calorico e abitudini letti insieme.</p>
+           </div>
+ 
+           <div
+@@ -1827,57 +1888,25 @@ export default function ProgressPage() {
+             ))}
+           </div>
+         </div>
+-
+-        {loading ? (
+-          <div className={styles.loadingChart}>
+-            Carico lo storico…
++        <div className={styles.overviewGrid}>
++          <div className={styles.overviewChart}>
++            {loading ? <div className={styles.loadingChart}>Carico lo storico…</div> : <WeightChart items={visibleItems} />}
+           </div>
+-        ) : (
+-          <WeightChart
+-            items={visibleItems}
+-          />
+-        )}
+-      </section>
+-
+-      <section className={styles.statsGrid}>
+-        <article>
+-          <span>Minimo</span>
+-          <strong>
+-            {stats
+-              ? `${formatWeight(stats.min)} kg`
+-              : "—"}
+-          </strong>
+-        </article>
+-
+-        <article>
+-          <span>Massimo</span>
+-          <strong>
+-            {stats
+-              ? `${formatWeight(stats.max)} kg`
+-              : "—"}
+-          </strong>
+-        </article>
+-
+-        <article>
+-          <span>Variazione</span>
+-          <strong>
+-            {stats
+-              ? `${stats.change > 0 ? "+" : ""}${formatWeight(
+-                  stats.change,
+-                )} kg`
+-              : "—"}
+-          </strong>
+-        </article>
+-
+-        <article>
+-          <span>Misurazioni</span>
+-          <strong>
+-            {stats?.count ?? 0}
+-          </strong>
+-        </article>
++          <aside className={styles.insightPanel}>
++            <p className={styles.kicker}>Insight</p>
++            <h3>Cosa sta funzionando</h3>
++            {progressInsights.length ? progressInsights.slice(0, 3).map((insight, index) => (
++              <article key={`${insight.eyebrow}-summary-${index}`}>
++                <span aria-hidden="true">{index === 0 ? "↓" : index === 1 ? "◔" : "✓"}</span>
++                <div><strong>{insight.title}</strong><p>{insight.body}</p></div>
++              </article>
++            )) : <p className={styles.muted}>Continua a registrare: presto troverai qui una lettura dei tuoi progressi.</p>}
++            <Link href="#nutrition-detail" className={styles.insightLink}>Vedi dettaglio nutrizione →</Link>
++          </aside>
++        </div>
+       </section>
+ 
+-      <section className={styles.analyticsSection}>
++      <section className={styles.analyticsSection} id="nutrition-detail">
+         <div className={styles.sectionHeader}>
+           <div>
+             <p className={styles.kicker}>
+@@ -2162,59 +2191,27 @@ export default function ProgressPage() {
+           </article>
+         </section>
+       )}
+-      {progressInsights.length ? (
+-        <section className={styles.insightsSection}>
+-          <div className={styles.insightsHeader}>
+-            <div>
+-              <p className={styles.kicker}>
+-                Insight
+-              </p>
+-
+-              <h2>
+-                Cosa sta succedendo
+-              </h2>
+-
+-              <p className={styles.sectionSubtitle}>
+-                Una lettura semplice dei dati che hai
+-                registrato.
+-              </p>
+-            </div>
+-          </div>
+-
+-          <div className={styles.insightsGrid}>
+-            {progressInsights.map(
+-              (insight, index) => (
+-                <article
+-                  key={`${insight.eyebrow}-${index}`}
+-                  className={`${styles.insightCard} ${
+-                    insight.tone === "coral"
+-                      ? styles.insightCardCoral
+-                      : insight.tone === "navy"
+-                        ? styles.insightCardNavy
+-                        : styles.insightCardNeutral
+-                  }`}
+-                >
+-                  <span
+-                    className={
+-                      styles.insightEyebrow
+-                    }
+-                  >
+-                    {insight.eyebrow}
+-                  </span>
+-
+-                  <strong>
+-                    {insight.title}
+-                  </strong>
+-
+-                  <p>
+-                    {insight.body}
+-                  </p>
+-                </article>
+-              ),
+-            )}
+-          </div>
+-        </section>
+-      ) : null}
++      <section className={styles.consistencySection}>
++        <div>
++          <p className={styles.kicker}>Costanza</p>
++          <h2>Gli ultimi 7 giorni</h2>
++          <p className={styles.sectionSubtitle}>Una settimana è fatta di direzioni, non di giornate perfette.</p>
++        </div>
++        <div className={styles.consistencyDays}>
++          {(nutrition?.items ?? []).slice(-7).map((item) => {
++            const difference = item.difference_kcal;
++            const state = difference === null ? "empty" : difference > 100 ? "surplus" : difference < -100 ? "deficit" : "maintenance";
++            return (
++              <article key={`consistency-${item.date}`}>
++                <span className={`${styles.dayRing} ${styles[`dayRing_${state}`]}`}>{state === "deficit" ? "↓" : state === "surplus" ? "↑" : state === "maintenance" ? "=" : "·"}</span>
++                <strong>{new Date(`${item.date}T00:00:00`).toLocaleDateString("it-IT", { weekday: "short" })}</strong>
++                <small>{formatDate(item.date)}</small>
++              </article>
++            );
++          })}
++          {!nutrition?.items.length ? <p className={styles.muted}>Nessun dato disponibile per questa settimana.</p> : null}
++        </div>
++      </section>
+ 
+       </main>
+     </>
+-- 
+2.51.1
+

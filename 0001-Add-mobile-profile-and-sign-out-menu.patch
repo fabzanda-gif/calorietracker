@@ -1,0 +1,310 @@
+From 2ea11a2f553dc89b7c0962f79289c1d444a3d268 Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Thu, 3 Sep 2026 11:31:44 +0200
+Subject: [PATCH] Add mobile profile and sign out menu
+
+---
+ .../components/navigation/AppNav.module.css   | 152 +++++++++++++++++-
+ frontend/components/navigation/AppNav.tsx     |  76 ++++++++-
+ 2 files changed, 222 insertions(+), 6 deletions(-)
+
+diff --git a/frontend/components/navigation/AppNav.module.css b/frontend/components/navigation/AppNav.module.css
+index efc2023..1d37cda 100644
+--- a/frontend/components/navigation/AppNav.module.css
++++ b/frontend/components/navigation/AppNav.module.css
+@@ -178,7 +178,7 @@
+   );
+ 
+   display: grid;
+-  grid-template-columns: repeat(4, 1fr);
++  grid-template-columns: repeat(5, 1fr);
+ 
+   min-height: 64px;
+   padding: 6px;
+@@ -214,6 +214,11 @@
+   font-weight: 750;
+ 
+   text-decoration: none;
++
++  border: 0;
++  background: transparent;
++  font-family: inherit;
++  cursor: pointer;
+ }
+ 
+ .mobileLinkActive {
+@@ -228,12 +233,155 @@
+   line-height: 1;
+ }
+ 
++.mobileAvatar {
++  display: grid;
++  place-items: center;
++  width: 20px;
++  height: 20px;
++  overflow: hidden;
++  border-radius: 50%;
++  background: #153354;
++  color: #ffffff;
++  font-size: 0.55rem;
++  font-weight: 850;
++}
++
++.mobileAvatar img {
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++}
++
++.mobileLinkActive .mobileAvatar {
++  background: #ffffff;
++  color: #153354;
++}
++
++.mobileAccountBackdrop {
++  position: fixed;
++  z-index: 108;
++  inset: 0;
++  border: 0;
++  background: rgba(16, 40, 70, 0.3);
++  backdrop-filter: blur(2px);
++  -webkit-backdrop-filter: blur(2px);
++}
++
++.mobileAccountSheet {
++  position: fixed;
++  z-index: 110;
++  left: 12px;
++  right: 12px;
++  bottom: calc(88px + env(safe-area-inset-bottom));
++  display: grid;
++  gap: 12px;
++  padding: 18px;
++  border: 1px solid #e2e1db;
++  border-radius: 22px;
++  background: #ffffff;
++  box-shadow: 0 22px 60px rgba(16, 40, 70, 0.22);
++}
++
++.mobileAccountHeader {
++  display: grid;
++  grid-template-columns: 42px minmax(0, 1fr) 34px;
++  align-items: center;
++  gap: 10px;
++  padding-bottom: 14px;
++  border-bottom: 1px solid #eeeeea;
++}
++
++.mobileAccountHeader > button {
++  width: 34px;
++  height: 34px;
++  border: 0;
++  border-radius: 50%;
++  background: #f5f5f2;
++  color: #536276;
++  font-size: 1.35rem;
++  cursor: pointer;
++}
++
++.mobileProfileAction {
++  display: grid;
++  grid-template-columns: 36px minmax(0, 1fr) auto;
++  align-items: center;
++  gap: 10px;
++  padding: 12px;
++  border-radius: 15px;
++  background: #f7f8f7;
++  color: #102846;
++  text-decoration: none;
++}
++
++.mobileProfileAction > span:first-child {
++  display: grid;
++  place-items: center;
++  width: 36px;
++  height: 36px;
++  border-radius: 50%;
++  background: #fff0ef;
++  color: #ff5b57;
++}
++
++.mobileProfileAction > span:nth-child(2) {
++  display: grid;
++  gap: 3px;
++}
++
++.mobileProfileAction strong {
++  font-size: 0.84rem;
++}
++
++.mobileProfileAction small {
++  color: #777771;
++  font-size: 0.68rem;
++}
++
++.mobileProfileAction > span:last-child {
++  color: #718096;
++  font-size: 1.35rem;
++}
++
++.mobileSignOut {
++  min-height: 48px;
++  border: 1px solid #ff6865;
++  border-radius: 999px;
++  background: #ff6865;
++  color: #ffffff;
++  font: inherit;
++  font-size: 0.8rem;
++  font-weight: 800;
++  cursor: pointer;
++}
++
++.mobileAccountSheetZero {
++  border-color: #343434;
++  background: #151515;
++  color: #ffffff;
++}
++
++.mobileAccountSheetZero .mobileAccountHeader {
++  border-bottom-color: #333333;
++}
++
++.mobileAccountSheetZero .mobileProfileAction {
++  background: #222222;
++  color: #ffffff;
++}
++
++.mobileAccountSheetZero .mobileProfileAction small {
++  color: #aaaaaa;
++}
++
+ @media (min-width: 760px) {
+   .desktopNav {
+     display: flex;
+   }
+ 
+-  .mobileNav {
++  .mobileNav,
++  .mobileAccountBackdrop,
++  .mobileAccountSheet {
+     display: none;
+   }
+ }
+diff --git a/frontend/components/navigation/AppNav.tsx b/frontend/components/navigation/AppNav.tsx
+index 2369c18..83928b3 100644
+--- a/frontend/components/navigation/AppNav.tsx
++++ b/frontend/components/navigation/AppNav.tsx
+@@ -2,6 +2,7 @@
+ 
+ import Link from "next/link";
+ import { usePathname } from "next/navigation";
++import { useEffect, useState } from "react";
+ 
+ import { useAuth } from "@/components/auth/AuthProvider";
+ 
+@@ -58,6 +59,19 @@ export function AppNav({
+ }: AppNavProps) {
+   const pathname = usePathname();
+   const { user, signOut } = useAuth();
++  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
++
++  useEffect(() => {
++    setMobileAccountOpen(false);
++  }, [pathname]);
++
++  async function handleSignOut() {
++    window.sessionStorage.removeItem(
++      "sanosync-onboarding-test-completed",
++    );
++    setMobileAccountOpen(false);
++    await signOut();
++  }
+ 
+   const metadataName =
+     user?.user_metadata?.full_name ??
+@@ -207,10 +221,7 @@ export function AppNav({
+             type="button"
+             className={styles.signOut}
+             onClick={() => {
+-              window.sessionStorage.removeItem(
+-                "sanosync-onboarding-test-completed",
+-              );
+-              void signOut();
++              void handleSignOut();
+             }}
+           >
+             Esci
+@@ -218,6 +229,47 @@ export function AppNav({
+         </div>
+       </aside>
+ 
++      {mobileAccountOpen ? (
++        <>
++          <button
++            type="button"
++            className={styles.mobileAccountBackdrop}
++            aria-label="Chiudi il menu account"
++            onClick={() => setMobileAccountOpen(false)}
++          />
++          <section
++            id="mobile-account-menu"
++            className={
++              experienceMode === "zero"
++                ? `${styles.mobileAccountSheet} ${styles.mobileAccountSheetZero}`
++                : styles.mobileAccountSheet
++            }
++            aria-label="Account"
++          >
++            <div className={styles.mobileAccountHeader}>
++              <span className={styles.profileAvatar}>
++                {avatarUrl ? (
++                  <img src={avatarUrl} alt="" referrerPolicy="no-referrer" />
++                ) : initials}
++              </span>
++              <span className={styles.profileDetails}>
++                <strong>{displayName}</strong>
++                <small>{user?.email ?? "Gestisci il profilo"}</small>
++              </span>
++              <button type="button" aria-label="Chiudi" onClick={() => setMobileAccountOpen(false)}>×</button>
++            </div>
++            <Link href="/profile" className={styles.mobileProfileAction}>
++              <span aria-hidden="true">◯</span>
++              <span><strong>Profilo</strong><small>Dati personali, integrazioni e account</small></span>
++              <span aria-hidden="true">›</span>
++            </Link>
++            <button type="button" className={styles.mobileSignOut} onClick={() => void handleSignOut()}>
++              Esci dall’account
++            </button>
++          </section>
++        </>
++      ) : null}
++
+       <nav
+         className={styles.mobileNav}
+         aria-label="Navigazione principale"
+@@ -249,6 +301,22 @@ export function AppNav({
+             </Link>
+           );
+         })}
++        <button
++          type="button"
++          className={
++            pathname.startsWith("/profile") || mobileAccountOpen
++              ? styles.mobileLinkActive
++              : styles.mobileLink
++          }
++          aria-expanded={mobileAccountOpen}
++          aria-controls="mobile-account-menu"
++          onClick={() => setMobileAccountOpen((current) => !current)}
++        >
++          <span className={styles.mobileAvatar} aria-hidden="true">
++            {avatarUrl ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" /> : initials}
++          </span>
++          <span>Profilo</span>
++        </button>
+       </nav>
+     </>
+   );
+-- 
+2.51.1
+

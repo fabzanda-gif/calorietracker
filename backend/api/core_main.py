@@ -27,6 +27,7 @@ from backend.api.routers.decision_outcomes import router as decision_outcomes_ro
 from backend.api.routers.health import router as health_router
 from backend.api.routers.learned_insights import router as learned_insights_router
 from backend.api.routers.meal_prep import router as meal_prep_router
+from backend.api.routers.onboarding import router as onboarding_router
 from backend.api.routers.pantry import router as pantry_router
 from backend.api.routers.profile import router as profile_router
 from backend.api.routers.progress import router as progress_router
@@ -259,6 +260,7 @@ app.add_api_route(
     tags=["days-core"],
 )
 app.include_router(profile_router)
+app.include_router(onboarding_router)
 app.include_router(weekly_schedule_router)
 app.include_router(pantry_router)
 app.include_router(daily_logs_router)

@@ -1,0 +1,773 @@
+From b78b47743cff8af90ad57db54d996ac5c8226f6b Mon Sep 17 00:00:00 2001
+From: fabzanda-gif <fab.zanda@gmail.com>
+Date: Wed, 2 Sep 2026 15:30:02 +0300
+Subject: [PATCH] Add known meal autocomplete and recipe ratings
+
+---
+ backend/api/routers/recipes.py                |   4 +
+ backend/repositories/recipes.py               |   2 +-
+ backend/sql/20260902_add_recipe_ratings.sql   |  11 ++
+ frontend/app/recipes/RecipesPage.module.css   |  33 ++++
+ frontend/app/recipes/page.tsx                 |  56 +++++-
+ frontend/components/home/HomeShell.module.css |  13 --
+ frontend/components/home/HomeShell.tsx        |  67 -------
+ frontend/components/home/QuickAdd.module.css  |  55 ++++++
+ frontend/components/home/QuickAdd.tsx         | 164 +++++++++++++++++-
+ .../components/navigation/AppNav.module.css   |  11 ++
+ frontend/components/navigation/AppNav.tsx     |   7 +-
+ frontend/lib/api/recipes.ts                   |   4 +
+ 12 files changed, 342 insertions(+), 85 deletions(-)
+ create mode 100644 backend/sql/20260902_add_recipe_ratings.sql
+
+diff --git a/backend/api/routers/recipes.py b/backend/api/routers/recipes.py
+index 6f40a3f..58b49ba 100644
+--- a/backend/api/routers/recipes.py
++++ b/backend/api/routers/recipes.py
+@@ -51,6 +51,8 @@ class RecipeCreate(BaseModel):
+     structured_ingredients: list[StructuredRecipeIngredient] | None = None
+     is_shared: bool = False
+     image_url: str | None = None
++    taste_rating: int | None = Field(default=None, ge=1, le=5)
++    ease_rating: int | None = Field(default=None, ge=1, le=5)
+ 
+ 
+ class RecipeUpdate(BaseModel):
+@@ -66,6 +68,8 @@ class RecipeUpdate(BaseModel):
+     ingredients_json: Any | None = None
+     structured_ingredients: list[StructuredRecipeIngredient] | None = None
+     image_url: str | None = None
++    taste_rating: int | None = Field(default=None, ge=1, le=5)
++    ease_rating: int | None = Field(default=None, ge=1, le=5)
+ 
+ 
+ class RecipeShareUpdate(BaseModel):
+diff --git a/backend/repositories/recipes.py b/backend/repositories/recipes.py
+index e6421b8..804a323 100644
+--- a/backend/repositories/recipes.py
++++ b/backend/repositories/recipes.py
+@@ -8,7 +8,7 @@ from .base import BaseRepository, RepositoryError
+ RECIPE_COLUMNS = (
+     "id,user_id,name,meal_type,category,recipe_servings,"
+     "calories,protein,carbs,fat,notes,ingredients_json,"
+-    "is_shared,image_url,created_at"
++    "is_shared,image_url,taste_rating,ease_rating,created_at"
+ )
+ 
+ 
+diff --git a/backend/sql/20260902_add_recipe_ratings.sql b/backend/sql/20260902_add_recipe_ratings.sql
+new file mode 100644
+index 0000000..d0234c4
+--- /dev/null
++++ b/backend/sql/20260902_add_recipe_ratings.sql
+@@ -0,0 +1,11 @@
++alter table public.recipe_library
++    add column if not exists taste_rating smallint,
++    add column if not exists ease_rating smallint;
++
++alter table public.recipe_library
++    drop constraint if exists recipe_library_taste_rating_check,
++    add constraint recipe_library_taste_rating_check
++        check (taste_rating is null or taste_rating between 1 and 5),
++    drop constraint if exists recipe_library_ease_rating_check,
++    add constraint recipe_library_ease_rating_check
++        check (ease_rating is null or ease_rating between 1 and 5);
+diff --git a/frontend/app/recipes/RecipesPage.module.css b/frontend/app/recipes/RecipesPage.module.css
+index 90f4157..11be101 100644
+--- a/frontend/app/recipes/RecipesPage.module.css
++++ b/frontend/app/recipes/RecipesPage.module.css
+@@ -675,6 +675,32 @@
+   font-size: 0.72rem;
+ }
+ 
++.recipeRating {
++  padding: 3px 7px;
++  border-radius: 999px;
++  background: #fff0ef;
++  color: #102846 !important;
++}
++
++.recipeSort {
++  display: flex;
++  align-items: center;
++  gap: 7px;
++  color: #778392;
++  font-size: 0.7rem;
++  font-weight: 750;
++}
++
++.recipeSort select {
++  min-height: 36px;
++  padding: 0 9px;
++  border: 1px solid #deded8;
++  border-radius: 10px;
++  background: #ffffff;
++  color: #153354;
++  font: inherit;
++}
++
+ .recipeDescription {
+   margin-top: 10px !important;
+ 
+@@ -813,6 +839,7 @@
+   grid-template-columns:
+     minmax(240px, 1fr)
+     auto
++    auto
+     auto;
+ 
+   align-items: center;
+@@ -1122,6 +1149,12 @@
+     grid-column: 2;
+     grid-row: 1;
+   }
++
++  .recipeSort {
++    grid-column: 1 / -1;
++    grid-row: 3;
++    justify-content: flex-end;
++  }
+ }
+ 
+ 
+diff --git a/frontend/app/recipes/page.tsx b/frontend/app/recipes/page.tsx
+index 7ddd49f..8f92d6e 100644
+--- a/frontend/app/recipes/page.tsx
++++ b/frontend/app/recipes/page.tsx
+@@ -90,6 +90,10 @@ export default function RecipesPage() {
+     useState("Cena");
+   const [servings, setServings] =
+     useState("1");
++  const [tasteRating, setTasteRating] =
++    useState("");
++  const [easeRating, setEaseRating] =
++    useState("");
+ 
+   const [imageUrl, setImageUrl] =
+     useState<string | null>(null);
+@@ -120,6 +124,8 @@ export default function RecipesPage() {
+ 
+   const [recipeMealFilter, setRecipeMealFilter] =
+     useState("Tutte");
++  const [recipeSort, setRecipeSort] =
++    useState<"recent" | "taste" | "ease">("recent");
+ 
+ 
+   const [mealDraft, setMealDraft] =
+@@ -167,7 +173,7 @@ export default function RecipesPage() {
+       .trim()
+       .toLocaleLowerCase("it");
+ 
+-    return recipes.filter((recipe) => {
++    const matches = recipes.filter((recipe) => {
+       const recipeType =
+         String(
+           recipe.meal_type || "",
+@@ -203,10 +209,21 @@ export default function RecipesPage() {
+ 
+       return searchableText.includes(query);
+     });
++
++    if (recipeSort === "taste") {
++      return matches.sort((a, b) => Number(b.taste_rating || 0) - Number(a.taste_rating || 0));
++    }
++
++    if (recipeSort === "ease") {
++      return matches.sort((a, b) => Number(b.ease_rating || 0) - Number(a.ease_rating || 0));
++    }
++
++    return matches;
+   }, [
+     recipes,
+     recipeSearch,
+     recipeMealFilter,
++    recipeSort,
+   ]);
+ 
+   useEffect(() => {
+@@ -250,6 +267,8 @@ export default function RecipesPage() {
+     setName("");
+     setMealType("Cena");
+     setServings("1");
++    setTasteRating("");
++    setEaseRating("");
+     setImageUrl(null);
+     setNotes("");
+     setDraftIngredients([]);
+@@ -279,6 +298,8 @@ export default function RecipesPage() {
+       setServings(
+         String(recipe.recipe_servings || 1),
+       );
++      setTasteRating(recipe.taste_rating ? String(recipe.taste_rating) : "");
++      setEaseRating(recipe.ease_rating ? String(recipe.ease_rating) : "");
+       setImageUrl(
+         recipe.image_url || null,
+       );
+@@ -802,6 +823,8 @@ export default function RecipesPage() {
+         ),
+       image_url: imageUrl,
+       notes: notes.trim() || null,
++      taste_rating: tasteRating ? Number(tasteRating) : null,
++      ease_rating: easeRating ? Number(easeRating) : null,
+       structured_ingredients:
+         draftIngredients.map((item) => ({
+           ingredient_id:
+@@ -1251,6 +1274,14 @@ export default function RecipesPage() {
+               ? "ricetta"
+               : "ricette"}
+           </div>
++          <label className={styles.recipeSort}>
++            <span>Ordina</span>
++            <select value={recipeSort} onChange={(event) => setRecipeSort(event.target.value as "recent" | "taste" | "ease")}>
++              <option value="recent">Più recenti</option>
++              <option value="taste">Gusto</option>
++              <option value="ease">Facilità</option>
++            </select>
++          </label>
+         </div>
+ 
+         {loading ? (
+@@ -1291,6 +1322,12 @@ export default function RecipesPage() {
+                     </strong>
+ 
+                     <div className={styles.recipeNutrition}>
++                      <span className={styles.recipeRating}>
++                        Gusto <strong>{recipe.taste_rating ?? "—"}/5</strong>
++                      </span>
++                      <span className={styles.recipeRating}>
++                        Facilità <strong>{recipe.ease_rating ?? "—"}/5</strong>
++                      </span>
+                       <span>
+                         <strong>
+                           {Math.round(
+@@ -1565,6 +1602,23 @@ export default function RecipesPage() {
+           </label>
+         </div>
+ 
++        <div className={styles.twoColumns}>
++          <label className={styles.field}>
++            Gusto
++            <select value={tasteRating} onChange={(event) => setTasteRating(event.target.value)}>
++              <option value="">Non valutato</option>
++              {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
++            </select>
++          </label>
++          <label className={styles.field}>
++            Facilità
++            <select value={easeRating} onChange={(event) => setEaseRating(event.target.value)}>
++              <option value="">Non valutata</option>
++              {[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}/5</option>)}
++            </select>
++          </label>
++        </div>
++
+         <label className={styles.field}>
+           Preparazione
+           <textarea
+diff --git a/frontend/components/home/HomeShell.module.css b/frontend/components/home/HomeShell.module.css
+index 0a72577..0f250c4 100644
+--- a/frontend/components/home/HomeShell.module.css
++++ b/frontend/components/home/HomeShell.module.css
+@@ -3637,19 +3637,6 @@
+   gap: 8px;
+ }
+ 
+-.recentMealPicker {
+-  display: grid;
+-  gap: 6px;
+-}
+-
+-.recentMealPicker > span {
+-  color: #68768a;
+-  font-size: 0.68rem;
+-  font-weight: 800;
+-  letter-spacing: 0.05em;
+-  text-transform: uppercase;
+-}
+-
+ .conversationControls select,
+ .conversationControls textarea {
+   width: 100%;
+diff --git a/frontend/components/home/HomeShell.tsx b/frontend/components/home/HomeShell.tsx
+index d9ea447..7e6aec5 100644
+--- a/frontend/components/home/HomeShell.tsx
++++ b/frontend/components/home/HomeShell.tsx
+@@ -35,7 +35,6 @@ import {
+   confirmConversationalMeal,
+   deleteMeal,
+   getMeal,
+-  getMealHistory,
+   getMealsForDate,
+   previewConversationalMeal,
+   previewPhotoMeal,
+@@ -395,8 +394,6 @@ export function HomeShell() {
+     useState<LoggedMeal | null>(null);
+   const [actualMeals, setActualMeals] =
+     useState<LoggedMeal[]>([]);
+-  const [mealHistory, setMealHistory] =
+-    useState<LoggedMeal[]>([]);
+ 
+   const [actualActivities, setActualActivities] =
+     useState<Activity[]>([]);
+@@ -476,27 +473,6 @@ export function HomeShell() {
+     [actualMeals],
+   );
+ 
+-  const recentMealChoices = useMemo(() => {
+-    const seen = new Set<string>();
+-
+-    return mealHistory.filter((meal) => {
+-      const name = (meal.base_name || meal.name || "").trim();
+-
+-      if (!name) {
+-        return false;
+-      }
+-
+-      const key = `${meal.meal_type.toLowerCase()}::${name.toLowerCase()}`;
+-
+-      if (seen.has(key)) {
+-        return false;
+-      }
+-
+-      seen.add(key);
+-      return true;
+-    });
+-  }, [mealHistory]);
+-
+   useEffect(() => {
+     if (
+       conversationPreview ||
+@@ -878,7 +854,6 @@ export function HomeShell() {
+           weightHistoryPayload,
+           dayHistoryPayload,
+           profilePayload,
+-          mealHistoryPayload,
+         ] = await Promise.all([
+           getDay(
+             date,
+@@ -920,10 +895,6 @@ export function HomeShell() {
+             accessToken,
+           ),
+           getProfile(accessToken),
+-          getMealHistory(accessToken).catch(() => ({
+-            count: 0,
+-            items: [],
+-          })),
+         ]);
+ 
+         const nextMealOptionsPayload =
+@@ -950,7 +921,6 @@ export function HomeShell() {
+               : null,
+           );
+           setActualMeals(mealsPayload.items);
+-          setMealHistory(mealHistoryPayload.items);
+           setActualActivities(
+             activitiesPayload.items,
+           );
+@@ -1281,7 +1251,6 @@ export function HomeShell() {
+       nextMealPayload,
+       mealsPayload,
+       activitiesPayload,
+-      mealHistoryPayload,
+     ] = await Promise.all([
+       getDay(date, accessToken),
+       getDayBudget(date, accessToken),
+@@ -1297,10 +1266,6 @@ export function HomeShell() {
+         date,
+         accessToken,
+       ),
+-      getMealHistory(accessToken).catch(() => ({
+-        count: 0,
+-        items: [],
+-      })),
+     ]);
+ 
+     const nextMealOptionsPayload =
+@@ -1323,7 +1288,6 @@ export function HomeShell() {
+         : null,
+     );
+     setActualMeals(mealsPayload.items);
+-    setMealHistory(mealHistoryPayload.items);
+     setActualActivities(
+       activitiesPayload.items,
+     );
+@@ -2582,37 +2546,6 @@ export function HomeShell() {
+             </div>
+ 
+             <div className={styles.conversationControls}>
+-              {conversationMode === "text" && recentMealChoices.length ? (
+-                <label className={styles.recentMealPicker}>
+-                  <span>Inserimento rapido</span>
+-                  <select
+-                    defaultValue=""
+-                    aria-label="Scegli un pasto già registrato"
+-                    onChange={(event) => {
+-                      const index = Number(event.target.value);
+-                      const meal = recentMealChoices[index];
+-
+-                      if (!meal) {
+-                        return;
+-                      }
+-
+-                      setConversationMealType(meal.meal_type || "Pranzo");
+-                      setConversationText(meal.base_name || meal.name);
+-                      setConversationPreview(null);
+-                      setConversationError(null);
+-                      setConversationSuccess(null);
+-                    }}
+-                  >
+-                    <option value="">Scegli tra i pasti recenti…</option>
+-                    {recentMealChoices.map((meal, index) => (
+-                      <option key={`${meal.id ?? index}-${meal.meal_type}`} value={index}>
+-                        {meal.name} · {meal.meal_type}
+-                      </option>
+-                    ))}
+-                  </select>
+-                </label>
+-              ) : null}
+-
+               <select
+                 value={conversationMealType}
+                 onChange={(event) =>
+diff --git a/frontend/components/home/QuickAdd.module.css b/frontend/components/home/QuickAdd.module.css
+index 7f5fdb8..8226a67 100644
+--- a/frontend/components/home/QuickAdd.module.css
++++ b/frontend/components/home/QuickAdd.module.css
+@@ -111,6 +111,61 @@
+   font-weight: 750;
+ }
+ 
++.knownMealField {
++  position: relative;
++}
++
++.knownMealSuggestions {
++  position: absolute;
++  z-index: 20;
++  top: calc(100% + 5px);
++  left: 0;
++  right: 0;
++  overflow: hidden;
++  border: 1px solid #d7d7d0;
++  border-radius: 12px;
++  background: #ffffff;
++  box-shadow: 0 16px 35px rgba(16, 39, 68, 0.14);
++}
++
++.knownMealSuggestions button {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 14px;
++  width: 100%;
++  padding: 10px 12px;
++  border: 0;
++  border-bottom: 1px solid #eeeeea;
++  background: #ffffff;
++  color: #102846;
++  cursor: pointer;
++  text-align: left;
++}
++
++.knownMealSuggestions button:last-child {
++  border-bottom: 0;
++}
++
++.knownMealSuggestions button:hover {
++  background: #fff2f1;
++}
++
++.knownMealSuggestions button span {
++  display: grid;
++  gap: 2px;
++}
++
++.knownMealSuggestions small {
++  color: #74746e;
++}
++
++.knownMealSuggestions b {
++  flex: 0 0 auto;
++  color: #ef5e5c;
++  font-size: 0.74rem;
++}
++
+ .panel input,
+ .panel select,
+ .ingredientRow select {
+diff --git a/frontend/components/home/QuickAdd.tsx b/frontend/components/home/QuickAdd.tsx
+index 50ff6ae..963fb61 100644
+--- a/frontend/components/home/QuickAdd.tsx
++++ b/frontend/components/home/QuickAdd.tsx
+@@ -12,7 +12,15 @@ import {
+   getIngredients,
+   type Ingredient,
+ } from "@/lib/api/ingredients";
+-import { createMeal } from "@/lib/api/meals";
++import {
++  createMeal,
++  getMealHistory,
++  type LoggedMeal,
++} from "@/lib/api/meals";
++import {
++  getRecipes,
++  type Recipe,
++} from "@/lib/api/recipes";
+ import { createWeight } from "@/lib/api/weight";
+ 
+ import styles from "./QuickAdd.module.css";
+@@ -45,6 +53,52 @@ interface IngredientRow {
+   unitMode: "g" | "unit";
+ }
+ 
++type KnownMeal = {
++  key: string;
++  name: string;
++  mealType: string;
++  quantityMode: "portion" | "grams";
++  calories: number;
++  protein: number;
++  carbs: number;
++  fat: number;
++  source: "Ricetta" | "Cronologia";
++};
++
++function recipeKnownMeal(recipe: Recipe): KnownMeal {
++  const servings = Math.max(1, Number(recipe.recipe_servings) || 1);
++
++  return {
++    key: `recipe-${recipe.id}`,
++    name: recipe.name,
++    mealType: recipe.meal_type || "Pranzo",
++    quantityMode: "portion",
++    calories: Number(recipe.calories || 0) / servings,
++    protein: Number(recipe.protein || 0) / servings,
++    carbs: Number(recipe.carbs || 0) / servings,
++    fat: Number(recipe.fat || 0) / servings,
++    source: "Ricetta",
++  };
++}
++
++function historyKnownMeal(meal: LoggedMeal): KnownMeal {
++  const quantity = Math.max(0.01, Number(meal.quantity) || 1);
++  const perHundred = meal.is_per_100g === true;
++  const fallbackFactor = perHundred ? 100 / quantity : 1 / quantity;
++
++  return {
++    key: `history-${meal.id ?? `${meal.date}-${meal.name}`}`,
++    name: meal.base_name || meal.name,
++    mealType: meal.meal_type || "Pranzo",
++    quantityMode: perHundred ? "grams" : "portion",
++    calories: Number(meal.base_calories ?? Number(meal.calories || 0) * fallbackFactor),
++    protein: Number(meal.base_protein ?? Number(meal.protein || 0) * fallbackFactor),
++    carbs: Number(meal.base_carbs ?? Number(meal.carbs || 0) * fallbackFactor),
++    fat: Number(meal.base_fat ?? Number(meal.fat || 0) * fallbackFactor),
++    source: "Cronologia",
++  };
++}
++
+ 
+ function defaultIngredientAmount(
+   ingredient: Ingredient,
+@@ -150,6 +204,10 @@ export function QuickAdd({
+ 
+   const [name, setName] =
+     useState("");
++  const [knownMeals, setKnownMeals] =
++    useState<KnownMeal[]>([]);
++  const [showKnownMeals, setShowKnownMeals] =
++    useState(false);
+ 
+   const [calories, setCalories] =
+     useState("");
+@@ -202,6 +260,79 @@ export function QuickAdd({
+   const [message, setMessage] =
+     useState<string | null>(null);
+ 
++  const knownMealSuggestions = useMemo(() => {
++    const query = name.trim().toLocaleLowerCase("it");
++
++    return knownMeals
++      .filter((meal) => {
++        const snack = ["spuntino", "snack"].includes(
++          meal.mealType.toLocaleLowerCase("it"),
++        );
++        const compatible = mode === "snack" ? snack : !snack;
++
++        return compatible && (
++          !query || meal.name.toLocaleLowerCase("it").includes(query)
++        );
++      })
++      .slice(0, 8);
++  }, [knownMeals, mode, name]);
++
++  useEffect(() => {
++    if ((mode !== "meal" && mode !== "snack") || !accessToken) {
++      return;
++    }
++
++    let active = true;
++
++    async function loadKnownMeals() {
++      const [recipes, history] = await Promise.all([
++        getRecipes(accessToken).catch(() => ({ count: 0, items: [] })),
++        getMealHistory(accessToken).catch(() => ({ count: 0, items: [] })),
++      ]);
++
++      if (!active) {
++        return;
++      }
++
++      const seen = new Set<string>();
++      const choices = [
++        ...recipes.items.map(recipeKnownMeal),
++        ...history.items.map(historyKnownMeal),
++      ].filter((meal) => {
++        const key = meal.name.trim().toLocaleLowerCase("it");
++
++        if (!key || seen.has(key)) {
++          return false;
++        }
++
++        seen.add(key);
++        return true;
++      });
++
++      setKnownMeals(choices);
++    }
++
++    void loadKnownMeals();
++
++    return () => {
++      active = false;
++    };
++  }, [mode, accessToken]);
++
++  function selectKnownMeal(meal: KnownMeal) {
++    setName(meal.name);
++    setMealType(meal.mealType === "Spuntino" ? "Pranzo" : meal.mealType);
++    setQuantityMode(meal.quantityMode);
++    setMealQuantity(meal.quantityMode === "grams" ? "100" : "1");
++    setCalories(String(Math.round(meal.calories * 10) / 10));
++    setProtein(String(Math.round(meal.protein * 10) / 10));
++    setCarbs(String(Math.round(meal.carbs * 10) / 10));
++    setFat(String(Math.round(meal.fat * 10) / 10));
++    setMealEntryMode("quick");
++    setShowKnownMeals(false);
++    setMessage(null);
++  }
++
+ 
+   useEffect(() => {
+     if (
+@@ -966,7 +1097,7 @@ export function QuickAdd({
+             </label>
+           ) : null}
+ 
+-          <label>
++          <label className={styles.knownMealField}>
+             <span>
+               Nome del pasto
+             </span>
+@@ -978,8 +1109,37 @@ export function QuickAdd({
+                 setName(
+                   event.target.value,
+                 );
++                setShowKnownMeals(true);
+               }}
++              onFocus={() => setShowKnownMeals(true)}
++              onBlur={() => {
++                window.setTimeout(() => setShowKnownMeals(false), 120);
++              }}
++              autoComplete="off"
++              role="combobox"
++              aria-expanded={showKnownMeals && knownMealSuggestions.length > 0}
++              aria-autocomplete="list"
+             />
++
++            {showKnownMeals && knownMealSuggestions.length ? (
++              <div className={styles.knownMealSuggestions} role="listbox">
++                {knownMealSuggestions.map((meal) => (
++                  <button
++                    key={meal.key}
++                    type="button"
++                    role="option"
++                    onMouseDown={(event) => event.preventDefault()}
++                    onClick={() => selectKnownMeal(meal)}
++                  >
++                    <span>
++                      <strong>{meal.name}</strong>
++                      <small>{meal.source} · {meal.mealType}</small>
++                    </span>
++                    <b>{Math.round(meal.calories)} kcal</b>
++                  </button>
++                ))}
++              </div>
++            ) : null}
+           </label>
+ 
+           {mealEntryMode === "quick" ? (
+diff --git a/frontend/components/navigation/AppNav.module.css b/frontend/components/navigation/AppNav.module.css
+index 8d14539..efc2023 100644
+--- a/frontend/components/navigation/AppNav.module.css
++++ b/frontend/components/navigation/AppNav.module.css
+@@ -126,6 +126,17 @@
+   line-height: 1;
+ }
+ 
++.desktopIcon svg,
++.mobileIcon svg {
++  width: 20px;
++  height: 20px;
++  fill: none;
++  stroke: currentColor;
++  stroke-width: 1.9;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++
+ .separator {
+   height: 1px;
+   margin: 18px 14px;
+diff --git a/frontend/components/navigation/AppNav.tsx b/frontend/components/navigation/AppNav.tsx
+index cf23771..a5f0b8f 100644
+--- a/frontend/components/navigation/AppNav.tsx
++++ b/frontend/components/navigation/AppNav.tsx
+@@ -26,7 +26,12 @@ const ITEMS = [
+   {
+     href: "/progress",
+     label: "Progressi",
+-    icon: "▥",
++    icon: (
++      <svg aria-hidden="true" viewBox="0 0 24 24">
++        <path d="M4 18 9 13l3 3 7-8" />
++        <path d="M14 8h5v5" />
++      </svg>
++    ),
+   },
+ ];
+ 
+diff --git a/frontend/lib/api/recipes.ts b/frontend/lib/api/recipes.ts
+index 38d9875..ab3f180 100644
+--- a/frontend/lib/api/recipes.ts
++++ b/frontend/lib/api/recipes.ts
+@@ -33,6 +33,8 @@ export interface Recipe {
+   notes?: string | null;
+   ingredients_json?: unknown;
+   image_url?: string | null;
++  taste_rating?: number | null;
++  ease_rating?: number | null;
+   structured_ingredients?: StructuredRecipeIngredient[];
+ }
+ 
+@@ -48,6 +50,8 @@ export interface RecipeWriteInput {
+   recipe_servings?: number | null;
+   image_url?: string | null;
+   notes?: string | null;
++  taste_rating?: number | null;
++  ease_rating?: number | null;
+   structured_ingredients: Array<{
+     ingredient_id: string;
+     quantity: number;
+-- 
+2.51.1
+
