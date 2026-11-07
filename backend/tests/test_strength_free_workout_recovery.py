@@ -150,3 +150,52 @@ def test_phase2_routes_are_published():
     paths = core_app.openapi()["paths"]
     assert "/strength/workouts/free/recent" in paths
     assert "/strength/workouts/{workout_id}/detail" in paths
+
+
+def test_cannot_substitute_exercise_after_saving_sets():
+    class ExerciseRows:
+        updated = False
+
+        def get(self, user_id, exercise_id):
+            return {
+                "id": exercise_id,
+                "strength_workout_id": "workout-1",
+                "exercise_id": "library-1",
+            }
+
+        def update(self, **kwargs):
+            self.updated = True
+            return {}
+
+    class HasSets:
+        def has_logged_sets_for_exercise(
+            self, user_id, workout_log_id, exercise_id
+        ):
+            assert (user_id, workout_log_id, exercise_id) == (
+                "user-1", "log-1", "exercise-1"
+            )
+            return True
+
+    class Library:
+        def get_exercise(self, identifier, language="it"):
+            raise AssertionError(
+                "Should reject before loading replacement"
+            )
+
+    exercises = ExerciseRows()
+    with pytest.raises(HTTPException) as exc:
+        strength.substitute_strength_exercise(
+            workout_id="workout-1",
+            exercise_id="exercise-1",
+            request=strength.StrengthExerciseSubstituteRequest(
+                library_exercise_id="replacement-1"
+            ),
+            current_user=user(),
+            workouts_repo=Workouts(),
+            exercises_repo=exercises,
+            library_repo=Library(),
+            workout_logs_repo=Logs(),
+            set_logs_repo=HasSets(),
+        )
+    assert exc.value.status_code == 409
+    assert exercises.updated is False
