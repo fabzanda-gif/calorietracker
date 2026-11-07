@@ -1,0 +1,179 @@
+.card {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.header,
+.autoCard,
+.proposal {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.header h3 {
+  margin: 0;
+}
+
+.header p {
+  margin: 6px 0 0;
+  color: rgba(15, 23, 42, 0.62);
+}
+
+.refresh,
+.secondaryButton {
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: white;
+  color: inherit;
+  font: inherit;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.refresh:disabled,
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.error,
+.ok {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 13px;
+}
+
+.error {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.ok {
+  display: grid;
+  gap: 3px;
+  background: rgba(22, 163, 74, 0.07);
+}
+
+.ok span {
+  color: rgba(15, 23, 42, 0.62);
+}
+
+.eventStrip {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.event {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.event span {
+  font-size: 0.76rem;
+  color: rgba(15, 23, 42, 0.58);
+}
+
+.autoCard,
+.proposal {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 15px;
+}
+
+.autoCard {
+  background: rgba(14, 116, 144, 0.07);
+}
+
+.proposal {
+  background: rgba(255, 104, 101, 0.08);
+}
+
+.autoCard > div:first-child,
+.proposal > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.autoCard span,
+.proposal span,
+.proposal small {
+  font-size: 0.76rem;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.autoCard p,
+.proposal p {
+  margin: 0;
+  max-width: 680px;
+  color: rgba(15, 23, 42, 0.72);
+  line-height: 1.45;
+}
+
+.target {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.primaryButton {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 13px;
+  background: #111827;
+  color: white;
+  font: inherit;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .header,
+  .autoCard,
+  .proposal {
+    flex-direction: column;
+  }
+
+  .refresh,
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .target {
+    text-align: left;
+  }
+
+  .actions {
+    width: 100%;
+    flex-direction: column;
+  }
+}
