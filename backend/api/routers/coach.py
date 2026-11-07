@@ -21,6 +21,7 @@ from backend.api.dependencies import (
     get_strength_workout_exercises_repository,
     get_strength_workout_logs_repository,
     get_strength_workouts_repository,
+    get_strength_plans_repository,
     get_training_coach_adjustments_repository,
     get_training_coach_preferences_repository,
 )
@@ -39,6 +40,7 @@ from backend.repositories.strength_workouts import (
     StrengthWorkoutExercisesRepository,
     StrengthWorkoutsRepository,
 )
+from backend.repositories.strength_plans import StrengthPlansRepository
 from backend.repositories.training_coach_adjustments import (
     TrainingCoachAdjustmentsRepository,
 )
@@ -51,6 +53,9 @@ from backend.services.adaptive_training_coach import (
 from backend.services.training_load import (
     TrainingLoadService,
 )
+from backend.services.skipped_session_review import (
+    SkippedSessionReviewService,
+)
 
 
 router = APIRouter(
@@ -61,6 +66,11 @@ router = APIRouter(
 
 class CoachReconcileRequest(BaseModel):
     as_of: date | None = None
+
+
+class CoachRecoveryApplyRequest(BaseModel):
+    suggested_date: date
+    original_date: date
 
 
 class CoachPreferencesUpdate(BaseModel):
@@ -228,6 +238,35 @@ def _coach_context(
         )
     ]
 
+    skipped_running = [
+        item
+        for item in planned_repo.list_range(
+            user_id, recent_start, as_of,
+        )
+        if item.get("status") == "skipped"
+        and _is_running_planned(item)
+    ]
+    skipped_strength = [
+        item
+        for item in workouts_repo.list_date_range(
+            user_id, recent_start, as_of,
+        )
+        if item.get("status") == "skipped"
+    ]
+    recovery_future_end = as_of + timedelta(days=8)
+    recovery_alerts = SkippedSessionReviewService().build(
+        as_of=as_of,
+        running_sessions=skipped_running,
+        strength_workouts=skipped_strength,
+        upcoming_running=planned_repo.list_range(
+            user_id, as_of, recovery_future_end,
+        ),
+        upcoming_strength=workouts_repo.list_date_range(
+            user_id, as_of, recovery_future_end,
+        ),
+        recent_events=events,
+    )
+
     proposals = (
         AdaptiveTrainingCoachService().build(
             recent_events=events,
@@ -251,6 +290,7 @@ def _coach_context(
         "upcoming_running":
             upcoming_running,
         "proposals": proposals,
+        "recovery_alerts": recovery_alerts,
     }
 
 
@@ -295,6 +335,7 @@ def _apply_strength_changes(
     workouts_repo: StrengthWorkoutsRepository,
     exercises_repo:
         StrengthWorkoutExercisesRepository,
+    before_state: dict | None = None,
 ) -> dict:
     workout = workouts_repo.get(
         user_id,
@@ -313,7 +354,23 @@ def _apply_strength_changes(
             ),
         )
 
-    updated_exercises = []
+    # Validate the full adjustment before updating any exercise.
+    # This avoids applying only half of an obsolete proposal.
+    if before_state:
+        for field in ("scheduled_date", "focus"):
+            if (
+                field in before_state
+                and workout.get(field) != before_state[field]
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "La seduta è cambiata. "
+                        "Aggiorna il Coach prima di applicare."
+                    ),
+                )
+
+    validated_updates = []
 
     for item in (
         proposed_changes.get(
@@ -353,6 +410,24 @@ def _apply_strength_changes(
                 ),
             )
 
+        # The proposal records the values it was calculated from.
+        # Refuse to overwrite subsequent user edits.
+        for before_field, current_field in (
+            ("before_load_kg", "prescribed_load_kg"),
+            ("before_target_sets", "target_sets"),
+        ):
+            if (
+                before_field in item
+                and exercise.get(current_field) != item[before_field]
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Un esercizio è cambiato. "
+                        "Aggiorna il Coach prima di applicare."
+                    ),
+                )
+
         payload = {}
 
         if (
@@ -374,9 +449,11 @@ def _apply_strength_changes(
                 item["target_sets"]
             )
 
-        if not payload:
-            continue
+        if payload:
+            validated_updates.append((exercise_id, payload))
 
+    updated_exercises = []
+    for exercise_id, payload in validated_updates:
         updated = exercises_repo.update(
             user_id=user_id,
             exercise_id=exercise_id,
@@ -404,6 +481,7 @@ def _apply_running_changes(
     proposed_changes: dict,
     planned_repo:
         PlannedActivitiesRepository,
+    before_state: dict | None = None,
 ) -> dict:
     planned = planned_repo.get(
         target_id,
@@ -421,6 +499,27 @@ def _apply_running_changes(
                 "più modificabile."
             ),
         )
+
+    # Do not overwrite manual edits made after the Coach suggestion.
+    # Legacy adjustments may not have a complete before_state snapshot.
+    if before_state:
+        for field in (
+            "scheduled_date",
+            "distance_meters",
+            "duration_minutes",
+            "intensity",
+        ):
+            if (
+                field in before_state
+                and planned.get(field) != before_state[field]
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "La seduta è cambiata. "
+                        "Aggiorna il Coach prima di applicare."
+                    ),
+                )
 
     allowed = {
         "distance_meters",
@@ -492,6 +591,7 @@ def _apply_adjustment(
             proposed_changes=changes,
             workouts_repo=workouts_repo,
             exercises_repo=exercises_repo,
+            before_state=adjustment.get("before_state"),
         )
 
     if target_kind == "planned_activity":
@@ -500,6 +600,7 @@ def _apply_adjustment(
             target_id=target_id,
             proposed_changes=changes,
             planned_repo=planned_repo,
+            before_state=adjustment.get("before_state"),
         )
 
     raise HTTPException(
@@ -547,6 +648,11 @@ def update_training_coach_preferences(
             get_training_coach_preferences_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         item = preferences_repo.upsert(
             user_id=current_user.id,
@@ -611,6 +717,11 @@ def reconcile_training_coach(
             get_training_coach_preferences_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     as_of = request.as_of or date.today()
 
     try:
@@ -734,36 +845,10 @@ def reconcile_training_coach(
                     "not persisted"
                 )
 
-            if proposal.get("auto_apply"):
-                after_state = _apply_adjustment(
-                    user_id=current_user.id,
-                    adjustment=created,
-                    workouts_repo=workouts_repo,
-                    exercises_repo=exercises_repo,
-                    planned_repo=planned_repo,
-                )
-
-                updated = adjustment_repo.update(
-                    adjustment_id=
-                        created["id"],
-                    user_id=current_user.id,
-                    payload={
-                        "decision":
-                            "auto_applied",
-                        "after_state":
-                            after_state,
-                        "updated_at":
-                            datetime.now(
-                                timezone.utc
-                            ).isoformat(),
-                    },
-                )
-
-                resolved.append(
-                    updated or created
-                )
-            else:
-                resolved.append(created)
+            # Phase 5 policy: reconciling is discovery, never consent.
+            # Even an internally marked auto_apply candidate requires
+            # explicit acceptance in /adjustments/{id}/apply.
+            resolved.append(created)
 
         history = adjustment_repo.list_recent(
             user_id=current_user.id,
@@ -786,6 +871,8 @@ def reconcile_training_coach(
             },
             "load_events":
                 context["events"],
+            "recovery_alerts":
+                context.get("recovery_alerts", []),
             "adjustments": resolved,
             "history": history,
             "summary": {
@@ -815,6 +902,179 @@ def reconcile_training_coach(
         ) from exc
 
 
+@router.post("/recovery/{kind}/{session_id}/apply")
+def apply_skipped_session_recovery(
+    kind: Literal["planned_activity", "strength_workout"],
+    session_id: str,
+    request: CoachRecoveryApplyRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
+    plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+    exercises_repo: StrengthWorkoutExercisesRepository = Depends(
+        get_strength_workout_exercises_repository
+    ),
+    set_logs_repo: StrengthSetLogsRepository = Depends(
+        get_strength_set_logs_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
+):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
+    # Recompute a suggestion on the server. The client cannot select
+    # an unchecked date or move a different user's session.
+    as_of = date.today()
+    recent_start = as_of - timedelta(days=3)
+    future_end = as_of + timedelta(days=8)
+
+    if kind == "planned_activity":
+        source = planned_repo.get(session_id, current_user.id)
+        if source and not _is_running_planned(source):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La seduta non è una corsa ripianificabile.",
+            )
+    else:
+        source = workouts_repo.get(current_user.id, session_id)
+
+    if not source:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Seduta non trovata.",
+        )
+    if (
+        source.get("status") != "skipped"
+        or str(source.get("scheduled_date")) != request.original_date.isoformat()
+        or not (recent_start <= request.original_date <= as_of)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La seduta è cambiata. Aggiorna il Coach.",
+        )
+
+    # A skipped final workout may have completed its strength plan.
+    # Reactivate only that completed plan when this workout is recovered.
+    plan_to_reopen = None
+    if kind == "strength_workout" and source.get("strength_plan_id"):
+        plan_to_reopen = plans_repo.get(
+            source["strength_plan_id"], current_user.id,
+        )
+        if not plan_to_reopen or plan_to_reopen.get("status") not in {
+            "active", "completed"
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Il programma palestra non è più attivo.",
+            )
+
+    try:
+        context = _coach_context(
+            user_id=current_user.id,
+            as_of=as_of,
+            activities_repo=activities_repo,
+            planned_repo=planned_repo,
+            workouts_repo=workouts_repo,
+            exercises_repo=exercises_repo,
+            workout_logs_repo=workout_logs_repo,
+            set_logs_repo=set_logs_repo,
+        )
+        alerts = context["recovery_alerts"]
+        match = next(
+            (
+                item for item in alerts
+                if item["kind"] == kind
+                and item["session_id"] == session_id
+            ),
+            None,
+        )
+        if (
+            not match
+            or match["suggested_date"] != request.suggested_date.isoformat()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La proposta non è più valida. Aggiorna il Coach.",
+            )
+
+        if kind == "planned_activity":
+            updated = planned_repo.reschedule_skipped(
+                activity_id=session_id,
+                user_id=current_user.id,
+                original_date=request.original_date.isoformat(),
+                new_date=request.suggested_date.isoformat(),
+            )
+        else:
+            updated = workouts_repo.reschedule_skipped(
+                workout_id=session_id,
+                user_id=current_user.id,
+                original_date=request.original_date.isoformat(),
+                new_date=request.suggested_date.isoformat(),
+            )
+
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La seduta è cambiata. Aggiorna il Coach.",
+            )
+
+        plan_update = None
+        if plan_to_reopen and plan_to_reopen.get("status") == "completed":
+            try:
+                plan_update = plans_repo.reopen_completed(
+                    plan_id=plan_to_reopen["id"],
+                    user_id=current_user.id,
+                )
+            except RepositoryError:
+                plan_update = None
+
+            if not plan_update:
+                # Two Supabase writes are not atomic. Attempt a
+                # conditional compensation on either failure mode.
+                undone = workouts_repo.undo_recovery(
+                    workout_id=session_id,
+                    user_id=current_user.id,
+                    original_date=request.original_date.isoformat(),
+                    recovered_date=request.suggested_date.isoformat(),
+                )
+                if not undone:
+                    raise RepositoryError(
+                        "Strength plan reactivation and recovery "
+                        "compensation both failed; manual repair needed"
+                    )
+                raise RepositoryError(
+                    "Strength plan could not be reactivated; "
+                    "workout recovery was reverted"
+                )
+
+        return {
+            "applied": True,
+            "item": updated,
+            "plan": plan_update,
+        }
+
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post(
     "/adjustments/{adjustment_id}/apply"
 )
@@ -840,6 +1100,11 @@ def apply_training_coach_adjustment(
             get_training_coach_adjustments_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         adjustment = adjustment_repo.get(
             adjustment_id,
@@ -911,6 +1176,11 @@ def dismiss_training_coach_adjustment(
             get_training_coach_adjustments_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         adjustment = adjustment_repo.get(
             adjustment_id,

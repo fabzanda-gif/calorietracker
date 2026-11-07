@@ -9,14 +9,18 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
+  applyCoachRecovery,
   applyCoachAdjustment,
   dismissCoachAdjustment,
   reconcileTrainingCoach,
   updateCoachPreferences,
   type CoachAdjustment,
   type CoachLoadEvent,
+  type CoachRecoveryAlert,
   type CoachPriority,
 } from "@/lib/api/coach";
+
+import { getAthleteState, type AthleteState } from "@/lib/api/athlete-state";
 
 import styles from "./AdaptiveCoachPanel.module.css";
 
@@ -119,8 +123,11 @@ export function AdaptiveCoachPanel({
     useState<string | null>(null);
   const [events, setEvents] =
     useState<CoachLoadEvent[]>([]);
+  const [athlete, setAthlete] = useState<AthleteState | null>(null);
   const [adjustments, setAdjustments] =
     useState<CoachAdjustment[]>([]);
+  const [recoveryAlerts, setRecoveryAlerts] =
+    useState<CoachRecoveryAlert[]>([]);
   const [busyId, setBusyId] =
     useState<string | null>(null);
   const [priority, setPriority] =
@@ -150,9 +157,18 @@ export function AdaptiveCoachPanel({
         setEvents(
           response.load_events,
         );
+        setRecoveryAlerts(response.recovery_alerts ?? []);
         setAdjustments(
           response.adjustments,
         );
+        // Athlete State is descriptive context only. Its absence must
+        // not turn a Coach analysis into a failed or unsafe write.
+        try {
+          const snapshot = await getAthleteState(accessToken);
+          setAthlete(snapshot);
+        } catch {
+          setAthlete(null);
+        }
       } catch (err) {
         setError(
           err instanceof Error
@@ -223,6 +239,46 @@ export function AdaptiveCoachPanel({
           ? err.message
           : "Non riesco ad applicare la proposta.",
       );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function approveRecovery(alert: CoachRecoveryAlert) {
+    if (!accessToken || !alert.suggested_date) {
+      return;
+    }
+
+    const approved = window.confirm(
+      "Ripianificare “" + alert.title + "” al " +
+      formatDate(alert.suggested_date) + "?"
+    );
+    if (!approved) {
+      return;
+    }
+
+    setBusyId(alert.kind + "-" + alert.session_id);
+    setError(null);
+
+    try {
+      await applyCoachRecovery(
+        alert.kind,
+        alert.session_id,
+        alert.scheduled_date,
+        alert.suggested_date,
+        accessToken,
+      );
+      await load();
+      if (onChanged) {
+        await onChanged();
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "La ripianificazione non è disponibile.",
+      );
+      await load();
     } finally {
       setBusyId(null);
     }
@@ -367,6 +423,29 @@ export function AdaptiveCoachPanel({
         </div>
       ) : null}
 
+      <div className={styles.athleteSummary} role="status">
+        <strong>Contesto dallo storico palestra</strong>
+        {athlete ? (
+          <span>
+            {athlete.last_28_days.completed_sessions} sedute e{" "}
+            {athlete.last_28_days.total_sets} serie negli ultimi 28 giorni.
+            {" "}
+            {athlete.data_status === "limited"
+              ? "Dati ancora limitati: nessuna conclusione automatica sul recupero."
+              : "Le proposte restano soggette alla tua conferma."}
+          </span>
+        ) : (
+          <span>
+            Storico atleta non disponibile: il Coach usa solo le attività
+            registrate e le sedute pianificate verificabili.
+          </span>
+        )}
+        <small>
+          Nessuna riduzione di carico o ripianificazione viene applicata
+          semplicemente aprendo questa schermata.
+        </small>
+      </div>
+
       {events.length ? (
         <div className={styles.eventStrip}>
           {events.slice(0, 4).map(
@@ -396,7 +475,61 @@ export function AdaptiveCoachPanel({
         </div>
       ) : null}
 
+      {recoveryAlerts.map((alert) => (
+        <article
+          key={alert.kind + "-" + alert.session_id}
+          className={styles.proposal}
+        >
+          <div>
+            <span>Allenamento saltato · Da valutare</span>
+            <strong>{alert.title}</strong>
+            <p>{alert.message}</p>
+            {alert.suggested_date && !alert.is_race ? (
+              <p>
+                {alert.recovery_days === 0
+                  ? "Seduta leggera: nessun giorno extra richiesto dalla regola del calendario."
+                  : "Spaziatura prudenziale: " +
+                    alert.recovery_days +
+                    (alert.recovery_days === 1
+                      ? " giorno"
+                      : " giorni") +
+                    " rispetto ad altre sedute."}
+              </p>
+            ) : null}
+            <small>
+              {alert.kind === "strength_workout"
+                ? "Palestra"
+                : "Corsa"}
+              {" · "}
+              {formatDate(alert.scheduled_date)}
+              {alert.suggested_date
+                ? " → " + formatDate(alert.suggested_date)
+                : ""}
+            </small>
+          </div>
+          {alert.suggested_date && !alert.is_race ? (
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={
+                  busyId === alert.kind + "-" + alert.session_id
+                }
+                onClick={() => {
+                  void approveRecovery(alert);
+                }}
+              >
+                {busyId === alert.kind + "-" + alert.session_id
+                  ? "Ripianifico…"
+                  : "Conferma nuova data"}
+              </button>
+            </div>
+          ) : null}
+        </article>
+      ))}
+
       {!loading &&
+      recoveryAlerts.length === 0 &&
       proposed.length === 0 &&
       automatic.length === 0 ? (
         <div className={styles.ok}>
