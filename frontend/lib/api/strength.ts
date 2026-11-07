@@ -42,6 +42,7 @@ export interface StrengthWorkoutExercise {
   user_id?: string;
   strength_workout_id: string;
   position: number;
+  exercise_id?: string | null;
   exercise_key: string;
   exercise_name: string;
   movement_pattern: string;
@@ -51,18 +52,22 @@ export interface StrengthWorkoutExercise {
   target_rir: number | null;
   rest_seconds: number | null;
   prescribed_load_kg: number | null;
+  is_user_added?: boolean;
+  substituted_from_exercise_id?: string | null;
+  prescription_source?: "plan" | "manual" | "substitution";
 }
 
 export interface StrengthWorkout {
   id: string;
   user_id?: string;
-  strength_plan_id: string;
+  strength_plan_id: string | null;
   scheduled_date: string;
-  training_week: number;
-  workout_index: number;
+  training_week: number | null;
+  workout_index: number | null;
   title: string;
   focus: string;
   status: StrengthWorkoutStatus;
+  workout_kind?: "planned" | "free";
   estimated_duration_minutes: number | null;
   exercises: StrengthWorkoutExercise[];
 }
@@ -105,10 +110,17 @@ export interface StrengthPlanDetailResponse {
   workouts: StrengthWorkout[];
 }
 
+export type StrengthEffortFeeling =
+  | "easy"
+  | "right"
+  | "hard"
+  | "too_hard";
+
 export interface StrengthSetLogInput {
   reps: number;
   load_kg: number;
-  rir: number | null;
+  rir?: number | null;
+  feeling?: StrengthEffortFeeling | null;
 }
 
 export interface StrengthWorkoutLogInput {
@@ -430,6 +442,206 @@ export function applyStrengthProgression(
     {
       method: "POST",
       accessToken,
+    },
+  );
+}
+
+
+export interface StrengthSavedSet {
+  id?: string;
+  strength_workout_log_id: string;
+  strength_workout_exercise_id: string;
+  set_index: number;
+  reps: number;
+  load_kg: number;
+  rir: number | null;
+  feeling: StrengthEffortFeeling | null;
+}
+
+export interface StrengthSessionResponse {
+  status: "draft";
+  workout: StrengthWorkout;
+  workout_log: {
+    id: string;
+    strength_workout_id: string;
+    performed_date: string;
+    duration_minutes: number | null;
+    notes: string | null;
+    status: "draft";
+  };
+  exercises: StrengthWorkoutExercise[];
+  sets: StrengthSavedSet[];
+}
+
+export function startStrengthSession(
+  workoutId: string,
+  performedDate: string,
+  accessToken?: string | null,
+): Promise<StrengthSessionResponse> {
+  return apiRequest<StrengthSessionResponse>(
+    `/strength/workouts/${workoutId}/session`,
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        performed_date: performedDate,
+      }),
+    },
+  );
+}
+
+export function saveStrengthSet(
+  workoutId: string,
+  exerciseId: string,
+  setIndex: number,
+  input: {
+    reps: number;
+    load_kg: number;
+    feeling?: StrengthEffortFeeling | null;
+    rir?: number | null;
+  },
+  accessToken?: string | null,
+): Promise<{
+  saved: true;
+  workout_log_id: string;
+  set: StrengthSavedSet;
+}> {
+  return apiRequest(
+    (
+      `/strength/workouts/${workoutId}` +
+      `/exercises/${exerciseId}/sets/${setIndex}`
+    ),
+    {
+      method: "PUT",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deleteStrengthSet(
+  workoutId: string,
+  exerciseId: string,
+  setIndex: number,
+  accessToken?: string | null,
+): Promise<{ deleted: true }> {
+  return apiRequest(
+    (
+      `/strength/workouts/${workoutId}` +
+      `/exercises/${exerciseId}/sets/${setIndex}`
+    ),
+    {
+      method: "DELETE",
+      accessToken,
+    },
+  );
+}
+
+export function completeStrengthSession(
+  workoutId: string,
+  input: {
+    duration_minutes?: number | null;
+    notes?: string | null;
+  },
+  accessToken?: string | null,
+): Promise<unknown> {
+  return apiRequest(
+    `/strength/workouts/${workoutId}/complete`,
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function createFreeStrengthWorkout(
+  input: {
+    title?: string;
+    performed_date?: string;
+  },
+  accessToken?: string | null,
+): Promise<{
+  created: true;
+  workout: StrengthWorkout;
+}> {
+  return apiRequest(
+    "/strength/workouts/free",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function addStrengthWorkoutExercise(
+  workoutId: string,
+  input: {
+    library_exercise_id: string;
+    target_sets?: number;
+    target_reps_min?: number;
+    target_reps_max?: number;
+    target_rir?: number | null;
+    rest_seconds?: number | null;
+  },
+  accessToken?: string | null,
+): Promise<{
+  created: true;
+  exercise: StrengthWorkoutExercise;
+}> {
+  return apiRequest(
+    `/strength/workouts/${workoutId}/exercises`,
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getStrengthSubstitutions(
+  workoutId: string,
+  exerciseId: string,
+  accessToken?: string | null,
+): Promise<{
+  items: Array<Record<string, unknown> & {
+    id: string;
+    name: string;
+    slug: string;
+    substitution_score: number;
+  }>;
+  count: number;
+}> {
+  return apiRequest(
+    (
+      `/strength/workouts/${workoutId}` +
+      `/exercises/${exerciseId}/substitutions`
+    ),
+    { accessToken },
+  );
+}
+
+export function substituteStrengthExercise(
+  workoutId: string,
+  exerciseId: string,
+  libraryExerciseId: string,
+  accessToken?: string | null,
+): Promise<{
+  substituted: true;
+  exercise: StrengthWorkoutExercise;
+}> {
+  return apiRequest(
+    (
+      `/strength/workouts/${workoutId}` +
+      `/exercises/${exerciseId}/substitute`
+    ),
+    {
+      method: "PUT",
+      accessToken,
+      body: JSON.stringify({
+        library_exercise_id: libraryExerciseId,
+      }),
     },
   );
 }
