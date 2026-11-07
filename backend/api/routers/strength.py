@@ -1939,7 +1939,10 @@ def skip_strength_workout(
 
         if (
             existing_log
-            and existing_log.get("status")
+            and existing_log.get(
+                "status",
+                "completed",
+            )
             == "completed"
         ):
             raise HTTPException(
