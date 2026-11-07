@@ -226,8 +226,9 @@ def test_training_setup_completes_training_only():
 
 def test_core_backend_exposes_onboarding_routes():
     paths = {
-        route.path
+        path
         for route in core_app.routes
+        if (path := getattr(route, "path", None))
     }
 
     assert "/onboarding/status" in paths
