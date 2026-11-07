@@ -9,6 +9,7 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
+  applyCoachRecovery,
   applyCoachAdjustment,
   dismissCoachAdjustment,
   reconcileTrainingCoach,
@@ -232,6 +233,46 @@ export function AdaptiveCoachPanel({
     }
   }
 
+  async function approveRecovery(alert: CoachRecoveryAlert) {
+    if (!accessToken || !alert.suggested_date) {
+      return;
+    }
+
+    const approved = window.confirm(
+      "Ripianificare “" + alert.title + "” al " +
+      formatDate(alert.suggested_date) + "?"
+    );
+    if (!approved) {
+      return;
+    }
+
+    setBusyId(alert.kind + "-" + alert.session_id);
+    setError(null);
+
+    try {
+      await applyCoachRecovery(
+        alert.kind,
+        alert.session_id,
+        alert.scheduled_date,
+        alert.suggested_date,
+        accessToken,
+      );
+      await load();
+      if (onChanged) {
+        await onChanged();
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "La ripianificazione non è disponibile.",
+      );
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function changePriority(
     nextPriority: CoachPriority,
   ) {
@@ -415,8 +456,29 @@ export function AdaptiveCoachPanel({
                 : "Corsa"}
               {" · "}
               {formatDate(alert.scheduled_date)}
+              {alert.suggested_date
+                ? " → " + formatDate(alert.suggested_date)
+                : ""}
             </small>
           </div>
+          {alert.suggested_date && !alert.is_race ? (
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={
+                  busyId === alert.kind + "-" + alert.session_id
+                }
+                onClick={() => {
+                  void approveRecovery(alert);
+                }}
+              >
+                {busyId === alert.kind + "-" + alert.session_id
+                  ? "Ripianifico…"
+                  : "Conferma nuova data"}
+              </button>
+            </div>
+          ) : null}
         </article>
       ))}
 
