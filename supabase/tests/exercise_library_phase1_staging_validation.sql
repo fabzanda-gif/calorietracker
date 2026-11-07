@@ -32,6 +32,7 @@ WITH expected_classification(
   ('0336', 'single_leg', 'secondary', 'medium', 'medium', 'high'),
   ('0432', 'hinge', 'secondary', 'medium', 'medium', 'medium'),
   ('drv-hip-raise-bridge', 'hinge', 'accessory', 'low', 'low', 'low'),
+  ('new-band-triceps-pushdown', 'isolation', 'accessory', 'low', 'low', 'low'),
   ('2611', 'squat', 'secondary', 'high', 'low', 'low'),
   ('0740', 'squat', 'secondary', 'high', 'low', 'low'),
   ('0743', 'squat', 'primary', 'high', 'medium', 'low'),
@@ -220,11 +221,11 @@ joined_relations AS (
   AND er.relationship=ee.relationship
 ),
 checks(name,passed,details) AS (
- SELECT 'curated_144_all_present',
-        (SELECT count(*)=144 AND count(id)=144 FROM classified),
-        (SELECT count(*)::text||'/144 source IDs' FROM classified WHERE id IS NOT NULL)
+ SELECT 'curated_145_all_present',
+        (SELECT count(*)=145 AND count(id)=145 FROM classified),
+        (SELECT count(*)::text||'/145 source IDs' FROM classified WHERE id IS NOT NULL)
  UNION ALL
- SELECT 'curated_144_metadata_matches',
+ SELECT 'curated_145_metadata_matches',
         NOT EXISTS (
           SELECT 1 FROM classified WHERE id IS NULL
            OR actual_movement_pattern IS DISTINCT FROM movement_pattern
