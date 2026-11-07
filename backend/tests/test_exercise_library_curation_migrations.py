@@ -13,7 +13,7 @@ MIGRATIONS = Path(__file__).resolve().parents[2] / "supabase" / "migrations"
 def test_phase1_second_curation_batch_is_bounded_and_non_approving():
     sql = (
         MIGRATIONS
-        / "20261107211000_curate_exercise_library_phase1_batch2.sql"
+        / "20261107233923_curate_exercise_library_phase1_batch2.sql"
     ).read_text(encoding="utf-8")
 
     # Match source IDs only in the curated VALUES block, not relationships.
@@ -57,7 +57,7 @@ def test_phase1_second_curation_batch_is_bounded_and_non_approving():
 def test_phase1_third_batch_is_bounded_and_does_not_approve():
     sql = (
         MIGRATIONS
-        / "20261107212000_curate_exercise_library_phase1_batch3.sql"
+        / "20261107233939_curate_exercise_library_phase1_batch3.sql"
     ).read_text(encoding="utf-8")
     curated = sql.split("with curated (", 1)[1].split(
         "update public.exercises", 1
@@ -92,10 +92,10 @@ def test_phase1_third_batch_is_bounded_and_does_not_approve():
 
 def test_phase1_curation_batches_cover_155_unique_exercises_without_approval():
     files = (
-        ("20261107210000_curate_exercise_library_phase1_batch1.sql", 18),
-        ("20261107211000_curate_exercise_library_phase1_batch2.sql", 44),
-        ("20261107212000_curate_exercise_library_phase1_batch3.sql", 53),
-        ("20261107213000_curate_exercise_library_phase1_batch4.sql", 30),
+        ("20261107233829_curate_exercise_library_phase1_batch1.sql", 18),
+        ("20261107233923_curate_exercise_library_phase1_batch2.sql", 44),
+        ("20261107233939_curate_exercise_library_phase1_batch3.sql", 53),
+        ("20261107233949_curate_exercise_library_phase1_batch4.sql", 30),
     )
     all_ids = []
     for filename, expected_count in files:
