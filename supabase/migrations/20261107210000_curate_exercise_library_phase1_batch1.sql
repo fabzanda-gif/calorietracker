@@ -71,7 +71,7 @@ resolved as (
     on dst.source='free-exercise-db-with-videos'
    and dst.source_id=p.target_id and dst.active=true
 ),
-symmetric as (
+symmetric_edges as (
   select source_exercise_id,target_exercise_id,relationship,score,rationale
   from resolved
   union all
@@ -82,7 +82,7 @@ symmetric as (
 insert into public.exercise_relationships
   (source_exercise_id,target_exercise_id,relationship,similarity_score,rationale)
 select source_exercise_id,target_exercise_id,relationship,score,rationale
-from symmetric
+from symmetric_edges
 on conflict (source_exercise_id,target_exercise_id,relationship)
 do update set similarity_score=excluded.similarity_score,
               rationale=excluded.rationale;
