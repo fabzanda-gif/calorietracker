@@ -7,6 +7,7 @@ on:
       - codex/landing-redesign
       - codex/phase4-program-generator-v2
       - codex/phase5-adaptive-coach-v1
+      - codex/phase6-training-nutrition-context
   pull_request:
     branches:
       - main
