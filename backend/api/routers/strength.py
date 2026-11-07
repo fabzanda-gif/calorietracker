@@ -636,6 +636,45 @@ def list_strength_workouts(
         ) from exc
 
 
+@router.get("/workouts/free/recent")
+def list_recent_free_strength_workouts(
+    current_user: CurrentUser = Depends(get_current_user),
+    workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+):
+    """Recover free workouts, including drafts after app/browser restart."""
+    try:
+        workouts = workouts_repo.list_recent_free(
+            current_user.id,
+            limit=30,
+        )
+        logs = workout_logs_repo.list_for_workout_ids(
+            current_user.id,
+            [str(workout["id"]) for workout in workouts],
+        )
+        logs_by_workout = {
+            str(log["strength_workout_id"]): log
+            for log in logs
+        }
+        items = [
+            {
+                "workout": workout,
+                "workout_log": logs_by_workout.get(str(workout["id"])),
+            }
+            for workout in workouts
+        ]
+        return {"items": items, "count": len(items)}
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post(
     "/workouts/{workout_id}/log",
     status_code=status.HTTP_201_CREATED,
