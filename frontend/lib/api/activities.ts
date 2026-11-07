@@ -63,6 +63,16 @@ export interface ActivityCreateResponse {
   created: boolean;
   item: Activity;
   movement?: ActivityMovementSummary;
+  coach?: {
+    available: boolean;
+    policy?: "gym" | "balanced" | "running";
+    summary?: {
+      events: number;
+      proposed: number;
+      auto_applied: number;
+    };
+    message?: string;
+  } | null;
 }
 
 export interface ActivityListResponse {
