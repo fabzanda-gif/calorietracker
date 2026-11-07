@@ -358,3 +358,57 @@ def test_endpoint_returns_404_for_unknown_workout():
         )
 
     assert exc.value.status_code == 404
+
+
+def test_easy_feeling_can_mark_top_reps_over_target():
+    logs = [
+        {
+            "strength_workout_exercise_id":
+                "exercise-1",
+            "set_index": index,
+            "reps": 12,
+            "load_kg": 80,
+            "rir": None,
+            "feeling": "easy",
+        }
+        for index in range(1, 4)
+    ]
+
+    result = StrengthOutcomeService().evaluate(
+        planned_exercises=[
+            planned("exercise-1")
+        ],
+        set_logs=logs,
+    )
+
+    assert (
+        result["exercises"][0]["outcome"]
+        == "over_target"
+    )
+
+
+def test_too_hard_feeling_marks_effort_under_target():
+    logs = [
+        {
+            "strength_workout_exercise_id":
+                "exercise-1",
+            "set_index": index,
+            "reps": 8,
+            "load_kg": 80,
+            "rir": None,
+            "feeling": "too_hard",
+        }
+        for index in range(1, 4)
+    ]
+
+    result = StrengthOutcomeService().evaluate(
+        planned_exercises=[
+            planned("exercise-1")
+        ],
+        set_logs=logs,
+    )
+
+    assert (
+        result["exercises"][0]["outcome"]
+        == "under_target"
+    )
