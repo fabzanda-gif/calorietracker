@@ -814,60 +814,62 @@ export function StrengthWorkoutLoggerV2({
         accessToken,
       );
 
-      const outcomeResponse =
-        await getStrengthWorkoutOutcome(
-          activeWorkout.id,
-          accessToken,
-        );
-
-      setOutcome(outcomeResponse.outcome);
-
-      if (
-        activeWorkout.workout_kind !== "free"
-      ) {
-        const preview =
-          await getStrengthProgressionPreview(
-            activeWorkout.id,
-            accessToken,
-          );
-
-        setProgression(preview);
-
-        const actionable =
-          preview.proposals.filter(
-            (proposal) =>
-              proposal.action !== "maintain" &&
-              proposal.next_exposure != null,
-          );
-
-        const applied = await Promise.allSettled(
-          actionable.map((proposal) =>
-            applyStrengthProgression(
-              activeWorkout.id,
-              proposal.exercise_id,
-              accessToken,
-            ),
-          ),
-        );
-
-        setAutoApplied(
-          applied.filter(
-            (item) =>
-              item.status === "fulfilled",
-          ).length,
-        );
-      }
-
-      setMessage(
-        "Seduta completata e salvata.",
-      );
+      // Completion has already committed on the server. Summary and
+      // progression reads are best-effort; their failure must never
+      // tell the athlete that their saved workout was not completed.
+      setMessage("Seduta completata e salvata.");
       setHistoryRefreshKey((value) => value + 1);
       if (activeWorkout.workout_kind === "free") {
         setActiveWorkout(workout);
       }
 
+      try {
+        const outcomeResponse =
+          await getStrengthWorkoutOutcome(
+            activeWorkout.id,
+            accessToken,
+          );
+        setOutcome(outcomeResponse.outcome);
+      } catch (summaryError) {
+        console.warn("Workout saved; outcome summary unavailable", summaryError);
+      }
+
+      if (activeWorkout.workout_kind !== "free") {
+        try {
+          const preview =
+            await getStrengthProgressionPreview(
+              activeWorkout.id,
+              accessToken,
+            );
+          setProgression(preview);
+          const actionable = preview.proposals.filter(
+            (proposal) =>
+              proposal.action !== "maintain" &&
+              proposal.next_exposure != null,
+          );
+          const applied = await Promise.allSettled(
+            actionable.map((proposal) =>
+              applyStrengthProgression(
+                activeWorkout.id,
+                proposal.exercise_id,
+                accessToken,
+              ),
+            ),
+          );
+          setAutoApplied(
+            applied.filter((item) => item.status === "fulfilled").length,
+          );
+        } catch (progressionError) {
+          console.warn("Workout saved; progression preview unavailable", progressionError);
+        }
+      }
+
       if (onCompleted) {
-        await onCompleted();
+        try {
+          await onCompleted();
+        } catch (refreshError) {
+          console.warn("Workout saved; parent refresh unavailable", refreshError);
+        }
       }
     } catch (err) {
       setError(
