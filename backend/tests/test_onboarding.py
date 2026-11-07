@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from backend.api.dependencies import CurrentUser
+from backend.api.core_main import app as core_app
 from backend.api.routers import onboarding
 
 
@@ -221,3 +222,15 @@ def test_training_setup_completes_training_only():
         "back",
         "shoulders",
     ]
+
+
+def test_core_backend_exposes_onboarding_routes():
+    paths = {
+        route.path
+        for route in core_app.routes
+    }
+
+    assert "/onboarding/status" in paths
+    assert "/onboarding/core" in paths
+    assert "/onboarding/nutrition" in paths
+    assert "/onboarding/training" in paths
