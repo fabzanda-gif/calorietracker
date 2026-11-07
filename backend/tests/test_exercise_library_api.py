@@ -41,6 +41,18 @@ class FakeExerciseLibraryRepo:
             }
         ]
 
+    def catalog_status(self):
+        return {
+            "total_active": 317,
+            "approved_for_generation": 10,
+            "pending_curation": 307,
+            "missing_movement_pattern": 307,
+            "missing_training_role": 307,
+            "missing_fatigue_cost": 307,
+            "has_substitution_relationships": False,
+            "by_body_part": {"back": 56},
+        }
+
     def list_exercises(self, **kwargs):
         self.list_calls.append(kwargs)
         return list(self.items)
@@ -131,3 +143,16 @@ def test_core_backend_exposes_exercise_library():
 
     assert "/exercises" in paths
     assert "/exercises/{identifier}" in paths
+
+
+def test_catalog_status_reports_quality_without_modifying_entries():
+    repo = FakeExerciseLibraryRepo()
+    response = exercises.get_catalog_status(
+        current_user=user(),
+        repo=repo,
+    )
+    assert response["total_active"] == 317
+    assert response["approved_for_generation"] == 10
+    assert response["pending_curation"] == 307
+    assert response["has_substitution_relationships"] is False
+    assert "/exercises/catalog/status" in core_app.openapi()["paths"]
