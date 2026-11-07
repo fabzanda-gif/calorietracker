@@ -210,7 +210,19 @@ def create_program_v2(
         if request.replace_active:
             for old in active:
                 if old.get("id") != saved["plan"]["id"]:
-                    plans_repo.delete(old["id"], current_user.id)
+                    # Never delete a previously active plan: the FK chain
+                    # would cascade to workouts, completed logs and sets.
+                    # Pause it while retaining the athlete's history.
+                    paused = plans_repo.update_status(
+                        plan_id=old["id"],
+                        user_id=current_user.id,
+                        status="paused",
+                    )
+                    if not paused or paused.get("status") != "paused":
+                        raise RepositoryError(
+                            "Unable to pause previous plan safely; "
+                            "new plan requires manual review."
+                        )
                     replaced.append(old["id"])
         return {"created": True, **saved, "replaced_plan_ids": replaced}
     except HTTPException:
