@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, timedelta
 from typing import Literal
 
@@ -10,6 +11,7 @@ from backend.api.dependencies import (
     CurrentUser,
     get_activities_repository,
     get_current_user,
+    get_supabase_client,
     get_meals_repository,
     get_strength_workout_logs_repository,
     get_weight_repository,
@@ -29,6 +31,33 @@ class MacroApplyRequest(BaseModel):
     preview_id: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     confirm: Literal[True]
     logging_complete_confirmed: Literal[True]
+
+
+def _verified_live_user(user: CurrentUser) -> CurrentUser:
+    """Bypass the short auth cache before a sensitive metadata write."""
+    try:
+        response = get_supabase_client().auth.get_user(user.access_token)
+        account = getattr(response, "user", None)
+        if (
+            account is None
+            or str(getattr(account, "id", "")) !=
+                str(user.authenticated_id or user.id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unable to verify authenticated profile.",
+            )
+        return replace(
+            user,
+            metadata=dict(getattr(account, "user_metadata", None) or {}),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to refresh profile before applying the proposal.",
+        ) from exc
 
 
 def _fresh_preview(
@@ -109,9 +138,10 @@ def apply_adaptive_macro_proposal(
         )
     # Re-read all source data and goal metadata. A client preview is
     # evidence of what the user reviewed, not a trusted command payload.
+    live_user = _verified_live_user(current_user)
     fresh = _fresh_preview(
         as_of=date.today(),
-        user=current_user,
+        user=live_user,
         meals_repo=meals_repo,
         activities_repo=activities_repo,
         strength_logs_repo=strength_logs_repo,
@@ -137,7 +167,7 @@ def apply_adaptive_macro_proposal(
             goal_adjustment_kcal=proposal["proposed_goal_adjustment_kcal"],
             adaptive_macros_last_applied_on=date.today().isoformat(),
         ),
-        current_user=current_user,
+        current_user=live_user,
     )
     return {
         "applied": True,
