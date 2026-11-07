@@ -90,7 +90,7 @@ def test_phase1_third_batch_is_bounded_and_does_not_approve():
     )
 
 
-def test_phase1_curation_batches_cover_154_unique_exercises_without_approval():
+def test_phase1_curation_batches_cover_155_unique_exercises_without_approval():
     files = (
         ("20261107210000_curate_exercise_library_phase1_batch1.sql", 18),
         ("20261107211000_curate_exercise_library_phase1_batch2.sql", 44),
