@@ -20,6 +20,7 @@ from backend.observability import (
 
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.daily_logs import router as daily_logs_router
+from backend.api.routers.exercises import router as exercises_router
 from backend.api.routers.day_history import router as day_history_router
 from backend.api.routers.decision_learning import router as decision_learning_router
 from backend.api.routers.decision_outcomes import router as decision_outcomes_router
@@ -282,6 +283,7 @@ app.include_router(weight_router)
 app.include_router(progress_router)
 app.include_router(profile_router)
 app.include_router(onboarding_router)
+app.include_router(exercises_router)
 app.include_router(special_periods_router)
 app.include_router(strength_router)
 app.include_router(weekly_schedule_router)
