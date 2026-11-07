@@ -450,6 +450,18 @@ export function AdaptiveCoachPanel({
             <span>Allenamento saltato · Da valutare</span>
             <strong>{alert.title}</strong>
             <p>{alert.message}</p>
+            {alert.suggested_date && !alert.is_race ? (
+              <p>
+                {alert.recovery_days === 0
+                  ? "Seduta leggera: nessun giorno extra richiesto dalla regola del calendario."
+                  : "Spaziatura prudenziale: " +
+                    alert.recovery_days +
+                    (alert.recovery_days === 1
+                      ? " giorno"
+                      : " giorni") +
+                    " rispetto ad altre sedute."}
+              </p>
+            ) : null}
             <small>
               {alert.kind === "strength_workout"
                 ? "Palestra"
