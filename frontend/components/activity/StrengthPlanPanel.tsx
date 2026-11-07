@@ -9,6 +9,7 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider";
 
+import { AdaptiveCoachPanel } from "@/components/activity/AdaptiveCoachPanel";
 import { StrengthProgramOverview } from "@/components/activity/StrengthProgramOverview";
 import { StrengthWorkoutLoggerV2 } from "@/components/activity/StrengthWorkoutLoggerV2";
 
@@ -180,6 +181,11 @@ export function StrengthPlanPanel() {
     loading,
     setLoading,
   ] = useState(false);
+
+  const [
+    coachRefreshKey,
+    setCoachRefreshKey,
+  ] = useState(0);
 
   const [
     error,
@@ -356,6 +362,17 @@ export function StrengthPlanPanel() {
       }
     },
     [accessToken],
+  );
+
+
+  const handleTrainingChanged = useCallback(
+    async () => {
+      await loadPlan();
+      setCoachRefreshKey(
+        (value) => value + 1,
+      );
+    },
+    [loadPlan],
   );
 
 
@@ -1201,9 +1218,14 @@ export function StrengthPlanPanel() {
         </>
       )}
 
+      <AdaptiveCoachPanel
+        refreshKey={coachRefreshKey}
+        onChanged={handleTrainingChanged}
+      />
+
       <StrengthWorkoutLoggerV2
         workout={nextWorkout}
-        onCompleted={loadPlan}
+        onCompleted={handleTrainingChanged}
       />
 
 
