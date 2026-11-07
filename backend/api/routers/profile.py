@@ -78,6 +78,11 @@ _EXPORT_TABLES = (
     "strength_workouts",
     "training_plan_adaptations",
     "training_plans",
+    "training_muscle_priorities",
+    "training_preferred_days",
+    "training_profiles",
+    "nutrition_profiles",
+    "user_preferences",
     "weekly_schedule",
 )
 
