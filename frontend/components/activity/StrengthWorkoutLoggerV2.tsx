@@ -62,7 +62,11 @@ const FEELINGS: Array<{
 
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 
@@ -750,6 +754,14 @@ export function StrengthWorkoutLoggerV2({
       return;
     }
 
+    if (loadingSession ||
+        Object.values(drafts).some((sets) =>
+          sets.some((set) => set.saving),
+        )) {
+      setError("Attendi il salvataggio delle serie prima di completare.");
+      return;
+    }
+
     setCompleting(true);
     setError(null);
     setMessage(null);
@@ -1359,7 +1371,7 @@ export function StrengthWorkoutLoggerV2({
         <button
           type="button"
           className={styles.primaryButton}
-          disabled={completing}
+          disabled={completing || loadingSession}
           onClick={() => {
             void completeWorkout();
           }}
