@@ -114,6 +114,7 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 import { HOME_COPY, localeCode } from "./homeI18n";
 
 import QuickActivityForm from "./QuickActivityForm";
+import { RegisteredMealList } from "./RegisteredMealList";
 import styles from "./HomeShell.module.css";
 
 function localIsoDate(
@@ -7600,275 +7601,36 @@ export function HomeShell() {
 
                     {summaryMealForSlot(slot) ? (
                       <>
-                        <div className={styles.registeredMealList}>
-                          {summaryMealsForSlot(slot).map(
-                            (registeredMeal) => (
-                              <div
-                                key={String(
-                                  registeredMeal.id ??
-                                    registeredMeal.name,
-                                )}
-                                className={
-                                  styles.registeredMealRow
-                                }
-                              >
-                                <div
-                                  className={
-                                    styles.registeredMealRowInfo
-                                  }
-                                >
-                                  <strong>
-                                    {registeredMeal.name.replace(
-                                      /\s*\([^)]*porz\.\)\s*$/i,
-                                      "",
-                                    )}
-                                  </strong>
-
-                                  <span>
-                                    {registeredMeal.recipe_servings
-                                      ? `${formatNumber(
-                                          registeredMeal.recipe_servings,
-                                        )} ${
-                                          registeredMeal.recipe_servings === 1
-                                            ? homeCopy.portions
-                                            : homeCopy.portions
-                                        }`
-                                      : `1 ${homeCopy.portions}`}
-                                  </span>
-                                </div>
-
-                                <div
-                                  className={
-                                    styles.registeredMealRowActions
-                                  }
-                                >
-                                  <div
-                                    className={
-                                      styles.registeredMealPortionControl
-                                    }
-                                  >
-                                    <button
-                                      type="button"
-                                      aria-label="Togli una porzione"
-                                      disabled={
-                                        deletingMealId !== null ||
-                                        savingMealEdit
-                                      }
-                                      onClick={() => {
-                                        void adjustRegisteredMealPortions(
-                                          registeredMeal,
-                                          -1,
-                                        );
-                                      }}
-                                    >
-                                      −
-                                    </button>
-
-                                    <span>
-                                      {formatNumber(
-                                        Math.max(
-                                          1,
-                                          Number(
-                                            registeredMeal.recipe_servings,
-                                          ) || 1,
-                                        ),
-                                      )}
-                                    </span>
-
-                                    <button
-                                      type="button"
-                                      aria-label="Aggiungi una porzione"
-                                      disabled={
-                                        deletingMealId !== null ||
-                                        savingMealEdit
-                                      }
-                                      onClick={() => {
-                                        void adjustRegisteredMealPortions(
-                                          registeredMeal,
-                                          1,
-                                        );
-                                      }}
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    disabled={
-                                      deletingMealId !== null ||
-                                      savingMealEdit
-                                    }
-                                    onClick={() => {
-                                      if (
-                                        editingMealId ===
-                                        registeredMeal.id
-                                      ) {
-                                        closeMealEditor();
-                                      } else {
-                                        void openMealEditor(
-                                          registeredMeal,
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    ✎{" "}
-                                    {editingMealId ===
-                                    registeredMeal.id
-                                      ? "Chiudi"
-                                      : homeCopy.edit}
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className={
-                                      styles.registeredMealRowDelete
-                                    }
-                                    disabled={
-                                      deletingMealId !== null ||
-                                      savingMealEdit
-                                    }
-                                    onClick={() => {
-                                      void deleteRegisteredMeal(
-                                        registeredMeal,
-                                      );
-                                    }}
-                                  >
-                                    🗑{" "}
-                                    {deletingMealId ===
-                                    registeredMeal.id
-                                      ? "Elimino…"
-                                      : homeCopy.delete}
-                                  </button>
-                                </div>
-                              </div>
-                            ),
-                          )}
-                        </div>
-
-                        {summaryMealsForSlot(slot).length > 0 ? (
-                          <div className={styles.registeredMealNutrition}>
-                            <div className={styles.nutritionItem}>
-                              <strong>
-                                {formatNumber(
-                                  summaryMealsForSlot(slot).reduce(
-                                    (total, registeredMeal) =>
-                                      total +
-                                      Number(
-                                        registeredMeal.calories || 0,
-                                      ),
-                                    0,
-                                  ),
-                                )}
-                              </strong>
-                              <span>kcal</span>
-                            </div>
-
-                            <div className={styles.nutritionItem}>
-                              <strong>
-                                {formatNumber(
-                                  summaryMealsForSlot(slot).reduce(
-                                    (total, registeredMeal) =>
-                                      total +
-                                      Number(
-                                        registeredMeal.protein || 0,
-                                      ),
-                                    0,
-                                  ),
-                                )}
-                              </strong>
-                              <span>{homeCopy.proteins}</span>
-                            </div>
-
-                            <div className={styles.nutritionItem}>
-                              <strong>
-                                {formatNumber(
-                                  summaryMealsForSlot(slot).reduce(
-                                    (total, registeredMeal) =>
-                                      total +
-                                      Number(
-                                        registeredMeal.carbs || 0,
-                                      ),
-                                    0,
-                                  ),
-                                )}
-                              </strong>
-                              <span>{homeCopy.carbs}</span>
-                            </div>
-
-                            <div className={styles.nutritionItem}>
-                              <strong>
-                                {formatNumber(
-                                  summaryMealsForSlot(slot).reduce(
-                                    (total, registeredMeal) =>
-                                      total +
-                                      Number(
-                                        registeredMeal.fat || 0,
-                                      ),
-                                    0,
-                                  ),
-                                )}
-                              </strong>
-                              <span>{homeCopy.fats}</span>
-                            </div>
-                          </div>
-                        ) : null}
-                        {summaryMealsForSlot(slot).length > 0 ? (
-                          <div
-                            className={
-                              styles.registeredMealInsights
+                        <RegisteredMealList
+                          meals={summaryMealsForSlot(slot)}
+                          copy={homeCopy}
+                          deletingMealId={deletingMealId}
+                          editingMealId={editingMealId}
+                          savingMealEdit={savingMealEdit}
+                          formatNumber={formatNumber}
+                          onAdjustPortions={(registeredMeal, delta) => {
+                            void adjustRegisteredMealPortions(
+                              registeredMeal,
+                              delta,
+                            );
+                          }}
+                          onEdit={(registeredMeal) => {
+                            if (
+                              editingMealId === registeredMeal.id
+                            ) {
+                              closeMealEditor();
+                            } else {
+                              void openMealEditor(
+                                registeredMeal,
+                              );
                             }
-                          >
-                            <span
-                              className={
-                                styles.registeredMealInsightSuccess
-                              }
-                            >
-                              {homeCopy.mealLogged}
-                            </span>
-
-                            {summaryMealsForSlot(slot).reduce(
-                              (total, registeredMeal) =>
-                                total +
-                                Number(
-                                  registeredMeal.protein || 0,
-                                ),
-                              0,
-                            ) < 15 ? (
-                              <span
-                                className={
-                                  styles.registeredMealInsightWarning
-                                }
-                              >
-                                {homeCopy.lowProtein}
-                              </span>
-                            ) : summaryMealsForSlot(slot).reduce(
-                                (total, registeredMeal) =>
-                                  total +
-                                  Number(
-                                    registeredMeal.protein || 0,
-                                  ),
-                                0,
-                              ) <= 30 ? (
-                              <span
-                                className={
-                                  styles.registeredMealInsightSuccess
-                                }
-                              >
-                                ✓ Buon apporto proteico
-                              </span>
-                            ) : (
-                              <span
-                                className={
-                                  styles.registeredMealInsightSuccess
-                                }
-                              >
-                                {homeCopy.highProtein}
-                              </span>
-                            )}
-                          </div>
-                        ) : null}
-
+                          }}
+                          onDelete={(registeredMeal) => {
+                            void deleteRegisteredMeal(
+                              registeredMeal,
+                            );
+                          }}
+                        />
 
                         {summaryMealsForSlot(slot).some(
                           (registeredMeal) =>
