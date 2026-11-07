@@ -95,6 +95,7 @@ export interface CoachRecoveryAlert {
   requires_approval: boolean;
   suggested_date: string | null;
   is_race: boolean;
+  recovery_days: number;
 }
 
 export interface CoachReconcileResponse {
