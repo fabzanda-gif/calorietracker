@@ -10,6 +10,7 @@ on:
       - codex/phase6-training-nutrition-context
       - codex/phase7-gym-running-cross-training
       - codex/phase8-adaptive-macros-v1
+      - codex/release-candidate-phase1-8-20261108
   pull_request:
     branches:
       - main
