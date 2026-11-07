@@ -90,6 +90,31 @@ class StrengthWorkoutLogsRepository(
                 f"workout logs: {exc}"
             ) from exc
 
+    def list_recent_sessions(
+        self,
+        user_id: str,
+        *,
+        status: str,
+        limit: int = 30,
+    ) -> list[dict]:
+        if status not in ("draft", "completed"):
+            raise ValueError("Invalid strength session status")
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_LOG_SELECT)
+                .eq("user_id", user_id)
+                .eq("status", status)
+                .order("performed_date", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load recent strength sessions: {exc}"
+            ) from exc
+
     def create(
         self,
         payload: dict[str, Any],
