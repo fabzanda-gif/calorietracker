@@ -5,6 +5,8 @@ from backend.api.dependencies import CurrentUser
 from backend.api.routers import coach as coach_router
 from backend.api.routers.coach import (
     CoachReconcileRequest,
+    CoachRecoveryApplyRequest,
+    apply_skipped_session_recovery,
     _apply_running_changes,
     _apply_strength_changes,
     reconcile_training_coach,
@@ -448,3 +450,63 @@ def test_reconcile_does_not_stack_auto_guard(
         == "guard-1"
     )
     assert result["summary"]["auto_applied"] == 1
+
+
+def test_recovery_requires_skipped_status():
+    from datetime import date
+
+    class CompletedPlannedRepo:
+        def get(self, session_id, user_id):
+            return {
+                "id": session_id,
+                "status": "completed",
+                "scheduled_date": "2026-11-06",
+                "activity_type": "running",
+            }
+
+    with pytest.raises(HTTPException) as exc:
+        apply_skipped_session_recovery(
+            kind="planned_activity",
+            session_id="run-1",
+            request=CoachRecoveryApplyRequest(
+                suggested_date=date(2026, 11, 8),
+                original_date=date(2026, 11, 6),
+            ),
+            current_user=CurrentUser(
+                id="user-1", access_token="token",
+            ),
+            planned_repo=CompletedPlannedRepo(),
+            workouts_repo=object(),
+        )
+
+    assert exc.value.status_code == 409
+
+
+def test_recovery_rejects_non_running_activity():
+    from datetime import date
+
+    class CyclingRepo:
+        def get(self, session_id, user_id):
+            return {
+                "id": session_id,
+                "status": "skipped",
+                "scheduled_date": "2026-11-06",
+                "activity_type": "cycling",
+            }
+
+    with pytest.raises(HTTPException) as exc:
+        apply_skipped_session_recovery(
+            kind="planned_activity",
+            session_id="bike-1",
+            request=CoachRecoveryApplyRequest(
+                suggested_date=date(2026, 11, 8),
+                original_date=date(2026, 11, 6),
+            ),
+            current_user=CurrentUser(
+                id="user-1", access_token="token",
+            ),
+            planned_repo=CyclingRepo(),
+            workouts_repo=object(),
+        )
+
+    assert exc.value.status_code == 409
