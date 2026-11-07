@@ -1,5 +1,10 @@
 import { apiRequest } from "./client";
 
+export type CoachPriority =
+  | "gym"
+  | "balanced"
+  | "running";
+
 export type CoachDecision =
   | "proposed"
   | "auto_applied"
@@ -82,7 +87,7 @@ export interface CoachAdjustment {
 }
 
 export interface CoachReconcileResponse {
-  policy: "balanced";
+  policy: CoachPriority;
   as_of: string;
   window: {
     recent_start: string;
@@ -151,6 +156,38 @@ export function dismissCoachAdjustment(
     {
       method: "POST",
       accessToken,
+    },
+  );
+}
+
+
+export function getCoachPreferences(
+  accessToken?: string | null,
+): Promise<{
+  priority: CoachPriority;
+}> {
+  return apiRequest(
+    "/coach/preferences",
+    {
+      accessToken,
+    },
+  );
+}
+
+export function updateCoachPreferences(
+  priority: CoachPriority,
+  accessToken?: string | null,
+): Promise<{
+  priority: CoachPriority;
+}> {
+  return apiRequest(
+    "/coach/preferences",
+    {
+      method: "PUT",
+      accessToken,
+      body: JSON.stringify({
+        priority,
+      }),
     },
   );
 }
