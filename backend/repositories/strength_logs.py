@@ -55,6 +55,41 @@ class StrengthWorkoutLogsRepository(
                 f"workout log: {exc}"
             ) from exc
 
+    def list_date_range(
+        self,
+        user_id: str,
+        start_date: Any,
+        end_date: Any,
+    ) -> list[dict]:
+        try:
+            response = (
+                self.table
+                .select(
+                    STRENGTH_WORKOUT_LOG_SELECT
+                )
+                .eq("user_id", user_id)
+                .eq("status", "completed")
+                .gte(
+                    "performed_date",
+                    str(start_date),
+                )
+                .lte(
+                    "performed_date",
+                    str(end_date),
+                )
+                .order(
+                    "performed_date",
+                    desc=True,
+                )
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to load completed strength "
+                f"workout logs: {exc}"
+            ) from exc
+
     def create(
         self,
         payload: dict[str, Any],
