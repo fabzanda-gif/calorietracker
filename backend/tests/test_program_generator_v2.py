@@ -115,6 +115,18 @@ def test_v2_respects_exclusions_and_approved_equipment():
     assert set(missing["missing_movement_patterns"]) == set(MANDATORY_PATTERNS)
 
 
+def test_missing_equipment_metadata_cannot_bypass_equipment_filter():
+    items = catalog()
+    items[0]["equipment"] = []
+    result = ProgramGeneratorV2().preview(
+        config=config(), catalog=items,
+    )
+    assert result["ready_for_activation"] is False
+    assert "squat" in result["missing_movement_patterns"] or (
+        len(result["workouts"][0]["exercises"]) < 5
+    )
+
+
 def test_v2_prefers_user_selection_without_unapproved_exercises():
     candidates = catalog()
     candidates.append(exercise("horizontal_push", "favorite-bench"))
