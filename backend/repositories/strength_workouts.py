@@ -9,7 +9,7 @@ STRENGTH_WORKOUT_SELECT = (
     "id,user_id,strength_plan_id,"
     "scheduled_date,training_week,"
     "workout_index,title,focus,status,"
-    "estimated_duration_minutes,"
+    "workout_kind,estimated_duration_minutes,"
     "created_at,updated_at"
 )
 
@@ -19,7 +19,9 @@ STRENGTH_EXERCISE_SELECT = (
     "movement_pattern,target_sets,"
     "target_reps_min,target_reps_max,"
     "target_rir,rest_seconds,"
-    "prescribed_load_kg,created_at"
+    "prescribed_load_kg,is_user_added,"
+    "substituted_from_exercise_id,"
+    "prescription_source,created_at"
 )
 
 
@@ -136,6 +138,31 @@ class StrengthWorkoutsRepository(BaseRepository):
                 f"{exc}"
             ) from exc
 
+    def create(
+        self,
+        payload: dict[str, Any],
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .insert(payload)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to create strength workout: "
+                f"{exc}"
+            ) from exc
+
+    def create(
+        self,
+        payload: dict[str, Any],
+    ) -> dict | None:
+        created = self.create_many([payload])
+        return created[0] if created else None
+
     def create_many(
         self,
         payloads: list[dict[str, Any]],
@@ -187,6 +214,29 @@ class StrengthWorkoutExercisesRepository(
             raise RepositoryError(
                 "Unable to load strength exercise: "
                 f"{exc}"
+            ) from exc
+
+    def update(
+        self,
+        *,
+        user_id: str,
+        exercise_id: Any,
+        payload: dict[str, Any],
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update(payload)
+                .eq("user_id", user_id)
+                .eq("id", exercise_id)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to update strength "
+                f"exercise: {exc}"
             ) from exc
 
     def update_prescribed_load(
