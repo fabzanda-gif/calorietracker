@@ -515,7 +515,10 @@ def test_recovery_rejects_non_running_activity():
 
 
 def test_recovery_reopens_completed_strength_plan(monkeypatch):
-    from datetime import date
+    from datetime import date, timedelta
+    today = date.today()
+    original = today - timedelta(days=1)
+    suggestion = today + timedelta(days=2)
 
     class SkippedWorkoutRepo:
         def __init__(self):
@@ -524,7 +527,7 @@ def test_recovery_reopens_completed_strength_plan(monkeypatch):
             return {
                 "id": workout_id,
                 "status": "skipped",
-                "scheduled_date": "2026-11-06",
+                "scheduled_date": original.isoformat(),
                 "strength_plan_id": "plan-1",
             }
         def reschedule_skipped(self, **kwargs):
@@ -547,7 +550,7 @@ def test_recovery_reopens_completed_strength_plan(monkeypatch):
             "recovery_alerts": [{
                 "kind": "strength_workout",
                 "session_id": "gym-1",
-                "suggested_date": "2026-11-09",
+                "suggested_date": suggestion.isoformat(),
             }],
         },
     )
@@ -557,8 +560,8 @@ def test_recovery_reopens_completed_strength_plan(monkeypatch):
         kind="strength_workout",
         session_id="gym-1",
         request=CoachRecoveryApplyRequest(
-            original_date=date(2026, 11, 6),
-            suggested_date=date(2026, 11, 9),
+            original_date=original,
+            suggested_date=suggestion,
         ),
         current_user=CurrentUser(id="user-1", access_token="token"),
         planned_repo=object(),
@@ -576,14 +579,17 @@ def test_recovery_reopens_completed_strength_plan(monkeypatch):
 
 
 def test_recovery_rejects_archived_strength_plan(monkeypatch):
-    from datetime import date
+    from datetime import date, timedelta
+    today = date.today()
+    original = today - timedelta(days=1)
+    suggestion = today + timedelta(days=2)
 
     class SkippedWorkoutRepo:
         def get(self, user_id, workout_id):
             return {
                 "id": workout_id,
                 "status": "skipped",
-                "scheduled_date": "2026-11-06",
+                "scheduled_date": original.isoformat(),
                 "strength_plan_id": "plan-1",
             }
 
@@ -596,8 +602,8 @@ def test_recovery_rejects_archived_strength_plan(monkeypatch):
             kind="strength_workout",
             session_id="gym-1",
             request=CoachRecoveryApplyRequest(
-                original_date=date(2026, 11, 6),
-                suggested_date=date(2026, 11, 9),
+                original_date=original,
+                suggested_date=suggestion,
             ),
             current_user=CurrentUser(id="user-1", access_token="token"),
             planned_repo=object(),
