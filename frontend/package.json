@@ -7,7 +7,8 @@
     "build": "NEXT_DIST_DIR=.next next build",
     "start": "NEXT_DIST_DIR=.next next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:home-actions": "node scripts/check-home-meal-actions.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

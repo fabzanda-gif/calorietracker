@@ -68,6 +68,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check Home meal actions
+        run: npm run check:home-actions
+
       - name: Build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co

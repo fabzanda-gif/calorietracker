@@ -7486,53 +7486,76 @@ export function HomeShell() {
                         </strong>
                       )}
 
-                      {summaryMealsForSlot(slot).length === 1 ? (
-                        <button
-                          type="button"
-                          className={styles.dailyMealDeleteButton}
-                          aria-label={`Elimina ${summaryMealsForSlot(slot)[0].name}`}
-                          title="Elimina questo record"
-                          disabled={
-                            deletingMealId !== null ||
-                            savingMealEdit
-                          }
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-
-                            const registeredMeal =
-                              summaryMealsForSlot(slot)[0];
-
-                            if (registeredMeal) {
-                              void deleteRegisteredMeal(
-                                registeredMeal,
-                              );
-                            }
-                          }}
-                        >
-                          {deletingMealId ===
-                          summaryMealsForSlot(slot)[0]?.id
-                            ? "…"
-                            : "🗑"}
-                        </button>
-                      ) : null}
-
-                      {summaryMealForSlot(slot) ? (
-                        <span
-                          className={styles.dailyEntryDone}
-                          aria-label={homeCopy.logged}
-                        >
-                          ✓
-                        </span>
-                      ) : null}
-
                       <span
                         className={
-                          styles.dailyEntryChevron
+                          styles.dailyMealSummaryActions
                         }
-                        aria-hidden="true"
                       >
-                        ▾
+                        {summaryMealsForSlot(slot).length === 1 ? (
+                          <button
+                            type="button"
+                            className={styles.dailyMealDeleteButton}
+                            aria-label={`Elimina ${summaryMealsForSlot(slot)[0].name}`}
+                            title="Elimina questo record"
+                            disabled={
+                              deletingMealId !== null ||
+                              savingMealEdit
+                            }
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+
+                              const registeredMeal =
+                                summaryMealsForSlot(slot)[0];
+
+                              if (registeredMeal) {
+                                void deleteRegisteredMeal(
+                                  registeredMeal,
+                                );
+                              }
+                            }}
+                          >
+                            {deletingMealId ===
+                            summaryMealsForSlot(slot)[0]?.id
+                              ? "…"
+                              : "🗑"}
+                          </button>
+                        ) : summaryMealsForSlot(slot).length > 1 ? (
+                          <button
+                            type="button"
+                            className={styles.dailyMealManageButton}
+                            aria-label={`Gestisci ${summaryMealsForSlot(slot).length} record di ${localizedMealLabel(slot)}`}
+                            title="Gestisci i record di questo pasto"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+
+                              event.currentTarget
+                                .closest("details")
+                                ?.setAttribute("open", "");
+                            }}
+                          >
+                            Gestisci {summaryMealsForSlot(slot).length}
+                          </button>
+                        ) : null}
+
+                        {summaryMealForSlot(slot) ? (
+                          <span
+                            className={styles.dailyEntryDone}
+                            aria-label={homeCopy.logged}
+                          >
+                            ✓
+                          </span>
+                        ) : null}
+
+                        <span
+                          className={
+                            styles.dailyEntryChevron
+                          }
+                          aria-hidden="true"
+                        >
+                          ▾
+                        </span>
                       </span>
                     </summary>
 

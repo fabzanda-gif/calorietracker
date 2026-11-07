@@ -17967,3 +17967,108 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 0.72rem;
   }
 }
+
+
+/* HOME MEAL SUMMARY ACTIONS — stable final layout
+   Keep delete/check/chevron in one grid cell so later CSS cannot
+   push individual controls outside the compact row. */
+.dailyMealSummary {
+  grid-template-columns:
+    36px
+    minmax(0, 1fr)
+    max-content
+    auto !important;
+}
+
+.dailyMealSummaryActions {
+  grid-column: 4 !important;
+  grid-row: 1 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: max-content;
+}
+
+.dailyMealSummaryActions .dailyMealDeleteButton,
+.dailyMealSummaryActions .dailyEntryDone,
+.dailyMealSummaryActions .dailyEntryChevron {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  flex: 0 0 auto;
+}
+
+.dailyMealSummaryActions .dailyMealDeleteButton {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+}
+
+.dailyMealSummaryActions .dailyEntryDone {
+  width: 25px !important;
+  height: 25px !important;
+  min-width: 25px !important;
+}
+
+.dailyMealSummaryActions .dailyEntryChevron {
+  width: 14px !important;
+  min-width: 14px !important;
+}
+
+@media (max-width: 759px) {
+  .dailyMealSummary {
+    grid-template-columns:
+      31px
+      minmax(0, 1fr)
+      max-content
+      auto !important;
+  }
+
+  .dailyMealSummaryActions {
+    gap: 5px;
+  }
+
+  .dailyMealSummaryActions .dailyMealDeleteButton {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+  }
+
+  .dailyMealSummaryActions .dailyEntryDone {
+    width: 23px !important;
+    height: 23px !important;
+    min-width: 23px !important;
+  }
+
+  .dailyMealSummaryActions .dailyEntryChevron {
+    width: 12px !important;
+    min-width: 12px !important;
+  }
+}
+
+
+.dailyMealManageButton {
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 104, 104, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 104, 104, 0.07);
+  color: #d9585c;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dailyMealManageButton:hover {
+  background: rgba(255, 104, 104, 0.12);
+}
+
+@media (max-width: 759px) {
+  .dailyMealManageButton {
+    min-height: 26px;
+    padding: 4px 7px;
+    font-size: 0.58rem;
+  }
+}
