@@ -9,6 +9,7 @@ from backend.api.dependencies import (
     get_weight_repository,
 )
 from backend.api.main import app
+from backend.api.routers import activities as activities_router
 from backend.api.routers.activities import (
     _is_training_activity,
     _with_activity_defaults,
@@ -90,7 +91,7 @@ def override_daily_logs_repo():
 
 
 @pytest.fixture(autouse=True)
-def api_overrides():
+def api_overrides(monkeypatch):
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_activities_repository] = override_repo
     app.dependency_overrides[get_daily_logs_repository] = (
@@ -98,6 +99,19 @@ def api_overrides():
     )
     app.dependency_overrides[get_weight_repository] = (
         lambda: fake_weight_repo
+    )
+    monkeypatch.setattr(
+        activities_router,
+        "_reconcile_coach_after_activity",
+        lambda **kwargs: {
+            "available": True,
+            "policy": "balanced",
+            "summary": {
+                "events": 1,
+                "proposed": 0,
+                "auto_applied": 0,
+            },
+        },
     )
     yield
     app.dependency_overrides.clear()
@@ -133,6 +147,7 @@ def test_create_activity_uses_authenticated_user():
     )
     assert response.status_code == 201
     assert fake_repo.last_create["user_id"] == "authenticated-user"
+    assert response.json()["coach"]["available"] is True
 
 
 def test_update_activity_is_user_scoped():
@@ -321,6 +336,7 @@ def test_import_gpx_saves_parsed_activity():
     assert fake_repo.last_create["average_cadence"] == 160
     assert fake_repo.last_create["average_heart_rate"] == 140
     assert len(fake_repo.last_create["route_points"]) == 2
+    assert response.json()["coach"]["available"] is True
 
 
 def test_import_gpx_prefers_file_date_over_requested_date():
