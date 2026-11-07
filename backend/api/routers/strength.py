@@ -1937,13 +1937,23 @@ def skip_strength_workout(
             )
         )
 
-        if existing_log:
+        if (
+            existing_log
+            and existing_log.get("status")
+            == "completed"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
                     "La seduta è già stata "
                     "registrata."
                 ),
+            )
+
+        if existing_log:
+            workout_logs_repo.delete(
+                existing_log["id"],
+                current_user.id,
             )
 
         updated = workouts_repo.update_status(
