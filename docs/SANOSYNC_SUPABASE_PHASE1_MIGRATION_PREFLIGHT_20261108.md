@@ -4,8 +4,8 @@ Audit date: **2026-11-08**. Scope: Exercise Library Phase 1 metadata batches, su
 
 ## Verification performed (read-only on existing Supabase project)
 
-- Four migration batches contain **18 + 43 + 53 + 30 = 144 distinct curated source IDs**; 10 previously approved golden exercises complete the intended 154-item curated set.
-- All **144** source IDs exist in the current live catalog, are active, and are not generator-approved. All source IDs named by the **33 proposed directional relationship pairs** exist as active catalog entries. Across classification rows and relationship endpoints there are **152 distinct source IDs**, all found.
+- Four migration batches contain **18 + 44 + 53 + 30 = 145 distinct curated source IDs**; 10 previously approved golden exercises complete the intended 155-item curated set.
+- All **145** source IDs exist in the current live catalog, are active, and are not generator-approved. All source IDs named by the **33 proposed directional relationship pairs** exist as active catalog entries. Across classification rows and relationship endpoints there are **152 distinct source IDs**, all found.
 - Substitutes are mirrored as intended, regressions and progressions remain directional. The four migrations propose **61 distinct directed relationship rows** (15 + 18 + 18 + 10). No self-pairs or duplicate direction/relationship keys in each INSERT.
 - Existing `public.exercises.id` and linked foreign keys are UUID. `public.exercise_relationships.similarity_score` is nullable, with 0–1 check. The relationship type check permits `close_substitute`, `substitute`, `regression`, `progression`, `similar`.
 - Proposed values for `movement_pattern`, `training_role`, fatigue, complexity and stability match the existing SQL enums. Metadata batches do not toggle `approved_for_generation=true`.
@@ -21,7 +21,7 @@ The live `supabase_migrations.schema_migrations` already contains original Exerc
 
 ## Artifacts added to PR #20
 
-- `supabase/tests/exercise_library_phase1_staging_validation.sql`: SELECT-only checks to run after migrations on a disposable database. Asserts all 144 metadata rows match their intended values, 61 relationship rows, appropriate grants, schema RLS, four ownership policies and no inadvertent exercise approvals. Expected outcome: **every returned `passed` is true**.
+- `supabase/tests/exercise_library_phase1_staging_validation.sql`: SELECT-only checks to run after migrations on a disposable database. Asserts all 145 metadata rows match their intended values, 61 relationship rows, appropriate grants, schema RLS, four ownership policies and no inadvertent exercise approvals. Expected outcome: **every returned `passed` is true**.
 - `supabase/tests/exercise_library_preference_rls_rollback.sql`: executable transaction-only, **staging-only** two-test-user RLS test. Confirms owner can insert/read; cross-user SELECT, INSERT, UPDATE and DELETE are denied; the transaction ends with `ROLLBACK`, removing all test users/preferences. Do not execute this on production.
 - `backend/tests/test_exercise_library_release_preflight.py`: CI regression tests to keep the staging assertion queries synchronized with the four versioned curation batches, relationship types, enum checks and the preference RLS definition.
 
