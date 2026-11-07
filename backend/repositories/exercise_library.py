@@ -20,6 +20,69 @@ EXERCISE_COLUMNS = (
 class ExerciseLibraryRepository(BaseRepository):
     table_name = "exercises"
 
+    def catalog_status(self) -> dict:
+        """Read-only quality snapshot, not an approval mechanism."""
+        columns = (
+            "id,body_part,movement_pattern,training_role,"
+            "fatigue_cost,approved_for_generation"
+        )
+        try:
+            # PostgREST caps rows per request; use bounded pages so
+            # catalog growth does not silently undercount entries.
+            rows: list[dict] = []
+            page_size = 500
+            while True:
+                response = (
+                    self.table.select(columns)
+                    .eq("active", True)
+                    .order("id")
+                    .range(len(rows), len(rows) + page_size - 1)
+                    .execute()
+                )
+                page = self._data(response)
+                rows.extend(page)
+                if len(page) < page_size:
+                    break
+
+            relationships = (
+                self.supabase
+                .table("exercise_relationships")
+                .select("source_exercise_id")
+                .limit(1)
+                .execute()
+            )
+            total = len(rows)
+            approved = sum(
+                bool(row.get("approved_for_generation"))
+                for row in rows
+            )
+            by_body_part: dict[str, int] = {}
+            for row in rows:
+                key = str(row.get("body_part") or "unknown")
+                by_body_part[key] = by_body_part.get(key, 0) + 1
+            return {
+                "total_active": total,
+                "approved_for_generation": approved,
+                "pending_curation": total - approved,
+                "missing_movement_pattern": sum(
+                    not row.get("movement_pattern") for row in rows
+                ),
+                "missing_training_role": sum(
+                    not row.get("training_role") for row in rows
+                ),
+                "missing_fatigue_cost": sum(
+                    not row.get("fatigue_cost") for row in rows
+                ),
+                "has_substitution_relationships": bool(
+                    self._data(relationships)
+                ),
+                "by_body_part": dict(sorted(by_body_part.items())),
+            }
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to audit exercise catalog: {exc}"
+            ) from exc
+
     def _candidate_ids_for_search(
         self,
         search: str,
