@@ -90,6 +90,25 @@ class StrengthWorkoutLogsRepository(
                 f"workout logs: {exc}"
             ) from exc
 
+    def list_for_workout_ids(
+        self, user_id: str, workout_ids: list[str]
+    ) -> list[dict]:
+        if not workout_ids:
+            return []
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_LOG_SELECT)
+                .eq("user_id", user_id)
+                .in_("strength_workout_id", workout_ids)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load strength session summaries: {exc}"
+            ) from exc
+
     def list_recent_sessions(
         self,
         user_id: str,
