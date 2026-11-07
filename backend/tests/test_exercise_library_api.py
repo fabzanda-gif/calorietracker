@@ -41,6 +41,25 @@ class FakeExerciseLibraryRepo:
             }
         ]
 
+    def list_alternatives(
+        self, identifier, *, language="it", equipment_key=None, limit=20
+    ):
+        self.last_alternatives_query = {
+            "identifier": identifier,
+            "language": language,
+            "equipment_key": equipment_key,
+            "limit": limit,
+        }
+        if identifier == "missing":
+            return None
+        return [{
+            "exercise": self.items[0],
+            "relationship": "substitute",
+            "similarity_score": None,
+            "rationale": "Same movement pattern",
+            "requires_confirmation": True,
+        }]
+
     def catalog_status(self):
         return {
             "total_active": 317,
@@ -156,3 +175,37 @@ def test_catalog_status_reports_quality_without_modifying_entries():
     assert response["pending_curation"] == 307
     assert response["has_substitution_relationships"] is False
     assert "/exercises/catalog/status" in core_app.openapi()["paths"]
+
+
+def test_exercise_alternatives_are_suggestions_with_filter():
+    repo = FakeExerciseLibraryRepo()
+    result = exercises.get_exercise_alternatives(
+        identifier="barbell-bench-press",
+        equipment="dumbbell",
+        language="it",
+        limit=5,
+        current_user=user(),
+        repo=repo,
+    )
+    assert result["count"] == 1
+    assert result["items"][0]["requires_confirmation"] is True
+    assert repo.last_alternatives_query == {
+        "identifier": "barbell-bench-press",
+        "language": "it",
+        "equipment_key": "dumbbell",
+        "limit": 5,
+    }
+    assert "/exercises/{identifier}/alternatives" in core_app.openapi()["paths"]
+
+
+def test_exercise_alternatives_404_for_missing_exercise():
+    with pytest.raises(HTTPException) as exc:
+        exercises.get_exercise_alternatives(
+            identifier="missing",
+            equipment=None,
+            language="it",
+            limit=20,
+            current_user=user(),
+            repo=FakeExerciseLibraryRepo(),
+        )
+    assert exc.value.status_code == 404
