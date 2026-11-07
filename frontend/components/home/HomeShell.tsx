@@ -7486,6 +7486,37 @@ export function HomeShell() {
                         </strong>
                       )}
 
+                      {summaryMealsForSlot(slot).length === 1 ? (
+                        <button
+                          type="button"
+                          className={styles.dailyMealDeleteButton}
+                          aria-label={`Elimina ${summaryMealsForSlot(slot)[0].name}`}
+                          title="Elimina questo record"
+                          disabled={
+                            deletingMealId !== null ||
+                            savingMealEdit
+                          }
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            const registeredMeal =
+                              summaryMealsForSlot(slot)[0];
+
+                            if (registeredMeal) {
+                              void deleteRegisteredMeal(
+                                registeredMeal,
+                              );
+                            }
+                          }}
+                        >
+                          {deletingMealId ===
+                          summaryMealsForSlot(slot)[0]?.id
+                            ? "…"
+                            : "🗑"}
+                        </button>
+                      ) : null}
+
                       {summaryMealForSlot(slot) ? (
                         <span
                           className={styles.dailyEntryDone}
