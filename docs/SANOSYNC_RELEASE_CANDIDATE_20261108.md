@@ -33,7 +33,7 @@ Post-migration checks: **155 classified active exercises**, **61 directional sub
 1. Latest-head GitHub Actions backend, TypeScript, Next.js build and Playwright green.
 2. **Backend production owner/workspace selection:** Render exposes two workspaces (`sanosync` and `My Workspace`); connector requires explicit workspace selection to inspect and coordinate backend services. Do not choose silently. Confirm backend auto-deploy or perform backend deployment explicitly after selecting workspace.
 3. Run an actual JWT-authenticated smoke flow through API + Supabase with two real test accounts; verify RLS, preference isolation, gym write/read, plan preview and read-only demo. The suite in CI is simulated HTTP, not a proof against the real data API.
-4. Verify whether paused strength plans' future `planned` workouts are exposed in active calendar/Coach views. The current replacement code preserves history but its write path is multi-step, not atomic.
+4. The release candidate now filters future `planned` workouts belonging to paused/completed strength plans out of date-range queries used by calendars and Coach, preserving historical completed workouts. Regression tests cover active/paused/free/unknown-plan behavior. **Still verify against live API after backend deployment**; the replacement write path remains non-atomic.
 5. Decide on minimal editorial approval of an appropriate hinge exercise before enabling Program Generator v2 creation; current 10 approved records do **not** cover hinge, and v2 intentionally blocks incomplete programs.
 6. Verify project security advisories for two pre-existing public SECURITY DEFINER RPC functions (special-period triggers). These are not caused by Phase 1 migrations; review grants before broad rollout.
 7. Capture and confirm a recoverable database snapshot and have an operator validate the application rollback path before production merge. Existing Auth has 8 accounts and meals table has 391 records even if there are no active customers.
@@ -47,6 +47,13 @@ Post-migration checks: **155 classified active exercises**, **61 directional sub
 5. Merge **only the integrated release candidate** PR #31 once gates are green; do not separately merge Phase 1–8 PRs again and do not merge superseded Coach PR #19.
 6. Validate signed-in E2E after deploy, verify calorie budget unchanged and counts of meals/auth/workout logs, and watch API logs.
 7. If deployment fails, restore Vercel's known previous production deployment and redeploy/revert the backend to its previous ready version; keep **additive** Supabase schema and data in place to preserve user information. Do not delete the preference table, classifications or logged workouts as an automatic SQL rollback.
+
+## Additional release-candidate hardening
+
+- `StrengthWorkoutsRepository.list_date_range` now treats planned sessions from non-active strength plans as inactive, while retaining completed historical sessions and independent free sessions. Regression tests explicitly check the owner-scoped plan query and fail-closed behavior if a plan cannot be read.
+- The latest source branch is under CI again after this correction. No merge to `main` or backend/frontend deployment has occurred.
+- Backend deployment coordination is not yet authorized: the connected Render account has both `sanosync` and `My Workspace`. The Render connector requires the user to identify which workspace to operate in before its services can be inspected or deployed.
+- Production Supabase contains 8 Auth accounts and 391 existing meals; both existed before these migrations. No destructive rollback of the catalog or preference schema should be attempted.
 
 ## Verification record
 
