@@ -153,6 +153,5 @@ def test_read_only_user_cannot_reschedule_skipped_workout():
             exercises_repo=NoWorkoutWrites(),
             workout_logs_repo=NoWorkoutWrites(),
             set_logs_repo=NoWorkoutWrites(),
-            preferences_repo=NoWorkoutWrites(),
         )
     assert exc.value.status_code == 403
