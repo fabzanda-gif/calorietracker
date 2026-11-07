@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { usePathname } from "next/navigation";
 
-import { getProfile, type ProfileResponse } from "@/lib/api/profile";
-import { getLatestWeight } from "@/lib/api/weight";
+import {
+  getProfile,
+  type ProfileResponse,
+} from "@/lib/api/profile";
+import {
+  getOnboardingStatus,
+  type OnboardingStatus,
+} from "@/lib/api/onboarding";
 import { WelcomeJourney } from "@/components/onboarding/WelcomeJourney";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -12,28 +23,6 @@ import { useAuth } from "./AuthProvider";
 import { LoginCard } from "./LoginCard";
 import styles from "./AuthGate.module.css";
 
-function hasText(value: unknown): boolean {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function hasPositiveNumber(value: unknown): boolean {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
-}
-
-function profileHasMinimumOnboardingData(
-  profile: ProfileResponse,
-  hasWeight: boolean,
-): boolean {
-  const metadata = profile.metadata ?? {};
-
-  return Boolean(
-    hasText(metadata.gender) &&
-    hasText(metadata.birth_date) &&
-    hasPositiveNumber(metadata.height) &&
-    hasText(metadata.goal_mode) &&
-    hasWeight
-  );
-}
 
 export function AuthGate({
   children,
@@ -44,12 +33,20 @@ export function AuthGate({
   const { t } = useI18n();
   const pathname = usePathname();
 
-  const [onboardingCheckLoading, setOnboardingCheckLoading] =
-    useState(false);
-  const [needsOnboarding, setNeedsOnboarding] =
-    useState(false);
+  const [
+    onboardingCheckLoading,
+    setOnboardingCheckLoading,
+  ] = useState(false);
+  const [
+    needsOnboarding,
+    setNeedsOnboarding,
+  ] = useState(false);
   const [profile, setProfile] =
     useState<ProfileResponse | null>(null);
+  const [
+    onboardingStatus,
+    setOnboardingStatus,
+  ] = useState<OnboardingStatus | null>(null);
 
   const legalPage =
     pathname === "/privacy" || pathname === "/terms";
@@ -64,6 +61,7 @@ export function AuthGate({
       setOnboardingCheckLoading(false);
       setNeedsOnboarding(false);
       setProfile(null);
+      setOnboardingStatus(null);
       return;
     }
 
@@ -73,36 +71,31 @@ export function AuthGate({
       setOnboardingCheckLoading(true);
 
       try {
-        const [profileResponse, weightResponse] =
-          await Promise.all([
-            getProfile(accessToken),
-            getLatestWeight(accessToken),
-          ]);
+        const [
+          profileResponse,
+          statusResponse,
+        ] = await Promise.all([
+          getProfile(accessToken),
+          getOnboardingStatus(accessToken),
+        ]);
 
         if (!active) {
           return;
         }
 
         setProfile(profileResponse);
+        setOnboardingStatus(statusResponse);
 
         const isDemo =
           profileResponse.read_only === true ||
           profileResponse.demo_mode === true;
 
-        if (isDemo) {
-          setNeedsOnboarding(false);
-          return;
-        }
-
         setNeedsOnboarding(
-          !profileHasMinimumOnboardingData(
-            profileResponse,
-            Boolean(weightResponse.item),
-          ),
+          !isDemo && !statusResponse.completed,
         );
       } catch (error) {
-        // Do not lock an existing user out of the app because the
-        // onboarding eligibility check temporarily failed.
+        // Never lock an existing user out because the onboarding
+        // eligibility check is temporarily unavailable.
         console.error(
           "Unable to check onboarding status",
           error,
@@ -110,6 +103,7 @@ export function AuthGate({
 
         if (active) {
           setNeedsOnboarding(false);
+          setOnboardingStatus(null);
         }
       } finally {
         if (active) {
@@ -131,7 +125,11 @@ export function AuthGate({
   ]);
 
   const initialName = useMemo(() => {
-    const metadata = profile?.metadata ?? user?.user_metadata ?? {};
+    const metadata =
+      profile?.metadata ??
+      user?.user_metadata ??
+      {};
+
     const value =
       metadata.name ??
       metadata.first_name ??
@@ -168,6 +166,7 @@ export function AuthGate({
       <WelcomeJourney
         accessToken={accessToken}
         initialName={initialName}
+        initialStatus={onboardingStatus}
       />
     );
   }
