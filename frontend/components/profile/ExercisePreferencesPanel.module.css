@@ -1,0 +1,21 @@
+.panel { display: grid; gap: 16px; padding: 24px; border: 1px solid #e3e0d9; border-radius: 20px; background: #fffdf9; color: #102846; }
+.panel h2, .panel h3 { margin: 0; }
+.panel h2 { font-size: 1.25rem; }
+.panel h3 { font-size: 1rem; }
+.help { margin: 0; color: #657080; line-height: 1.5; }
+.search { display: grid; gap: 8px; }
+.search label { font-weight: 750; }
+.searchRow { display: flex; gap: 8px; flex-wrap: wrap; }
+.searchRow input, .searchRow select { flex: 1 1 200px; min-width: 0; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font: inherit; }
+.panel button { border: 1px solid #102846; background: #102846; color: #fff; font: inherit; font-weight: 700; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
+.panel button:disabled { opacity: .5; cursor: wait; }
+.panel button[aria-pressed="true"] { border-color: #c95d52; background: #fff0ed; color: #a33d39; }
+.selected, .results { display: grid; gap: 10px; }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e5e3de; border-radius: 12px; }
+.item > span { display: grid; gap: 3px; min-width: 0; }
+.item small { color: #657080; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.error { color: #9e2926; margin: 0; }
+.success { color: #216844; margin: 0; }
+@media (max-width: 540px) { .item { align-items: flex-start; flex-direction: column; } .actions { width: 100%; } }
