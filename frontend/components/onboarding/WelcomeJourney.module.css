@@ -53,3 +53,171 @@
   .actions button[type="submit"] { order: -1; }
   .consent { text-align: center; }
 }
+
+
+.choiceGrid {
+  display: grid;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.choiceGrid .choice,
+.choiceGrid .choiceActive {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-height: 92px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  text-align: left;
+}
+
+.choiceGrid .choice {
+  border: 1px solid #ddd9d1;
+  background: #ffffff;
+  color: #102846;
+}
+
+.choiceGrid .choice:hover {
+  border-color: #f2a7a1;
+  background: #fff9f6;
+}
+
+.choiceGrid .choiceActive {
+  border: 2px solid #ff6865;
+  background: #fff3f0;
+  color: #102846;
+  box-shadow: 0 10px 30px rgba(255, 104, 101, 0.12);
+}
+
+.choiceGrid strong {
+  font-size: 1rem;
+}
+
+.choiceGrid span {
+  color: #657080;
+  font-size: 0.86rem;
+  font-weight: 550;
+  line-height: 1.4;
+}
+
+.badge {
+  justify-self: start;
+  margin-bottom: 3px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ff6865;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.inlineInfo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.inlineInfo span {
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: #eff7f3;
+  color: #29644d;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.fieldGroup > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.help {
+  color: #7b8490;
+  font-size: 0.75rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chips .chip,
+.chips .chipActive {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.chips .chip {
+  border: 1px solid #dcd9d2;
+  background: #fff;
+  color: #102846;
+}
+
+.chips .chipActive {
+  border: 1px solid #ff6865;
+  background: #fff0ed;
+  color: #b73c39;
+}
+
+.summary {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f7f3ed;
+}
+
+.summary span {
+  color: #657080;
+  font-size: 0.78rem;
+}
+
+.summary strong {
+  text-align: right;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 600px) {
+  .progress span {
+    flex: 1;
+    width: auto;
+  }
+
+  .choiceGrid .choice,
+  .choiceGrid .choiceActive {
+    min-height: 82px;
+  }
+
+  .summary > div {
+    display: grid;
+    gap: 4px;
+  }
+
+  .summary strong {
+    text-align: left;
+  }
+}
