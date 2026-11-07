@@ -139,6 +139,8 @@ export function StrengthWorkoutLoggerV2({
   >({});
   const [performedDate, setPerformedDate] =
     useState(todayIso());
+  const [freeTitle, setFreeTitle] = useState("Workout libero");
+  const [creatingFree, setCreatingFree] = useState(false);
   const [duration, setDuration] = useState("");
   const [notes, setNotes] = useState("");
   const [loadingSession, setLoadingSession] =
@@ -703,10 +705,13 @@ export function StrengthWorkoutLoggerV2({
   }
 
   async function startFreeWorkout() {
-    if (!accessToken) {
+    if (!accessToken || creatingFree) return;
+    const title = freeTitle.trim();
+    if (!title) {
+      setError("Dai un nome al workout libero.");
       return;
     }
-
+    setCreatingFree(true);
     setError(null);
     setMessage(null);
 
@@ -714,7 +719,7 @@ export function StrengthWorkoutLoggerV2({
       const response =
         await createFreeStrengthWorkout(
           {
-            title: "Workout libero",
+            title,
             performed_date: performedDate,
           },
           accessToken,
@@ -732,6 +737,8 @@ export function StrengthWorkoutLoggerV2({
           ? err.message
           : "Non riesco a creare il workout libero.",
       );
+    } finally {
+      setCreatingFree(false);
     }
   }
 
@@ -909,14 +916,33 @@ export function StrengthWorkoutLoggerV2({
             performance.
           </p>
         </div>
+        <label>
+          Nome della seduta
+          <input
+            aria-label="Nome del workout libero"
+            maxLength={120}
+            value={freeTitle}
+            onChange={(event) => setFreeTitle(event.target.value)}
+          />
+        </label>
+        <label>
+          Data
+          <input
+            aria-label="Data del workout libero"
+            type="date"
+            value={performedDate}
+            onChange={(event) => setPerformedDate(event.target.value)}
+          />
+        </label>
         <button
           type="button"
           className={styles.primaryButton}
+          disabled={creatingFree || !freeTitle.trim()}
           onClick={() => {
             void startFreeWorkout();
           }}
         >
-          Inizia workout libero
+          {creatingFree ? "Creo…" : "Inizia workout libero"}
         </button>
       </section>
       {accessToken && (
