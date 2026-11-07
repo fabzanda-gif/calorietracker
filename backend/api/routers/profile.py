@@ -12,6 +12,7 @@ from backend.api.dependencies import (
     CurrentUser,
     get_admin_supabase_client,
     get_current_user,
+    invalidate_current_user_cache,
 )
 
 
@@ -256,6 +257,7 @@ def update_profile(
         )
 
     data = response.json()
+    invalidate_current_user_cache(current_user.access_token)
 
     # Supabase Auth può restituire l'utente direttamente oppure
     # annidato sotto "user". Gestiamo entrambe le forme.
