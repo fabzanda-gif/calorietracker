@@ -259,7 +259,12 @@ def test_apply_requires_explicit_double_confirmation():
 
 def test_apply_recomputes_proposal_and_changes_only_goal_adjustment(monkeypatch):
     repos = fixture_repos()
-    monkeypatch.setattr(adaptive_macros.date, "today", lambda: TODAY)
+    class FrozenDate(date):
+        @classmethod
+        def today(cls):
+            return TODAY
+
+    monkeypatch.setattr(adaptive_macros, "date", FrozenDate)
     # Revalidate the freshly built analysis; record only the metadata fields.
     preview = adaptive_macros.preview_adaptive_macros(
         as_of=TODAY, current_user=identity(), **fixture_repos(),
