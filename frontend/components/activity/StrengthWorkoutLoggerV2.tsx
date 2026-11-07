@@ -321,6 +321,7 @@ export function StrengthWorkoutLoggerV2({
     exerciseId: string,
     setIndex: number,
     override?: Partial<SetDraft>,
+    strict = false,
   ) {
     if (!accessToken || !activeWorkout) {
       return;
@@ -392,6 +393,7 @@ export function StrengthWorkoutLoggerV2({
           ? err.message
           : "Non riesco a salvare la serie.",
       );
+      if (strict) throw err;
     }
   }
 
@@ -765,6 +767,8 @@ export function StrengthWorkoutLoggerV2({
               persistSet(
                 exercise.id,
                 index,
+                undefined,
+                true,
               ),
             );
           }
