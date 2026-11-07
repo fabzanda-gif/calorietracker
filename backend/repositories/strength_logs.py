@@ -90,6 +90,50 @@ class StrengthWorkoutLogsRepository(
                 f"workout logs: {exc}"
             ) from exc
 
+    def list_for_workout_ids(
+        self, user_id: str, workout_ids: list[str]
+    ) -> list[dict]:
+        if not workout_ids:
+            return []
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_LOG_SELECT)
+                .eq("user_id", user_id)
+                .in_("strength_workout_id", workout_ids)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load strength session summaries: {exc}"
+            ) from exc
+
+    def list_recent_sessions(
+        self,
+        user_id: str,
+        *,
+        status: str,
+        limit: int = 30,
+    ) -> list[dict]:
+        if status not in ("draft", "completed"):
+            raise ValueError("Invalid strength session status")
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_LOG_SELECT)
+                .eq("user_id", user_id)
+                .eq("status", status)
+                .order("performed_date", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load recent strength sessions: {exc}"
+            ) from exc
+
     def create(
         self,
         payload: dict[str, Any],
@@ -160,6 +204,29 @@ class StrengthSetLogsRepository(
     BaseRepository
 ):
     table_name = "strength_set_logs"
+
+    def has_logged_sets_for_exercise(
+        self,
+        user_id: str,
+        workout_log_id: Any,
+        exercise_id: Any,
+    ) -> bool:
+        """Prevent replacing the identity of an already-logged exercise."""
+        try:
+            response = (
+                self.table
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("strength_workout_log_id", workout_log_id)
+                .eq("strength_workout_exercise_id", exercise_id)
+                .limit(1)
+                .execute()
+            )
+            return bool(self._data(response))
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to check logged strength exercise: {exc}"
+            ) from exc
 
     def upsert_set(
         self,

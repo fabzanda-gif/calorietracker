@@ -636,6 +636,99 @@ def list_strength_workouts(
         ) from exc
 
 
+@router.get("/workouts/{workout_id}/detail")
+def get_strength_workout_detail(
+    workout_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
+    exercises_repo: StrengthWorkoutExercisesRepository = Depends(
+        get_strength_workout_exercises_repository
+    ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+    set_logs_repo: StrengthSetLogsRepository = Depends(
+        get_strength_set_logs_repository
+    ),
+):
+    """Return owner-scoped exercise and saved-set detail for recovery."""
+    try:
+        workout = workouts_repo.get(current_user.id, workout_id)
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workout palestra non trovato.",
+            )
+        exercises = exercises_repo.list_for_workout(
+            current_user.id,
+            workout_id,
+        )
+        workout_log = workout_logs_repo.get_for_workout(
+            current_user.id,
+            workout_id,
+        )
+        sets = (
+            set_logs_repo.list_for_workout_log(
+                current_user.id,
+                workout_log["id"],
+            )
+            if workout_log else []
+        )
+        return {
+            "workout": {**workout, "exercises": exercises},
+            "workout_log": workout_log,
+            "sets": sets,
+        }
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/workouts/free/recent")
+def list_recent_free_strength_workouts(
+    current_user: CurrentUser = Depends(get_current_user),
+    workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+):
+    """Recover free workouts, including drafts after app/browser restart."""
+    try:
+        workouts = workouts_repo.list_recent_free(
+            current_user.id,
+            limit=30,
+        )
+        logs = workout_logs_repo.list_for_workout_ids(
+            current_user.id,
+            [str(workout["id"]) for workout in workouts],
+        )
+        logs_by_workout = {
+            str(log["strength_workout_id"]): log
+            for log in logs
+        }
+        items = [
+            {
+                "workout": workout,
+                "workout_log": logs_by_workout.get(str(workout["id"])),
+            }
+            for workout in workouts
+        ]
+        return {"items": items, "count": len(items)}
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post(
     "/workouts/{workout_id}/log",
     status_code=status.HTTP_201_CREATED,
@@ -666,6 +759,11 @@ def log_strength_workout(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2067,7 +2165,7 @@ def _start_or_resume_strength_session(
     *,
     user_id: str,
     workout_id: str,
-    performed_date: date,
+    performed_date: date | None,
     workout_logs_repo: StrengthWorkoutLogsRepository,
 ) -> dict:
     existing = workout_logs_repo.get_for_workout(
@@ -2083,7 +2181,8 @@ def _start_or_resume_strength_session(
             )
 
         if (
-            str(existing.get("performed_date"))
+            performed_date is not None
+            and str(existing.get("performed_date"))
             != str(performed_date)
         ):
             updated = workout_logs_repo.update(
@@ -2102,6 +2201,8 @@ def _start_or_resume_strength_session(
 
         return existing
 
+    if performed_date is None:
+        performed_date = date.today()
     now = datetime.now(timezone.utc).isoformat()
     created = workout_logs_repo.create(
         {
@@ -2199,6 +2300,11 @@ def start_strength_session(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2282,6 +2388,11 @@ def autosave_strength_set(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     if set_index < 1 or set_index > 10:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -2322,7 +2433,7 @@ def autosave_strength_set(
         workout_log = _start_or_resume_strength_session(
             user_id=current_user.id,
             workout_id=workout_id,
-            performed_date=date.today(),
+            performed_date=None,  # Preserve selected date on autosave.
             workout_logs_repo=workout_logs_repo,
         )
 
@@ -2392,6 +2503,11 @@ def delete_strength_set(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2473,6 +2589,11 @@ def complete_strength_session(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2584,6 +2705,11 @@ def create_free_strength_workout(
             get_strength_workouts_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         performed_date = (
             request.performed_date
@@ -2649,6 +2775,11 @@ def add_strength_workout_exercise(
             get_exercise_library_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     if request.target_reps_max < request.target_reps_min:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -2885,7 +3016,18 @@ def substitute_strength_exercise(
         ExerciseLibraryRepository = Depends(
             get_exercise_library_repository
         ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+    set_logs_repo: StrengthSetLogsRepository = Depends(
+        get_strength_set_logs_repository
+    ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2915,6 +3057,22 @@ def substitute_strength_exercise(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="L'esercizio non appartiene al workout.",
+            )
+
+        existing_log = workout_logs_repo.get_for_workout(
+            current_user.id, workout_id,
+        )
+        if existing_log and set_logs_repo.has_logged_sets_for_exercise(
+            current_user.id,
+            existing_log["id"],
+            exercise_id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Impossibile sostituire un esercizio con serie "
+                    "già registrate. Mantieni lo storico originale."
+                ),
             )
 
         replacement = library_repo.get_exercise(
