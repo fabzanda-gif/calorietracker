@@ -645,3 +645,39 @@ export function substituteStrengthExercise(
     },
   );
 }
+
+export interface FreeWorkoutRecentItem {
+  workout: Omit<StrengthWorkout, "exercises">;
+  workout_log: {
+    id: string;
+    performed_date: string;
+    status: "draft" | "completed";
+    duration_minutes: number | null;
+    notes: string | null;
+  } | null;
+}
+
+export interface FreeWorkoutRecentResponse {
+  items: FreeWorkoutRecentItem[];
+  count: number;
+}
+
+/** Bounded user-scoped free-workout timeline; includes unfinished sessions. */
+export function getRecentFreeStrengthWorkouts(
+  accessToken: string,
+): Promise<FreeWorkoutRecentResponse> {
+  return apiRequest<FreeWorkoutRecentResponse>(
+    "/strength/workouts/free/recent",
+    { accessToken },
+  );
+}
+
+export function getStrengthWorkoutDetail(
+  workoutId: string,
+  accessToken: string,
+): Promise<{ workout: StrengthWorkout }> {
+  return apiRequest<{ workout: StrengthWorkout }>(
+    `/strength/workouts/${encodeURIComponent(workoutId)}/detail`,
+    { accessToken },
+  );
+}
