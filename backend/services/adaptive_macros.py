@@ -95,6 +95,11 @@ class AdaptiveMacroService:
             reasons.append("Le pesate devono coprire almeno 21 giorni.")
         if len(totals) < self.MIN_LOGGED_DAYS:
             reasons.append("Servono almeno 20 giorni con pasti registrati negli ultimi 28.")
+        last_applied = self._date(metadata.get("adaptive_macros_last_applied_on"))
+        if last_applied is not None and 0 <= (as_of - last_applied).days < 14:
+            reasons.append(
+                "Adattamento recente: osserva almeno 14 giorni prima di una nuova proposta."
+            )
         if mode == "maintenance":
             reasons.append("Per il mantenimento osserviamo il trend senza modificare l'obiettivo calorico.")
         if mode in {"gain", "loss"} and adjustment <= 0:
@@ -218,6 +223,7 @@ class AdaptiveMacroService:
             "adjustment": adjustment, "observed": observed,
             "proposal": proposal, "status": status,
             "protein_configured": metadata.get("protein_goal_enabled"),
+            "last_adapted": metadata.get("adaptive_macros_last_applied_on"),
             "raw_weights": [
                 (day.isoformat(), value) for day, value in points
             ],
