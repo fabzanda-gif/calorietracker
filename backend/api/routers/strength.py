@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
+from typing import Literal
 
 from fastapi import (
     APIRouter,
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 from backend.api.dependencies import (
     CurrentUser,
     get_current_user,
+    get_exercise_library_repository,
     get_strength_plans_repository,
     get_strength_workout_exercises_repository,
     get_strength_workout_logs_repository,
@@ -21,6 +23,7 @@ from backend.api.dependencies import (
     get_strength_workouts_repository,
 )
 from backend.repositories.base import RepositoryError
+from backend.repositories.exercise_library import ExerciseLibraryRepository
 from backend.repositories.strength_plans import (
     StrengthPlansRepository,
 )
@@ -61,6 +64,12 @@ class StrengthSetLogRequest(BaseModel):
         ge=0,
         le=6,
     )
+    feeling: Literal[
+        "easy",
+        "right",
+        "hard",
+        "too_hard",
+    ] | None = None
 
 
 class StrengthExerciseLogRequest(BaseModel):
@@ -87,6 +96,66 @@ class StrengthWorkoutLogRequest(BaseModel):
     exercises: list[
         StrengthExerciseLogRequest
     ] = Field(min_length=1)
+
+
+class StrengthSessionStartRequest(BaseModel):
+    performed_date: date | None = None
+
+
+class StrengthSetAutosaveRequest(BaseModel):
+    reps: int = Field(gt=0)
+    load_kg: float = Field(default=0, ge=0)
+    feeling: Literal[
+        "easy",
+        "right",
+        "hard",
+        "too_hard",
+    ] | None = None
+    rir: float | None = Field(
+        default=None,
+        ge=0,
+        le=6,
+    )
+
+
+class StrengthWorkoutCompleteRequest(BaseModel):
+    duration_minutes: int | None = Field(
+        default=None,
+        gt=0,
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=2000,
+    )
+
+
+class StrengthFreeWorkoutRequest(BaseModel):
+    title: str = Field(
+        default="Workout libero",
+        min_length=1,
+        max_length=120,
+    )
+    performed_date: date | None = None
+
+
+class StrengthWorkoutExerciseAddRequest(BaseModel):
+    library_exercise_id: str = Field(min_length=1)
+    target_sets: int = Field(default=3, ge=1, le=10)
+    target_reps_min: int = Field(default=8, ge=1, le=100)
+    target_reps_max: int = Field(default=12, ge=1, le=100)
+    target_rir: float | None = Field(
+        default=2,
+        ge=0,
+        le=6,
+    )
+    rest_seconds: int | None = Field(
+        default=90,
+        gt=0,
+    )
+
+
+class StrengthExerciseSubstituteRequest(BaseModel):
+    library_exercise_id: str = Field(min_length=1)
 
 
 class StrengthPlanRequest(BaseModel):
