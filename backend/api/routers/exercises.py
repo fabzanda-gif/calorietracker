@@ -84,6 +84,23 @@ def list_exercises(
         ) from exc
 
 
+@router.get("/catalog/status")
+def get_catalog_status(
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: ExerciseLibraryRepository = Depends(
+        get_exercise_library_repository
+    ),
+):
+    del current_user
+    try:
+        return repo.catalog_status()
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/{identifier}")
 def get_exercise(
     identifier: str,
