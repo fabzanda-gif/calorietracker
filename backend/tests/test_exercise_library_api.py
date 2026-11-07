@@ -41,6 +41,49 @@ class FakeExerciseLibraryRepo:
             }
         ]
 
+    def list_alternatives(
+        self, identifier, *, language="it", equipment_key=None, limit=20, user_id=None
+    ):
+        self.last_alternatives_query = {
+            "identifier": identifier,
+            "language": language,
+            "equipment_key": equipment_key,
+            "limit": limit,
+            "user_id": user_id,
+        }
+        if identifier == "missing":
+            return None
+        return [{
+            "exercise": self.items[0],
+            "relationship": "substitute",
+            "similarity_score": None,
+            "rationale": "Same movement pattern",
+            "requires_confirmation": True,
+        }]
+
+    def list_user_preferences(self, user_id):
+        self.preference_user_id = user_id
+        return [{"exercise_id": "exercise-1", "preference": "preferred"}]
+
+    def save_user_preference(self, user_id, exercise_id, preference):
+        self.saved_preference = (user_id, exercise_id, preference)
+        return {"exercise_id": exercise_id, "preference": preference}
+
+    def remove_user_preference(self, user_id, exercise_id):
+        self.removed_preference = (user_id, exercise_id)
+
+    def catalog_status(self):
+        return {
+            "total_active": 317,
+            "approved_for_generation": 10,
+            "pending_curation": 307,
+            "missing_movement_pattern": 307,
+            "missing_training_role": 307,
+            "missing_fatigue_cost": 307,
+            "has_substitution_relationships": False,
+            "by_body_part": {"back": 56},
+        }
+
     def list_exercises(self, **kwargs):
         self.list_calls.append(kwargs)
         return list(self.items)
@@ -131,3 +174,92 @@ def test_core_backend_exposes_exercise_library():
 
     assert "/exercises" in paths
     assert "/exercises/{identifier}" in paths
+
+
+def test_catalog_status_reports_quality_without_modifying_entries():
+    repo = FakeExerciseLibraryRepo()
+    response = exercises.get_catalog_status(
+        current_user=user(),
+        repo=repo,
+    )
+    assert response["total_active"] == 317
+    assert response["approved_for_generation"] == 10
+    assert response["pending_curation"] == 307
+    assert response["has_substitution_relationships"] is False
+    assert "/exercises/catalog/status" in core_app.openapi()["paths"]
+
+
+def test_exercise_alternatives_are_suggestions_with_filter():
+    repo = FakeExerciseLibraryRepo()
+    result = exercises.get_exercise_alternatives(
+        identifier="barbell-bench-press",
+        equipment="dumbbell",
+        language="it",
+        limit=5,
+        current_user=user(),
+        repo=repo,
+    )
+    assert result["count"] == 1
+    assert result["items"][0]["requires_confirmation"] is True
+    assert repo.last_alternatives_query == {
+        "identifier": "barbell-bench-press",
+        "language": "it",
+        "equipment_key": "dumbbell",
+        "limit": 5,
+        "user_id": "user-1",
+    }
+    assert "/exercises/{identifier}/alternatives" in core_app.openapi()["paths"]
+
+
+def test_exercise_alternatives_404_for_missing_exercise():
+    with pytest.raises(HTTPException) as exc:
+        exercises.get_exercise_alternatives(
+            identifier="missing",
+            equipment=None,
+            language="it",
+            limit=20,
+            current_user=user(),
+            repo=FakeExerciseLibraryRepo(),
+        )
+    assert exc.value.status_code == 404
+
+
+def test_exercise_preferences_are_user_scoped():
+    repo = FakeExerciseLibraryRepo()
+    result = exercises.get_exercise_preferences(
+        current_user=user(), repo=repo
+    )
+    assert result["count"] == 1
+    assert repo.preference_user_id == "user-1"
+    saved = exercises.update_exercise_preference(
+        identifier="barbell-bench-press",
+        payload=exercises.ExercisePreferenceUpdate(preference="excluded"),
+        current_user=user(),
+        repo=repo,
+    )
+    assert saved["preference"] == "excluded"
+    assert repo.saved_preference == ("user-1", "exercise-1", "excluded")
+    exercises.delete_exercise_preference(
+        identifier="barbell-bench-press",
+        current_user=user(),
+        repo=repo,
+    )
+    assert repo.removed_preference == ("user-1", "exercise-1")
+    paths = core_app.openapi()["paths"]
+    assert "/exercises/preferences" in paths
+    assert "/exercises/{identifier}/preference" in paths
+
+
+def test_exercise_preference_writes_forbid_read_only_accounts():
+    repo = FakeExerciseLibraryRepo()
+    readonly = CurrentUser(
+        id="user-1", access_token="token", read_only=True
+    )
+    with pytest.raises(HTTPException) as exc:
+        exercises.update_exercise_preference(
+            identifier="barbell-bench-press",
+            payload=exercises.ExercisePreferenceUpdate(preference="excluded"),
+            current_user=readonly,
+            repo=repo,
+        )
+    assert exc.value.status_code == 403

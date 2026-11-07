@@ -1,0 +1,17 @@
+.panel { display: grid; gap: 16px; padding: 24px; border: 1px solid #e3e0d9; border-radius: 20px; background: #fffdf9; color: #102846; }
+.panel h2 { margin: 0; font-size: 1.25rem; }
+.muted { color: #657080; margin: 0; line-height: 1.5; }
+.fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.fields label { display: grid; gap: 6px; font-size: .9rem; font-weight: 700; }
+.fields select { min-width: 0; padding: 12px; border: 1px solid #ccc; border-radius: 12px; background: #fff; font: inherit; }
+.group { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+.group legend { font-weight: 700; margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chips button { border: 1px solid #ddd; color: #102846; background: #fff; padding: 9px 12px; border-radius: 999px; font: inherit; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: #fff0ed; color: #a33d39; border-color: #ff6865; font-weight: 750; }
+.chips button:disabled { opacity: .5; cursor: default; }
+.save { justify-self: start; border: 0; border-radius: 999px; padding: 13px 20px; color: white; background: #102846; font: inherit; font-weight: 750; cursor: pointer; }
+.save:disabled { opacity: .55; }
+.error { color: #9e2926; }
+.success { color: #216844; }
+@media (max-width: 560px) { .fields { grid-template-columns: 1fr; } }

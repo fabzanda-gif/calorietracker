@@ -6,6 +6,8 @@ import {
 } from "react";
 
 import { AppNav } from "@/components/navigation/AppNav";
+import { ExercisePreferencesPanel } from "@/components/profile/ExercisePreferencesPanel";
+import { TrainingProfilePanel } from "@/components/profile/TrainingProfilePanel";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -1407,6 +1409,9 @@ export default function ProfilePage() {
                   : "Salva modifiche"}
               </button>
             </div>
+
+            <TrainingProfilePanel accessToken={accessToken} />
+            <ExercisePreferencesPanel accessToken={accessToken} />
 
             <section className={`${styles.card} ${styles.logoutZone}`}>
               <div className={styles.sectionHeader}>

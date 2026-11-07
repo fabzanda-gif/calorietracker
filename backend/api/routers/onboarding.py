@@ -353,6 +353,11 @@ def save_core_onboarding(
         get_onboarding_repository
     ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         existing = (
             repo.get_preferences(
@@ -427,6 +432,11 @@ def save_nutrition_setup(
         get_onboarding_repository
     ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         preferences = repo.get_preferences(
             current_user.id
@@ -503,6 +513,11 @@ def save_training_setup(
         get_onboarding_repository
     ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         preferences = repo.get_preferences(
             current_user.id
