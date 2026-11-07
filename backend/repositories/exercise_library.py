@@ -305,7 +305,7 @@ class ExerciseLibraryRepository(BaseRepository):
         language: str = "it",
         equipment_key: str | None = None,
         limit: int = 20,
-    ) -> list[dict]:
+    ) -> list[dict] | None:
         """Return reviewed links; never auto-substitute a workout exercise."""
         source = self.get_exercise(identifier, language=language)
         if source is None:
