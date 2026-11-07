@@ -738,6 +738,11 @@ def log_strength_workout(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2271,6 +2276,11 @@ def start_strength_session(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2354,6 +2364,11 @@ def autosave_strength_set(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     if set_index < 1 or set_index > 10:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -2464,6 +2479,11 @@ def delete_strength_set(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2545,6 +2565,11 @@ def complete_strength_session(
             get_strength_set_logs_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
@@ -2656,6 +2681,11 @@ def create_free_strength_workout(
             get_strength_workouts_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         performed_date = (
             request.performed_date
@@ -2721,6 +2751,11 @@ def add_strength_workout_exercise(
             get_exercise_library_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     if request.target_reps_max < request.target_reps_min:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -2958,6 +2993,11 @@ def substitute_strength_exercise(
             get_exercise_library_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         workout = workouts_repo.get(
             current_user.id,
