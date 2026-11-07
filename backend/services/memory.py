@@ -44,22 +44,28 @@ class MemoryService:
         self,
         user_id: str,
         day_date: date,
+        *,
+        preloaded_daily_logs: list[dict] | None = None,
     ) -> dict:
         return self._predict_weekday_field(
             user_id=user_id,
             day_date=day_date,
             field_name="day_type",
+            preloaded_daily_logs=preloaded_daily_logs,
         )
 
     def predict_activity_plan(
         self,
         user_id: str,
         day_date: date,
+        *,
+        preloaded_daily_logs: list[dict] | None = None,
     ) -> dict:
         return self._predict_weekday_field(
             user_id=user_id,
             day_date=day_date,
             field_name="activity_plan",
+            preloaded_daily_logs=preloaded_daily_logs,
         )
 
     def _predict_weekday_field(
@@ -68,15 +74,26 @@ class MemoryService:
         user_id: str,
         day_date: date,
         field_name: str,
+        preloaded_daily_logs: list[dict] | None = None,
     ) -> dict:
         start_date = day_date - timedelta(weeks=self.lookback_weeks)
         end_date = day_date - timedelta(days=1)
 
-        rows = self.daily_logs_repo.list_date_range(
-            user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        if preloaded_daily_logs is None:
+            rows = self.daily_logs_repo.list_date_range(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            rows = [
+                row
+                for row in preloaded_daily_logs
+                if row.get("date")
+                and start_date
+                <= date.fromisoformat(str(row["date"]))
+                <= end_date
+            ]
 
         observations = self._same_weekday_observations(
             rows=rows,

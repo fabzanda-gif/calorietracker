@@ -7,11 +7,16 @@ from pydantic import BaseModel
 
 from backend.api.dependencies import (
     CurrentUser,
+    get_activities_repository,
     get_current_user,
     get_daily_logs_repository,
 )
+from backend.repositories.activities import ActivitiesRepository
 from backend.repositories.base import RepositoryError
 from backend.repositories.daily_logs import DailyLogsRepository
+from backend.services.activity_movement_sync import (
+    ActivityMovementSyncService,
+)
 
 
 router = APIRouter(prefix="/daily-logs", tags=["daily-logs"])
@@ -45,7 +50,12 @@ def update_daily_log(
     log_date: Date,
     changes: DailyLogUpdate,
     current_user: CurrentUser = Depends(get_current_user),
-    repo: DailyLogsRepository = Depends(get_daily_logs_repository),
+    repo: DailyLogsRepository = Depends(
+        get_daily_logs_repository
+    ),
+    activities_repo: ActivitiesRepository = Depends(
+        get_activities_repository
+    ),
 ):
     payload = changes.model_dump(exclude_unset=True)
 
@@ -73,10 +83,23 @@ def update_daily_log(
             log_date=log_date,
             values=payload,
         )
+
+        movement = None
+
+        if "steps" in payload:
+            movement = ActivityMovementSyncService(
+                activities_repo=activities_repo,
+                daily_logs_repo=repo,
+            ).sync(
+                user_id=current_user.id,
+                day_date=log_date,
+            )
+
         return {
             "updated": True,
             "date": str(log_date),
             "item": item,
+            "movement": movement,
         }
     except RepositoryError as exc:
         raise HTTPException(

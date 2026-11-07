@@ -1,0 +1,261 @@
+.card {
+  padding: 24px;
+  border: 1px solid rgba(15, 42, 67, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #7d8792;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.header h2 {
+  margin: 0;
+  color: #0f2a43;
+  font-size: 1.2rem;
+}
+
+.header p {
+  margin: 6px 0 0;
+  color: #657281;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.typePicker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.typeButton,
+.typeActive {
+  min-height: 48px;
+  border-radius: 13px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.typeButton {
+  border: 1px solid rgba(15, 42, 67, 0.12);
+  background: #fff;
+  color: #0f2a43;
+}
+
+.typeActive {
+  border: 1px solid rgba(255, 104, 100, 0.35);
+  background: rgba(255, 104, 100, 0.1);
+  color: #0f2a43;
+}
+
+.contextBox {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 13px 15px;
+  border-radius: 13px;
+  background: rgba(15, 42, 67, 0.045);
+}
+
+.contextBox strong {
+  color: #0f2a43;
+  font-size: 0.88rem;
+}
+
+.contextBox span {
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.formGrid label {
+  display: grid;
+  gap: 6px;
+}
+
+.formGrid label > span {
+  color: #0f2a43;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.formGrid input {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid rgba(15, 42, 67, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.notesLabel {
+  grid-column: 1 / -1;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.addButton {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #0f2a43;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.addButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.error,
+.success {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+}
+
+.error {
+  background: rgba(190, 40, 40, 0.08);
+  color: #8d2e2e;
+}
+
+.success {
+  background: rgba(40, 150, 80, 0.09);
+  color: #27643d;
+}
+
+.listSection {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(15, 42, 67, 0.08);
+}
+
+.listTitle {
+  margin-bottom: 10px;
+  color: #0f2a43;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.empty {
+  margin: 0;
+  color: #7a8490;
+  font-size: 0.8rem;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(15, 42, 67, 0.08);
+  border-radius: 13px;
+  background: #fff;
+}
+
+.itemIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: rgba(255, 104, 100, 0.08);
+}
+
+.itemCopy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemCopy strong {
+  color: #0f2a43;
+  font-size: 0.86rem;
+}
+
+.itemCopy span,
+.itemCopy small {
+  color: #687587;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.removeButton {
+  border: 0;
+  background: transparent;
+  color: #d6575a;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 680px) {
+  .card {
+    padding: 18px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .notesLabel {
+    grid-column: auto;
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .addButton {
+    width: 100%;
+  }
+
+  .item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .removeButton {
+    grid-column: 2;
+    justify-self: start;
+    padding: 4px 0;
+  }
+}

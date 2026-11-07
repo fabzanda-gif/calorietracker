@@ -31,7 +31,7 @@ def test_expected_api_paths_are_registered():
 def test_all_data_routes_have_bearer_security():
     schema = app.openapi()
 
-    public_paths = {"/health"}
+    public_paths = {"/health", "/health/live", "/health/ready"}
 
     for path, operations in schema["paths"].items():
         if path in public_paths:

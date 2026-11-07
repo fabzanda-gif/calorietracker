@@ -182,6 +182,15 @@ class LearnedInsightsService:
         if prediction.get("state") != "predicted":
             return
 
+        evidence = prediction.get("evidence") or {}
+        confidence_level = prediction.get(
+            "confidence_level"
+        )
+        # A recent-history fallback is useful on today's Home, but it
+        # is not evidence of a weekday-specific learned pattern.
+        if evidence.get("scope") == "recent":
+            confidence_level = "low"
+
         insight = {
             "kind": "meal",
             "weekday": weekday,
@@ -190,9 +199,7 @@ class LearnedInsightsService:
             "day_context": prediction.get("day_context"),
             "value": prediction.get("value"),
             "confidence": prediction.get("confidence"),
-            "confidence_level": prediction.get(
-                "confidence_level"
-            ),
+            "confidence_level": confidence_level,
             "estimated_calories": prediction.get(
                 "estimated_calories"
             ),

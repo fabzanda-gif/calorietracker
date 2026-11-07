@@ -101,6 +101,40 @@ def test_recipe_with_other_meal_type_is_filtered():
     assert result[0]["name"] == "Lunch bowl"
 
 
+def test_lunch_and_dinner_are_interchangeable_but_snacks_are_not():
+    result = MealCandidateService().build(
+        day_date=DAY,
+        meal_type="Cena",
+        meal_prep_items=[],
+        routine_prediction=None,
+        recipes=[
+            {"id": "lunch", "name": "Pasta", "meal_type": "Pranzo", "calories": 650},
+            {"id": "snack", "name": "Yogurt", "meal_type": "Spuntino", "calories": 180},
+        ],
+    )
+
+    assert [item["name"] for item in result] == ["Pasta"]
+    assert result[0]["meal_type"] == "Cena"
+    assert result[0]["source_meal_type"] == "Pranzo"
+
+
+def test_main_meal_does_not_reuse_legacy_multi_row_composites():
+    result = MealCandidateService().build(
+        day_date=DAY,
+        meal_type="Cena",
+        meal_prep_items=[],
+        routine_prediction=None,
+        recipes=[],
+        historical_meals=[
+            {"date": "2026-08-20", "meal_type": "Cena", "name": "Yogurt", "calories": 180},
+            {"date": "2026-08-20", "meal_type": "Cena", "name": "Crackers", "calories": 220},
+            {"date": "2026-08-20", "meal_type": "Cena", "name": "Frutta", "calories": 120},
+        ],
+    )
+
+    assert result == []
+
+
 def test_missing_taste_defaults_to_five():
     result = MealCandidateService().build(
         day_date=DAY,

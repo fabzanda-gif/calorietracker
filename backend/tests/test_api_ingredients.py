@@ -10,6 +10,13 @@ from backend.api.main import app
 
 
 class FakeIngredientsRepository:
+    def get_by_normalized_name(
+        self,
+        normalized_name,
+        user_id,
+    ):
+        return None
+
     def __init__(self):
         self.items = {
             "ingredient-1": {

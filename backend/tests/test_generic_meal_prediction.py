@@ -85,10 +85,12 @@ def test_day_service_predicts_all_three_main_meal_slots():
     assert day["meals"]["breakfast"]["meal_type"] == "Colazione"
     assert day["meals"]["lunch"]["meal_type"] == "Pranzo"
     assert day["meals"]["dinner"]["meal_type"] == "Cena"
+    assert day["meals"]["snack"]["meal_type"] == "Snack"
 
     assert meal_memory.calls == [
         "Colazione",
         "Pranzo",
+        "Snack",
         "Cena",
     ]
 

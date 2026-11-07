@@ -10,3 +10,6 @@ frontend/tsconfig.tsbuildinfo
 
 # Local frontend environment
 frontend/.env.local
+
+# Local Streamlit / backend secrets
+.streamlit/secrets.toml

@@ -22,6 +22,38 @@ export function getWeightHistory(
   );
 }
 
+export function getWeightHistoryRange(
+  startDate: string,
+  endDate: string,
+  accessToken?: string | null,
+): Promise<WeightHistoryResponse> {
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+  });
+
+  return apiRequest<WeightHistoryResponse>(
+    `/weight?${params.toString()}`,
+    {
+      accessToken,
+    },
+  );
+}
+
+
+export function getLatestWeight(
+  accessToken?: string | null,
+): Promise<{
+  item: WeightEntry | null;
+}> {
+  return apiRequest(
+    "/weight/latest",
+    {
+      accessToken,
+    },
+  );
+}
+
 export function createWeight(
   input: {
     date: string;
@@ -37,6 +69,30 @@ export function createWeight(
     {
       method: "POST",
       accessToken,
+      route: "heavy",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+
+export function updateWeight(
+  rowId: string | number,
+  input: {
+    date?: string;
+    weight?: number;
+  },
+  accessToken?: string | null,
+): Promise<{
+  updated: boolean;
+  item: WeightEntry | null;
+}> {
+  return apiRequest(
+    `/weight/${rowId}`,
+    {
+      method: "PATCH",
+      accessToken,
+      route: "heavy",
       body: JSON.stringify(input),
     },
   );

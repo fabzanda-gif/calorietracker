@@ -1,0 +1,114 @@
+/* Global mobile polish for floating controls and bottom navigation. */
+
+@media (max-width: 759px) {
+  /* Keep the language + experience controls compact and aligned. */
+  [class*="LanguageSwitcher_compact"] {
+    top: calc(8px + env(safe-area-inset-top)) !important;
+    right: 154px !important;
+  }
+
+  [class*="LanguageSwitcher_compactButton"] {
+    min-width: 38px !important;
+    height: 34px !important;
+    padding-inline: 7px !important;
+  }
+
+  [class*="AppNav_globalExperienceSwitch"] {
+    top: calc(8px + env(safe-area-inset-top)) !important;
+    right: 8px !important;
+    bottom: auto !important;
+    padding: 3px !important;
+  }
+
+  [class*="AppNav_globalExperienceSwitch"] button {
+    min-height: 30px !important;
+    padding-inline: 10px !important;
+    font-size: 0.7rem !important;
+  }
+
+  /* Standard and Zero must use exactly the same navigation geometry. */
+  body [class*="AppNav_mobileNav"] {
+    left: 10px !important;
+    right: 10px !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    min-height: 58px !important;
+    height: auto !important;
+    padding: 5px !important;
+    border-radius: 20px !important;
+    overflow: visible !important;
+  }
+
+  body [class*="AppNav_mobileLink"] {
+    min-height: 50px !important;
+    border-radius: 14px !important;
+    font-size: 0.64rem !important;
+  }
+
+  /*
+   * Same brand notch in both modes. Only artwork/colors change.
+   * Use assets that are already known to render correctly.
+   */
+  body [class*="AppNav_mobileNav"]::before {
+    left: 50% !important;
+    top: -54px !important;
+    width: 82px !important;
+    height: 60px !important;
+    transform: translateX(-50%) !important;
+    border-radius: 42px 42px 0 0 !important;
+    background-repeat: no-repeat !important;
+    background-position: center 5px !important;
+    background-size: 68px auto !important;
+    overflow: visible !important;
+  }
+
+  body [class*="AppNav_mobileNav"]:not([class*="AppNav_mobileNavZero"])::before {
+    background-color: rgba(255, 255, 255, 0.99) !important;
+    background-image: url("/assets/LogoCoral.png") !important;
+    border-color: rgba(244, 127, 122, 0.34) !important;
+  }
+
+  body [class*="AppNav_mobileNavZero"]::before {
+    top: -54px !important;
+    width: 82px !important;
+    height: 60px !important;
+    border-radius: 42px 42px 0 0 !important;
+    background-color: #080808 !important;
+    background-image: url("/assets/LogoZero.jpeg") !important;
+    background-position: center -2px !important;
+    background-size: 70px auto !important;
+    border-color: rgba(244, 61, 61, 0.48) !important;
+  }
+
+  /* Keep SanoSync AI compact on phones and never split its title. */
+  main[class*="HomeShell_page"] [class*="HomeShell_conversationHeader"] h2 {
+    white-space: nowrap !important;
+    font-size: 1rem !important;
+    line-height: 1.05 !important;
+  }
+
+  main[class*="HomeShell_page"] [class*="HomeShell_conversationAiLogo"],
+  main[class*="HomeShell_page"] img[alt="SanoSync AI"],
+  main[class*="HomeShell_page"] img[alt="SanoSync AI Zero"] {
+    width: 32px !important;
+    height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    object-fit: contain !important;
+  }
+
+  main[class*="HomeShell_page"] [class*="HomeShell_conversationEyebrow"] {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  [class*="LanguageSwitcher_compact"] {
+    right: 142px !important;
+  }
+
+  [class*="AppNav_globalExperienceSwitch"] button {
+    padding-inline: 8px !important;
+  }
+}

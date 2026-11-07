@@ -216,7 +216,9 @@ def calculate_bmr(
     weight = float(weight)
     height = float(height)
 
-    if gender in {"Uomo", "Male", "Man"}:
+    normalized_gender = str(gender).strip().casefold()
+
+    if normalized_gender in {"uomo", "male", "man", "m"}:
         return int(
             round(
                 (10 * weight)
