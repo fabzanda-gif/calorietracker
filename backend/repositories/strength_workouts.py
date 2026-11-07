@@ -112,6 +112,64 @@ class StrengthWorkoutsRepository(BaseRepository):
                 f"{exc}"
             ) from exc
 
+
+    def reschedule_skipped(
+        self,
+        *,
+        workout_id: Any,
+        user_id: str,
+        original_date: str,
+        new_date: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update({
+                    "scheduled_date": new_date,
+                    "status": "planned",
+                })
+                .eq("id", workout_id)
+                .eq("user_id", user_id)
+                .eq("status", "skipped")
+                .eq("scheduled_date", original_date)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to reschedule skipped strength workout: {exc}"
+            ) from exc
+
+    def undo_recovery(
+        self,
+        *,
+        workout_id: Any,
+        user_id: str,
+        original_date: str,
+        recovered_date: str,
+    ) -> dict | None:
+        """Best-effort compensation if plan reactivation fails."""
+        try:
+            response = (
+                self.table
+                .update({
+                    "scheduled_date": original_date,
+                    "status": "skipped",
+                })
+                .eq("id", workout_id)
+                .eq("user_id", user_id)
+                .eq("status", "planned")
+                .eq("scheduled_date", recovered_date)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to undo strength recovery: {exc}"
+            ) from exc
+
     def update_status(
         self,
         *,
