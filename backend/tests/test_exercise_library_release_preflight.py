@@ -11,10 +11,10 @@ ROOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = ROOT / "supabase" / "migrations"
 PREFLIGHT = ROOT / "supabase" / "tests" / "exercise_library_phase1_staging_validation.sql"
 BATCHES = [
-    "20261107210000_curate_exercise_library_phase1_batch1.sql",
-    "20261107211000_curate_exercise_library_phase1_batch2.sql",
-    "20261107212000_curate_exercise_library_phase1_batch3.sql",
-    "20261107213000_curate_exercise_library_phase1_batch4.sql",
+    "20261107233829_curate_exercise_library_phase1_batch1.sql",
+    "20261107233923_curate_exercise_library_phase1_batch2.sql",
+    "20261107233939_curate_exercise_library_phase1_batch3.sql",
+    "20261107233949_curate_exercise_library_phase1_batch4.sql",
 ]
 MOVEMENTS = {
     "squat", "hinge", "horizontal_push", "vertical_push",
@@ -115,7 +115,7 @@ def test_staging_preflight_matches_every_curated_value_and_pair():
 
 def test_preference_policy_has_owner_check_for_each_operation():
     sql = (MIGRATIONS /
-        "20261107214000_add_training_exercise_preferences.sql"
+        "20261107234007_add_training_exercise_preferences.sql"
     ).read_text(encoding="utf-8").lower()
     assert "enable row level security" in sql
     assert "references auth.users(id)" in sql
