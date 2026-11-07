@@ -233,3 +233,30 @@ def test_core_backend_exposes_onboarding_routes():
     assert "/onboarding/core" in paths
     assert "/onboarding/nutrition" in paths
     assert "/onboarding/training" in paths
+
+
+def test_training_profile_update_does_not_write_to_read_only_demo():
+    from fastapi import HTTPException
+    repo = FakeOnboardingRepo()
+    readonly = CurrentUser(
+        id="user-1",
+        access_token="demo-token",
+        read_only=True,
+    )
+    with pytest.raises(HTTPException) as exc:
+        onboarding.save_training_setup(
+            onboarding.TrainingSetupRequest(
+                experience_level="intermediate",
+                sessions_per_week=3,
+                session_duration_minutes=60,
+                planning_horizon="weekly",
+                environment="commercial_gym",
+                coach_style="balanced",
+                feedback_mode="simple",
+                schedule_flexibility="flexible",
+            ),
+            current_user=readonly,
+            repo=repo,
+        )
+    assert exc.value.status_code == 403
+    assert repo.training is None
