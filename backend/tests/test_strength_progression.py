@@ -202,3 +202,29 @@ def test_representative_load_uses_mode():
     )
 
     assert value == 80
+
+
+def test_too_hard_feeling_can_reduce_load():
+    set_logs = [
+        {
+            "strength_workout_exercise_id":
+                "exercise-1",
+            "set_index": index,
+            "reps": 8,
+            "load_kg": 80,
+            "rir": None,
+            "feeling": "too_hard",
+        }
+        for index in range(1, 4)
+    ]
+
+    result = StrengthProgressionService().preview(
+        planned_exercise=planned(),
+        exercise_outcome=outcome(
+            "under_target"
+        ),
+        set_logs=set_logs,
+    )
+
+    assert result["action"] == "reduce_load"
+    assert result["proposed_load_kg"] == 75
