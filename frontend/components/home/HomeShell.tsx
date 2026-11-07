@@ -1645,6 +1645,32 @@ export function HomeShell() {
                               : "Modifica"}
                           </button>
 
+                          <button
+                            type="button"
+                            className={
+                              styles.deleteRegisteredMealButton
+                            }
+                            disabled={
+                              deletingMealId !== null ||
+                              savingMealEdit
+                            }
+                            onClick={() => {
+                              const actual =
+                                actualMealForSlot(slot);
+
+                              if (actual) {
+                                void deleteRegisteredMeal(
+                                  actual,
+                                );
+                              }
+                            }}
+                          >
+                            {deletingMealId ===
+                            actualMealForSlot(slot)?.id
+                              ? "Elimino…"
+                              : "Elimina"}
+                          </button>
+
                           <details
                             className={
                               styles.registeredMealActionMenu
@@ -1690,36 +1716,6 @@ export function HomeShell() {
                                   ?.is_reusable === false
                                   ? "Riusa nei suggerimenti"
                                   : "Non suggerire più"}
-                              </button>
-
-                              <button
-                                type="button"
-                                className={
-                                  styles.registeredMealMenuDelete
-                                }
-                                disabled={
-                                  deletingMealId !== null ||
-                                  savingMealEdit
-                                }
-                                onClick={(event) => {
-                                  const actual =
-                                    actualMealForSlot(slot);
-
-                                  if (actual) {
-                                    void deleteRegisteredMeal(
-                                      actual,
-                                    );
-                                  }
-
-                                  event.currentTarget
-                                    .closest("details")
-                                    ?.removeAttribute("open");
-                                }}
-                              >
-                                {deletingMealId ===
-                                actualMealForSlot(slot)?.id
-                                  ? "Elimino…"
-                                  : "Elimina"}
                               </button>
                             </div>
                           </details>
