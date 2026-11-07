@@ -2024,8 +2024,8 @@ export function HomeShell() {
               left.scheduled_date.localeCompare(
                 right.scheduled_date,
               ) ||
-              left.workout_index -
-                right.workout_index,
+              (left.workout_index ?? 0) -
+                (right.workout_index ?? 0),
           )[0] ?? null;
 
         if (active) {
