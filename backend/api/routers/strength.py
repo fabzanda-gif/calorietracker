@@ -3013,6 +3013,12 @@ def substitute_strength_exercise(
         ExerciseLibraryRepository = Depends(
             get_exercise_library_repository
         ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+    set_logs_repo: StrengthSetLogsRepository = Depends(
+        get_strength_set_logs_repository
+    ),
 ):
     if current_user.read_only:
         raise HTTPException(
@@ -3048,6 +3054,22 @@ def substitute_strength_exercise(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="L'esercizio non appartiene al workout.",
+            )
+
+        existing_log = workout_logs_repo.get_for_workout(
+            current_user.id, workout_id,
+        )
+        if existing_log and set_logs_repo.has_logged_sets_for_exercise(
+            current_user.id,
+            existing_log["id"],
+            exercise_id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Impossibile sostituire un esercizio con serie "
+                    "già registrate. Mantieni lo storico originale."
+                ),
             )
 
         replacement = library_repo.get_exercise(
