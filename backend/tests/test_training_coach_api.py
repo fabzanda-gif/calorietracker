@@ -142,6 +142,117 @@ def test_apply_strength_changes_rejects_foreign_exercise():
     assert exc.value.status_code == 409
 
 
+
+def test_strength_rejects_manually_changed_prescribed_load():
+    class ChangedExercisesRepo(ExercisesRepo):
+        def get(self, user_id, exercise_id):
+            exercise = super().get(user_id, exercise_id)
+            exercise["prescribed_load_kg"] = 105
+            return exercise
+
+    repo = ChangedExercisesRepo()
+    with pytest.raises(HTTPException) as exc:
+        _apply_strength_changes(
+            user_id="user-1",
+            target_workout_id="workout-1",
+            proposed_changes={
+                "exercise_updates": [{
+                    "exercise_id": "exercise-1",
+                    "before_load_kg": 100,
+                    "prescribed_load_kg": 95,
+                }],
+            },
+            workouts_repo=WorkoutsRepo(),
+            exercises_repo=repo,
+        )
+
+    assert exc.value.status_code == 409
+    assert repo.updated == []
+
+
+def test_strength_rejects_rescheduled_workout():
+    class RescheduledWorkoutsRepo(WorkoutsRepo):
+        def get(self, user_id, workout_id):
+            item = super().get(user_id, workout_id)
+            item["scheduled_date"] = "2026-11-09"
+            return item
+
+    repo = ExercisesRepo()
+    with pytest.raises(HTTPException) as exc:
+        _apply_strength_changes(
+            user_id="user-1",
+            target_workout_id="workout-1",
+            proposed_changes={
+                "exercise_updates": [{
+                    "exercise_id": "exercise-1",
+                    "before_target_sets": 4,
+                    "target_sets": 3,
+                }],
+            },
+            workouts_repo=RescheduledWorkoutsRepo(),
+            exercises_repo=repo,
+            before_state={"scheduled_date": "2026-11-08"},
+        )
+
+    assert exc.value.status_code == 409
+    assert repo.updated == []
+
+
+def test_strength_preflight_prevents_partial_updates():
+    class ChangedSecondExerciseRepo(ExercisesRepo):
+        def get(self, user_id, exercise_id):
+            exercise = super().get(user_id, exercise_id)
+            if exercise_id == "exercise-2":
+                exercise["target_sets"] = 5
+            return exercise
+
+    repo = ChangedSecondExerciseRepo()
+    with pytest.raises(HTTPException) as exc:
+        _apply_strength_changes(
+            user_id="user-1",
+            target_workout_id="workout-1",
+            proposed_changes={
+                "exercise_updates": [
+                    {
+                        "exercise_id": "exercise-1",
+                        "before_target_sets": 4,
+                        "target_sets": 3,
+                    },
+                    {
+                        "exercise_id": "exercise-2",
+                        "before_target_sets": 4,
+                        "target_sets": 3,
+                    },
+                ],
+            },
+            workouts_repo=WorkoutsRepo(),
+            exercises_repo=repo,
+        )
+
+    assert exc.value.status_code == 409
+    assert repo.updated == []
+
+
+def test_strength_accepts_unchanged_prescription():
+    repo = ExercisesRepo()
+    result = _apply_strength_changes(
+        user_id="user-1",
+        target_workout_id="workout-1",
+        proposed_changes={
+            "exercise_updates": [{
+                "exercise_id": "exercise-1",
+                "before_load_kg": 100,
+                "prescribed_load_kg": 95,
+            }],
+        },
+        workouts_repo=WorkoutsRepo(),
+        exercises_repo=repo,
+    )
+
+    assert result["exercises"][0]["prescribed_load_kg"] == 95
+    assert len(repo.updated) == 1
+
+
 def test_apply_running_changes_only_allows_coach_fields():
     repo = PlannedRepo()
 
