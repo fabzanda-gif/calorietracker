@@ -28,6 +28,25 @@ STRENGTH_EXERCISE_SELECT = (
 class StrengthWorkoutsRepository(BaseRepository):
     table_name = "strength_workouts"
 
+    def list_recent_free(
+        self, user_id: str, *, limit: int = 30
+    ) -> list[dict]:
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_SELECT)
+                .eq("user_id", user_id)
+                .eq("workout_kind", "free")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load free strength workouts: {exc}"
+            ) from exc
+
     def list_for_plan(
         self,
         user_id: str,

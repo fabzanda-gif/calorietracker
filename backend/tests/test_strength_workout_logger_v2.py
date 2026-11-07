@@ -281,3 +281,39 @@ def test_create_free_workout_uses_shared_workout_model():
     assert result["workout"]["workout_kind"] == "free"
     assert result["workout"]["strength_plan_id"] is None
     assert result["workout"]["focus"] == "free"
+
+
+def test_autosave_preserves_historical_session_date():
+    workouts = FakeWorkoutsRepo()
+    logs = FakeWorkoutLogsRepo()
+    sets = FakeSetLogsRepo()
+    historical_date = date(2026, 10, 15)
+
+    start_strength_session(
+        workout_id="workout-1",
+        request=StrengthSessionStartRequest(performed_date=historical_date),
+        current_user=user(),
+        workouts_repo=workouts,
+        exercises_repo=FakeExercisesRepo(),
+        workout_logs_repo=logs,
+        set_logs_repo=sets,
+    )
+    assert logs.item["performed_date"] == str(historical_date)
+
+    autosave_strength_set(
+        workout_id="workout-1",
+        exercise_id="exercise-1",
+        set_index=1,
+        request=StrengthSetAutosaveRequest(
+            reps=8,
+            load_kg=60,
+            feeling="right",
+        ),
+        current_user=user(),
+        workouts_repo=workouts,
+        exercises_repo=FakeExercisesRepo(),
+        workout_logs_repo=logs,
+        set_logs_repo=sets,
+    )
+    assert logs.item["performed_date"] == str(historical_date)
+    assert sets.items[0]["reps"] == 8
