@@ -780,6 +780,8 @@ def log_strength_workout(
                             "load_kg":
                                 set_item.load_kg,
                             "rir": set_item.rir,
+                            "feeling":
+                                set_item.feeling,
                         }
                     )
 
