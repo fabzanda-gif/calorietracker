@@ -646,8 +646,14 @@ def get_strength_workout_detail(
     exercises_repo: StrengthWorkoutExercisesRepository = Depends(
         get_strength_workout_exercises_repository
     ),
+    workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
+        get_strength_workout_logs_repository
+    ),
+    set_logs_repo: StrengthSetLogsRepository = Depends(
+        get_strength_set_logs_repository
+    ),
 ):
-    """Return a workout with exercises, scoped to the authenticated user."""
+    """Return owner-scoped exercise and saved-set detail for recovery."""
     try:
         workout = workouts_repo.get(current_user.id, workout_id)
         if not workout:
@@ -659,7 +665,22 @@ def get_strength_workout_detail(
             current_user.id,
             workout_id,
         )
-        return {"workout": {**workout, "exercises": exercises}}
+        workout_log = workout_logs_repo.get_for_workout(
+            current_user.id,
+            workout_id,
+        )
+        sets = (
+            set_logs_repo.list_for_workout_log(
+                current_user.id,
+                workout_log["id"],
+            )
+            if workout_log else []
+        )
+        return {
+            "workout": {**workout, "exercises": exercises},
+            "workout_log": workout_log,
+            "sets": sets,
+        }
     except HTTPException:
         raise
     except RepositoryError as exc:
