@@ -101,6 +101,48 @@ def get_catalog_status(
         ) from exc
 
 
+@router.get("/{identifier}/alternatives")
+def get_exercise_alternatives(
+    identifier: str,
+    equipment: str | None = Query(
+        default=None,
+        max_length=80,
+    ),
+    language: str = Query(
+        default="it",
+        pattern="^[a-z]{2}(-[A-Z]{2})?$",
+    ),
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=50,
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: ExerciseLibraryRepository = Depends(
+        get_exercise_library_repository
+    ),
+):
+    del current_user
+    try:
+        items = repo.list_alternatives(
+            identifier,
+            language=language,
+            equipment_key=equipment,
+            limit=limit,
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    if items is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exercise not found",
+        )
+    return {"items": items, "count": len(items)}
+
+
 @router.get("/{identifier}")
 def get_exercise(
     identifier: str,
