@@ -64,6 +64,9 @@ from backend.repositories.training_plan_adaptations import (
 from backend.repositories.training_coach_adjustments import (
     TrainingCoachAdjustmentsRepository,
 )
+from backend.repositories.training_coach_preferences import (
+    TrainingCoachPreferencesRepository,
+)
 from backend.repositories.weight import WeightRepository
 from backend.repositories.weekly_schedule import WeeklyScheduleRepository
 
@@ -553,6 +556,16 @@ def get_training_coach_adjustments_repository(
     ),
 ) -> TrainingCoachAdjustmentsRepository:
     return TrainingCoachAdjustmentsRepository(
+        supabase
+    )
+
+
+def get_training_coach_preferences_repository(
+    supabase: Client = Depends(
+        get_authenticated_supabase
+    ),
+) -> TrainingCoachPreferencesRepository:
+    return TrainingCoachPreferencesRepository(
         supabase
     )
 
