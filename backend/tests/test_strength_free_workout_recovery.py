@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from backend.api.core_main import app as core_app
+from backend.api.main import app as heavy_app
 from backend.api.dependencies import CurrentUser
 from backend.api.routers import strength
 
@@ -147,7 +147,7 @@ def test_demo_read_only_cannot_start_free_workout():
 
 
 def test_phase2_routes_are_published():
-    paths = core_app.openapi()["paths"]
+    paths = heavy_app.openapi()["paths"]
     assert "/strength/workouts/free/recent" in paths
     assert "/strength/workouts/{workout_id}/detail" in paths
 
