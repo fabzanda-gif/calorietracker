@@ -240,7 +240,7 @@ class StrengthOutcomeService:
             outcome = UNDER_TARGET
             reasons.append(
                 "Lo sforzo è stato molto "
-                "più alto del target RIR."
+                "più alto del target."
             )
 
         elif self._is_over_target(
@@ -306,6 +306,7 @@ class StrengthOutcomeService:
 
     @classmethod
     def _is_over_target(
+        cls,
         *,
         target_sets: int,
         reps_max: int,
