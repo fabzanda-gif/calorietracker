@@ -17914,3 +17914,56 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   font: inherit;
 }
+
+
+/* HOME MEAL DELETE VISIBILITY FIX
+   Keep the explicit delete action in the compact meal row.
+   Later fidelity rules use fixed grid columns, so the delete button
+   must have its own column instead of relying on auto-placement. */
+.dailyMealSummary {
+  grid-template-columns:
+    36px
+    minmax(0, 1fr)
+    max-content
+    30px
+    27px
+    16px !important;
+}
+
+.dailyMealDeleteButton {
+  grid-column: 4 !important;
+  grid-row: 1 !important;
+  display: grid !important;
+  place-items: center !important;
+  margin: 0 !important;
+}
+
+.dailyEntryDone {
+  grid-column: 5 !important;
+  grid-row: 1 !important;
+}
+
+.dailyEntryChevron {
+  grid-column: 6 !important;
+  grid-row: 1 !important;
+}
+
+@media (max-width: 759px) {
+  .dailyMealSummary {
+    grid-template-columns:
+      31px
+      minmax(0, 1fr)
+      max-content
+      27px
+      23px
+      13px !important;
+  }
+
+  .dailyMealDeleteButton {
+    width: 27px;
+    height: 27px;
+    min-width: 27px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+  }
+}
