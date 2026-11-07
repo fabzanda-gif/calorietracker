@@ -404,6 +404,7 @@ def _apply_running_changes(
     proposed_changes: dict,
     planned_repo:
         PlannedActivitiesRepository,
+    before_state: dict | None = None,
 ) -> dict:
     planned = planned_repo.get(
         target_id,
@@ -421,6 +422,27 @@ def _apply_running_changes(
                 "più modificabile."
             ),
         )
+
+    # Do not overwrite manual edits made after the Coach suggestion.
+    # Legacy adjustments may not have a complete before_state snapshot.
+    if before_state:
+        for field in (
+            "scheduled_date",
+            "distance_meters",
+            "duration_minutes",
+            "intensity",
+        ):
+            if (
+                field in before_state
+                and planned.get(field) != before_state[field]
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "La seduta è cambiata. "
+                        "Aggiorna il Coach prima di applicare."
+                    ),
+                )
 
     allowed = {
         "distance_meters",
@@ -500,6 +522,7 @@ def _apply_adjustment(
             target_id=target_id,
             proposed_changes=changes,
             planned_repo=planned_repo,
+            before_state=adjustment.get("before_state"),
         )
 
     raise HTTPException(
