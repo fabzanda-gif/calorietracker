@@ -65,6 +65,7 @@ export function AuthGate({
       return;
     }
 
+    const token = accessToken;
     let active = true;
 
     async function checkOnboarding() {
@@ -75,8 +76,8 @@ export function AuthGate({
           profileResponse,
           statusResponse,
         ] = await Promise.all([
-          getProfile(accessToken),
-          getOnboardingStatus(accessToken),
+          getProfile(token),
+          getOnboardingStatus(token),
         ]);
 
         if (!active) {
