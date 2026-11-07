@@ -70,6 +70,7 @@ class CrossTrainingService:
             for l in completed_strength if l.get("status") == "completed"
             and l.get("strength_workout_id")
         }
+        load_service = TrainingLoadService()
         for item in actual_activities:
             if not self._running(item):
                 continue
@@ -85,8 +86,8 @@ class CrossTrainingService:
                 "title": item.get("activity_name") or "Corsa",
                 "scope": "lower",
                 "quality": (
-                    float(item.get("duration_seconds") or 0) >= 3600
-                    or float(item.get("distance_meters") or 0) >= 10000
+                    load_service._number(item.get("duration_seconds")) >= 3600
+                    or load_service._number(item.get("distance_meters")) >= 10000
                 ),
                 "is_race": False,
             })
@@ -110,22 +111,32 @@ class CrossTrainingService:
                 "quality": self._running_quality(item),
                 "is_race": kind == "race",
             })
+        strength_metadata = {
+            str(item["id"]): item
+            for item in planned_strength if item.get("id")
+        }
         for item in completed_strength:
             if item.get("status") != "completed" or not item.get("id"):
                 continue
             day = self._day(item.get("performed_date"))
             if not day or not start_date <= day <= end:
                 continue
+            linked_workout = strength_metadata.get(
+                str(item.get("strength_workout_id")), {}
+            )
             events.append({
                 "id": "strength:actual:" + str(item["id"]),
                 "source_id": str(item["id"]),
                 "date": day.isoformat(),
                 "modality": "strength",
                 "status": "completed",
-                "title": "Palestra completata",
-                # Completed log does not include per-exercise scope here.
-                # Unknown is not assumed to be a lower-body session.
-                "scope": "unknown",
+                "title": linked_workout.get("title") or "Palestra completata",
+                # Use known workout focus when present. Unknown strength
+                # scope must not be misclassified as heavy leg training.
+                "scope": (
+                    self._strength_scope(linked_workout)
+                    if linked_workout.get("focus") else "unknown"
+                ),
                 "quality": False,
                 "is_race": False,
             })
