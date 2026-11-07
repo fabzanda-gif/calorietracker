@@ -648,6 +648,11 @@ def update_training_coach_preferences(
             get_training_coach_preferences_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         item = preferences_repo.upsert(
             user_id=current_user.id,
@@ -712,6 +717,11 @@ def reconcile_training_coach(
             get_training_coach_preferences_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     as_of = request.as_of or date.today()
 
     try:
@@ -835,36 +845,10 @@ def reconcile_training_coach(
                     "not persisted"
                 )
 
-            if proposal.get("auto_apply"):
-                after_state = _apply_adjustment(
-                    user_id=current_user.id,
-                    adjustment=created,
-                    workouts_repo=workouts_repo,
-                    exercises_repo=exercises_repo,
-                    planned_repo=planned_repo,
-                )
-
-                updated = adjustment_repo.update(
-                    adjustment_id=
-                        created["id"],
-                    user_id=current_user.id,
-                    payload={
-                        "decision":
-                            "auto_applied",
-                        "after_state":
-                            after_state,
-                        "updated_at":
-                            datetime.now(
-                                timezone.utc
-                            ).isoformat(),
-                    },
-                )
-
-                resolved.append(
-                    updated or created
-                )
-            else:
-                resolved.append(created)
+            # Phase 5 policy: reconciling is discovery, never consent.
+            # Even an internally marked auto_apply candidate requires
+            # explicit acceptance in /adjustments/{id}/apply.
+            resolved.append(created)
 
         history = adjustment_repo.list_recent(
             user_id=current_user.id,
@@ -946,6 +930,11 @@ def apply_skipped_session_recovery(
         get_activities_repository
     ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     # Recompute a suggestion on the server. The client cannot select
     # an unchecked date or move a different user's session.
     as_of = date.today()
@@ -1111,6 +1100,11 @@ def apply_training_coach_adjustment(
             get_training_coach_adjustments_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         adjustment = adjustment_repo.get(
             adjustment_id,
@@ -1182,6 +1176,11 @@ def dismiss_training_coach_adjustment(
             get_training_coach_adjustments_repository
         ),
 ):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
     try:
         adjustment = adjustment_repo.get(
             adjustment_id,
