@@ -156,13 +156,6 @@ class StrengthWorkoutsRepository(BaseRepository):
                 f"{exc}"
             ) from exc
 
-    def create(
-        self,
-        payload: dict[str, Any],
-    ) -> dict | None:
-        created = self.create_many([payload])
-        return created[0] if created else None
-
     def create_many(
         self,
         payloads: list[dict[str, Any]],
@@ -295,6 +288,13 @@ class StrengthWorkoutExercisesRepository(
                 "Unable to load strength workout "
                 f"exercises: {exc}"
             ) from exc
+
+    def create(
+        self,
+        payload: dict[str, Any],
+    ) -> dict | None:
+        created = self.create_many([payload])
+        return created[0] if created else None
 
     def create_many(
         self,
