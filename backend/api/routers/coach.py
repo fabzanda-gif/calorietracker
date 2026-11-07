@@ -51,6 +51,9 @@ from backend.services.adaptive_training_coach import (
 from backend.services.training_load import (
     TrainingLoadService,
 )
+from backend.services.skipped_session_review import (
+    SkippedSessionReviewService,
+)
 
 
 router = APIRouter(
@@ -228,6 +231,27 @@ def _coach_context(
         )
     ]
 
+    skipped_running = [
+        item
+        for item in planned_repo.list_range(
+            user_id, recent_start, as_of,
+        )
+        if item.get("status") == "skipped"
+        and _is_running_planned(item)
+    ]
+    skipped_strength = [
+        item
+        for item in workouts_repo.list_date_range(
+            user_id, recent_start, as_of,
+        )
+        if item.get("status") == "skipped"
+    ]
+    recovery_alerts = SkippedSessionReviewService().build(
+        as_of=as_of,
+        running_sessions=skipped_running,
+        strength_workouts=skipped_strength,
+    )
+
     proposals = (
         AdaptiveTrainingCoachService().build(
             recent_events=events,
@@ -251,6 +275,7 @@ def _coach_context(
         "upcoming_running":
             upcoming_running,
         "proposals": proposals,
+        "recovery_alerts": recovery_alerts,
     }
 
 
@@ -847,6 +872,8 @@ def reconcile_training_coach(
             },
             "load_events":
                 context["events"],
+            "recovery_alerts":
+                context.get("recovery_alerts", []),
             "adjustments": resolved,
             "history": history,
             "summary": {
