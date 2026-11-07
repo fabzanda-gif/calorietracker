@@ -66,6 +66,11 @@ class CoachReconcileRequest(BaseModel):
     as_of: date | None = None
 
 
+class CoachRecoveryApplyRequest(BaseModel):
+    suggested_date: date
+    original_date: date
+
+
 class CoachPreferencesUpdate(BaseModel):
     priority: Literal[
         "gym",
@@ -906,6 +911,127 @@ def reconcile_training_coach(
             status_code=(
                 status.HTTP_502_BAD_GATEWAY
             ),
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/recovery/{kind}/{session_id}/apply")
+def apply_skipped_session_recovery(
+    kind: Literal["planned_activity", "strength_workout"],
+    session_id: str,
+    request: CoachRecoveryApplyRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    planned_repo: PlannedActivitiesRepository = Depends(
+        get_planned_activities_repository
+    ),
+    workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
+):
+    # Recompute a suggestion on the server. The client cannot select
+    # an unchecked date or move a different user's session.
+    as_of = date.today()
+    recent_start = as_of - timedelta(days=3)
+    future_end = as_of + timedelta(days=8)
+
+    if kind == "planned_activity":
+        source = planned_repo.get(session_id, current_user.id)
+        if source and not _is_running_planned(source):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La seduta non è una corsa ripianificabile.",
+            )
+    else:
+        source = workouts_repo.get(current_user.id, session_id)
+
+    if not source:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Seduta non trovata.",
+        )
+    if (
+        source.get("status") != "skipped"
+        or str(source.get("scheduled_date")) != request.original_date.isoformat()
+        or not (recent_start <= request.original_date <= as_of)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La seduta è cambiata. Aggiorna il Coach.",
+        )
+
+    try:
+        running = planned_repo.list_range(
+            current_user.id, recent_start, as_of,
+        )
+        strength = workouts_repo.list_date_range(
+            current_user.id, recent_start, as_of,
+        )
+        future_running = planned_repo.list_range(
+            current_user.id, as_of, future_end,
+        )
+        future_strength = workouts_repo.list_date_range(
+            current_user.id, as_of, future_end,
+        )
+
+        alerts = SkippedSessionReviewService().build(
+            as_of=as_of,
+            running_sessions=[
+                item for item in running
+                if item.get("status") == "skipped"
+                and _is_running_planned(item)
+            ],
+            strength_workouts=[
+                item for item in strength
+                if item.get("status") == "skipped"
+            ],
+            upcoming_running=future_running,
+            upcoming_strength=future_strength,
+        )
+        match = next(
+            (
+                item for item in alerts
+                if item["kind"] == kind
+                and item["session_id"] == session_id
+            ),
+            None,
+        )
+        if (
+            not match
+            or match["suggested_date"] != request.suggested_date.isoformat()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La proposta non è più valida. Aggiorna il Coach.",
+            )
+
+        if kind == "planned_activity":
+            updated = planned_repo.reschedule_skipped(
+                activity_id=session_id,
+                user_id=current_user.id,
+                original_date=request.original_date.isoformat(),
+                new_date=request.suggested_date.isoformat(),
+            )
+        else:
+            updated = workouts_repo.reschedule_skipped(
+                workout_id=session_id,
+                user_id=current_user.id,
+                original_date=request.original_date.isoformat(),
+                new_date=request.suggested_date.isoformat(),
+            )
+
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La seduta è cambiata. Aggiorna il Coach.",
+            )
+
+        return {"applied": True, "item": updated}
+
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
 
