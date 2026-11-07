@@ -91,6 +91,14 @@ _AUTH_CACHE_LOCK = threading.Lock()
 _AUTH_CACHE_TTL_SECONDS = 60.0
 
 
+def invalidate_current_user_cache(access_token: str) -> None:
+    """Refresh metadata immediately after a user-initiated profile update."""
+    token_key = hashlib.sha256(access_token.encode("utf-8")).hexdigest()
+    with _AUTH_CACHE_LOCK:
+        _AUTH_CACHE.pop(token_key, None)
+
+
+
 def _demo_user_ids() -> tuple[str, str] | None:
     demo_id = os.getenv(
         "DEMO_ACCOUNT_USER_ID",
