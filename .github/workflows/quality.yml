@@ -6,6 +6,7 @@ on:
       - main
       - codex/landing-redesign
       - codex/phase4-program-generator-v2
+      - codex/phase5-adaptive-coach-v1
   pull_request:
     branches:
       - main
