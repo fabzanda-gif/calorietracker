@@ -192,6 +192,14 @@ def _legacy_food_complete(
 def _next_step(
     preferences: dict,
 ) -> str | None:
+    # Legacy accounts are grandfathered into v2. They can opt into
+    # module-specific setup later without being blocked at app entry.
+    if int(
+        preferences.get("onboarding_version")
+        or 2
+    ) < 2:
+        return None
+
     if not preferences.get(
         "core_onboarding_completed"
     ):
