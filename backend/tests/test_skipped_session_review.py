@@ -128,3 +128,94 @@ def test_race_has_no_recovery_date():
         strength_workouts=[],
     )
     assert alerts[0]["suggested_date"] is None
+
+
+def test_easy_run_can_use_a_day_next_to_another_easy_run():
+    alerts = SkippedSessionReviewService().build(
+        as_of=date(2026, 11, 7),
+        running_sessions=[{
+            "id": "easy-missed",
+            "status": "skipped",
+            "scheduled_date": "2026-11-06",
+            "session_kind": "easy",
+            "intensity": "low",
+        }],
+        strength_workouts=[],
+        upcoming_running=[{
+            "id": "easy-planned",
+            "status": "planned",
+            "scheduled_date": "2026-11-09",
+            "session_kind": "easy",
+            "intensity": "low",
+        }],
+    )
+    assert alerts[0]["suggested_date"] == "2026-11-08"
+
+
+def test_hard_run_needs_more_space_from_planned_training():
+    alerts = SkippedSessionReviewService().build(
+        as_of=date(2026, 11, 7),
+        running_sessions=[{
+            "id": "tempo-missed",
+            "status": "skipped",
+            "scheduled_date": "2026-11-06",
+            "session_kind": "tempo",
+            "intensity": "hard",
+        }],
+        strength_workouts=[],
+        upcoming_strength=[{
+            "id": "gym-planned",
+            "status": "planned",
+            "scheduled_date": "2026-11-09",
+            "focus": "lower",
+        }],
+    )
+    assert alerts[0]["recovery_days"] == 2
+    assert alerts[0]["suggested_date"] == "2026-11-12"
+
+
+def test_planned_intense_run_requires_extra_separation():
+    alerts = SkippedSessionReviewService().build(
+        as_of=date(2026, 11, 7),
+        running_sessions=[{
+            "id": "missed",
+            "status": "skipped",
+            "scheduled_date": "2026-11-06",
+        }],
+        strength_workouts=[],
+        upcoming_running=[{
+            "id": "interval-planned",
+            "status": "planned",
+            "scheduled_date": "2026-11-10",
+            "session_kind": "intervals",
+        }],
+    )
+    assert alerts[0]["suggested_date"] == "2026-11-13"
+
+
+def test_skipped_lower_workout_uses_more_recovery_than_upper():
+    common = {
+        "as_of": date(2026, 11, 7),
+        "running_sessions": [],
+        "upcoming_running": [{
+            "id": "planned-easy",
+            "status": "planned",
+            "scheduled_date": "2026-11-10",
+            "intensity": "low",
+        }],
+    }
+    service = SkippedSessionReviewService()
+    lower = service.build(**common, strength_workouts=[{
+        "id": "lower",
+        "scheduled_date": "2026-11-06",
+        "status": "skipped",
+        "focus": "lower",
+    }])[0]
+    upper = service.build(**common, strength_workouts=[{
+        "id": "upper",
+        "scheduled_date": "2026-11-06",
+        "status": "skipped",
+        "focus": "upper",
+    }])[0]
+    assert lower["recovery_days"] == 2
+    assert upper["recovery_days"] == 1
