@@ -1,4 +1,4 @@
--- Phase 1 / Exercise Library v1: curated batch 2 (43 real source IDs)
+-- Phase 1 / Exercise Library v1: curated batch 2 (44 real source IDs)
 -- Reviewed against the live SanoSync catalog on 2026-11-07.
 -- Metadata-only: intentionally does NOT approve exercises for generation.
 -- This PR does not deploy this migration into the production database.
@@ -18,6 +18,7 @@ with curated(
     ('0336','single_leg','secondary','medium','medium','high'),
     ('0432','hinge','secondary','medium','medium','medium'),
     ('drv-hip-raise-bridge','hinge','accessory','low','low','low'),
+    ('new-band-triceps-pushdown','isolation','accessory','low','low','low'),
     ('2611','squat','secondary','high','low','low'),
     ('0740','squat','secondary','high','low','low'),
     ('0743','squat','primary','high','medium','low'),
