@@ -91,3 +91,22 @@ def test_alternative_repository_prioritizes_links_and_hides_inactive():
     ]["exercise"]["id"] == "active"
     assert len(repo.list_alternatives("source", equipment_key="dumbbell")) == 1
     assert repo.list_alternatives("missing") is None
+    # User-specific exclusions cannot be suggested, while preferred
+    # alternatives remain explicit proposals requiring confirmation.
+    records["training_exercise_preferences"] = [
+        {
+            "user_id": "user-1",
+            "exercise_id": "active",
+            "preference": "excluded",
+        },
+        {
+            "user_id": "other-user",
+            "exercise_id": "second",
+            "preference": "excluded",
+        },
+    ]
+    personalized = repo.list_alternatives("source", user_id="user-1")
+    assert [s["exercise"]["id"] for s in personalized] == ["second"]
+    assert personalized[0]["requires_confirmation"] is True
+    assert personalized[0]["user_preference"] is None
+
