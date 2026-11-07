@@ -21,6 +21,7 @@ from backend.api.dependencies import (
     get_strength_workout_exercises_repository,
     get_strength_workout_logs_repository,
     get_strength_workouts_repository,
+    get_strength_plans_repository,
     get_training_coach_adjustments_repository,
     get_training_coach_preferences_repository,
 )
@@ -39,6 +40,7 @@ from backend.repositories.strength_workouts import (
     StrengthWorkoutExercisesRepository,
     StrengthWorkoutsRepository,
 )
+from backend.repositories.strength_plans import StrengthPlansRepository
 from backend.repositories.training_coach_adjustments import (
     TrainingCoachAdjustmentsRepository,
 )
@@ -928,6 +930,9 @@ def apply_skipped_session_recovery(
     workouts_repo: StrengthWorkoutsRepository = Depends(
         get_strength_workouts_repository
     ),
+    plans_repo: StrengthPlansRepository = Depends(
+        get_strength_plans_repository
+    ),
     workout_logs_repo: StrengthWorkoutLogsRepository = Depends(
         get_strength_workout_logs_repository
     ),
@@ -971,6 +976,21 @@ def apply_skipped_session_recovery(
             status_code=status.HTTP_409_CONFLICT,
             detail="La seduta è cambiata. Aggiorna il Coach.",
         )
+
+    # A skipped final workout may have completed its strength plan.
+    # Reactivate only that completed plan when this workout is recovered.
+    plan_to_reopen = None
+    if kind == "strength_workout" and source.get("strength_plan_id"):
+        plan_to_reopen = plans_repo.get(
+            source["strength_plan_id"], current_user.id,
+        )
+        if not plan_to_reopen or plan_to_reopen.get("status") not in {
+            "active", "completed"
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Il programma palestra non è più attivo.",
+            )
 
     try:
         context = _coach_context(
@@ -1022,7 +1042,24 @@ def apply_skipped_session_recovery(
                 detail="La seduta è cambiata. Aggiorna il Coach.",
             )
 
-        return {"applied": True, "item": updated}
+        plan_update = None
+        if plan_to_reopen and plan_to_reopen.get("status") == "completed":
+            plan_update = plans_repo.update_status(
+                plan_id=plan_to_reopen["id"],
+                user_id=current_user.id,
+                status="active",
+            )
+            if not plan_update:
+                raise RepositoryError(
+                    "Recovered workout saved, but strength plan "
+                    "could not be reactivated"
+                )
+
+        return {
+            "applied": True,
+            "item": updated,
+            "plan": plan_update,
+        }
 
     except HTTPException:
         raise
