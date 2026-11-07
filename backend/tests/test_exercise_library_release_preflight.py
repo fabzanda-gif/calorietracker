@@ -135,7 +135,7 @@ def test_preference_policy_has_owner_check_for_each_operation():
 
 def test_relationship_schema_allows_null_score_but_not_invalid_edges():
     schema = (MIGRATIONS /
-        "20261107191500_add_exercise_library_v1.sql"
+        "20261107190642_add_exercise_library_v1.sql"
     ).read_text(encoding="utf-8")
     assert "similarity_score numeric null" in schema
     assert "similarity_score between 0 and 1" in schema
