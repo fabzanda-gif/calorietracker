@@ -30,11 +30,11 @@ Do not treat Coach PR #19 as a prerequisite for this work, or merge unrelated dr
   - `PUT /exercises/{identifier}/preference`
   - `DELETE /exercises/{identifier}/preference`
 - The alternatives endpoint excludes user-excluded exercises and prioritizes preferred ones. No workout, plan or set is modified by this endpoint.
-- Curated four metadata batches: 18 + 43 + 53 + 30 = 144 new distinct exercises, plus 10 existing golden exercises, for **154 classified entries** after migration.
+- Curated four metadata batches: 18 + 44 + 53 + 30 = 145 new distinct exercises, plus 10 existing golden exercises, for **155 classified entries** after migration.
 - Substitution relationships, regression / progression and close-substitutes are stored in their own directed relationship table.
 
 ## Scope and critical safeguards
-- 154 **classified** is NOT the same as 154 **approved_for_generation**. Only the 10 already approved remain generator-approved after these migrations.
+- 155 **classified** is NOT the same as 155 **approved_for_generation**. Only the 10 already approved remain generator-approved after these migrations.
 - Use the reviewed taxonomy only to suggest, search and enrich exercises until subsequent quality review explicitly approves them.
 - The changes in this PR are unmerged and not deployed until explicitly verified.
 - Never automatically swap a logged or scheduled workout because an alternative exists.
@@ -45,7 +45,7 @@ Do not treat Coach PR #19 as a prerequisite for this work, or merge unrelated dr
 - Applying these migrations to a production Supabase instance is a separate release operation; CI runs unit/integration/TS/build/browser checks, not live migration execution.
 
 ## QA acceptance checklist
-- [x] 144 distinct exercise source IDs in four batch migrations; no overlap with the ten golden exercises (static CI guard).
+- [x] 145 distinct exercise source IDs in four batch migrations; no overlap with the ten golden exercises (static CI guard).
 - [x] Query database for existence and inactive status of the newly curated identifiers (data checked in development session).
 - [x] Backend API and repository tests for exercise alternatives, equipment filtering, missing and inactive exercises.
 - [x] User-specific preference isolation test (another user's exclusion cannot leak).
