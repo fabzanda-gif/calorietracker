@@ -208,10 +208,34 @@ def create_program_v2(
         )
         replaced = []
         if request.replace_active:
-            for old in active:
-                if old.get("id") != saved["plan"]["id"]:
-                    plans_repo.delete(old["id"], current_user.id)
-                    replaced.append(old["id"])
+            try:
+                for old in active:
+                    if old.get("id") != saved["plan"]["id"]:
+                        # Never delete a prior plan: cascade reaches
+                        # completed workout logs and their saved sets.
+                        paused = plans_repo.update_status(
+                            plan_id=old["id"],
+                            user_id=current_user.id,
+                            status="paused",
+                        )
+                        if not paused or paused.get("status") != "paused":
+                            raise RepositoryError(
+                                "Unable to pause previous plan safely."
+                            )
+                        replaced.append(old["id"])
+            except Exception:
+                # Restoring the previously active plan is a separate
+                # best-effort release gate; prevent TWO active plans if
+                # an old-plan update fails after creating the new one.
+                try:
+                    plans_repo.update_status(
+                        plan_id=saved["plan"]["id"],
+                        user_id=current_user.id,
+                        status="paused",
+                    )
+                except RepositoryError:
+                    pass
+                raise
         return {"created": True, **saved, "replaced_plan_ids": replaced}
     except HTTPException:
         raise
