@@ -1,9 +1,13 @@
 import pytest
 from fastapi import HTTPException
 
+from backend.api.dependencies import CurrentUser
+from backend.api.routers import coach as coach_router
 from backend.api.routers.coach import (
+    CoachReconcileRequest,
     _apply_running_changes,
     _apply_strength_changes,
+    reconcile_training_coach,
 )
 
 
@@ -155,3 +159,96 @@ def test_apply_running_changes_only_allows_coach_fields():
 
     assert result["distance_meters"] == 6800
     assert "title" not in repo.updated[0]
+
+
+
+class AdjustmentRepo:
+    def __init__(self):
+        self.created = []
+
+    def get_for_signal(self, **kwargs):
+        return None
+
+    def get_for_target_action(self, **kwargs):
+        return {
+            "id": "guard-1",
+            "decision": "auto_applied",
+            "target_id": "workout-1",
+            "action": "reduce_load",
+        }
+
+    def create(self, payload):
+        self.created.append(payload)
+        return {
+            **payload,
+            "id": "new-1",
+        }
+
+    def update(self, **kwargs):
+        raise AssertionError(
+            "existing auto guard must not be updated"
+        )
+
+    def list_recent(self, **kwargs):
+        return []
+
+
+def test_reconcile_does_not_stack_auto_guard(
+    monkeypatch,
+):
+    proposal = {
+        "source_kind": "activity",
+        "source_id": "activity-2",
+        "source_date": "2026-11-07",
+        "target_kind": "strength_workout",
+        "target_id": "workout-1",
+        "target_date": "2026-11-08",
+        "action": "reduce_load",
+        "severity": "high",
+        "scope": "lower",
+        "title": "Protezione",
+        "message": "Riduci il carico.",
+        "proposed_changes": {
+            "exercise_updates": [],
+        },
+        "before_state": {},
+        "auto_apply": True,
+    }
+
+    monkeypatch.setattr(
+        coach_router,
+        "_coach_context",
+        lambda **kwargs: {
+            "as_of": "2026-11-07",
+            "recent_start": "2026-11-04",
+            "future_end": "2026-11-10",
+            "events": [],
+            "proposals": [proposal],
+        },
+    )
+
+    adjustments = AdjustmentRepo()
+
+    result = reconcile_training_coach(
+        request=CoachReconcileRequest(
+            as_of=None,
+        ),
+        current_user=CurrentUser(
+            id="user-1",
+            access_token="token",
+        ),
+        activities_repo=object(),
+        planned_repo=object(),
+        workouts_repo=object(),
+        exercises_repo=object(),
+        workout_logs_repo=object(),
+        set_logs_repo=object(),
+        adjustment_repo=adjustments,
+    )
+
+    assert adjustments.created == []
+    assert (
+        result["adjustments"][0]["id"]
+        == "guard-1"
+    )
+    assert result["summary"]["auto_applied"] == 1
