@@ -42,6 +42,7 @@ from backend.api.routers.google_calendar import router as google_calendar_router
 from backend.api.routers.pantry import router as pantry_router
 from backend.api.routers.recipes import router as recipes_router
 from backend.api.routers.progress import router as progress_router
+from backend.api.routers.program_v2 import router as program_v2_router
 from backend.api.routers.profile import router as profile_router
 from backend.api.routers.special_periods import router as special_periods_router
 from backend.api.routers.strength import router as strength_router
@@ -290,6 +291,7 @@ app.include_router(onboarding_router)
 app.include_router(exercises_router)
 app.include_router(special_periods_router)
 app.include_router(strength_router)
+app.include_router(program_v2_router)
 app.include_router(weekly_schedule_router)
 app.include_router(daily_logs_router)
 app.include_router(day_history_router)

@@ -384,6 +384,9 @@ def _persist_strength_plan(
                         "position": exercise[
                             "position"
                         ],
+                        "exercise_id": exercise.get(
+                            "exercise_id"
+                        ),
                         "exercise_key": exercise[
                             "exercise_key"
                         ],
