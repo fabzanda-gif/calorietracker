@@ -205,6 +205,29 @@ class StrengthSetLogsRepository(
 ):
     table_name = "strength_set_logs"
 
+    def has_logged_sets_for_exercise(
+        self,
+        user_id: str,
+        workout_log_id: Any,
+        exercise_id: Any,
+    ) -> bool:
+        """Prevent replacing the identity of an already-logged exercise."""
+        try:
+            response = (
+                self.table
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("strength_workout_log_id", workout_log_id)
+                .eq("strength_workout_exercise_id", exercise_id)
+                .limit(1)
+                .execute()
+            )
+            return bool(self._data(response))
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to check logged strength exercise: {exc}"
+            ) from exc
+
     def upsert_set(
         self,
         payload: dict[str, Any],
