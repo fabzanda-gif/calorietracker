@@ -142,6 +142,7 @@ export interface ExerciseAlternative {
   similarity_score: number | null;
   rationale: string | null;
   requires_confirmation: true;
+  user_preference: "preferred" | "excluded" | null;
 }
 
 export interface ExerciseAlternativesResponse {
@@ -169,4 +170,50 @@ export function getExerciseAlternatives(
   const query = params.toString();
   const url = `/exercises/${encodeURIComponent(identifier)}/alternatives${query ? `?${query}` : ""}`;
   return apiRequest<ExerciseAlternativesResponse>(url, { accessToken });
+}
+
+export type ExercisePreference = "preferred" | "excluded";
+
+export interface ExercisePreferenceRecord {
+  exercise_id: string;
+  preference: ExercisePreference;
+}
+
+export interface ExercisePreferencesResponse {
+  items: ExercisePreferenceRecord[];
+  count: number;
+}
+
+export function getExercisePreferences(
+  accessToken: string,
+): Promise<ExercisePreferencesResponse> {
+  return apiRequest<ExercisePreferencesResponse>(
+    "/exercises/preferences",
+    { accessToken },
+  );
+}
+
+export function setExercisePreference(
+  accessToken: string,
+  identifier: string,
+  preference: ExercisePreference,
+): Promise<ExercisePreferenceRecord> {
+  return apiRequest<ExercisePreferenceRecord>(
+    `/exercises/${encodeURIComponent(identifier)}/preference`,
+    {
+      accessToken,
+      method: "PUT",
+      body: JSON.stringify({ preference }),
+    },
+  );
+}
+
+export function deleteExercisePreference(
+  accessToken: string,
+  identifier: string,
+): Promise<void> {
+  return apiRequest<void>(
+    `/exercises/${encodeURIComponent(identifier)}/preference`,
+    { accessToken, method: "DELETE" },
+  );
 }
