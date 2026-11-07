@@ -650,7 +650,47 @@ def reconcile_training_coach(
             )
 
             if existing:
-                resolved.append(existing)
+                if (
+                    existing.get("decision")
+                    == "proposed"
+                ):
+                    refreshed = (
+                        adjustment_repo.update(
+                            adjustment_id=
+                                existing["id"],
+                            user_id=current_user.id,
+                            payload={
+                                "severity":
+                                    proposal[
+                                        "severity"
+                                    ],
+                                "scope":
+                                    proposal["scope"],
+                                "title":
+                                    proposal["title"],
+                                "message":
+                                    proposal["message"],
+                                "proposed_changes":
+                                    proposal[
+                                        "proposed_changes"
+                                    ],
+                                "before_state":
+                                    proposal.get(
+                                        "before_state"
+                                    ),
+                                "updated_at":
+                                    datetime.now(
+                                        timezone.utc
+                                    ).isoformat(),
+                            },
+                        )
+                    )
+                    resolved.append(
+                        refreshed or existing
+                    )
+                else:
+                    resolved.append(existing)
+
                 continue
 
             if proposal.get("auto_apply"):
