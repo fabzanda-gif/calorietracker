@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from typing import Literal
 
 from backend.api.dependencies import (
     CurrentUser,
@@ -101,6 +103,88 @@ def get_catalog_status(
         ) from exc
 
 
+class ExercisePreferenceUpdate(BaseModel):
+    preference: Literal["preferred", "excluded"]
+
+
+@router.get("/preferences")
+def get_exercise_preferences(
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: ExerciseLibraryRepository = Depends(
+        get_exercise_library_repository
+    ),
+):
+    try:
+        items = repo.list_user_preferences(current_user.id)
+        return {"items": items, "count": len(items)}
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.put("/{identifier}/preference")
+def update_exercise_preference(
+    identifier: str,
+    payload: ExercisePreferenceUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: ExerciseLibraryRepository = Depends(
+        get_exercise_library_repository
+    ),
+):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
+    try:
+        exercise = repo.get_exercise(identifier)
+        if exercise is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exercise not found",
+            )
+        return repo.save_user_preference(
+            current_user.id,
+            exercise["id"],
+            payload.preference,
+        )
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete("/{identifier}/preference", status_code=204)
+def delete_exercise_preference(
+    identifier: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    repo: ExerciseLibraryRepository = Depends(
+        get_exercise_library_repository
+    ),
+):
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only account",
+        )
+    try:
+        exercise = repo.get_exercise(identifier)
+        if exercise is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exercise not found",
+            )
+        repo.remove_user_preference(current_user.id, exercise["id"])
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/{identifier}/alternatives")
 def get_exercise_alternatives(
     identifier: str,
@@ -122,13 +206,13 @@ def get_exercise_alternatives(
         get_exercise_library_repository
     ),
 ):
-    del current_user
     try:
         items = repo.list_alternatives(
             identifier,
             language=language,
             equipment_key=equipment,
             limit=limit,
+            user_id=current_user.id,
         )
     except RepositoryError as exc:
         raise HTTPException(
