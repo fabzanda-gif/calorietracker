@@ -217,6 +217,9 @@ def test_preview_endpoint_uses_authenticated_owner_for_all_queries():
 def test_apply_rejects_stale_snapshot_before_any_profile_write(monkeypatch):
     repos = fixture_repos()
     monkeypatch.setattr(
+        adaptive_macros, "_verified_live_user", lambda user: user,
+    )
+    monkeypatch.setattr(
         adaptive_macros, "update_profile",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("No profile update expected")
@@ -277,6 +280,9 @@ def test_apply_recomputes_proposal_and_changes_only_goal_adjustment(monkeypatch)
             return TODAY
 
     monkeypatch.setattr(adaptive_macros, "date", FrozenDate)
+    monkeypatch.setattr(
+        adaptive_macros, "_verified_live_user", lambda user: user,
+    )
     # Revalidate the freshly built analysis; record only the metadata fields.
     preview = adaptive_macros.preview_adaptive_macros(
         as_of=TODAY, current_user=identity(), **fixture_repos(),
@@ -306,3 +312,39 @@ def test_apply_recomputes_proposal_and_changes_only_goal_adjustment(monkeypatch)
             "adaptive_macros_last_applied_on": TODAY.isoformat(),
         }
     ]
+
+
+def test_live_goal_change_makes_prior_preview_stale(monkeypatch):
+    class FrozenDate(date):
+        @classmethod
+        def today(cls):
+            return TODAY
+
+    monkeypatch.setattr(adaptive_macros, "date", FrozenDate)
+    before = adaptive_macros.preview_adaptive_macros(
+        as_of=TODAY, current_user=identity(), **fixture_repos(),
+    )
+    from dataclasses import replace
+    monkeypatch.setattr(
+        adaptive_macros, "_verified_live_user",
+        lambda user: replace(
+            user, metadata={**user.metadata, "goal_adjustment_kcal": 350}
+        ),
+    )
+    monkeypatch.setattr(
+        adaptive_macros, "update_profile",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("Stale goal must never be overwritten")
+        ),
+    )
+    with pytest.raises(HTTPException) as exc:
+        adaptive_macros.apply_adaptive_macro_proposal(
+            request=adaptive_macros.MacroApplyRequest(
+                preview_id=before["preview_id"],
+                confirm=True,
+                logging_complete_confirmed=True,
+            ),
+            current_user=identity(),
+            **fixture_repos(),
+        )
+    assert exc.value.status_code == 409
