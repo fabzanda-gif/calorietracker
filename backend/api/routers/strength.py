@@ -2078,6 +2078,25 @@ def _start_or_resume_strength_session(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Questo workout è già completato.",
             )
+
+        if (
+            str(existing.get("performed_date"))
+            != str(performed_date)
+        ):
+            updated = workout_logs_repo.update(
+                existing["id"],
+                user_id,
+                {
+                    "performed_date":
+                        str(performed_date),
+                    "updated_at": datetime.now(
+                        timezone.utc
+                    ).isoformat(),
+                },
+            )
+            if updated:
+                return updated
+
         return existing
 
     now = datetime.now(timezone.utc).isoformat()
