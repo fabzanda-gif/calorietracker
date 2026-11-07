@@ -15,6 +15,7 @@ import {
   updateCoachPreferences,
   type CoachAdjustment,
   type CoachLoadEvent,
+  type CoachRecoveryAlert,
   type CoachPriority,
 } from "@/lib/api/coach";
 
@@ -121,6 +122,8 @@ export function AdaptiveCoachPanel({
     useState<CoachLoadEvent[]>([]);
   const [adjustments, setAdjustments] =
     useState<CoachAdjustment[]>([]);
+  const [recoveryAlerts, setRecoveryAlerts] =
+    useState<CoachRecoveryAlert[]>([]);
   const [busyId, setBusyId] =
     useState<string | null>(null);
   const [priority, setPriority] =
@@ -150,6 +153,7 @@ export function AdaptiveCoachPanel({
         setEvents(
           response.load_events,
         );
+        setRecoveryAlerts(response.recovery_alerts ?? []);
         setAdjustments(
           response.adjustments,
         );
@@ -396,7 +400,28 @@ export function AdaptiveCoachPanel({
         </div>
       ) : null}
 
+      {recoveryAlerts.map((alert) => (
+        <article
+          key={alert.kind + "-" + alert.session_id}
+          className={styles.proposal}
+        >
+          <div>
+            <span>Allenamento saltato · Da valutare</span>
+            <strong>{alert.title}</strong>
+            <p>{alert.message}</p>
+            <small>
+              {alert.kind === "strength_workout"
+                ? "Palestra"
+                : "Corsa"}
+              {" · "}
+              {formatDate(alert.scheduled_date)}
+            </small>
+          </div>
+        </article>
+      ))}
+
       {!loading &&
+      recoveryAlerts.length === 0 &&
       proposed.length === 0 &&
       automatic.length === 0 ? (
         <div className={styles.ok}>
