@@ -567,6 +567,34 @@ def reconcile_training_coach(
                 resolved.append(existing)
                 continue
 
+            if proposal.get("auto_apply"):
+                target_guard = (
+                    adjustment_repo
+                    .get_for_target_action(
+                        user_id=current_user.id,
+                        target_kind=
+                            proposal["target_kind"],
+                        target_id=
+                            proposal["target_id"],
+                        action=proposal["action"],
+                    )
+                )
+
+                if (
+                    target_guard
+                    and target_guard.get(
+                        "decision"
+                    )
+                    in {
+                        "auto_applied",
+                        "accepted",
+                    }
+                ):
+                    resolved.append(
+                        target_guard
+                    )
+                    continue
+
             created = adjustment_repo.create(
                 _adjustment_payload(
                     user_id=current_user.id,
