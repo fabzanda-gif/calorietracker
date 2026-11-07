@@ -21,6 +21,7 @@ from backend.repositories.daily_logs import DailyLogsRepository
 from backend.repositories.day_briefings import DayBriefingsRepository
 from backend.repositories.decision_selections import DecisionSelectionsRepository
 from backend.repositories.ingredients import IngredientsRepository
+from backend.repositories.exercise_library import ExerciseLibraryRepository
 from backend.repositories.meal_ingredients import MealIngredientsRepository
 from backend.repositories.meal_prep import MealPrepRepository
 from backend.repositories.meals import MealsRepository
@@ -410,6 +411,12 @@ def get_oura_connections_repository(
     return OuraConnectionsRepository(
         supabase
     )
+
+
+def get_exercise_library_repository(
+    supabase: Client = Depends(get_authenticated_supabase),
+) -> ExerciseLibraryRepository:
+    return ExerciseLibraryRepository(supabase)
 
 
 def get_onboarding_repository(
