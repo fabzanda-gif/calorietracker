@@ -121,3 +121,38 @@ def test_read_only_user_cannot_trigger_reconciliation_writes():
             preferences_repo=NoWorkoutWrites(),
         )
     assert exc.value.status_code == 403
+
+
+def test_read_only_user_cannot_accept_existing_coach_proposal():
+    with pytest.raises(HTTPException) as exc:
+        coach_router.apply_training_coach_adjustment(
+            adjustment_id="proposal-1",
+            current_user=user(read_only=True),
+            workouts_repo=NoWorkoutWrites(),
+            exercises_repo=NoWorkoutWrites(),
+            planned_repo=NoWorkoutWrites(),
+            adjustment_repo=NoWorkoutWrites(),
+        )
+    assert exc.value.status_code == 403
+
+
+def test_read_only_user_cannot_reschedule_skipped_workout():
+    with pytest.raises(HTTPException) as exc:
+        coach_router.apply_skipped_session_recovery(
+            kind="strength_workout",
+            session_id="workout-1",
+            request=coach_router.CoachRecoveryApplyRequest(
+                original_date=date(2026, 11, 6),
+                suggested_date=date(2026, 11, 10),
+            ),
+            current_user=user(read_only=True),
+            activities_repo=NoWorkoutWrites(),
+            planned_repo=NoWorkoutWrites(),
+            workouts_repo=NoWorkoutWrites(),
+            plans_repo=NoWorkoutWrites(),
+            exercises_repo=NoWorkoutWrites(),
+            workout_logs_repo=NoWorkoutWrites(),
+            set_logs_repo=NoWorkoutWrites(),
+            preferences_repo=NoWorkoutWrites(),
+        )
+    assert exc.value.status_code == 403
