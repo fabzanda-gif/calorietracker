@@ -86,6 +86,15 @@ export interface CoachAdjustment {
   updated_at?: string;
 }
 
+export interface CoachRecoveryAlert {
+  kind: "planned_activity" | "strength_workout";
+  session_id: string;
+  scheduled_date: string;
+  title: string;
+  message: string;
+  requires_approval: boolean;
+}
+
 export interface CoachReconcileResponse {
   policy: CoachPriority;
   as_of: string;
@@ -94,6 +103,7 @@ export interface CoachReconcileResponse {
     future_end: string;
   };
   load_events: CoachLoadEvent[];
+  recovery_alerts?: CoachRecoveryAlert[];
   adjustments: CoachAdjustment[];
   history: CoachAdjustment[];
   summary: {
