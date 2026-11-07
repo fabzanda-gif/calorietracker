@@ -74,6 +74,28 @@ def test_staging_preflight_matches_every_curated_value_and_pair():
                for left, right, kind in reviewed)
     assert len(set(reviewed)) == 33
 
+    # Every substitute endpoint must have a known movement classification.
+    # Otherwise the alternative API could offer an unclassified exercise,
+    # as happened with the band triceps pushdown during this audit.
+    golden_patterns = {
+        "1435": "squat",
+        "0025": "horizontal_push",
+        "0334": "isolation",
+        "0464": "core",
+        "0553": "vertical_push",
+        "0198": "vertical_pull",
+        "0314": "horizontal_push",
+        "0208": "horizontal_pull",
+        "1723": "isolation",
+        "0289": "vertical_push",
+    }
+    patterns = {row[0]: row[1] for row in curated}
+    patterns.update(golden_patterns)
+    for source, target, _relationship in reviewed:
+        assert source in patterns, source
+        assert target in patterns, target
+        assert patterns[source] == patterns[target], (source, target)
+
     query = PREFLIGHT.read_text(encoding="utf-8")
     classified_section = query.split("expected_classification(", 1)[1].split(
         "expected_pairs(", 1
