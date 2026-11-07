@@ -616,3 +616,67 @@ def test_recovery_rejects_archived_strength_plan(monkeypatch):
         )
 
     assert exc.value.status_code == 409
+
+
+def test_recovery_undoes_strength_change_if_plan_reopen_fails(monkeypatch):
+    from datetime import date, timedelta
+
+    today = date.today()
+    original = today - timedelta(days=1)
+    suggestion = today + timedelta(days=2)
+
+    class WorkoutRepo:
+        def __init__(self):
+            self.compensations = []
+        def get(self, user_id, workout_id):
+            return {
+                "id": workout_id,
+                "status": "skipped",
+                "scheduled_date": original.isoformat(),
+                "strength_plan_id": "plan-1",
+            }
+        def reschedule_skipped(self, **kwargs):
+            return {"id": kwargs["workout_id"], "status": "planned"}
+        def undo_recovery(self, **kwargs):
+            self.compensations.append(kwargs)
+            return {"id": kwargs["workout_id"], "status": "skipped"}
+
+    class PlansRepo:
+        def get(self, plan_id, user_id):
+            return {"id": plan_id, "status": "completed"}
+        def update_status(self, **kwargs):
+            return None
+
+    monkeypatch.setattr(
+        coach_router,
+        "_coach_context",
+        lambda **kwargs: {
+            "recovery_alerts": [{
+                "kind": "strength_workout",
+                "session_id": "gym-1",
+                "suggested_date": suggestion.isoformat(),
+            }],
+        },
+    )
+    workouts = WorkoutRepo()
+    with pytest.raises(HTTPException) as exc:
+        apply_skipped_session_recovery(
+            kind="strength_workout",
+            session_id="gym-1",
+            request=CoachRecoveryApplyRequest(
+                original_date=original,
+                suggested_date=suggestion,
+            ),
+            current_user=CurrentUser(id="user-1", access_token="token"),
+            planned_repo=object(),
+            workouts_repo=workouts,
+            plans_repo=PlansRepo(),
+            activities_repo=object(),
+            workout_logs_repo=object(),
+            exercises_repo=object(),
+            set_logs_repo=object(),
+        )
+
+    assert exc.value.status_code == 502
+    assert len(workouts.compensations) == 1
+    assert workouts.compensations[0]["original_date"] == original.isoformat()
