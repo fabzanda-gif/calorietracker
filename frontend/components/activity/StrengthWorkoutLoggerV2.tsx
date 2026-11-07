@@ -956,6 +956,8 @@ export function StrengthWorkoutLoggerV2({
         >
           {creatingFree ? "Creo…" : "Inizia workout libero"}
         </button>
+        {error && <p className={styles.error} role="alert">{error}</p>}
+        {message && <p className={styles.message} role="status">{message}</p>}
       </section>
       {accessToken && (
         <FreeWorkoutTimeline
