@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import type { ExerciseLibraryItem } from "./exercises";
 
 
 export type StrengthGoal =
@@ -605,12 +606,11 @@ export function getStrengthSubstitutions(
   exerciseId: string,
   accessToken?: string | null,
 ): Promise<{
-  items: Array<Record<string, unknown> & {
-    id: string;
-    name: string;
-    slug: string;
-    substitution_score: number;
-  }>;
+  items: Array<
+    ExerciseLibraryItem & {
+      substitution_score: number;
+    }
+  >;
   count: number;
 }> {
   return apiRequest(
