@@ -18,6 +18,7 @@ type Props = { accessToken: string };
 
 export function ExercisePreferencesPanel({ accessToken }: Props) {
   const [query, setQuery] = useState("");
+  const [equipment, setEquipment] = useState("");
   const [results, setResults] = useState<ExerciseLibraryItem[]>([]);
   const [preferences, setPreferences] = useState<ExercisePreferenceRecord[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
@@ -71,16 +72,13 @@ export function ExercisePreferencesPanel({ accessToken }: Props) {
   }, [accessToken]);
 
   async function searchExercises() {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
     setSearching(true);
     setError(null);
     setMessage(null);
     try {
       const response = await listExercises(accessToken, {
-        search: query.trim(),
+        search: query.trim() || undefined,
+        equipment: equipment || undefined,
         language: "it",
         limit: 20,
       });
@@ -147,6 +145,24 @@ export function ExercisePreferencesPanel({ accessToken }: Props) {
               }
             }}
           />
+          <select
+            aria-label="Attrezzatura"
+            value={equipment}
+            onChange={(event) => setEquipment(event.target.value)}
+          >
+            <option value="">Tutte le attrezzature</option>
+            <option value="body-weight">Corpo libero</option>
+            <option value="barbell">Bilanciere</option>
+            <option value="dumbbell">Manubri</option>
+            <option value="cable">Cavi</option>
+            <option value="leverage-machine">Macchine</option>
+            <option value="smith-machine">Smith machine</option>
+            <option value="sled-machine">Pressa</option>
+            <option value="kettlebell">Kettlebell</option>
+            <option value="ez-barbell">Bilanciere EZ</option>
+            <option value="band">Elastici</option>
+            <option value="stability-ball">Fitball</option>
+          </select>
           <button type="button" onClick={() => void searchExercises()} disabled={searching}>
             {searching ? "Cerco…" : "Cerca"}
           </button>
