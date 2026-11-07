@@ -19,6 +19,7 @@ from backend.observability import (
 )
 
 from backend.api.routers.athlete_state import router as athlete_state_router
+from backend.api.routers.training_nutrition_context import router as training_nutrition_context_router
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.coach import router as coach_router
 from backend.api.routers.daily_logs import router as daily_logs_router
@@ -283,6 +284,7 @@ app.include_router(google_calendar_router)
 app.include_router(notifications_router)
 app.include_router(activities_router)
 app.include_router(athlete_state_router)
+app.include_router(training_nutrition_context_router)
 app.include_router(coach_router)
 app.include_router(weight_router)
 app.include_router(progress_router)
