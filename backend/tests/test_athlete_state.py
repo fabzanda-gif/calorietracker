@@ -57,7 +57,8 @@ def test_state_excludes_drafts_and_outside_window():
     assert state["target_sessions_per_week"] == 3
     assert len(state["weekly"]) == 8
     assert state["last_completed_date"] == "2026-11-07"
-    assert state["data_status"] == "available"
+    assert state["data_status"] == "limited"  # Third completed session has no saved sets.
+    assert state["quality"]["sessions_without_sets"] == 1
 
 
 def test_empty_history_is_explicitly_limited_not_a_fatigue_score():
