@@ -1,5 +1,5 @@
 -- Exercise Library v1: batch 4, thirty catalog-verified exercises.
--- The four versioned batches plus the ten golden exercises now cover 154
+-- The four versioned batches plus the ten golden exercises now cover 155
 -- distinct catalog records with intentional curation metadata.
 -- These records remain unapproved for program generation.
 -- No existing workout plan, logged set or exercise approval is modified.
