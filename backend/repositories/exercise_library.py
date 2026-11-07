@@ -298,6 +298,104 @@ class ExerciseLibraryRepository(BaseRepository):
                 f"Unable to load exercise: {exc}"
             ) from exc
 
+    def list_alternatives(
+        self,
+        identifier: str,
+        *,
+        language: str = "it",
+        equipment_key: str | None = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        """Return reviewed links; never auto-substitute a workout exercise."""
+        source = self.get_exercise(identifier, language=language)
+        if source is None:
+            return None
+
+        try:
+            response = (
+                self.supabase
+                .table("exercise_relationships")
+                .select(
+                    "target_exercise_id,relationship,"
+                    "similarity_score,rationale"
+                )
+                .eq("source_exercise_id", source["id"])
+                .in_(
+                    "relationship",
+                    ["close_substitute", "substitute", "regression"],
+                )
+                .order("relationship")
+                .limit(100)
+                .execute()
+            )
+            links = self._data(response)
+            if not links:
+                return []
+
+            target_ids = sorted({
+                str(link["target_exercise_id"])
+                for link in links
+            })
+            if equipment_key:
+                allowed = self._candidate_ids_for_equipment(
+                    equipment_key
+                )
+                target_ids = [
+                    item_id for item_id in target_ids
+                    if item_id in allowed
+                ]
+            if not target_ids:
+                return []
+
+            candidates = self._data(
+                self.table
+                .select(EXERCISE_COLUMNS)
+                .eq("active", True)
+                .in_("id", target_ids)
+                .execute()
+            )
+            hydrated = {
+                str(item["id"]): item
+                for item in self._hydrate(
+                    candidates,
+                    language=language,
+                    include_aliases=False,
+                )
+            }
+            priority = {
+                "close_substitute": 0,
+                "substitute": 1,
+                "regression": 2,
+            }
+            suggestions = []
+            for link in links:
+                exercise = hydrated.get(
+                    str(link["target_exercise_id"])
+                )
+                if exercise is None:
+                    continue
+                suggestions.append({
+                    "exercise": exercise,
+                    "relationship": link["relationship"],
+                    "similarity_score": link.get("similarity_score"),
+                    "rationale": link.get("rationale"),
+                    "requires_confirmation": True,
+                })
+            suggestions.sort(
+                key=lambda item: (
+                    priority.get(item["relationship"], 10),
+                    -float(item["similarity_score"] or 0),
+                    item["exercise"]["name"],
+                )
+            )
+            return suggestions[:limit]
+        except RepositoryError:
+            raise
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load exercise alternatives: {exc}"
+            ) from exc
+
     def _hydrate(
         self,
         rows: list[dict],
