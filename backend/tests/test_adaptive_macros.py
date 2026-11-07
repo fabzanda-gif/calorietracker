@@ -118,6 +118,18 @@ def test_very_large_weight_change_requires_review():
     assert any("insolita" in reason for reason in result["reasons"])
 
 
+def test_recently_accepted_change_blocks_repeated_stacking():
+    result = run_service(
+        metadata={
+            **METADATA,
+            "adaptive_macros_last_applied_on": "2026-11-04",
+        },
+    )
+    assert result["proposal"] is None
+    assert result["status"] == "insufficient_data"
+    assert any("14 giorni" in reason for reason in result["reasons"])
+
+
 def test_missing_meals_are_not_assumed_zero_food():
     result = run_service(meals=[])
     assert result["observed"]["mean_logged_calories_kcal"] is None
@@ -288,5 +300,9 @@ def test_apply_recomputes_proposal_and_changes_only_goal_adjustment(monkeypatch)
     )
     assert result["applied"] is True
     assert saved == [
-        {"goal_mode": "loss", "goal_adjustment_kcal": 300.0}
+        {
+            "goal_mode": "loss",
+            "goal_adjustment_kcal": 300.0,
+            "adaptive_macros_last_applied_on": TODAY.isoformat(),
+        }
     ]
