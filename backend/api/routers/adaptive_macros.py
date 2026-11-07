@@ -135,6 +135,7 @@ def apply_adaptive_macro_proposal(
         ProfileUpdate(
             goal_mode=proposal["goal_mode"],
             goal_adjustment_kcal=proposal["proposed_goal_adjustment_kcal"],
+            adaptive_macros_last_applied_on=date.today().isoformat(),
         ),
         current_user=current_user,
     )
