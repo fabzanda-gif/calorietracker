@@ -514,7 +514,7 @@ export function StrengthWorkoutLoggerV2({
       setSubstitutions((current) => ({
         ...current,
         [exercise.id]:
-          response.items as ExerciseLibraryItem[],
+          response.items,
       }));
     } catch (err) {
       setError(
