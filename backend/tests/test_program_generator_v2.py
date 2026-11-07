@@ -186,3 +186,53 @@ def test_v2_demo_account_cannot_activate_program():
             ),
         )
     assert exc.value.status_code == 403
+
+
+def test_replacing_active_plan_pauses_old_and_preserves_history(monkeypatch):
+    """Never call delete: it cascades through logs and their saved sets."""
+    monkeypatch.setattr(
+        program_v2, "_preview_v2",
+        lambda *args: {"ready_for_activation": True},
+    )
+    monkeypatch.setattr(
+        program_v2, "_persist_strength_plan",
+        lambda **kwargs: {
+            "plan": {"id": "new-plan"},
+            "workout_count": 8,
+            "exercise_count": 32,
+        },
+    )
+
+    class Plans:
+        def __init__(self):
+            self.paused = []
+
+        def list_for_user(self, user_id):
+            assert user_id == "user-1"
+            return [{"id": "old-plan", "status": "active"}]
+
+        def update_status(self, *, plan_id, user_id, status):
+            self.paused.append((plan_id, user_id, status))
+            return {"id": plan_id, "status": status}
+
+        def delete(self, *args, **kwargs):
+            raise AssertionError("Deleting old plan would cascade workout history")
+
+    plans = Plans()
+    result = program_v2.create_program_v2(
+        request=program_v2.ProgramV2Request(
+            start_date=date(2026, 11, 9),
+            goal="hypertrophy",
+            allowed_equipment=["dumbbell"],
+            replace_active=True,
+        ),
+        current_user=CurrentUser(id="user-1", access_token="token"),
+        supabase=object(),
+        library_repo=object(),
+        plans_repo=plans,
+        workouts_repo=object(),
+        exercises_repo=object(),
+    )
+    assert result["created"] is True
+    assert result["replaced_plan_ids"] == ["old-plan"]
+    assert plans.paused == [("old-plan", "user-1", "paused")]
