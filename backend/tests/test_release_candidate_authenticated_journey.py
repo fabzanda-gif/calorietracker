@@ -319,20 +319,8 @@ def http_journey(monkeypatch):
 
     def authenticate(authorization: str | None = Header(default=None)):
         tokens = {
-            "Bearer e2e-a": CurrentUser(
-                id=A, access_token="e2e-a",
-                metadata={
-                    "gender": "male", "birth_date": "1995-04-10",
-                    "height": 180, "goal_mode": "maintenance",
-                },
-            ),
-            "Bearer e2e-b": CurrentUser(
-                id=B, access_token="e2e-b",
-                metadata={
-                    "gender": "female", "birth_date": "1990-05-01",
-                    "height": 165, "goal_mode": "maintenance",
-                },
-            ),
+            "Bearer e2e-a": CurrentUser(id=A, access_token="e2e-a"),
+            "Bearer e2e-b": CurrentUser(id=B, access_token="e2e-b"),
             "Bearer e2e-demo": CurrentUser(
                 id=DEMO, access_token="e2e-demo",
                 read_only=True,
