@@ -3,6 +3,7 @@
 import { AppNav } from "@/components/navigation/AppNav";
 import { AthleteStatePanel } from "@/components/progress/AthleteStatePanel";
 import { TrainingNutritionWeekPanel } from "@/components/progress/TrainingNutritionWeekPanel";
+import { CrossTrainingPanel } from "@/components/progress/CrossTrainingPanel";
 
 import Link from "next/link";
 import {
@@ -1769,6 +1770,7 @@ export default function ProgressPage() {
 
       {accessToken && <AthleteStatePanel accessToken={accessToken} />}
       {accessToken && <TrainingNutritionWeekPanel accessToken={accessToken} />}
+      {accessToken && <CrossTrainingPanel accessToken={accessToken} />}
 
       {error ? (
         <section className={styles.errorCard}>
