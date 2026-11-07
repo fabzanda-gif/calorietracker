@@ -65,8 +65,8 @@ def _reviewed_data():
 
 def test_staging_preflight_matches_every_curated_value_and_pair():
     curated, reviewed = _reviewed_data()
-    assert len(curated) == len(set(curated)) == 144
-    assert len({record[0] for record in curated}) == 144
+    assert len(curated) == len(set(curated)) == 145
+    assert len({record[0] for record in curated}) == 145
     assert len(reviewed) == len(set(reviewed)) == 33
     assert all(row[1] in MOVEMENTS and row[2] in ROLES for row in curated)
     assert all(set(row[3:]) <= LEVELS for row in curated)
@@ -83,7 +83,7 @@ def test_staging_preflight_matches_every_curated_value_and_pair():
     )[0]
     assert set(CLASSIFICATION.findall(classified_section)) == set(curated)
     assert set(RELATIONSHIP.findall(pair_section)) == set(reviewed)
-    assert len(CLASSIFICATION.findall(classified_section)) == 144
+    assert len(CLASSIFICATION.findall(classified_section)) == 145
     assert len(RELATIONSHIP.findall(pair_section)) == 33
     assert "count(*)=61" in query
     assert "preferences_rls_enabled" in query
