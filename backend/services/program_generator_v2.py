@@ -95,11 +95,18 @@ class ProgramGeneratorV2:
                 continue
             if not item.get("id") or str(item["id"]) in excluded:
                 continue
+            equipment_links = item.get("equipment") or []
+            # A missing equipment mapping is *unknown*, not proof the
+            # exercise is usable with any selected equipment.
+            if not equipment_links or any(
+                not link.get("key") for link in equipment_links
+            ):
+                continue
             required_equipment = {
-                str(e.get("key")) for e in item.get("equipment", [])
-                if e.get("key") and e.get("role") != "optional"
+                str(e["key"]) for e in equipment_links
+                if e.get("role") != "optional"
             }
-            if config.allowed_equipment and not required_equipment.issubset(
+            if not required_equipment or not required_equipment.issubset(
                 set(config.allowed_equipment)
             ):
                 continue
