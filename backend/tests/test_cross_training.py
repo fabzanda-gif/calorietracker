@@ -90,6 +90,54 @@ def test_upper_gym_and_easy_run_not_flagged():
     assert result["conflicts"] == []
 
 
+
+def test_completed_lower_gym_near_planned_quality_run_is_flagged():
+    result = timeline(
+        completed_strength=[
+            {"id": "log", "performed_date": "2026-11-09",
+             "strength_workout_id": "gym-1", "status": "completed"},
+        ],
+        planned_strength=[
+            {"id": "gym-1", "scheduled_date": "2026-11-09",
+             "status": "completed", "focus": "lower",
+             "title": "Lower A"},
+        ],
+        planned_running=[
+            {"id": "run-1", "scheduled_date": "2026-11-10",
+             "status": "planned", "activity_type": "running",
+             "session_kind": "tempo", "intensity": "hard"},
+        ],
+    )
+    assert result["summary"]["strength_sessions"] == 1
+    assert result["conflicts"][0]["severity"] == "moderate"
+
+
+def test_unverified_completed_gym_scope_is_not_assumed_to_be_lower_body():
+    result = timeline(
+        completed_strength=[
+            {"id": "log", "performed_date": "2026-11-09",
+             "strength_workout_id": "unknown", "status": "completed"},
+        ],
+        planned_running=[
+            {"id": "run-1", "scheduled_date": "2026-11-09",
+             "status": "planned", "activity_type": "running",
+             "session_kind": "interval", "intensity": "hard"},
+        ],
+    )
+    assert result["conflicts"] == []
+    assert result["summary"]["strength_sessions"] == 1
+
+
+def test_malformed_running_numbers_do_not_crash_timeline():
+    result = timeline(actual_activities=[
+        {"id": "run-1", "date": "2026-11-09",
+         "activity_type": "running", "duration_seconds": "oops",
+         "distance_meters": None},
+    ])
+    assert result["summary"]["running_sessions"] == 1
+    assert result["timeline"][0]["events"][0]["quality"] is False
+
+
 def test_race_is_protected_and_gym_is_only_reviewable_target():
     result = timeline(
         planned_strength=[
