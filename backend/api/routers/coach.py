@@ -1044,14 +1044,18 @@ def apply_skipped_session_recovery(
 
         plan_update = None
         if plan_to_reopen and plan_to_reopen.get("status") == "completed":
-            plan_update = plans_repo.update_status(
-                plan_id=plan_to_reopen["id"],
-                user_id=current_user.id,
-                status="active",
-            )
+            try:
+                plan_update = plans_repo.update_status(
+                    plan_id=plan_to_reopen["id"],
+                    user_id=current_user.id,
+                    status="active",
+                )
+            except RepositoryError:
+                plan_update = None
+
             if not plan_update:
-                # Two Supabase updates are not atomic. Restore the
-                # skipped workout when the plan cannot be reopened.
+                # Two Supabase writes are not atomic. Attempt a
+                # conditional compensation on either failure mode.
                 undone = workouts_repo.undo_recovery(
                     workout_id=session_id,
                     user_id=current_user.id,
