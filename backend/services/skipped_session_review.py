@@ -14,6 +14,28 @@ class SkippedSessionReviewService:
         except ValueError:
             return None
 
+    @staticmethod
+    def _recovery_days(kind: str, session: dict[str, Any]) -> int:
+        """Conservative scheduling heuristic, not a physiological score."""
+        intensity = str(session.get("intensity") or "").strip().casefold()
+        session_kind = str(session.get("session_kind") or "").strip().casefold()
+        focus = str(session.get("focus") or "").strip().casefold()
+        if intensity in {"hard", "high", "race"}:
+            return 2
+        if kind == "planned_activity" and session_kind in {
+            "interval", "intervals", "tempo", "long", "race"
+        }:
+            return 2
+        if kind == "strength_workout" and focus in {
+            "lower", "legs", "full_body", "full body"
+        }:
+            return 2
+        if intensity in {"low", "easy"} or session_kind in {
+            "recovery", "easy"
+        }:
+            return 0
+        return 1
+
     def build(
         self,
         *,
@@ -23,16 +45,23 @@ class SkippedSessionReviewService:
         upcoming_running: list[dict[str, Any]] | None = None,
         upcoming_strength: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
-        occupied = {
-            day
-            for item in (upcoming_running or []) + (upcoming_strength or [])
-            if item.get("status") == "planned"
-            for day in [self._date(item.get("scheduled_date"))]
-            if day is not None
-        }
-        alerts: list[dict[str, Any]] = []
-        reserved: set[date] = set()
+        calendar: list[tuple[date, int]] = []
+        for kind, sessions in (
+            ("planned_activity", upcoming_running or []),
+            ("strength_workout", upcoming_strength or []),
+        ):
+            for session in sessions:
+                if session.get("status") != "planned":
+                    continue
+                planned_date = self._date(session.get("scheduled_date"))
+                if planned_date is not None:
+                    calendar.append((
+                        planned_date,
+                        self._recovery_days(kind, session),
+                    ))
 
+        alerts: list[dict[str, Any]] = []
+        reserved: list[tuple[date, int]] = []
         for kind, sessions in (
             ("planned_activity", running_sessions),
             ("strength_workout", strength_workouts),
@@ -60,6 +89,7 @@ class SkippedSessionReviewService:
                     "scheduled_date": scheduled_date.isoformat(),
                     "title": str(session.get("title") or "Allenamento"),
                     "is_race": is_race,
+                    "recovery_days": self._recovery_days(kind, session),
                     "requires_approval": True,
                 })
 
@@ -74,17 +104,18 @@ class SkippedSessionReviewService:
         for alert in alerts:
             suggested: date | None = None
             if not alert["is_race"]:
-                # Allow a full day between the recovered workout and
-                # any already planned workout, in either direction.
                 for offset in range(1, 8):
                     candidate = as_of + timedelta(days=offset)
+                    # Both sessions need enough time apart. Unknown
+                    # load defaults to one full intervening day.
                     if any(
-                        candidate + timedelta(days=delta) in occupied | reserved
-                        for delta in (-1, 0, 1)
+                        abs((candidate - day).days)
+                        <= max(alert["recovery_days"], other_days)
+                        for day, other_days in calendar + reserved
                     ):
                         continue
                     suggested = candidate
-                    reserved.add(candidate)
+                    reserved.append((candidate, alert["recovery_days"]))
                     break
 
             alert["suggested_date"] = (
@@ -98,12 +129,12 @@ class SkippedSessionReviewService:
             elif suggested:
                 alert["message"] = (
                     "La seduta è stata saltata. Ho trovato una data libera "
-                    "da valutare; il calendario cambia solo con la tua conferma."
+                    "in base al carico previsto; conferma prima di spostarla."
                 )
             else:
                 alert["message"] = (
-                    "La seduta è stata saltata. Non ho trovato una data libera "
-                    "nei prossimi sette giorni: valuta il piano manualmente."
+                    "La seduta è stata saltata. Non ho trovato una data "
+                    "compatibile nei prossimi sette giorni."
                 )
 
         return sorted(
