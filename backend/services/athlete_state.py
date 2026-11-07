@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import date, timedelta
-from statistics import mean
 
 
 class AthleteStateService:
@@ -22,7 +21,6 @@ class AthleteStateService:
         ]
         log_by_id = {str(item["id"]): item for item in logs}
         exercises = {str(x["id"]): x for x in history.get("exercises", [])}
-        workouts = {str(x["id"]): x for x in history.get("workouts", [])}
         sets = [
             item for item in history.get("sets", [])
             if str(item.get("strength_workout_log_id")) in log_by_id
@@ -172,7 +170,12 @@ class AthleteStateService:
             "window_days": 56,
             "source": "completed_strength_workouts",
             "scope": "strength_only",
-            "data_status": "limited" if len(logs) < 3 or quality["history_truncated"] else "available",
+            "data_status": (
+                "limited"
+                if len(logs) < 3 or quality["history_truncated"]
+                or quality["sessions_without_sets"] > 0
+                else "available"
+            ),
             "last_completed_date": last_day.isoformat() if last_day else None,
             "days_since_last_completed": (as_of - last_day).days if last_day else None,
             "recent_7_days": recent,
