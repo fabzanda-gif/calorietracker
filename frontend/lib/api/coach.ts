@@ -93,6 +93,8 @@ export interface CoachRecoveryAlert {
   title: string;
   message: string;
   requires_approval: boolean;
+  suggested_date: string | null;
+  is_race: boolean;
 }
 
 export interface CoachReconcileResponse {
@@ -197,6 +199,30 @@ export function updateCoachPreferences(
       accessToken,
       body: JSON.stringify({
         priority,
+      }),
+    },
+  );
+}
+
+export function applyCoachRecovery(
+  kind: CoachRecoveryAlert["kind"],
+  id: string,
+  originalDate: string,
+  suggestedDate: string,
+  accessToken?: string | null,
+): Promise<{ applied: true; item: unknown }> {
+  return apiRequest(
+    "/coach/recovery/" +
+      encodeURIComponent(kind) +
+      "/" +
+      encodeURIComponent(id) +
+      "/apply",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        original_date: originalDate,
+        suggested_date: suggestedDate,
       }),
     },
   );
