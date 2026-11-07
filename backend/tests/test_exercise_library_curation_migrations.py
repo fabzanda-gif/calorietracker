@@ -88,3 +88,44 @@ def test_phase1_third_batch_is_bounded_and_does_not_approve():
         sql,
         flags=re.IGNORECASE,
     )
+
+
+def test_phase1_curation_batches_cover_154_unique_exercises_without_approval():
+    files = (
+        ("20261107210000_curate_exercise_library_phase1_batch1.sql", 18),
+        ("20261107211000_curate_exercise_library_phase1_batch2.sql", 43),
+        ("20261107212000_curate_exercise_library_phase1_batch3.sql", 53),
+        ("20261107213000_curate_exercise_library_phase1_batch4.sql", 30),
+    )
+    all_ids = []
+    for filename, expected_count in files:
+        sql = (MIGRATIONS / filename).read_text(encoding="utf-8")
+        # Take only exercise-metadata VALUES; the later VALUES belong to
+        # relationships and must not be confused with curated entries.
+        first_update = sql.index("update public.exercises")
+        batch = sql[:first_update]
+        ids = re.findall(
+            r"^\s*\('([^']+)','(?:squat|hinge|single_leg|"
+            r"horizontal_push|vertical_push|horizontal_pull|vertical_pull|"
+            r"core|isolation)'",
+            batch,
+            re.MULTILINE,
+        )
+        assert len(ids) == expected_count, filename
+        assert len(set(ids)) == expected_count, filename
+        assert "approved_for_generation=false" in sql.replace(" ", "")
+        assert not re.search(
+            r"set\s+approved_for_generation\s*=\s*true",
+            sql,
+            flags=re.IGNORECASE,
+        )
+        all_ids.extend(ids)
+
+    golden = (
+        "1435", "0025", "0334", "0464", "0553",
+        "0198", "0314", "0208", "1723", "0289"
+    )
+    assert len(all_ids) == 144
+    assert len(set(all_ids)) == 144
+    assert not set(all_ids).intersection(golden)
+    assert len(set(all_ids).union(golden)) == 154
