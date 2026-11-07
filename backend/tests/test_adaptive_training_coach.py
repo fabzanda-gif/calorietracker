@@ -240,3 +240,139 @@ def test_strongest_signal_wins_for_same_target_action():
 
     assert volume["severity"] == "high"
     assert volume["source_id"] == "10"
+
+
+
+def test_gym_priority_does_not_auto_cut_strength_load():
+    proposals = (
+        AdaptiveTrainingCoachService().build(
+            recent_events=[hard_run()],
+            upcoming_strength=[
+                lower_workout()
+            ],
+            strength_exercises={
+                "workout-1":
+                    lower_exercises()
+            },
+            upcoming_running=[],
+            priority="gym",
+        )
+    )
+
+    actions = {
+        item["action"]
+        for item in proposals
+    }
+
+    assert "reduce_load" not in actions
+    assert "reduce_volume" in actions
+
+
+def test_running_priority_protects_run_by_cutting_strength_more():
+    proposals = (
+        AdaptiveTrainingCoachService().build(
+            recent_events=[hard_run()],
+            upcoming_strength=[
+                lower_workout()
+            ],
+            strength_exercises={
+                "workout-1":
+                    lower_exercises()
+            },
+            upcoming_running=[],
+            priority="running",
+        )
+    )
+
+    load = next(
+        item
+        for item in proposals
+        if item["action"] == "reduce_load"
+    )
+
+    assert (
+        load["proposed_changes"]
+        ["exercise_updates"][0]
+        ["prescribed_load_kg"]
+        == 92.5
+    )
+
+
+def test_gym_priority_reduces_quality_run_more():
+    event = {
+        "source_kind": "strength_workout",
+        "source_id": "strength-1",
+        "date": "2026-11-07",
+        "title": "Lower A",
+        "modality": "strength",
+        "scope": "lower",
+        "intensity": "high",
+    }
+
+    proposal = (
+        AdaptiveTrainingCoachService().build(
+            recent_events=[event],
+            upcoming_strength=[],
+            strength_exercises={},
+            upcoming_running=[
+                {
+                    "id": "run-1",
+                    "scheduled_date":
+                        "2026-11-08",
+                    "title": "Tempo 8 km",
+                    "status": "planned",
+                    "session_kind": "tempo",
+                    "intensity": "hard",
+                    "distance_meters": 8000,
+                    "duration_minutes": 45,
+                }
+            ],
+            priority="gym",
+        )[0]
+    )
+
+    assert (
+        proposal["proposed_changes"]
+        ["distance_meters"]
+        == 6400
+    )
+
+
+def test_running_priority_reduces_quality_run_less():
+    event = {
+        "source_kind": "strength_workout",
+        "source_id": "strength-1",
+        "date": "2026-11-07",
+        "title": "Lower A",
+        "modality": "strength",
+        "scope": "lower",
+        "intensity": "high",
+    }
+
+    proposal = (
+        AdaptiveTrainingCoachService().build(
+            recent_events=[event],
+            upcoming_strength=[],
+            strength_exercises={},
+            upcoming_running=[
+                {
+                    "id": "run-1",
+                    "scheduled_date":
+                        "2026-11-08",
+                    "title": "Tempo 8 km",
+                    "status": "planned",
+                    "session_kind": "tempo",
+                    "intensity": "hard",
+                    "distance_meters": 8000,
+                    "duration_minutes": 45,
+                }
+            ],
+            priority="running",
+        )[0]
+    )
+
+    assert (
+        proposal["proposed_changes"]
+        ["distance_meters"]
+        == 7200
+    )
