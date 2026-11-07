@@ -101,6 +101,36 @@ class TrainingCoachAdjustmentsRepository(
                 f"adjustments: {exc}"
             ) from exc
 
+    def get_for_target_action(
+        self,
+        *,
+        user_id: str,
+        target_kind: str,
+        target_id: Any,
+        action: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .select(
+                    TRAINING_COACH_ADJUSTMENT_SELECT
+                )
+                .eq("user_id", user_id)
+                .eq("target_kind", target_kind)
+                .eq("target_id", target_id)
+                .eq("action", action)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to load target training "
+                f"coach adjustment: {exc}"
+            ) from exc
+
     def create(
         self,
         payload: dict[str, Any],
