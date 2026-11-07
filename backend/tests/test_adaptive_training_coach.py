@@ -69,7 +69,7 @@ def test_hard_run_guards_next_lower_workout():
     assert "reduce_volume" in by_action
 
     load = by_action["reduce_load"]
-    assert load["auto_apply"] is True
+    assert load["auto_apply"] is False  # All Phase 5 changes need explicit consent.
     assert (
         load["proposed_changes"]
         ["exercise_updates"][0]

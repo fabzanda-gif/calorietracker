@@ -20,6 +20,130 @@ EXERCISE_COLUMNS = (
 class ExerciseLibraryRepository(BaseRepository):
     table_name = "exercises"
 
+    def catalog_status(self) -> dict:
+        """Read-only quality snapshot, not an approval mechanism."""
+        columns = (
+            "id,body_part,movement_pattern,training_role,"
+            "fatigue_cost,approved_for_generation"
+        )
+        try:
+            # PostgREST caps rows per request; use bounded pages so
+            # catalog growth does not silently undercount entries.
+            rows: list[dict] = []
+            page_size = 500
+            while True:
+                response = (
+                    self.table.select(columns)
+                    .eq("active", True)
+                    .order("id")
+                    .range(len(rows), len(rows) + page_size - 1)
+                    .execute()
+                )
+                page = self._data(response)
+                rows.extend(page)
+                if len(page) < page_size:
+                    break
+
+            relationships = (
+                self.supabase
+                .table("exercise_relationships")
+                .select("source_exercise_id")
+                .limit(1)
+                .execute()
+            )
+            total = len(rows)
+            approved = sum(
+                bool(row.get("approved_for_generation"))
+                for row in rows
+            )
+            by_body_part: dict[str, int] = {}
+            for row in rows:
+                key = str(row.get("body_part") or "unknown")
+                by_body_part[key] = by_body_part.get(key, 0) + 1
+            return {
+                "total_active": total,
+                "approved_for_generation": approved,
+                "pending_curation": total - approved,
+                "missing_movement_pattern": sum(
+                    not row.get("movement_pattern") for row in rows
+                ),
+                "missing_training_role": sum(
+                    not row.get("training_role") for row in rows
+                ),
+                "missing_fatigue_cost": sum(
+                    not row.get("fatigue_cost") for row in rows
+                ),
+                "has_substitution_relationships": bool(
+                    self._data(relationships)
+                ),
+                "by_body_part": dict(sorted(by_body_part.items())),
+            }
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to audit exercise catalog: {exc}"
+            ) from exc
+
+    def list_user_preferences(self, user_id: str) -> list[dict]:
+        try:
+            response = (
+                self.supabase
+                .table("training_exercise_preferences")
+                .select("exercise_id,preference")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load exercise preferences: {exc}"
+            ) from exc
+
+    def save_user_preference(
+        self, user_id: str, exercise_id: str, preference: str
+    ) -> dict:
+        if preference not in ("preferred", "excluded"):
+            raise ValueError("Invalid exercise preference")
+        try:
+            response = (
+                self.supabase
+                .table("training_exercise_preferences")
+                .upsert(
+                    {
+                        "user_id": user_id,
+                        "exercise_id": exercise_id,
+                        "preference": preference,
+                    },
+                    on_conflict="user_id,exercise_id",
+                )
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else {
+                "exercise_id": exercise_id,
+                "preference": preference,
+            }
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to save exercise preference: {exc}"
+            ) from exc
+
+    def remove_user_preference(
+        self, user_id: str, exercise_id: str
+    ) -> None:
+        try:
+            (
+                self.supabase
+                .table("training_exercise_preferences")
+                .delete()
+                .eq("user_id", user_id)
+                .eq("exercise_id", exercise_id)
+                .execute()
+            )
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to remove exercise preference: {exc}"
+            ) from exc
+
     def _candidate_ids_for_search(
         self,
         search: str,
@@ -233,6 +357,114 @@ class ExerciseLibraryRepository(BaseRepository):
         except Exception as exc:
             raise RepositoryError(
                 f"Unable to load exercise: {exc}"
+            ) from exc
+
+    def list_alternatives(
+        self,
+        identifier: str,
+        *,
+        language: str = "it",
+        equipment_key: str | None = None,
+        limit: int = 20,
+        user_id: str | None = None,
+    ) -> list[dict] | None:
+        """Return reviewed links; never auto-substitute a workout exercise."""
+        source = self.get_exercise(identifier, language=language)
+        if source is None:
+            return None
+
+        try:
+            response = (
+                self.supabase
+                .table("exercise_relationships")
+                .select(
+                    "target_exercise_id,relationship,"
+                    "similarity_score,rationale"
+                )
+                .eq("source_exercise_id", source["id"])
+                .in_(
+                    "relationship",
+                    ["close_substitute", "substitute", "regression"],
+                )
+                .order("relationship")
+                .limit(100)
+                .execute()
+            )
+            links = self._data(response)
+            if not links:
+                return []
+
+            target_ids = sorted({
+                str(link["target_exercise_id"])
+                for link in links
+            })
+            if equipment_key:
+                allowed = self._candidate_ids_for_equipment(
+                    equipment_key
+                )
+                target_ids = [
+                    item_id for item_id in target_ids
+                    if item_id in allowed
+                ]
+            if not target_ids:
+                return []
+
+            candidates = self._data(
+                self.table
+                .select(EXERCISE_COLUMNS)
+                .eq("active", True)
+                .in_("id", target_ids)
+                .execute()
+            )
+            hydrated = {
+                str(item["id"]): item
+                for item in self._hydrate(
+                    candidates,
+                    language=language,
+                    include_aliases=False,
+                )
+            }
+            priority = {
+                "close_substitute": 0,
+                "substitute": 1,
+                "regression": 2,
+            }
+            preferences = {
+                str(item["exercise_id"]): item["preference"]
+                for item in (
+                    self.list_user_preferences(user_id)
+                    if user_id is not None else []
+                )
+            }
+            suggestions = []
+            for link in links:
+                exercise = hydrated.get(
+                    str(link["target_exercise_id"])
+                )
+                if exercise is None or preferences.get(str(exercise["id"])) == "excluded":
+                    continue
+                suggestions.append({
+                    "exercise": exercise,
+                    "relationship": link["relationship"],
+                    "similarity_score": link.get("similarity_score"),
+                    "rationale": link.get("rationale"),
+                    "requires_confirmation": True,
+                    "user_preference": preferences.get(str(exercise["id"])),
+                })
+            suggestions.sort(
+                key=lambda item: (
+                    priority.get(item["relationship"], 10),
+                    0 if item["user_preference"] == "preferred" else 1,
+                    -float(item["similarity_score"] or 0),
+                    item["exercise"]["name"],
+                )
+            )
+            return suggestions[:limit]
+        except RepositoryError:
+            raise
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load exercise alternatives: {exc}"
             ) from exc
 
     def _hydrate(

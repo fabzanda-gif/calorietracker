@@ -164,15 +164,15 @@ class AdaptiveTrainingCoachService:
                                     )
                                     + " è abbastanza vicino a "
                                     "questa seduta gambe. "
-                                    + "Ridurrò del "
+                                    + "Propongo di ridurre del "
                                     + str(reduction_pct)
                                     + "% solo i carichi "
-                                    + "già prescritti, senza "
-                                    + "cambiare la struttura."
+                                    + "già prescritti, con "
+                                    + "conferma esplicita."
                                 ),
                                 proposed_changes=
                                     load_change,
-                                auto_apply=True,
+                                auto_apply=False,
                             )
                         )
 

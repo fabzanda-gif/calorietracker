@@ -86,6 +86,18 @@ export interface CoachAdjustment {
   updated_at?: string;
 }
 
+export interface CoachRecoveryAlert {
+  kind: "planned_activity" | "strength_workout";
+  session_id: string;
+  scheduled_date: string;
+  title: string;
+  message: string;
+  requires_approval: boolean;
+  suggested_date: string | null;
+  is_race: boolean;
+  recovery_days: number;
+}
+
 export interface CoachReconcileResponse {
   policy: CoachPriority;
   as_of: string;
@@ -94,6 +106,7 @@ export interface CoachReconcileResponse {
     future_end: string;
   };
   load_events: CoachLoadEvent[];
+  recovery_alerts?: CoachRecoveryAlert[];
   adjustments: CoachAdjustment[];
   history: CoachAdjustment[];
   summary: {
@@ -187,6 +200,30 @@ export function updateCoachPreferences(
       accessToken,
       body: JSON.stringify({
         priority,
+      }),
+    },
+  );
+}
+
+export function applyCoachRecovery(
+  kind: CoachRecoveryAlert["kind"],
+  id: string,
+  originalDate: string,
+  suggestedDate: string,
+  accessToken?: string | null,
+): Promise<{ applied: true; item: unknown }> {
+  return apiRequest(
+    "/coach/recovery/" +
+      encodeURIComponent(kind) +
+      "/" +
+      encodeURIComponent(id) +
+      "/apply",
+    {
+      method: "POST",
+      accessToken,
+      body: JSON.stringify({
+        original_date: originalDate,
+        suggested_date: suggestedDate,
       }),
     },
   );

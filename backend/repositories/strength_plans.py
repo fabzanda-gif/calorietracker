@@ -91,6 +91,30 @@ class StrengthPlansRepository(BaseRepository):
                 f"{exc}"
             ) from exc
 
+    def reopen_completed(
+        self,
+        *,
+        plan_id: Any,
+        user_id: str,
+    ) -> dict | None:
+        """Reopen only if the plan is still completed."""
+        try:
+            response = (
+                self.table
+                .update({"status": "active"})
+                .eq("id", plan_id)
+                .eq("user_id", user_id)
+                .eq("status", "completed")
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                "Unable to reopen completed strength plan: "
+                f"{exc}"
+            ) from exc
+
     def create(
         self,
         payload: dict[str, Any],

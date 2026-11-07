@@ -28,6 +28,25 @@ STRENGTH_EXERCISE_SELECT = (
 class StrengthWorkoutsRepository(BaseRepository):
     table_name = "strength_workouts"
 
+    def list_recent_free(
+        self, user_id: str, *, limit: int = 30
+    ) -> list[dict]:
+        try:
+            response = (
+                self.table
+                .select(STRENGTH_WORKOUT_SELECT)
+                .eq("user_id", user_id)
+                .eq("workout_kind", "free")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return self._data(response)
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to load free strength workouts: {exc}"
+            ) from exc
+
     def list_for_plan(
         self,
         user_id: str,
@@ -79,7 +98,41 @@ class StrengthWorkoutsRepository(BaseRepository):
                 .execute()
             )
 
-            return self._data(response)
+            workouts = self._data(response)
+            # A replaced program is paused, not deleted (to preserve
+            # completed workout logs and saved sets). Its future
+            # 'planned' sessions must not remain in active calendars,
+            # Coach overlap checks or nutrition planning.
+            linked = sorted({
+                str(w["strength_plan_id"])
+                for w in workouts
+                if w.get("status") == "planned"
+                and w.get("strength_plan_id")
+            })
+            if not linked:
+                return workouts
+
+            plan_response = (
+                self.supabase.table("strength_plans")
+                .select("id,status")
+                .eq("user_id", user_id)
+                .in_("id", linked)
+                .execute()
+            )
+            plan_status = {
+                str(plan["id"]): plan.get("status")
+                for plan in self._data(plan_response)
+            }
+            return [
+                workout for workout in workouts
+                if not (
+                    workout.get("status") == "planned"
+                    and workout.get("strength_plan_id")
+                    and plan_status.get(
+                        str(workout["strength_plan_id"])
+                    ) != "active"
+                )
+            ]
 
         except Exception as exc:
             raise RepositoryError(
@@ -110,6 +163,64 @@ class StrengthWorkoutsRepository(BaseRepository):
             raise RepositoryError(
                 "Unable to load strength workout: "
                 f"{exc}"
+            ) from exc
+
+
+    def reschedule_skipped(
+        self,
+        *,
+        workout_id: Any,
+        user_id: str,
+        original_date: str,
+        new_date: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update({
+                    "scheduled_date": new_date,
+                    "status": "planned",
+                })
+                .eq("id", workout_id)
+                .eq("user_id", user_id)
+                .eq("status", "skipped")
+                .eq("scheduled_date", original_date)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to reschedule skipped strength workout: {exc}"
+            ) from exc
+
+    def undo_recovery(
+        self,
+        *,
+        workout_id: Any,
+        user_id: str,
+        original_date: str,
+        recovered_date: str,
+    ) -> dict | None:
+        """Best-effort compensation if plan reactivation fails."""
+        try:
+            response = (
+                self.table
+                .update({
+                    "scheduled_date": original_date,
+                    "status": "skipped",
+                })
+                .eq("id", workout_id)
+                .eq("user_id", user_id)
+                .eq("status", "planned")
+                .eq("scheduled_date", recovered_date)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to undo strength recovery: {exc}"
             ) from exc
 
     def update_status(

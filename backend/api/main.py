@@ -18,8 +18,12 @@ from backend.observability import (
     reset_request,
 )
 
+from backend.api.routers.athlete_state import router as athlete_state_router
+from backend.api.routers.adaptive_macros import router as adaptive_macros_router
+from backend.api.routers.training_nutrition_context import router as training_nutrition_context_router
 from backend.api.routers.activities import router as activities_router
 from backend.api.routers.coach import router as coach_router
+from backend.api.routers.cross_training import router as cross_training_router
 from backend.api.routers.daily_logs import router as daily_logs_router
 from backend.api.routers.exercises import router as exercises_router
 from backend.api.routers.day_history import router as day_history_router
@@ -41,6 +45,7 @@ from backend.api.routers.google_calendar import router as google_calendar_router
 from backend.api.routers.pantry import router as pantry_router
 from backend.api.routers.recipes import router as recipes_router
 from backend.api.routers.progress import router as progress_router
+from backend.api.routers.program_v2 import router as program_v2_router
 from backend.api.routers.profile import router as profile_router
 from backend.api.routers.special_periods import router as special_periods_router
 from backend.api.routers.strength import router as strength_router
@@ -280,7 +285,11 @@ app.include_router(oura_router)
 app.include_router(google_calendar_router)
 app.include_router(notifications_router)
 app.include_router(activities_router)
+app.include_router(athlete_state_router)
+app.include_router(adaptive_macros_router)
+app.include_router(training_nutrition_context_router)
 app.include_router(coach_router)
+app.include_router(cross_training_router)
 app.include_router(weight_router)
 app.include_router(progress_router)
 app.include_router(profile_router)
@@ -288,6 +297,7 @@ app.include_router(onboarding_router)
 app.include_router(exercises_router)
 app.include_router(special_periods_router)
 app.include_router(strength_router)
+app.include_router(program_v2_router)
 app.include_router(weekly_schedule_router)
 app.include_router(daily_logs_router)
 app.include_router(day_history_router)

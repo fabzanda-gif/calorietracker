@@ -12,6 +12,7 @@ import { ActivityLogger } from "@/components/activity/ActivityLogger";
 import { ActivityMap } from "@/components/activity/ActivityMap";
 import { RunningPlanBuilder } from "@/components/activity/RunningPlanBuilder";
 import { StrengthPlanPanel } from "@/components/activity/StrengthPlanPanel";
+import { ProgramGeneratorV2Panel } from "@/components/activity/ProgramGeneratorV2Panel";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   useExperienceMode,
@@ -2467,6 +2468,7 @@ export default function ActivitiesPage() {
             />
 
             <StrengthPlanPanel />
+                {accessToken && <ProgramGeneratorV2Panel accessToken={accessToken} />}
           </div>
         </details>
 

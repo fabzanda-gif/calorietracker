@@ -141,6 +141,35 @@ class PlannedActivitiesRepository(BaseRepository):
                 f"Unable to update planned activity: {exc}"
             ) from exc
 
+
+    def reschedule_skipped(
+        self,
+        *,
+        activity_id: Any,
+        user_id: str,
+        original_date: str,
+        new_date: str,
+    ) -> dict | None:
+        try:
+            response = (
+                self.table
+                .update({
+                    "scheduled_date": new_date,
+                    "status": "planned",
+                })
+                .eq("id", activity_id)
+                .eq("user_id", user_id)
+                .eq("status", "skipped")
+                .eq("scheduled_date", original_date)
+                .execute()
+            )
+            rows = self._data(response)
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise RepositoryError(
+                f"Unable to reschedule skipped activity: {exc}"
+            ) from exc
+
     def delete(
         self,
         activity_id: Any,

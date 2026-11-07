@@ -1,6 +1,10 @@
 "use client";
 
 import { AppNav } from "@/components/navigation/AppNav";
+import { AthleteStatePanel } from "@/components/progress/AthleteStatePanel";
+import { TrainingNutritionWeekPanel } from "@/components/progress/TrainingNutritionWeekPanel";
+import { CrossTrainingPanel } from "@/components/progress/CrossTrainingPanel";
+import { AdaptiveMacrosPanel } from "@/components/progress/AdaptiveMacrosPanel";
 
 import Link from "next/link";
 import {
@@ -1764,6 +1768,11 @@ export default function ProgressPage() {
           </p>
         </div>
       </header>
+
+      {accessToken && <AthleteStatePanel accessToken={accessToken} />}
+      {accessToken && <TrainingNutritionWeekPanel accessToken={accessToken} />}
+      {accessToken && <CrossTrainingPanel accessToken={accessToken} />}
+      {accessToken && <AdaptiveMacrosPanel accessToken={accessToken} />}
 
       {error ? (
         <section className={styles.errorCard}>

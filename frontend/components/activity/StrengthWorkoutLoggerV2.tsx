@@ -15,6 +15,7 @@ import {
   deleteStrengthSet,
   getStrengthProgressionPreview,
   getStrengthSubstitutions,
+  getStrengthWorkoutDetail,
   getStrengthWorkoutOutcome,
   saveStrengthSet,
   skipStrengthWorkout,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/api/exercises";
 
 import styles from "./StrengthWorkoutLoggerV2.module.css";
+import { FreeWorkoutTimeline } from "./FreeWorkoutTimeline";
 
 
 type SetDraft = {
@@ -60,7 +62,11 @@ const FEELINGS: Array<{
 
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 
@@ -137,6 +143,8 @@ export function StrengthWorkoutLoggerV2({
   >({});
   const [performedDate, setPerformedDate] =
     useState(todayIso());
+  const [freeTitle, setFreeTitle] = useState("Workout libero");
+  const [creatingFree, setCreatingFree] = useState(false);
   const [duration, setDuration] = useState("");
   const [notes, setNotes] = useState("");
   const [loadingSession, setLoadingSession] =
@@ -173,6 +181,7 @@ export function StrengthWorkoutLoggerV2({
     );
   const [autoApplied, setAutoApplied] =
     useState(0);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   useEffect(() => {
     if (
@@ -318,6 +327,7 @@ export function StrengthWorkoutLoggerV2({
     exerciseId: string,
     setIndex: number,
     override?: Partial<SetDraft>,
+    strict = false,
   ) {
     if (!accessToken || !activeWorkout) {
       return;
@@ -389,6 +399,7 @@ export function StrengthWorkoutLoggerV2({
           ? err.message
           : "Non riesco a salvare la serie.",
       );
+      if (strict) throw err;
     }
   }
 
@@ -667,11 +678,44 @@ export function StrengthWorkoutLoggerV2({
     }
   }
 
+  async function resumeFreeWorkout(
+    workoutId: string,
+    date: string,
+  ) {
+    if (!accessToken) return;
+    const response = await getStrengthWorkoutDetail(workoutId, accessToken);
+    if (response.workout.workout_kind !== "free" ||
+        response.workout.status !== "planned" ||
+        response.workout_log?.status === "completed") {
+      throw new Error("Questa seduta non è più modificabile.");
+    }
+    // Set the original date before the session recovery effect runs.
+    setPerformedDate(date);
+    setActiveWorkout(response.workout);
+    setOutcome(null);
+    setProgression(null);
+    setShowAddExercise(false);
+    setMessage("Seduta recuperata: riprendi dalle serie salvate.");
+    setError(null);
+  }
+
+  function closeFreeWorkout() {
+    // The draft and saved sets stay in the backend.
+    setActiveWorkout(workout);
+    setOutcome(null);
+    setProgression(null);
+    setMessage(null);
+    setHistoryRefreshKey((value) => value + 1);
+  }
+
   async function startFreeWorkout() {
-    if (!accessToken) {
+    if (!accessToken || creatingFree) return;
+    const title = freeTitle.trim();
+    if (!title) {
+      setError("Dai un nome al workout libero.");
       return;
     }
-
+    setCreatingFree(true);
     setError(null);
     setMessage(null);
 
@@ -679,13 +723,14 @@ export function StrengthWorkoutLoggerV2({
       const response =
         await createFreeStrengthWorkout(
           {
-            title: "Workout libero",
+            title,
             performed_date: performedDate,
           },
           accessToken,
         );
 
       setActiveWorkout(response.workout);
+      setHistoryRefreshKey((value) => value + 1);
       setShowAddExercise(true);
       setMessage(
         "Workout libero creato. Aggiungi il primo esercizio.",
@@ -696,6 +741,8 @@ export function StrengthWorkoutLoggerV2({
           ? err.message
           : "Non riesco a creare il workout libero.",
       );
+    } finally {
+      setCreatingFree(false);
     }
   }
 
@@ -704,6 +751,14 @@ export function StrengthWorkoutLoggerV2({
       !accessToken ||
       !activeWorkout
     ) {
+      return;
+    }
+
+    if (loadingSession ||
+        Object.values(drafts).some((sets) =>
+          sets.some((set) => set.saving),
+        )) {
+      setError("Attendi il salvataggio delle serie prima di completare.");
       return;
     }
 
@@ -731,6 +786,8 @@ export function StrengthWorkoutLoggerV2({
               persistSet(
                 exercise.id,
                 index,
+                undefined,
+                true,
               ),
             );
           }
@@ -757,56 +814,62 @@ export function StrengthWorkoutLoggerV2({
         accessToken,
       );
 
-      const outcomeResponse =
-        await getStrengthWorkoutOutcome(
-          activeWorkout.id,
-          accessToken,
-        );
+      // Completion has already committed on the server. Summary and
+      // progression reads are best-effort; their failure must never
+      // tell the athlete that their saved workout was not completed.
+      setMessage("Seduta completata e salvata.");
+      setHistoryRefreshKey((value) => value + 1);
+      if (activeWorkout.workout_kind === "free") {
+        setActiveWorkout(workout);
+      }
 
-      setOutcome(outcomeResponse.outcome);
-
-      if (
-        activeWorkout.workout_kind !== "free"
-      ) {
-        const preview =
-          await getStrengthProgressionPreview(
+      try {
+        const outcomeResponse =
+          await getStrengthWorkoutOutcome(
             activeWorkout.id,
             accessToken,
           );
+        setOutcome(outcomeResponse.outcome);
+      } catch (summaryError) {
+        console.warn("Workout saved; outcome summary unavailable", summaryError);
+      }
 
-        setProgression(preview);
-
-        const actionable =
-          preview.proposals.filter(
+      if (activeWorkout.workout_kind !== "free") {
+        try {
+          const preview =
+            await getStrengthProgressionPreview(
+              activeWorkout.id,
+              accessToken,
+            );
+          setProgression(preview);
+          const actionable = preview.proposals.filter(
             (proposal) =>
               proposal.action !== "maintain" &&
               proposal.next_exposure != null,
           );
-
-        const applied = await Promise.allSettled(
-          actionable.map((proposal) =>
-            applyStrengthProgression(
-              activeWorkout.id,
-              proposal.exercise_id,
-              accessToken,
+          const applied = await Promise.allSettled(
+            actionable.map((proposal) =>
+              applyStrengthProgression(
+                activeWorkout.id,
+                proposal.exercise_id,
+                accessToken,
+              ),
             ),
-          ),
-        );
-
-        setAutoApplied(
-          applied.filter(
-            (item) =>
-              item.status === "fulfilled",
-          ).length,
-        );
+          );
+          setAutoApplied(
+            applied.filter((item) => item.status === "fulfilled").length,
+          );
+        } catch (progressionError) {
+          console.warn("Workout saved; progression preview unavailable", progressionError);
+        }
       }
 
-      setMessage(
-        "Seduta completata e salvata.",
-      );
-
       if (onCompleted) {
-        await onCompleted();
+        try {
+          await onCompleted();
+        } catch (refreshError) {
+          console.warn("Workout saved; parent refresh unavailable", refreshError);
+        }
       }
     } catch (err) {
       setError(
@@ -854,6 +917,7 @@ export function StrengthWorkoutLoggerV2({
 
   if (!activeWorkout) {
     return (
+      <>
       <section className={styles.emptyCard}>
         <div>
           <p className={styles.eyebrow}>
@@ -866,20 +930,50 @@ export function StrengthWorkoutLoggerV2({
             performance.
           </p>
         </div>
+        <label>
+          Nome della seduta
+          <input
+            aria-label="Nome del workout libero"
+            maxLength={120}
+            value={freeTitle}
+            onChange={(event) => setFreeTitle(event.target.value)}
+          />
+        </label>
+        <label>
+          Data
+          <input
+            aria-label="Data del workout libero"
+            type="date"
+            value={performedDate}
+            onChange={(event) => setPerformedDate(event.target.value)}
+          />
+        </label>
         <button
           type="button"
           className={styles.primaryButton}
+          disabled={creatingFree || !freeTitle.trim()}
           onClick={() => {
             void startFreeWorkout();
           }}
         >
-          Inizia workout libero
+          {creatingFree ? "Creo…" : "Inizia workout libero"}
         </button>
+        {error && <p className={styles.error} role="alert">{error}</p>}
+        {message && <p className={styles.message} role="status">{message}</p>}
       </section>
+      {accessToken && (
+        <FreeWorkoutTimeline
+          accessToken={accessToken}
+          refreshKey={historyRefreshKey}
+          onResume={resumeFreeWorkout}
+        />
+      )}
+      </>
     );
   }
 
   return (
+    <>
     <section className={styles.card}>
       <header className={styles.header}>
         <div>
@@ -1268,10 +1362,20 @@ export function StrengthWorkoutLoggerV2({
       </div>
 
       <div className={styles.footer}>
+        {activeWorkout.workout_kind === "free" && (
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={closeFreeWorkout}
+            disabled={completing}
+          >
+            Chiudi e riprendi più tardi
+          </button>
+        )}
         <button
           type="button"
           className={styles.primaryButton}
-          disabled={completing}
+          disabled={completing || loadingSession}
           onClick={() => {
             void completeWorkout();
           }}
@@ -1336,5 +1440,14 @@ export function StrengthWorkoutLoggerV2({
         </div>
       ) : null}
     </section>
+    {accessToken && (
+      <FreeWorkoutTimeline
+        accessToken={accessToken}
+        refreshKey={historyRefreshKey}
+        activeWorkoutId={activeWorkout.id}
+        onResume={resumeFreeWorkout}
+      />
+    )}
+    </>
   );
 }
