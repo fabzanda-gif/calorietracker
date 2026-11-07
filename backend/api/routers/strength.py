@@ -636,6 +636,39 @@ def list_strength_workouts(
         ) from exc
 
 
+@router.get("/workouts/{workout_id}/detail")
+def get_strength_workout_detail(
+    workout_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    workouts_repo: StrengthWorkoutsRepository = Depends(
+        get_strength_workouts_repository
+    ),
+    exercises_repo: StrengthWorkoutExercisesRepository = Depends(
+        get_strength_workout_exercises_repository
+    ),
+):
+    """Return a workout with exercises, scoped to the authenticated user."""
+    try:
+        workout = workouts_repo.get(current_user.id, workout_id)
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workout palestra non trovato.",
+            )
+        exercises = exercises_repo.list_for_workout(
+            current_user.id,
+            workout_id,
+        )
+        return {"workout": {**workout, "exercises": exercises}}
+    except HTTPException:
+        raise
+    except RepositoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/workouts/free/recent")
 def list_recent_free_strength_workouts(
     current_user: CurrentUser = Depends(get_current_user),
