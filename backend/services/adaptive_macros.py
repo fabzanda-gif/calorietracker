@@ -163,6 +163,17 @@ class AdaptiveMacroService:
                     direction = -1  # smaller surplus
                 elif weight_rate < 0.05:
                     direction = 1   # larger surplus
+            # A smaller observed intake may be incomplete logging. Never
+            # propose a stronger loss deficit on a low reported mean.
+            if (
+                direction > 0 and mode == "loss"
+                and observed["mean_logged_calories_kcal"] is not None
+                and observed["mean_logged_calories_kcal"] < 1500
+            ):
+                reasons.append(
+                    "Introito registrato basso: evita di aumentare il deficit senza verifica professionale."
+                )
+                direction = 0
             if direction:
                 new_adjustment = max(0.0, min(750.0, adjustment + direction * self.MAX_CHANGE_KCAL))
                 if new_adjustment != adjustment:
@@ -207,6 +218,11 @@ class AdaptiveMacroService:
             "adjustment": adjustment, "observed": observed,
             "proposal": proposal, "status": status,
             "protein_configured": metadata.get("protein_goal_enabled"),
+            "raw_weights": [
+                (day.isoformat(), value) for day, value in points
+            ],
+            "daily_food": totals,
+            "training_days": sorted(d.isoformat() for d in training_days),
         }
         result["preview_id"] = sha256(
             dumps(fingerprint, sort_keys=True, ensure_ascii=False).encode()
