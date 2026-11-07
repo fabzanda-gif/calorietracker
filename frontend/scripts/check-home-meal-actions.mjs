@@ -16,6 +16,14 @@ const css = readFileSync(
 
 const checks = [
   {
+    ok:
+      home.includes("summaryMealsForSlot(slot).length > 1") &&
+      home.includes("styles.dailyMealManageButton") &&
+      home.includes("Gestisci {summaryMealsForSlot(slot).length}"),
+    message:
+      "Home must expose a visible manage action when a meal slot contains multiple records.",
+  },
+  {
     ok: home.includes("styles.dailyMealSummaryActions"),
     message: "Home meal summary must render the stable actions wrapper.",
   },
