@@ -1,6 +1,7 @@
 "use client";
 
 import { AppNav } from "@/components/navigation/AppNav";
+import { AthleteStatePanel } from "@/components/progress/AthleteStatePanel";
 
 import Link from "next/link";
 import {
@@ -1764,6 +1765,8 @@ export default function ProgressPage() {
           </p>
         </div>
       </header>
+
+      {accessToken && <AthleteStatePanel accessToken={accessToken} />}
 
       {error ? (
         <section className={styles.errorCard}>
