@@ -103,6 +103,29 @@ def test_legacy_food_user_is_grandfathered():
     )
 
 
+
+def test_v1_preferences_never_force_new_training_setup():
+    repo = FakeOnboardingRepo()
+    repo.preferences = {
+        "user_id": "user-1",
+        "onboarding_version": 1,
+        "primary_goal": "strength",
+        "food_enabled": True,
+        "training_enabled": True,
+        "core_onboarding_completed": True,
+        "food_setup_completed": True,
+        "training_setup_completed": False,
+        "last_step": "training_setup",
+    }
+
+    result = onboarding.get_onboarding_status(
+        current_user=user(),
+        repo=repo,
+    )
+
+    assert result["completed"] is True
+    assert result["next_step"] is None
+
 def test_training_only_core_skips_food_setup():
     repo = FakeOnboardingRepo()
 
