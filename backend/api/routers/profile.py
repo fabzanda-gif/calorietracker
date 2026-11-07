@@ -12,6 +12,7 @@ from backend.api.dependencies import (
     CurrentUser,
     get_admin_supabase_client,
     get_current_user,
+    invalidate_current_user_cache,
 )
 
 
@@ -33,6 +34,7 @@ class ProfileUpdate(BaseModel):
     goal_adjustment_kcal: float | None = Field(default=None, ge=0)
     protein_goal_enabled: bool | None = None
     protein_goal_g: float | None = Field(default=None, gt=0)
+    adaptive_macros_last_applied_on: str | None = None
     language: str | None = None
     city: str | None = None
     office_lunch: bool | None = None
@@ -215,6 +217,11 @@ def update_profile(
     payload: ProfileUpdate,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only accounts cannot update profile settings",
+        )
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
 
@@ -250,6 +257,7 @@ def update_profile(
         )
 
     data = response.json()
+    invalidate_current_user_cache(current_user.access_token)
 
     # Supabase Auth può restituire l'utente direttamente oppure
     # annidato sotto "user". Gestiamo entrambe le forme.

@@ -9,6 +9,7 @@ on:
       - codex/phase5-adaptive-coach-v1
       - codex/phase6-training-nutrition-context
       - codex/phase7-gym-running-cross-training
+      - codex/phase8-adaptive-macros-v1
   pull_request:
     branches:
       - main
