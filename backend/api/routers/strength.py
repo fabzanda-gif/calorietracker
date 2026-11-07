@@ -2165,7 +2165,7 @@ def _start_or_resume_strength_session(
     *,
     user_id: str,
     workout_id: str,
-    performed_date: date,
+    performed_date: date | None,
     workout_logs_repo: StrengthWorkoutLogsRepository,
 ) -> dict:
     existing = workout_logs_repo.get_for_workout(
@@ -2181,7 +2181,8 @@ def _start_or_resume_strength_session(
             )
 
         if (
-            str(existing.get("performed_date"))
+            performed_date is not None
+            and str(existing.get("performed_date"))
             != str(performed_date)
         ):
             updated = workout_logs_repo.update(
@@ -2200,6 +2201,8 @@ def _start_or_resume_strength_session(
 
         return existing
 
+    if performed_date is None:
+        performed_date = date.today()
     now = datetime.now(timezone.utc).isoformat()
     created = workout_logs_repo.create(
         {
@@ -2430,7 +2433,7 @@ def autosave_strength_set(
         workout_log = _start_or_resume_strength_session(
             user_id=current_user.id,
             workout_id=workout_id,
-            performed_date=date.today(),
+            performed_date=None,  # Preserve selected date on autosave.
             workout_logs_repo=workout_logs_repo,
         )
 
