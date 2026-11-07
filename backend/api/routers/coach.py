@@ -1045,10 +1045,9 @@ def apply_skipped_session_recovery(
         plan_update = None
         if plan_to_reopen and plan_to_reopen.get("status") == "completed":
             try:
-                plan_update = plans_repo.update_status(
+                plan_update = plans_repo.reopen_completed(
                     plan_id=plan_to_reopen["id"],
                     user_id=current_user.id,
-                    status="active",
                 )
             except RepositoryError:
                 plan_update = None
