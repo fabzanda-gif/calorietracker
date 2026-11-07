@@ -161,6 +161,82 @@ def test_apply_running_changes_only_allows_coach_fields():
     assert "title" not in repo.updated[0]
 
 
+def test_apply_running_changes_rejects_stale_proposal():
+    class EditedPlannedRepo(PlannedRepo):
+        def get(self, activity_id, user_id):
+            item = super().get(activity_id, user_id)
+            item["distance_meters"] = 10000
+            return item
+
+    repo = EditedPlannedRepo()
+
+    with pytest.raises(HTTPException) as exc:
+        _apply_running_changes(
+            user_id="user-1",
+            target_id="run-1",
+            proposed_changes={
+                "distance_meters": 6800,
+            },
+            planned_repo=repo,
+            before_state={
+                "distance_meters": 8000,
+                "duration_minutes": 45,
+                "intensity": "hard",
+            },
+        )
+
+    assert exc.value.status_code == 409
+    assert repo.updated == []
+
+
+def test_apply_running_changes_accepts_unchanged_snapshot():
+    repo = PlannedRepo()
+
+    result = _apply_running_changes(
+        user_id="user-1",
+        target_id="run-1",
+        proposed_changes={
+            "distance_meters": 6800,
+        },
+        planned_repo=repo,
+        before_state={
+            "distance_meters": 8000,
+            "duration_minutes": 45,
+            "intensity": "hard",
+        },
+    )
+
+    assert result["distance_meters"] == 6800
+    assert len(repo.updated) == 1
+
+
+def test_apply_running_changes_rejects_rescheduled_session():
+    class RescheduledRepo(PlannedRepo):
+        def get(self, activity_id, user_id):
+            item = super().get(activity_id, user_id)
+            item["scheduled_date"] = "2026-11-09"
+            return item
+
+    repo = RescheduledRepo()
+
+    with pytest.raises(HTTPException) as exc:
+        _apply_running_changes(
+            user_id="user-1",
+            target_id="run-1",
+            proposed_changes={
+                "distance_meters": 6800,
+            },
+            planned_repo=repo,
+            before_state={
+                "scheduled_date": "2026-11-08",
+                "distance_meters": 8000,
+            },
+        )
+
+    assert exc.value.status_code == 409
+    assert repo.updated == []
+
+
 
 class PreferencesRepo:
     def __init__(self, priority="balanced"):
