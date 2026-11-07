@@ -15,7 +15,7 @@ STRENGTH_WORKOUT_SELECT = (
 
 STRENGTH_EXERCISE_SELECT = (
     "id,user_id,strength_workout_id,"
-    "position,exercise_key,exercise_name,"
+    "position,exercise_id,exercise_key,exercise_name,"
     "movement_pattern,target_sets,"
     "target_reps_min,target_reps_max,"
     "target_rir,rest_seconds,"
@@ -253,10 +253,62 @@ class StrengthWorkoutExercisesRepository(
         if not payloads:
             return []
 
+        enriched = [
+            dict(payload)
+            for payload in payloads
+        ]
+
+        legacy_keys = sorted({
+            str(payload.get("exercise_key"))
+            for payload in enriched
+            if payload.get("exercise_key")
+            and not payload.get("exercise_id")
+        })
+
+        if legacy_keys:
+            try:
+                response = (
+                    self.supabase
+                    .table("exercises")
+                    .select("id,legacy_key")
+                    .in_("legacy_key", legacy_keys)
+                    .execute()
+                )
+                library_by_key = {
+                    str(item["legacy_key"]):
+                        str(item["id"])
+                    for item in self._data(response)
+                    if item.get("legacy_key")
+                    and item.get("id")
+                }
+
+                for payload in enriched:
+                    key = payload.get(
+                        "exercise_key"
+                    )
+                    if (
+                        key
+                        and not payload.get(
+                            "exercise_id"
+                        )
+                        and str(key)
+                        in library_by_key
+                    ):
+                        payload["exercise_id"] = (
+                            library_by_key[
+                                str(key)
+                            ]
+                        )
+            except Exception:
+                # Rollout compatibility: plans remain
+                # valid even before Exercise Library
+                # metadata is available.
+                pass
+
         try:
             response = (
                 self.table
-                .insert(payloads)
+                .insert(enriched)
                 .execute()
             )
 
