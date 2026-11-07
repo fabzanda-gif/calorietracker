@@ -31,12 +31,52 @@ Post-migration checks: **155 classified active exercises**, **61 directional sub
 ## Remaining gates before merging to main
 
 1. Latest-head GitHub Actions backend, TypeScript, Next.js build and Playwright green.
-2. **Backend production owner/workspace selection:** Render exposes two workspaces (`sanosync` and `My Workspace`); connector requires explicit workspace selection to inspect and coordinate backend services. Do not choose silently. Confirm backend auto-deploy or perform backend deployment explicitly after selecting workspace.
+2. **Backend Render target is confirmed:** use `My Workspace` / `sanosync-api`. Auto-deploy is OFF and the service tracks `codex/landing-redesign`, not `main`. Operator must switch Render branch to verified release code before manually deploying; `trigger_deploy` alone would otherwise publish the wrong branch.
 3. Run an actual JWT-authenticated smoke flow through API + Supabase with two real test accounts; verify RLS, preference isolation, gym write/read, plan preview and read-only demo. The suite in CI is simulated HTTP, not a proof against the real data API.
 4. The release candidate now filters future `planned` workouts belonging to paused/completed strength plans out of date-range queries used by calendars and Coach, preserving historical completed workouts. Regression tests cover active/paused/free/unknown-plan behavior. **Still verify against live API after backend deployment**; the replacement write path remains non-atomic.
 5. Decide on minimal editorial approval of an appropriate hinge exercise before enabling Program Generator v2 creation; current 10 approved records do **not** cover hinge, and v2 intentionally blocks incomplete programs.
 6. Verify project security advisories for two pre-existing public SECURITY DEFINER RPC functions (special-period triggers). These are not caused by Phase 1 migrations; review grants before broad rollout.
 7. Capture and confirm a recoverable database snapshot and have an operator validate the application rollback path before production merge. Existing Auth has 8 accounts and meals table has 391 records even if there are no active customers.
+
+## Render backend deployment target confirmed
+
+The owner confirmed **Render My Workspace** (not the separately available `sanosync` workspace).
+
+| Item | Verified value |
+| --- | --- |
+| Workspace | `My Workspace` / `tea-da7gnr942hec73booka0` |
+| Backend web service | `sanosync-api` / `srv-da7gqeh42hec73bp2bmg` |
+| Service dashboard | https://dashboard.render.com/web/srv-da7gqeh42hec73bp2bmg |
+| Public backend URL | https://sanosync-api.onrender.com |
+| Health endpoint | `/health` |
+| Deployment branch currently configured | `codex/landing-redesign` |
+| Auto-deploy | **off** |
+| Last known live Render deploy | `dep-dbnn8sbm8hqs73cmm2m0` |
+| Live Render commit (before release) | `da8521fc6f6773439d11434b5ef49d064c005d4e` |
+| Deployment configuration | `pip install -r requirements.txt` then `uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT` |
+
+**Critical release dependency:** A GitHub merge to `main` alone will NOT update Render. It tracks a different branch with manual deploys. In addition, the Render connector currently has no supported direct service-branch edit operation. Before deployment an operator must change the service Git branch to the merged release SHA's `main` or equivalent verified release branch in the Render dashboard, then trigger/confirm one deliberate deployment. Merely clicking Render's “Deploy latest commit” while the branch remains `codex/landing-redesign` will deploy the WRONG code.
+
+Known rollback: redeploy the previous live Render build/commit `da8521f` (or first reestablish the old branch if needed), and restore the known working Vercel production deployment `dpl_DHgDpKt2aGu1P2dyeKDxZW3ioDxS` (SHA `2d03d404...`). Keep additive Supabase tables and exercise data intact.
+
+**Vercel:** The project is `calorietracker` in team `SanoSync`; Git previews for this candidate are READY, but production is still `main` SHA `2d03d4049edc82fea6a1fbd1d6d2e066a041f04d`. Its latest pre-release production deployment is `dpl_DHgDpKt2aGu1P2dyeKDxZW3ioDxS`. This is the explicitly identified frontend rollback target.
+
+## Real-JWT acceptance gate
+
+Added `backend/tests/test_live_authenticated_release_gate.py` as a **manual-run**, normally skipped test suite; the existing `test_release_candidate_authenticated_journey.py` uses mocked authentication and is not proof of real Auth/RLS. The manual test authenticates **two different dedicated Supabase accounts** using the public password-token endpoint, verifies real JWT requests to the selected backend, checks onboard/profile preferences, Athlete State, Training ↔ Nutrition, Gym ↔ Running, Adaptive Macros and safe Program Generator preview, plus missing/invalid-token rejection. The default is read-only except the nonpersisting Generator preview.
+
+Setup environment variables locally or in a private CI-secret configuration (do not paste passwords into tickets, repository files, chat messages or CI logs):
+- `LIVE_E2E_SUPABASE_URL`: SanoSync Supabase Auth URL
+- `LIVE_E2E_SUPABASE_PUBLISHABLE_KEY`: a publishable key (never the service role key)
+- `LIVE_E2E_API_BASE_URL`: verified deployed or self-hosted backend URL
+- `LIVE_E2E_USER_A_EMAIL`, `LIVE_E2E_USER_A_PASSWORD`: disposable user A
+- `LIVE_E2E_USER_B_EMAIL`, `LIVE_E2E_USER_B_PASSWORD`: disposable user B
+- Optional `LIVE_E2E_DEMO_EMAIL` / `LIVE_E2E_DEMO_PASSWORD`: read-only demo identity
+- Optional `LIVE_E2E_MUTATIONS=true`: ONLY when explicitly using disposable test accounts; checks a preference write, user isolation, and restores the prior preference. Default is off.
+
+Run `python -m pytest -q backend/tests/test_live_authenticated_release_gate.py` from the repo root with required variables configured. Two actual identities must yield different Supabase Auth IDs. A full real-browser end-to-end journey still requires test account credentials and a backend serving the candidate API, which has **not** been deployed. Do not confuse a READY Vercel preview with candidate backend availability.
+
+No passwords, test users or Auth secrets have been created by the preflight work.
 
 ## Coordinated rollout order
 
@@ -52,7 +92,7 @@ Post-migration checks: **155 classified active exercises**, **61 directional sub
 
 - `StrengthWorkoutsRepository.list_date_range` now treats planned sessions from non-active strength plans as inactive, while retaining completed historical sessions and independent free sessions. Regression tests explicitly check the owner-scoped plan query and fail-closed behavior if a plan cannot be read.
 - The latest source branch is under CI again after this correction. No merge to `main` or backend/frontend deployment has occurred.
-- Backend deployment coordination is not yet authorized: the connected Render account has both `sanosync` and `My Workspace`. The Render connector requires the user to identify which workspace to operate in before its services can be inspected or deployed.
+- The user has confirmed Render `My Workspace`. The backend service and its deployed commit have been inspected read-only. Actual branch switching, backend deployment and GitHub merge remain pending the real-JWT acceptance gate.
 - Production Supabase contains 8 Auth accounts and 391 existing meals; both existed before these migrations. No destructive rollback of the catalog or preference schema should be attempted.
 
 ## Verification record
