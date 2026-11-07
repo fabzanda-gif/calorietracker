@@ -215,6 +215,11 @@ def update_profile(
     payload: ProfileUpdate,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
+    if current_user.read_only:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only accounts cannot update profile settings",
+        )
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
 
