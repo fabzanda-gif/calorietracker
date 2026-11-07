@@ -172,7 +172,7 @@ class AdaptiveTrainingCoachService:
                                 ),
                                 proposed_changes=
                                     load_change,
-                                auto_apply=True,
+                                auto_apply=False,
                             )
                         )
 
