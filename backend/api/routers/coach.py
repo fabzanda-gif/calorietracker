@@ -1050,9 +1050,22 @@ def apply_skipped_session_recovery(
                 status="active",
             )
             if not plan_update:
+                # Two Supabase updates are not atomic. Restore the
+                # skipped workout when the plan cannot be reopened.
+                undone = workouts_repo.undo_recovery(
+                    workout_id=session_id,
+                    user_id=current_user.id,
+                    original_date=request.original_date.isoformat(),
+                    recovered_date=request.suggested_date.isoformat(),
+                )
+                if not undone:
+                    raise RepositoryError(
+                        "Strength plan reactivation and recovery "
+                        "compensation both failed; manual repair needed"
+                    )
                 raise RepositoryError(
-                    "Recovered workout saved, but strength plan "
-                    "could not be reactivated"
+                    "Strength plan could not be reactivated; "
+                    "workout recovery was reverted"
                 )
 
         return {
