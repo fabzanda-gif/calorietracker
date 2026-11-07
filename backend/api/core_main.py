@@ -20,6 +20,7 @@ from backend.observability import (
 )
 
 from backend.api.routers.daily_logs import router as daily_logs_router
+from backend.api.routers.exercises import router as exercises_router
 from backend.api.routers.days import get_home_core
 from backend.api.routers.day_history import router as day_history_router
 from backend.api.routers.decision_learning import router as decision_learning_router
@@ -261,6 +262,7 @@ app.add_api_route(
 )
 app.include_router(profile_router)
 app.include_router(onboarding_router)
+app.include_router(exercises_router)
 app.include_router(weekly_schedule_router)
 app.include_router(pantry_router)
 app.include_router(daily_logs_router)
