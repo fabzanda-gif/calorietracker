@@ -33,7 +33,7 @@ def test_phase1_second_curation_batch_is_bounded_and_non_approving():
         "),\nresolved as", 1
     )[0]
     pairs = re.findall(
-        r"^\s*\('([^']+)','([^']+)','substitute',null,",
+        r"^\s*\('([^']+)','([^']+)','(?:close_substitute|substitute)',null,",
         relations,
         re.MULTILINE,
     )
@@ -49,6 +49,42 @@ def test_phase1_second_curation_batch_is_bounded_and_non_approving():
     )
     assert not re.search(
         r"delete\s+from\s+public\.exercises",
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+
+def test_phase1_third_batch_is_bounded_and_does_not_approve():
+    sql = (
+        MIGRATIONS
+        / "20261107212000_curate_exercise_library_phase1_batch3.sql"
+    ).read_text(encoding="utf-8")
+    curated = sql.split("with curated (", 1)[1].split(
+        "update public.exercises", 1
+    )[0]
+    ids = re.findall(
+        r"^\s*\('([^']+)','(?:squat|hinge|horizontal_pull|vertical_pull|"
+        r"horizontal_push|isolation|core)'",
+        curated,
+        re.MULTILINE,
+    )
+    assert len(ids) == 53
+    assert len(set(ids)) == 53
+
+    relationships = sql.split("with reviewed_pairs (", 1)[1].split(
+        "),\nresolved as", 1
+    )[0]
+    pairs = re.findall(
+        r"^\s*\('([^']+)','([^']+)','(?:close_substitute|substitute|regression)'",
+        relationships,
+        re.MULTILINE,
+    )
+    assert len(pairs) == 10
+    assert len(set(pairs)) == 10
+    assert all(source != target for source, target in pairs)
+    assert "approved_for_generation = false" in sql
+    assert not re.search(
+        r"set\s+approved_for_generation\s*=\s*true",
         sql,
         flags=re.IGNORECASE,
     )
