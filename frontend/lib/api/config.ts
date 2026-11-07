@@ -3,6 +3,7 @@ const DEFAULT_API_BASE_URL = "http://localhost:8000";
 const CORE_PREFIXES = [
   "/profile",
   "/onboarding",
+  "/exercises",
   "/weekly-schedule",
   "/pantry",
   "/daily-logs",
