@@ -79,28 +79,7 @@
     border-color: rgba(244, 61, 61, 0.48) !important;
   }
 
-  /* Keep SanoSync AI compact on phones and never split its title. */
-  main[class*="HomeShell_page"] [class*="HomeShell_conversationHeader"] h2 {
-    white-space: nowrap !important;
-    font-size: 1rem !important;
-    line-height: 1.05 !important;
-  }
 
-  main[class*="HomeShell_page"] [class*="HomeShell_conversationAiLogo"],
-  main[class*="HomeShell_page"] img[alt="SanoSync AI"],
-  main[class*="HomeShell_page"] img[alt="SanoSync AI Zero"] {
-    width: 32px !important;
-    height: 32px !important;
-    max-width: 32px !important;
-    max-height: 32px !important;
-    object-fit: contain !important;
-  }
-
-  main[class*="HomeShell_page"] [class*="HomeShell_conversationEyebrow"] {
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px !important;
-  }
 }
 
 @media (max-width: 390px) {

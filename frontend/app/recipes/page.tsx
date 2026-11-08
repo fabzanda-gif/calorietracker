@@ -625,7 +625,7 @@ export default function RecipesPage() {
     recipeAiServings,
   ]);
 
-  async function useRecipeAiPreview() {
+  async function applyRecipeAiPreview() {
     if (
       !accessToken ||
       !recipeAiPreview
@@ -2029,7 +2029,7 @@ export default function RecipesPage() {
                 !recipeAiName.trim()
               }
               onClick={() => {
-                void useRecipeAiPreview();
+                void applyRecipeAiPreview();
               }}
             >
               {saving

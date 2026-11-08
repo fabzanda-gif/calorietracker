@@ -303,7 +303,7 @@ export default function PlanPage() {
             <section className={styles.shortcutCard}>
               <span className={styles.cardKicker}>REGISTRA</span>
               <h2>Hai già fatto qualcosa?</h2>
-              <p>Per GPX, FIT, TCX, passi e dettagli dell'attività usa il registro.</p>
+              <p>Per GPX, FIT, TCX, passi e dettagli dell&apos;attività usa il registro.</p>
               <Link href="/activities" className={styles.textLink}>Vai al registro attività →</Link>
             </section>
           </aside>

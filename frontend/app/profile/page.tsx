@@ -864,7 +864,7 @@ export default function ProfilePage() {
           <div className={styles.card}>
             <h1>Profilo</h1>
             <p>
-              Effettua l'accesso per visualizzare
+              Effettua l&apos;accesso per visualizzare
               il tuo profilo.
             </p>
           </div>

@@ -6,6 +6,7 @@ import httpx
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from fastapi.security import HTTPAuthorizationCredentials
 
 from backend.api.dependencies import get_current_user
@@ -225,7 +226,8 @@ async def demo_read_only_middleware(
     token = authorization.split(" ", 1)[1].strip()
 
     try:
-        current_user = get_current_user(
+        current_user = await run_in_threadpool(
+            get_current_user,
             HTTPAuthorizationCredentials(
                 scheme="Bearer",
                 credentials=token,

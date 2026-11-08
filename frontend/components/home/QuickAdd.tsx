@@ -1184,12 +1184,13 @@ export function QuickAdd({
               onFocus={() => setShowKnownMeals(true)}
               autoComplete="off"
               role="combobox"
+              aria-controls="known-meal-suggestions"
               aria-expanded={showKnownMeals && knownMealSuggestions.length > 0}
               aria-autocomplete="list"
             />
 
             {showKnownMeals ? (
-              <div className={styles.knownMealSuggestions} role="listbox">
+              <div id="known-meal-suggestions" className={styles.knownMealSuggestions} role="listbox">
                 {knownMealsLoading ? (
                   <p>Carico ricette e pasti recenti…</p>
                 ) : null}
@@ -1198,6 +1199,7 @@ export function QuickAdd({
                     key={meal.key}
                     type="button"
                     role="option"
+                    aria-selected={false}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => selectKnownMeal(meal)}
                   >
