@@ -45,8 +45,8 @@ export function StrengthProgramOverview({ detail }: { detail: StrengthPlanDetail
       {loads.loading ? <p>Recupero i tuoi carichi…</p> : loads.error ? <p role="alert">{loads.error} <button type="button" onClick={loads.retry}>Riprova</button></p> : <>
         <div className={styles.tableScroll}><table><thead><tr><th>Ordine / esercizio</th><th>Serie × ripetizioni</th><th>Peso consigliato</th><th /></tr></thead><tbody>
           {[...selected.exercises].sort((a, b) => a.position - b.position).map((exercise, index) => { const advice = loadAdvice(exercise, loads.references, loads.profiles); return <tr key={exercise.id}>
-            <td>{index + 1}. {exercise.exercise_name}</td><td>{exercise.target_sets} × {advice.reps}<small>Fascia {exercise.target_reps_min}–{exercise.target_reps_max}</small></td>
-            <td>{advice.loadKg == null ? "Da impostare alla prima volta" : advice.loadKg === 0 ? "Corpo libero · 0 kg aggiunti" : `${advice.loadKg} kg`}<small>{advice.source === "plan" ? "Dal programma" : advice.source === "history" ? "Dalle tue ultime sedute" : advice.source === "profile" ? "Dal tuo riferimento salvato" : ""}</small></td>
+            <td data-label="Esercizio">{index + 1}. {exercise.exercise_name}</td><td data-label="Serie e ripetizioni">{exercise.target_sets} × {advice.reps}<small>Fascia {exercise.target_reps_min}–{exercise.target_reps_max}</small></td>
+            <td data-label="Peso consigliato">{advice.loadKg == null ? "Da impostare alla prima volta" : advice.loadKg === 0 ? "Corpo libero · 0 kg aggiunti" : `${advice.loadKg} kg`}<small>{advice.source === "plan" ? "Dal programma" : advice.source === "history" ? "Dalle tue ultime sedute" : advice.source === "profile" ? "Dal tuo riferimento salvato" : ""}</small></td>
             <td>{selected.status === "planned" && advice.source !== "bodyweight" && advice.source !== "plan" ? <button type="button" onClick={() => setCalibrateId(calibrateId === exercise.id ? null : exercise.id)}>Imposta massimale · {exercise.exercise_name}</button> : null}</td>
           </tr>; })}
         </tbody></table></div>

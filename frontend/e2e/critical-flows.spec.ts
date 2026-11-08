@@ -362,7 +362,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 1100 }, { name: 
     await page.getByRole("tab", { name: "Palestra", exact: true }).click();
     await expect(page.getByText("3 allenamenti a settimana per 8 settimane", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Giorni del programma").getByRole("button")).toHaveCount(24);
-    await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: "1. Back Squat", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: /1\. Back Squat/ })).toBeVisible();
     await expect(page.getByText("Full Body A", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("group", { name: "Come è andata la serie 1?" })).toHaveCount(0);
     expect(strength.sessionStarts()).toBe(0);
@@ -438,7 +438,7 @@ test("every scheduled day opens its sheet without starting a session, and known 
   await expect(days).toHaveCount(24);
   await days.nth(23).click();
   await expect(days.nth(23)).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: "1. Back Squat", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: /1\. Back Squat/ })).toBeVisible();
   await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: "1 × 8 Fascia 6–10", exact: true })).toHaveCount(2);
   expect(strength.sessionStarts()).toBe(0);
   await page.getByRole("button", { name: "Imposta massimale · Back Squat", exact: true }).click();
@@ -505,4 +505,114 @@ test("exercise demo uses the selected language and Italian instructions", async 
   await page.reload();
   await page.getByRole("button", { name: "Demo", exact: true }).click();
   await expect(page.getByText("Keep your torso stable and your back neutral.", { exact: true })).toBeVisible();
+});
+
+async function startTrainingOnboarding(page: Page, sport: "strength" | "running", failSetupOnce = false) {
+  await page.clock.install({ time: new Date("2026-11-08T10:00:00Z") });
+  await mockServices(page);
+  let completed = false;
+  let created = 0;
+  let failure = failSetupOnce;
+  let program: Record<string, unknown> | null = null;
+  let createInput: Record<string, unknown> | null = null;
+  const workouts: Array<Record<string, unknown>> = [];
+  const setupWrites: Array<Record<string, unknown>> = [];
+  await page.route("http://localhost:8000/onboarding/**", async (route) => {
+    if (route.request().method() === "PUT") {
+      if (failure) { failure = false; await route.fulfill({ status: 503, json: { detail: "Setup unavailable" } }); return; }
+      setupWrites.push(route.request().postDataJSON()); completed = true;
+    }
+    await route.fulfill({ json: { completed, next_step: completed ? null : "training_setup", preferences: { primary_goal: "hypertrophy", food_enabled: false, training_enabled: true }, preferred_days: [], priority_muscles: [] } });
+  });
+  await page.route("http://localhost:8000/strength/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let json: unknown;
+    if (path === "/strength/plans" && route.request().method() === "POST") {
+      created++; createInput = route.request().postDataJSON();
+      program = { ...createInput, id: "onboard-plan", status: "active", program_style: "full_body" };
+      const count = Number(createInput!.sessions_per_week);
+      for (let week = 0; week < Number(createInput!.total_weeks); week++) for (let index = 0; index < count; index++) {
+        const date = new Date(`${createInput!.start_date}T12:00:00`); date.setDate(date.getDate() + week * 7 + index * 3);
+        workouts.push({ id: `onboard-${week}-${index}`, scheduled_date: date.toISOString().slice(0, 10), training_week: week + 1, workout_index: index + 1, exercises: [], status: "planned", title: "Full Body A", focus: "full_body", estimated_duration_minutes: 45 });
+      }
+      json = { plan: program, workouts, workout_count: workouts.length };
+    } else if (path === "/strength/plans") json = { items: program && sport === "strength" ? [program] : [], count: program ? 1 : 0 };
+    else if (path.endsWith("/history")) json = { items: [], count: 0 };
+    else json = { plan: program, workouts, workout_count: workouts.length };
+    await route.fulfill({ json });
+  });
+  await page.route("**/rest/v1/strength_workouts**", async (route) => {
+    const id = new URL(route.request().url()).searchParams.get("id")!.slice(3);
+    const row = workouts.find((workout) => workout.id === id)!;
+    Object.assign(row, route.request().postDataJSON());
+    await route.fulfill({ json: { id } });
+  });
+  await page.route(/^http:\/\/localhost:8000\/activities\/training-plans(?:\/.*)?$/, async (route) => {
+    if (route.request().method() === "POST") {
+      created++; createInput = route.request().postDataJSON();
+      program = { ...createInput, id: "onboard-run", sport: "running", status: "active", total_weeks: 8 };
+      await route.fulfill({ json: { created: true, plan: program, session_count: 24, sessions: [] } });
+    } else await route.fulfill({ json: { items: program && sport === "running" ? [program] : [], count: program ? 1 : 0 } });
+  });
+  await page.goto("/");
+  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Password").fill("test-password");
+  await page.getByRole("button", { name: "Accedi", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Creiamo il tuo programma.", exact: true })).toBeVisible();
+  await page.getByLabel("Come vuoi allenarti?").selectOption(sport);
+  await page.getByLabel("Quando vuoi iniziare?").fill("2026-11-16");
+  return { created: () => created, input: () => createInput!, workouts, setupWrites };
+}
+
+test("gym onboarding creates the dated fixed-day program and retry does not duplicate it", async ({ page }) => {
+  const result = await startTrainingOnboarding(page, "strength", true);
+  await page.getByLabel("Sedute a settimana").selectOption("2");
+  await page.getByLabel("I tuoi giorni").selectOption("fixed");
+  await page.getByRole("button", { name: "Ven", exact: true }).click();
+  await page.getByRole("button", { name: "Crea il mio programma", exact: true }).click();
+  await expect(page.getByText(/503/)).toBeVisible();
+  expect(result.created()).toBe(1);
+  expect(result.setupWrites).toHaveLength(0);
+  await page.getByRole("button", { name: "Crea il mio programma", exact: true }).click();
+  await expect(page.getByText("Il tuo programma è stato creato. Puoi già consultare tutte le sedute.", { exact: true })).toBeVisible();
+  expect(result.created()).toBe(1);
+  expect(result.input()).toMatchObject({ start_date: "2026-11-16", sessions_per_week: 2, total_weeks: 8, goal: "hypertrophy" });
+  expect(result.workouts[0].scheduled_date).toBe("2026-11-16");
+  expect(result.workouts[1].scheduled_date).toBe("2026-11-18");
+  expect(result.workouts[2].scheduled_date).toBe("2026-11-23");
+  await page.getByRole("button", { name: "Apri il mio programma", exact: true }).click();
+  await expect(page).toHaveURL(/\/activities\/programs#palestra$/);
+  await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Giorni del programma").getByRole("button")).toHaveCount(16);
+});
+
+test("running onboarding creates a program from the chosen start, frequency and current ability", async ({ page }) => {
+  const result = await startTrainingOnboarding(page, "running");
+  await page.getByLabel("Sedute a settimana").selectOption("4");
+  await page.getByLabel("Quanto corri oggi (km)?").fill("5");
+  await page.getByLabel("Obiettivo distanza (km)").fill("10");
+  await page.getByRole("button", { name: "Crea il mio programma", exact: true }).click();
+  await expect(page.getByText("Il tuo programma è stato creato. Puoi già consultare tutte le sedute.", { exact: true })).toBeVisible();
+  expect(result.input()).toMatchObject({ start_date: "2026-11-16", target_date: "2027-01-11", sessions_per_week: 4, current_distance_meters: 5000, target_distance_meters: 10000, current_pace_seconds_per_km: 360 });
+  expect(result.created()).toBe(1);
+  expect(result.setupWrites).toHaveLength(1);
+});
+
+for (const width of [360, 390, 430]) test(`program calendar and exercise sheet fit mobile width ${width}`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width, height: 844 });
+  await mockServices(page);
+  await mockGuidedStrength(page);
+  await signIn(page);
+  await page.goto("/activities/programs#palestra");
+  await expect(page.getByLabel("Scheda del giorno")).toBeVisible();
+  await page.addStyleTag({ content: "html { font-size: 20px; }" });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const days = page.getByLabel("Giorni del programma").getByRole("button");
+  await expect(days).toHaveCount(24);
+  const bounds = await days.evaluateAll((buttons) => buttons.every((button) => button.getBoundingClientRect().right <= window.innerWidth && button.getBoundingClientRect().left >= 0));
+  expect(bounds).toBe(true);
+  await days.nth(23).click();
+  await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: /1\. Back Squat/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath(`program-mobile-${width}.png`), fullPage: true });
 });

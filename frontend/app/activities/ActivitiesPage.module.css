@@ -3202,3 +3202,7 @@ label.completePlanButton {
 .programTabs button { min-height: 44px; padding: 10px 24px; border: 1px solid #d5dce4; border-radius: 12px; background: transparent; color: inherit; cursor: pointer; font-weight: 750; }
 .programTabs button[aria-selected="true"] { background: #102744; border-color: #102744; color: white; }
 .pageZero .programTabs button[aria-selected="true"] { background: #f43d3d; border-color: #f43d3d; }
+/* Let program content shrink inside the grid instead of propagating table min-content width. */
+.trainingPrograms, .trainingProgramsBody, .trainingProgramsBody > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.trainingProgramsBody { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 760px) { .trainingProgramsBody { padding: 0 8px 12px; } }

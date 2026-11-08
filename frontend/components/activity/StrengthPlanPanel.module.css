@@ -490,3 +490,6 @@
     width: 100%;
   }
 }
+.section { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.section > *, .heading > *, .planSummary > div { min-width: 0; }
+@media (max-width: 760px) { .section { padding: 14px 10px; } .heading h2 { overflow-wrap: anywhere; } }

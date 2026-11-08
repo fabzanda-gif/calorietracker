@@ -597,6 +597,9 @@ function MetricChart({
 export default function ActivityWorkspace({ view }: { view: "recap" | "programs" }) {
   const programs = view === "programs";
   const [programKind, setProgramKind] = useState<"running" | "strength">("running");
+  useEffect(() => {
+    if (view === "programs" && window.location.hash === "#palestra") setProgramKind("strength");
+  }, [view]);
   const { locale } = useI18n();
   const copy = activitiesCopy[locale];
   const planText = plannerCopy[locale];
