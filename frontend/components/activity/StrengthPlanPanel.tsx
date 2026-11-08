@@ -79,9 +79,9 @@ function goalLabel(
     StrengthGoal,
     string
   > = {
-    hypertrophy: "Ipertrofia",
-    strength: "Forza",
-    general_fitness: "Fitness generale",
+    hypertrophy: "Aumentare la massa muscolare",
+    strength: "Diventare più forte",
+    general_fitness: "Restare in forma",
   };
 
   return labels[value];
@@ -906,13 +906,12 @@ export function StrengthPlanPanel() {
           </p>
 
           <h2>
-            Programma forza
+            Il tuo programma in palestra
           </h2>
 
           <p>
-            Piano, seduta reale e
-            progressione dei carichi nello
-            stesso flusso.
+            Organizza gli allenamenti e segui
+            i tuoi miglioramenti.
           </p>
         </div>
 
@@ -949,8 +948,8 @@ export function StrengthPlanPanel() {
             </strong>
 
             <span>
-              La struttura viene generata
-              in modo deterministico.
+              Scegli il tuo obiettivo e quanto
+              spesso vuoi allenarti.
             </span>
           </div>
 
@@ -967,13 +966,13 @@ export function StrengthPlanPanel() {
                 }
               >
                 <option value="hypertrophy">
-                  Ipertrofia
+                  Aumentare la massa muscolare
                 </option>
                 <option value="strength">
-                  Forza
+                  Diventare più forte
                 </option>
                 <option value="general_fitness">
-                  Fitness generale
+                  Restare in forma
                 </option>
               </select>
             </label>

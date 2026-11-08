@@ -187,7 +187,7 @@ for (const viewport of [{ name: "desktop", width: 1280, height: 900 }, { name: "
     await expect(page.getByRole("tab", { name: "Corsa", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("heading", { name: "Attività registrate", exact: true })).toHaveCount(0);
     await page.getByRole("tab", { name: "Palestra", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Programma forza", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Il tuo programma in palestra", exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Palestra", exact: true }).press("ArrowLeft");
     await expect(page.getByRole("tab", { name: "Corsa", exact: true })).toHaveAttribute("aria-selected", "true");
