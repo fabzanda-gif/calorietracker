@@ -31,7 +31,9 @@ function summary(withMeal: boolean): HomeSummaryResponse {
   };
 }
 
-async function mockServices(page: Page) {
+async function mockServices(page: Page, options: { failActivityOnce?: boolean; previewError?: boolean } = {}) {
+  let aiMealLogged = false;
+  let failActivity = options.failActivityOnce ?? false;
   const activity = { id: "activity-1", date: new Date().toISOString().slice(0, 10),
     activity_name: "Corsa del parco", activity_type: "Corsa", burned_calories: 300,
     duration_seconds: 1800, distance_meters: 5000, route_points: [], series_points: [] };
@@ -55,7 +57,25 @@ async function mockServices(page: Page) {
     let json: unknown;
     if (path === "/profile") json = { id: user.id, metadata: user.user_metadata };
     else if (path === "/onboarding/status") json = { completed: true, preferred_days: [], priority_muscles: [] };
-    else if (path.startsWith("/home-summary/")) json = summary(withMeal);
+    else if (path.startsWith("/home-summary/")) {
+      const home = summary(withMeal);
+      if (aiMealLogged) home.meals.push({ id: "ai-meal", meal_type: "Pranzo", name: "Pasta al pomodoro", calories: 500 });
+      json = home;
+    }
+    else if (path === "/meals/conversational/day-preview") {
+      if (options.previewError) { await route.fulfill({ status: 503, json: { detail: "AI unavailable" } }); return; }
+      json = { status: "preview", needs_review: false, requires_confirmation: true, actions: [
+        { id: "meal-ai", kind: "meal", date: "2026-11-08", meal_type: "Pranzo", items: [{ name: "Pasta al pomodoro", calories: 500, protein: 15, carbs: 80, fat: 10 }], totals: { calories: 500 }, requires_confirmation: true },
+        { id: "activity-ai", kind: "activity", date: "2026-11-08", activity_name: "Corsa AI", activity_type: "Corsa", burned_calories: 250, duration_seconds: 1800, distance_meters: 5000, requires_confirmation: true },
+        { id: "weight-ai", kind: "weight", date: "2026-11-08", weight_kg: 77, requires_confirmation: true },
+      ] };
+    }
+    else if (path === "/meals/conversational/confirm") { aiMealLogged = true; json = { created: true, item: {} }; }
+    else if (path === "/activities" && route.request().method() === "POST") {
+      if (failActivity) { failActivity = false; await route.fulfill({ status: 503, json: { detail: "Try again" } }); return; }
+      json = { created: true, item: {} };
+    }
+    else if (path === "/weight" && route.request().method() === "POST") json = { created: true, item: {} };
     else if (path === "/meals/meal-1" && route.request().method() === "DELETE") {
       withMeal = false;
       json = { deleted: true };
@@ -202,4 +222,55 @@ test("weekly exceptions and special periods stay in the profile", async ({ page 
   await weekly.locator("summary").click();
   await expect(weekly.getByLabel("Lunedì", { exact: true })).toHaveValue("office");
   expect(errors).toEqual([]);
+});
+
+
+for (const viewport of [{ name: "desktop", width: 1280, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
+  test(`AI tile previews and saves from Home on ${viewport.name}`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    const errors = await mockServices(page);
+    const writes: string[] = [];
+    page.on("request", (r) => { if (r.method() === "POST") writes.push(new URL(r.url()).pathname); });
+    await signIn(page);
+    await expect(page.locator('a[href="/ai"]')).toHaveCount(0);
+    const tile = page.getByRole("region", { name: "SanoSync AI", exact: true });
+    await tile.getByLabel("Pasti, attività o peso", { exact: true }).fill("Pasta a pranzo, corsa di 5 km e peso 77 kg");
+    await tile.getByRole("button", { name: "Analizza con SanoSync AI", exact: true }).click();
+    await expect(tile.getByRole("heading", { name: "Controlla prima di registrare", exact: true })).toBeVisible();
+    expect(writes.filter((p) => ["/meals/conversational/confirm", "/activities", "/weight"].includes(p))).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath(`home-ai-${viewport.name}.png`), fullPage: true });
+    await tile.getByRole("button", { name: "Conferma e registra", exact: true }).click();
+    await expect(tile.getByRole("status")).toHaveText("3 registrazioni completate.");
+    await expect(page.getByText("Pasta al pomodoro", { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("AI retry keeps only unsaved actions", async ({ page }) => {
+  await mockServices(page, { failActivityOnce: true });
+  const mealWrites: string[] = [];
+  page.on("request", (r) => { if (r.url().endsWith("/meals/conversational/confirm")) mealWrites.push(r.url()); });
+  await signIn(page);
+  const tile = page.getByRole("region", { name: "SanoSync AI", exact: true });
+  await tile.getByLabel("Pasti, attività o peso", { exact: true }).fill("Pasta, corsa e peso");
+  await tile.getByRole("button", { name: "Analizza con SanoSync AI", exact: true }).click();
+  await tile.getByRole("button", { name: "Conferma e registra", exact: true }).click();
+  await expect(tile.getByRole("status")).toContainText("Ho registrato 1 elemento");
+  await tile.getByRole("button", { name: "Conferma e registra", exact: true }).click();
+  await expect(tile.getByRole("status")).toHaveText("2 registrazioni completate.");
+  expect(mealWrites).toHaveLength(1);
+});
+
+test("AI errors leave the message editable and old AI links open the home tile", async ({ page }) => {
+  await mockServices(page, { previewError: true });
+  await signIn(page);
+  await page.goto("/ai");
+  await expect(page).toHaveURL(/\/#home-ai$/);
+  const tile = page.getByRole("region", { name: "SanoSync AI", exact: true });
+  await tile.getByLabel("Pasti, attività o peso", { exact: true }).fill("Messaggio da conservare");
+  await tile.getByRole("button", { name: "Analizza con SanoSync AI", exact: true }).click();
+  await expect(tile.getByRole("status")).toBeVisible();
+  await expect(tile.getByLabel("Pasti, attività o peso", { exact: true })).toHaveValue("Messaggio da conservare");
+  await expect(tile.getByRole("button", { name: "Analizza con SanoSync AI", exact: true })).toBeEnabled();
 });

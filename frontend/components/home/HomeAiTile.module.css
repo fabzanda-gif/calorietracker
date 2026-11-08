@@ -1,10 +1,5 @@
-.page {
-  width: min(980px, calc(100% - 48px));
-  margin: 0 auto;
-  padding: 110px 0 140px;
-  color: #102f4f;
-}
-
+.tile { max-width: 1180px; width: 100%; box-sizing: border-box; margin: 20px auto 24px; padding: 24px; scroll-margin-top: 80px; border: 1px solid #f3c8c5; border-radius: 24px; background: linear-gradient(135deg, #fff5f3, #fff 60%); color: #102f4f; }
+.inputLabel { display: block; font-size: .85rem; font-weight: 750; margin: 0 0 8px; }
 .hero,
 .composer,
 .preview {
@@ -44,7 +39,7 @@
   text-transform: uppercase;
 }
 
-.hero h1,
+.hero h2,
 .preview h2 {
   margin: 0;
   letter-spacing: -0.03em;
@@ -87,7 +82,7 @@
 
 .composer textarea {
   width: 100%;
-  min-height: 160px;
+  min-height: 100px;
   box-sizing: border-box;
   resize: vertical;
   border: 1px solid #dfe3e7;
@@ -227,20 +222,7 @@
   font-weight: 750;
 }
 
-@media (min-width: 760px) {
-  .page {
-    width: min(980px, calc(100% - 284px));
-    margin-left: max(260px, calc((100vw - 980px + 236px) / 2));
-    margin-right: 0;
-  }
-}
-
 @media (max-width: 759px) {
-  .page {
-    width: auto;
-    margin: 0;
-    padding: calc(92px + env(safe-area-inset-top)) 14px 150px;
-  }
 
   .hero {
     grid-template-columns: 1fr;
@@ -278,3 +260,16 @@
     display: grid;
   }
 }
+
+.tile .hero, .tile .composer, .tile .preview { border: 0; background: transparent; box-shadow: none; padding: 0; }
+.tile .hero { margin-bottom: 18px; }
+.tile .composer { margin-bottom: 0; }
+.tile .preview { padding-top: 22px; border-top: 1px solid #eadedb; margin-top: 22px; }
+.tile .examples { margin: 12px 0 16px; }
+.tile .primary { background: #ff6667; }
+.tile .primary:focus-visible, .tile .secondary:focus-visible { outline: 3px solid #102f4f; outline-offset: 3px; }
+:global(html[data-experience-mode="zero"]) .tile { background: #161616; border-color: #713634; color: #f6f6f6; }
+:global(html[data-experience-mode="zero"]) .tile .hero p,
+:global(html[data-experience-mode="zero"]) .tile .mealType,
+:global(html[data-experience-mode="zero"]) .tile .kicker { color: #c4c4c4; }
+@media (max-width: 759px) { .tile { padding: 18px; border-radius: 20px; } .tile .examples { display: none; } .tile .hero { grid-template-columns: auto 1fr; gap: 12px; } .tile .hero h2 { font-size: 21px; } .tile .primary { width: 100%; } }

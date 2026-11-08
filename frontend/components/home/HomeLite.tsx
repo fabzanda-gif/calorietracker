@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { HomeAiTile } from "./HomeAiTile";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -399,6 +400,15 @@ export function HomeLite() {
     }
   }
 
+  async function refreshAfterAI() {
+    if (!accessToken) return;
+    try {
+      setSummary(await getHomeSummary(today, accessToken));
+    } catch {
+      setError("Registrazione salvata. Ricarica la pagina per aggiornare il riepilogo.");
+    }
+  }
+
   const firstName = useMemo(() => {
     const metadata = user?.user_metadata ?? {};
     const value = metadata.first_name ?? metadata.full_name ?? metadata.name;
@@ -518,9 +528,6 @@ export function HomeLite() {
               })}
             </p>
           </div>
-          <Link href="/ai" className={styles.aiTopAction}>
-            ✦ SanoSync AI
-          </Link>
         </header>
 
         {loading ? (
@@ -551,7 +558,7 @@ export function HomeLite() {
                   </span>
                   <h2>{copy.firstMealTitle}</h2>
                   <p>{copy.firstMealBody}</p>
-                  <Link href="/ai" className={styles.returningAction}>
+                  <Link href="#home-ai" className={styles.returningAction}>
                     {copy.firstMealAction}
                   </Link>
                   <small>{copy.firstMealHint}</small>
@@ -642,6 +649,8 @@ export function HomeLite() {
                 </div>
               </section>
 
+              <HomeAiTile onSaved={refreshAfterAI} />
+
               <div className={styles.mainGrid}>
                 <section className={styles.card}>
                   <div className={styles.cardHeader}>
@@ -649,7 +658,7 @@ export function HomeLite() {
                       <span className={styles.sectionKicker}>{copy.meals}</span>
                       <h2>{copy.today}</h2>
                     </div>
-                    <Link href="/ai" className={styles.smallAction}>
+                    <Link href="#home-ai" className={styles.smallAction}>
                       {copy.add}
                     </Link>
                   </div>
@@ -717,7 +726,7 @@ export function HomeLite() {
                           {items.length ? (
                             <strong>{Math.round(kcal)} kcal</strong>
                           ) : (
-                            <Link href="/ai">{copy.log}</Link>
+                            <Link href="#home-ai">{copy.log}</Link>
                           )}
                         </div>
                       );
@@ -782,20 +791,11 @@ export function HomeLite() {
                 </section>
               </div>
 
-              <section className={styles.aiCard}>
-                <div>
-                  <span className={styles.aiSpark}>✦</span>
-                  <div>
-                    <span className={styles.sectionKicker}>SANOSYNC AI</span>
-                    <h2>{copy.aiTitle}</h2>
-                    <p>{copy.aiBody}</p>
-                  </div>
-                </div>
-                <Link href="/ai">{copy.aiAction}</Link>
-              </section>
+
             </>
           )
         ) : null}
+        {((!summary && !loading) || returning) ? <HomeAiTile onSaved={refreshAfterAI} /> : null}
       </main>
     </>
   );
