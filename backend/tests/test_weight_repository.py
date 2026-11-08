@@ -1,5 +1,8 @@
 from types import SimpleNamespace
 
+import pytest
+
+from backend.repositories.base import RepositoryError
 from backend.repositories.weight import WeightRepository
 
 
@@ -40,6 +43,10 @@ class FakeSupabase:
         self.calls.append(("table", (name,), {}))
         return FakeQuery(self, self.result)
 
+    def rpc(self, name, params):
+        self.calls.append(("rpc", (name, params), {}))
+        return FakeQuery(self, self.result)
+
 
 def names(fake):
     return [c[0] for c in fake.calls]
@@ -74,7 +81,7 @@ def test_delete_weight_never_deletes_daily_row():
     assert "delete" not in names(fake)
 
 
-def test_move_weight_clears_old_weight_then_upserts_new_date():
+def test_move_weight_uses_one_atomic_rpc():
     fake = FakeSupabase([{"id": 2, "date": "2026-08-23", "weight": 78.5}])
     WeightRepository(fake).move_weight(
         row_id=1,
@@ -84,9 +91,24 @@ def test_move_weight_clears_old_weight_then_upserts_new_date():
     )
 
     op_names = names(fake)
-    assert op_names.count("update") == 1
-    assert op_names.count("upsert") == 1
+    assert op_names.count("rpc") == 1
+    assert op_names.count("execute") == 1
+    assert "update" not in op_names
+    assert "upsert" not in op_names
     assert "delete" not in op_names
 
-    update_call = [c for c in fake.calls if c[0] == "update"][0]
-    assert update_call[1][0] == {"weight": None}
+    assert fake.calls[0][1] == ("move_weight_atomic", {
+        "p_row_id": 1, "p_user_id": "u1",
+        "p_new_date": "2026-08-23", "p_weight": 78.5,
+    })
+
+
+def test_move_weight_rpc_failure_has_no_non_atomic_fallback():
+    class BrokenSupabase(FakeSupabase):
+        def rpc(self, name, params):
+            raise RuntimeError("transaction failed")
+
+    fake = BrokenSupabase()
+    with pytest.raises(RepositoryError, match="Unable to move weight"):
+        WeightRepository(fake).move_weight(1, "u1", "2026-08-23", 78.5)
+    assert fake.calls == []

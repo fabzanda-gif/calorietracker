@@ -152,36 +152,15 @@ class WeightRepository(BaseRepository):
         new_date: Any,
         weight: float,
     ) -> dict | None:
-        """
-        Move a weight measurement to another date safely.
-
-        The old Streamlit implementation deleted the entire original
-        `daily_logs` row before upserting the new date. That could erase steps
-        or day-planning data stored in that row.
-
-        This implementation:
-        1. clears only the old row's weight;
-        2. upserts the weight on the new date.
-        """
+        """Move only weight in one database transaction, preserving daily data."""
         try:
-            (
-                self.table
-                .update({"weight": None})
-                .eq("id", row_id)
-                .eq("user_id", user_id)
-                .execute()
-            )
-
             response = (
-                self.table
-                .upsert(
-                    {
-                        "user_id": user_id,
-                        "date": str(new_date),
-                        "weight": float(weight),
-                    },
-                    on_conflict="user_id,date",
-                )
+                self.supabase.rpc("move_weight_atomic", {
+                    "p_row_id": row_id,
+                    "p_user_id": user_id,
+                    "p_new_date": str(new_date),
+                    "p_weight": float(weight),
+                })
                 .execute()
             )
             rows = self._data(response)

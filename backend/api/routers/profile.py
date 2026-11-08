@@ -76,6 +76,13 @@ _EXPORT_TABLES = (
     "strength_progression_history",
     "strength_workout_exercises",
     "strength_workouts",
+    "strength_workout_logs",
+    "strength_set_logs",
+    "special_periods",
+    "training_coach_adjustments",
+    "training_coach_preferences",
+    "training_exercise_preferences",
+    "google_calendar_events",
     "training_plan_adaptations",
     "training_plans",
     "training_muscle_priorities",
@@ -85,6 +92,64 @@ _EXPORT_TABLES = (
     "user_preferences",
     "weekly_schedule",
 )
+
+_EXPORT_PAGE_SIZE = 500
+_EXPORT_PARENT_BATCH_SIZE = 100
+_EXPORT_ORDER = {
+    "user_preferences": ("user_id",),
+    "nutrition_profiles": ("user_id",),
+    "training_profiles": ("user_id",),
+    "training_coach_preferences": ("user_id",),
+    "training_preferred_days": ("user_id", "weekday"),
+    "training_muscle_priorities": ("user_id", "muscle_key"),
+    "training_exercise_preferences": ("user_id", "exercise_id"),
+}
+
+
+def _export_rows(
+    supabase: Any,
+    table_name: str,
+    *,
+    user_id: str | None = None,
+    parent_column: str | None = None,
+    parent_ids: list[Any] | None = None,
+    columns: str = "*",
+) -> list[dict[str, Any]]:
+    """Read every page with a stable primary-key order and an ownership filter."""
+    rows = []
+    while True:
+        query = supabase.table(table_name).select(columns)
+        if user_id is not None:
+            query = query.eq("user_id", user_id)
+        elif parent_column is not None and parent_ids:
+            query = query.in_(parent_column, parent_ids)
+        else:
+            raise ValueError("An export ownership filter is required")
+        for column in _EXPORT_ORDER.get(table_name, ("id",)):
+            query = query.order(column)
+        page = _response_rows(
+            query.range(len(rows), len(rows) + _EXPORT_PAGE_SIZE - 1).execute()
+        )
+        if not page:
+            return rows
+        # Advance by the received count: the server may cap pages below our size.
+        rows.extend(page)
+
+
+def _export_children(
+    supabase: Any,
+    table_name: str,
+    parent_column: str,
+    parent_ids: list[Any],
+) -> list[dict[str, Any]]:
+    rows = []
+    for offset in range(0, len(parent_ids), _EXPORT_PARENT_BATCH_SIZE):
+        rows.extend(_export_rows(
+            supabase, table_name,
+            parent_column=parent_column,
+            parent_ids=parent_ids[offset:offset + _EXPORT_PARENT_BATCH_SIZE],
+        ))
+    return rows
 
 
 def _response_rows(response: Any) -> list[dict[str, Any]]:
@@ -113,14 +178,15 @@ def export_profile_data(
 
     try:
         for table_name in _EXPORT_TABLES:
-            response = (
-                supabase
-                .table(table_name)
-                .select("*")
-                .eq("user_id", user_id)
-                .execute()
+            exported[table_name] = _export_rows(
+                supabase, table_name, user_id=user_id,
             )
-            exported[table_name] = _response_rows(response)
+
+        exported["push_subscriptions"] = _export_rows(
+            supabase, "push_subscriptions", user_id=user_id,
+            columns="id,user_id,enabled,timezone,reminder_hour,"
+                    "last_notified_date,created_at,updated_at",
+        )
 
         meal_ids = [
             row["id"]
@@ -133,27 +199,12 @@ def export_profile_data(
             if row.get("id") is not None
         ]
 
-        exported["meal_ingredients"] = []
-        if meal_ids:
-            response = (
-                supabase
-                .table("meal_ingredients")
-                .select("*")
-                .in_("meal_id", meal_ids)
-                .execute()
-            )
-            exported["meal_ingredients"] = _response_rows(response)
-
-        exported["recipe_ingredients"] = []
-        if recipe_ids:
-            response = (
-                supabase
-                .table("recipe_ingredients")
-                .select("*")
-                .in_("recipe_id", recipe_ids)
-                .execute()
-            )
-            exported["recipe_ingredients"] = _response_rows(response)
+        exported["meal_ingredients"] = _export_children(
+            supabase, "meal_ingredients", "meal_id", meal_ids,
+        )
+        exported["recipe_ingredients"] = _export_children(
+            supabase, "recipe_ingredients", "recipe_id", recipe_ids,
+        )
 
         google_connection = (
             supabase
