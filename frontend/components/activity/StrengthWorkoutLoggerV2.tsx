@@ -32,13 +32,14 @@ import {
   type ExerciseLibraryItem,
 } from "@/lib/api/exercises";
 
+import { workoutTitle } from "@/lib/strengthWorkoutLabels";
 import styles from "./StrengthWorkoutLoggerV2.module.css";
 
 
 type SetDraft = {
   reps: string;
   loadKg: string;
-  feeling: StrengthEffortFeeling;
+  feeling: StrengthEffortFeeling | null;
   saved: boolean;
   saving: boolean;
 };
@@ -60,7 +61,8 @@ const FEELINGS: Array<{
 
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 
@@ -75,7 +77,7 @@ function emptySets(
         exercise.prescribed_load_kg != null
           ? String(exercise.prescribed_load_kg)
           : "",
-      feeling: "right" as const,
+      feeling: null,
       saved: false,
       saving: false,
     }),
@@ -135,7 +137,7 @@ export function StrengthWorkoutLoggerV2({
   const [drafts, setDrafts] = useState<
     Record<string, SetDraft[]>
   >({});
-  const [performedDate, setPerformedDate] =
+  const [performedDate] =
     useState(todayIso());
   const [duration, setDuration] = useState("");
   const [notes, setNotes] = useState("");
@@ -171,6 +173,11 @@ export function StrengthWorkoutLoggerV2({
     useState<StrengthProgressionPreviewResponse | null>(
       null,
     );
+  const [exerciseIndex, setExerciseIndex] = useState(0);
+  const [finished, setFinished] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const orderedExercises = useMemo(() => [...(activeWorkout?.exercises ?? [])].sort((a, b) => a.position - b.position), [activeWorkout?.exercises]);
   const [autoApplied, setAutoApplied] =
     useState(0);
 
@@ -228,7 +235,7 @@ export function StrengthWorkoutLoggerV2({
             list.push({
               reps: "",
               loadKg: "",
-              feeling: "right",
+              feeling: null,
               saved: false,
               saving: false,
             });
@@ -238,7 +245,7 @@ export function StrengthWorkoutLoggerV2({
             reps: String(saved.reps),
             loadKg: String(saved.load_kg),
             feeling:
-              saved.feeling ?? "right",
+              saved.feeling ?? null,
             saved: true,
             saving: false,
           };
@@ -249,6 +256,11 @@ export function StrengthWorkoutLoggerV2({
         }
 
         setDrafts(nextDrafts);
+        const sorted = [...response.exercises].sort((a, b) => a.position - b.position);
+        const unfinished = sorted.findIndex((exercise) => (nextDrafts[exercise.id] ?? []).some((set) => !set.saved));
+        setExerciseIndex(unfinished >= 0 ? unfinished : Math.max(0, sorted.length - 1));
+        setNotes(response.workout_log.notes ?? "");
+        setDuration(response.workout_log.duration_minutes != null ? String(response.workout_log.duration_minutes) : "");
         setActiveWorkout((current) =>
           current
             ? {
@@ -320,14 +332,14 @@ export function StrengthWorkoutLoggerV2({
     override?: Partial<SetDraft>,
   ) {
     if (!accessToken || !activeWorkout) {
-      return;
+      return false;
     }
 
     const current =
       drafts[exerciseId]?.[setIndex];
 
     if (!current) {
-      return;
+      return false;
     }
 
     const item = {
@@ -344,9 +356,10 @@ export function StrengthWorkoutLoggerV2({
       !Number.isFinite(reps) ||
       reps <= 0 ||
       !Number.isFinite(loadKg) ||
-      loadKg < 0
+      loadKg < 0 ||
+      item.feeling == null
     ) {
-      return;
+      return false;
     }
 
     updateDraft(
@@ -378,6 +391,8 @@ export function StrengthWorkoutLoggerV2({
           saving: false,
         },
       );
+      setError(null);
+      return true;
     } catch (err) {
       updateDraft(
         exerciseId,
@@ -385,10 +400,9 @@ export function StrengthWorkoutLoggerV2({
         { saving: false },
       );
       setError(
-        err instanceof Error
-          ? err.message
-          : "Non riesco a salvare la serie.",
+        "Non riesco a salvare la serie. Controlla la connessione e riprova.",
       );
+      return false;
     }
   }
 
@@ -410,7 +424,7 @@ export function StrengthWorkoutLoggerV2({
             loadKg:
               existing[existing.length - 1]
                 ?.loadKg ?? "",
-            feeling: "right",
+            feeling: null,
             saved: false,
             saving: false,
           },
@@ -651,6 +665,7 @@ export function StrengthWorkoutLoggerV2({
           emptySets(response.exercise),
       }));
 
+      setReviewing(false);
       setSearch("");
       setSearchResults([]);
       setShowAddExercise(false);
@@ -685,6 +700,10 @@ export function StrengthWorkoutLoggerV2({
           accessToken,
         );
 
+      setExerciseIndex(0);
+      setReviewing(false);
+      setOutcome(null);
+      setFinished(false);
       setActiveWorkout(response.workout);
       setShowAddExercise(true);
       setMessage(
@@ -697,6 +716,29 @@ export function StrengthWorkoutLoggerV2({
           : "Non riesco a creare il workout libero.",
       );
     }
+  }
+
+  async function nextExercise() {
+    const exercise = orderedExercises[exerciseIndex];
+    if (!exercise) return;
+    const sets = drafts[exercise.id] ?? [];
+    if (!sets.length || sets.some((item) => !item.reps.trim() || Number(item.reps) <= 0 || item.feeling == null)) {
+      setError("Indica le ripetizioni e come è andata ogni serie. Puoi togliere le serie che non hai eseguito.");
+      return;
+    }
+    setAdvancing(true);
+    setError(null);
+    try {
+      for (const [index, item] of sets.entries()) {
+        if (!item.saved && !await persistSet(exercise.id, index)) {
+          setError("Non tutte le serie sono state salvate. Controlla i valori e riprova.");
+          return;
+        }
+      }
+      setOpenDemo(null);
+      if (exerciseIndex + 1 < orderedExercises.length) setExerciseIndex((value) => value + 1);
+      else setReviewing(true);
+    } finally { setAdvancing(false); }
   }
 
   async function completeWorkout() {
@@ -715,7 +757,7 @@ export function StrengthWorkoutLoggerV2({
     setAutoApplied(0);
 
     try {
-      const saves: Promise<void>[] = [];
+      const saves: Promise<boolean>[] = [];
 
       for (const exercise of activeWorkout.exercises) {
         for (const [index, item] of (
@@ -737,7 +779,8 @@ export function StrengthWorkoutLoggerV2({
         }
       }
 
-      await Promise.all(saves);
+      const results = await Promise.all(saves);
+      if (results.some((saved) => !saved)) throw new Error("Alcune serie non sono state salvate. Torna agli esercizi e riprova.");
 
       if (!hasSavedSet && saves.length === 0) {
         throw new Error(
@@ -756,6 +799,9 @@ export function StrengthWorkoutLoggerV2({
         },
         accessToken,
       );
+
+      setFinished(true);
+      setMessage("Seduta completata e salvata.");
 
       const outcomeResponse =
         await getStrengthWorkoutOutcome(
@@ -836,6 +882,7 @@ export function StrengthWorkoutLoggerV2({
         accessToken,
       );
 
+      setFinished(true);
       setMessage("Seduta saltata.");
 
       if (onCompleted) {
@@ -873,7 +920,7 @@ export function StrengthWorkoutLoggerV2({
             void startFreeWorkout();
           }}
         >
-          Inizia workout libero
+          Inizia allenamento libero
         </button>
       </section>
     );
@@ -886,20 +933,20 @@ export function StrengthWorkoutLoggerV2({
           <p className={styles.eyebrow}>
             {activeWorkout.workout_kind === "free"
               ? "Workout libero"
-              : "Prossima seduta"}
+              : "Allenamento in corso"}
           </p>
-          <h3>{activeWorkout.title}</h3>
+          <h3>{workoutTitle(activeWorkout)}</h3>
           <p>
             {activeWorkout.workout_kind === "free"
-              ? "La performance sarà usata dal Coach."
+              ? "Registra le serie al tuo ritmo."
               : "Programmata per " +
-                activeWorkout.scheduled_date}
+                new Date(`${activeWorkout.scheduled_date}T00:00:00`).toLocaleDateString("it-IT", { day: "numeric", month: "long" })}
           </p>
         </div>
         <span className={styles.autosave}>
           {loadingSession
             ? "Apro…"
-            : "Autosave attivo"}
+            : finished ? "Seduta salvata" : "Salvataggio automatico"}
         </span>
       </header>
 
@@ -912,8 +959,10 @@ export function StrengthWorkoutLoggerV2({
         </div>
       ) : null}
 
+      {!finished && !reviewing ? <>
+      {orderedExercises.length ? <p className={styles.stepCount} aria-live="polite">Esercizio {exerciseIndex + 1} di {orderedExercises.length} · Ordine consigliato</p> : <p>Aggiungi il primo esercizio per iniziare.</p>}
       <div className={styles.exerciseList}>
-        {activeWorkout.exercises.map(
+        {orderedExercises.slice(exerciseIndex, exerciseIndex + 1).map(
           (exercise) => {
             const libraryDetail =
               exercise.exercise_id
@@ -936,7 +985,7 @@ export function StrengthWorkoutLoggerV2({
                       {exercise.exercise_name}
                     </h4>
                     <small>
-                      {exercise.target_sets} ×{" "}
+                      {exercise.target_sets} serie ×{" "}
                       {exercise.target_reps_min}–
                       {exercise.target_reps_max}
                       {exercise.prescribed_load_kg !=
@@ -946,6 +995,7 @@ export function StrengthWorkoutLoggerV2({
                           " kg"
                         : ""}
                     </small>
+                    {exercise.rest_seconds ? <small>Recupero consigliato: {exercise.rest_seconds} secondi tra le serie</small> : null}
                   </div>
 
                   <div className={styles.exerciseActions}>
@@ -1048,7 +1098,8 @@ export function StrengthWorkoutLoggerV2({
                       className={styles.setRow}
                     >
                       <strong>{setIndex + 1}</strong>
-                      <input
+                      <label className={styles.setField}><span>Ripetizioni</span><input
+                        aria-label={`Ripetizioni serie ${setIndex + 1}`}
                         type="number"
                         min="1"
                         placeholder={
@@ -1077,8 +1128,9 @@ export function StrengthWorkoutLoggerV2({
                             setIndex,
                           );
                         }}
-                      />
-                      <input
+                      /></label>
+                      <label className={styles.setField}><span>Peso (kg)</span><input
+                        aria-label={`Peso in kg serie ${setIndex + 1}`}
                         type="number"
                         min="0"
                         step="0.5"
@@ -1100,36 +1152,16 @@ export function StrengthWorkoutLoggerV2({
                             setIndex,
                           );
                         }}
-                      />
-                      <select
-                        value={item.feeling}
-                        onChange={(event) => {
-                          const feeling =
-                            event.target
-                              .value as StrengthEffortFeeling;
-                          updateDraft(
-                            exercise.id,
-                            setIndex,
-                            { feeling },
-                          );
-                          void persistSet(
-                            exercise.id,
-                            setIndex,
-                            { feeling },
-                          );
-                        }}
-                      >
-                        {FEELINGS.map(
-                          (option) => (
-                            <option
-                              key={option.value}
-                              value={option.value}
-                            >
-                              {option.label}
-                            </option>
-                          ),
-                        )}
-                      </select>
+                      /></label>
+                      <div className={styles.feelings} role="group" aria-label={`Come è andata la serie ${setIndex + 1}?`}>
+                        {FEELINGS.map((option) => <button key={option.value} type="button"
+                          aria-pressed={item.feeling === option.value}
+                          disabled={item.saving || advancing}
+                          onClick={() => {
+                            updateDraft(exercise.id, setIndex, { feeling: option.value });
+                            void persistSet(exercise.id, setIndex, { feeling: option.value });
+                          }}>{option.label}</button>)}
+                      </div>
                       <span
                         className={
                           item.saving
@@ -1173,7 +1205,13 @@ export function StrengthWorkoutLoggerV2({
         )}
       </div>
 
-      <div className={styles.addExercise}>
+      <div className={styles.footer}>
+        <button type="button" className={styles.secondaryButton} disabled={exerciseIndex === 0 || advancing} onClick={() => setExerciseIndex((value) => value - 1)}>← Precedente</button>
+        <button type="button" className={styles.primaryButton} disabled={!orderedExercises.length || advancing || loadingSession || Object.values(drafts).some((sets) => sets.some((item) => item.saving))} onClick={() => { void nextExercise(); }}>{advancing ? "Salvo…" : exerciseIndex + 1 < orderedExercises.length ? "Salva e prossimo esercizio →" : "Riepilogo allenamento →"}</button>
+      </div>
+      {orderedExercises[exerciseIndex + 1] ? <p>Prossimo: {orderedExercises[exerciseIndex + 1].exercise_name}</p> : null}
+      </> : null}
+      {!finished ? <div className={styles.addExercise}>
         <button
           type="button"
           onClick={() =>
@@ -1230,17 +1268,18 @@ export function StrengthWorkoutLoggerV2({
             ))}
           </div>
         ) : null}
-      </div>
+      </div> : null}
 
+      {!finished && reviewing ? <>
+      <h3>Hai finito gli esercizi</h3><p>Controlla i dettagli e salva la seduta.</p>
+      <button type="button" className={styles.secondaryButton} onClick={() => setReviewing(false)}>← Rivedi gli esercizi</button>
       <div className={styles.meta}>
         <label>
           Data
           <input
             type="date"
             value={performedDate}
-            onChange={(event) =>
-              setPerformedDate(event.target.value)
-            }
+            readOnly
           />
         </label>
         <label>
@@ -1307,6 +1346,9 @@ export function StrengthWorkoutLoggerV2({
         ) : null}
       </div>
 
+      </> : null}
+
+      {finished ? <p><a href="/activities/programs">Torna al programma →</a></p> : null}
       {outcome ? (
         <div className={styles.coachCard}>
           <strong>

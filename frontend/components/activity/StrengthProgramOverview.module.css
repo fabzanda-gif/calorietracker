@@ -228,3 +228,7 @@
     overflow-wrap: anywhere;
   }
 }
+.workout details { max-width: 55%; }
+.workout summary { cursor: pointer; font-weight: 700; }
+.workout li { margin-bottom: 8px; }
+@media (max-width: 720px) { .workout { flex-direction: column; } .workout details { max-width: 100%; } }

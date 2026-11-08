@@ -299,3 +299,115 @@ for (const scenario of [
     await expect(tile.getByRole("heading", { name: "Controlla prima di registrare", exact: true })).toBeVisible();
   });
 }
+
+async function mockGuidedStrength(page: Page, failSave = false) {
+  const exercise = (id: string, name: string, position: number, pattern: string) => ({
+    id, exercise_key: id, exercise_name: name, position, movement_pattern: pattern,
+    strength_workout_id: "workout-1", target_sets: 1, target_reps_min: 6, target_reps_max: 10,
+    target_rir: 2, rest_seconds: 90, prescribed_load_kg: null,
+  });
+  const exercises = [exercise("bench", "Bench Press", 2, "horizontal_push"), exercise("squat", "Back Squat", 1, "squat")];
+  const plan = { id: "plan-1", goal: "hypertrophy", experience_level: "beginner", program_style: "full_body", sessions_per_week: 3, start_date: "2026-11-08", total_weeks: 8, status: "active" };
+  const workouts = Array.from({ length: 24 }, (_, index) => ({ id: `workout-${index + 1}`, strength_plan_id: plan.id, scheduled_date: "2026-11-08", training_week: Math.floor(index / 3) + 1, workout_index: index + 1, title: "Full Body A", focus: "full_body", status: "planned", workout_kind: "planned", estimated_duration_minutes: 45, exercises }));
+  let sessionStarts = 0;
+  let completions = 0;
+  const saved = new Map<string, Record<string, unknown>>();
+  await page.route("http://localhost:8000/strength/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let json: unknown;
+    if (path === "/strength/plans") json = { items: [plan], count: 1 };
+    else if (path === "/strength/plans/plan-1") json = { plan, workouts, workout_count: 24 };
+    else if (path.endsWith("/history")) json = { items: [], count: 0 };
+    else if (path.endsWith("/session")) {
+      sessionStarts++;
+      json = { status: "draft", workout: workouts[0], workout_log: { id: "log-1", notes: null, duration_minutes: null }, exercises, sets: [...saved.values()] };
+    } else if (/\/sets\/1$/.test(path)) {
+      if (failSave) { await route.fulfill({ status: 503, json: { detail: "Salvataggio non disponibile" } }); return; }
+      const id = path.split("/")[5];
+      const item = { ...route.request().postDataJSON(), strength_workout_exercise_id: id, set_index: 1 };
+      saved.set(id, item);
+      json = { saved: true, workout_log_id: "log-1", set: item };
+    } else if (path.endsWith("/complete")) { completions++; json = { completed: true }; }
+    else if (path.endsWith("/outcome")) json = { status: "evaluated", outcome: { outcome: "on_target", message: "Allenamento salvato", exercises: [] } };
+    else if (path.endsWith("/progression-preview")) json = { proposals: [] };
+    else throw new Error(`Missing strength fixture: ${path}`);
+    await route.fulfill({ json });
+  });
+  return { sessionStarts: () => sessionStarts, completions: () => completions, saved };
+}
+
+for (const viewport of [{ name: "desktop", width: 1440, height: 1100 }, { name: "mobile", width: 390, height: 844 }]) {
+  test(`gym program stays compact and workout is guided on ${viewport.name}`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    const errors = await mockServices(page);
+    const strength = await mockGuidedStrength(page);
+    await signIn(page);
+    await page.goto("/activities/programs");
+    await page.getByRole("tab", { name: "Palestra", exact: true }).click();
+    await expect(page.getByText("3 allenamenti a settimana per 8 settimane", { exact: true })).toBeVisible();
+    await expect(page.getByText("Allenamento 1", { exact: true })).toHaveCount(1);
+    await expect(page.getByText("Allenamento 4", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Full Body A", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("group", { name: "Come è andata la serie 1?" })).toHaveCount(0);
+    expect(strength.sessionStarts()).toBe(0);
+    await page.screenshot({ path: testInfo.outputPath(`gym-compact-${viewport.name}.png`), fullPage: true });
+    await page.getByRole("link", { name: "Inizia allenamento", exact: true }).click();
+    await expect(page).toHaveURL(/\/activities\/workout\/plan-1\/workout-1$/);
+    await expect(page.getByRole("heading", { name: "Back Squat", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bench Press", exact: true })).toHaveCount(0);
+    expect(strength.sessionStarts()).toBe(1);
+    await page.getByRole("button", { name: "Salva e prossimo esercizio →" }).click();
+    await expect(page.getByText(/Indica le ripetizioni/)).toBeVisible();
+    await page.getByLabel("Ripetizioni serie 1").fill("8");
+    await page.getByLabel("Peso in kg serie 1").fill("30");
+    await page.getByRole("button", { name: "Giusto", exact: true }).click();
+    await expect.poll(() => strength.saved.size).toBe(1);
+    await page.screenshot({ path: testInfo.outputPath(`gym-guided-${viewport.name}.png`), fullPage: true });
+    await page.getByRole("button", { name: "Salva e prossimo esercizio →" }).click();
+    await expect(page.getByRole("heading", { name: "Bench Press", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Back Squat", exact: true })).toHaveCount(0);
+    await page.getByLabel("Ripetizioni serie 1").fill("9");
+    await page.getByLabel("Peso in kg serie 1").fill("20");
+    await page.getByRole("button", { name: "Facile", exact: true }).click();
+    await expect.poll(() => strength.saved.size).toBe(2);
+    await page.getByRole("button", { name: "Riepilogo allenamento →" }).click();
+    await expect(page.getByRole("heading", { name: "Hai finito gli esercizi" })).toBeVisible();
+    await page.getByRole("button", { name: "Completa seduta", exact: true }).click();
+    await expect(page.getByText("Seduta completata e salvata.", { exact: true })).toBeVisible();
+    expect(strength.completions()).toBe(1);
+    expect(errors).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
+test("failed set saves keep the current exercise and cannot complete the workout", async ({ page }) => {
+  await mockServices(page);
+  const strength = await mockGuidedStrength(page, true);
+  await signIn(page);
+  await page.goto("/activities/workout/plan-1/workout-1");
+  await page.getByLabel("Ripetizioni serie 1").fill("8");
+  await page.getByRole("button", { name: "Giusto", exact: true }).click();
+  await expect(page.getByText("Non riesco a salvare la serie. Controlla la connessione e riprova.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Salva e prossimo esercizio →" }).click();
+  await expect(page.getByText(/Non tutte le serie sono state salvate/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Back Squat", exact: true })).toBeVisible();
+  expect(strength.completions()).toBe(0);
+});
+
+test("workout resumes saved series and history remains a separate read-only page", async ({ page }) => {
+  await mockServices(page);
+  const strength = await mockGuidedStrength(page);
+  await signIn(page);
+  await page.goto("/activities/workout/history/plan-1");
+  await expect(page.getByRole("heading", { name: "Sedute completate", exact: true })).toBeVisible();
+  expect(strength.sessionStarts()).toBe(0);
+  await page.goto("/activities/workout/plan-1/workout-1");
+  await page.getByLabel("Ripetizioni serie 1").fill("8");
+  await page.getByRole("button", { name: "Giusto", exact: true }).click();
+  await expect.poll(() => strength.saved.size).toBe(1);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Bench Press", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "← Precedente", exact: true }).click();
+  await expect(page.getByLabel("Ripetizioni serie 1")).toHaveValue("8");
+  await expect(page.getByRole("button", { name: "Giusto", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
