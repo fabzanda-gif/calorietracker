@@ -5,6 +5,9 @@ import {
   useState,
 } from "react";
 
+import { WeeklyRoutineCard } from "@/components/profile/WeeklyRoutineCard";
+import { SpecialPeriodsCard } from "@/components/profile/SpecialPeriodsCard";
+
 import { AppNav } from "@/components/navigation/AppNav";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -864,7 +867,7 @@ export default function ProfilePage() {
           <div className={styles.card}>
             <h1>Profilo</h1>
             <p>
-              Effettua l'accesso per visualizzare
+              Effettua l&apos;accesso per visualizzare
               il tuo profilo.
             </p>
           </div>
@@ -1172,7 +1175,7 @@ export default function ProfilePage() {
 
             <section className={styles.card}>
               <div className={styles.sectionHeader}>
-                <h2>La mia settimana</h2>
+                <h2>Routine abituale</h2>
                 <p>
                   Indica dove ti trovi normalmente.
                   Potremo usare questa informazione
@@ -1465,6 +1468,12 @@ export default function ProfilePage() {
             </section>
           </form>
         )}
+        {accessToken && !loading ? <>
+          <WeeklyRoutineCard accessToken={accessToken} />
+          <section id="periodi-speciali" style={{ scrollMarginTop: 80, marginTop: 24 }}>
+            <SpecialPeriodsCard accessToken={accessToken} />
+          </section>
+        </> : null}
       </main>
     </>
   );

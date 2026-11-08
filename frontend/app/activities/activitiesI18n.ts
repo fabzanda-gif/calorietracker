@@ -9,8 +9,10 @@ export const activityLocale: Record<AppLocale, string> = {
 
 export const activitiesCopy = {
   it: {
+    strength: "Palestra",
+    routineSettings: "Routine e periodi speciali",
     activity: "Attività", activeRoutine: "La tua routine attiva",
-    activeIntro: "Gli allenamenti che aggiungono qualcosa al movimento naturale della tua giornata.",
+    activeIntro: "Il riepilogo delle attività svolte, i tuoi progressi e il registro degli allenamenti.",
     zeroTitle: "Muoviti. Poi ne parliamo.", zeroIntro: "La cronaca dei tuoi tentativi di non diventare arredamento.",
     last30Activities: "attività negli ultimi 30 giorni", yourMovement: "Il tuo movimento", last30Days: "Ultimi 30 giorni",
     totalTime: "Tempo totale", distance: "Distanza", energy: "Energia", consistency: "Costanza",
@@ -39,6 +41,8 @@ export const activitiesCopy = {
     weekdays: ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"],
   },
   en: {
+    strength: "Strength",
+    routineSettings: "Routine and special periods",
     activity: "Activity", activeRoutine: "Your active routine", activeIntro: "Workouts that add to the natural movement in your day.",
     zeroTitle: "Get moving. Then we'll talk.", zeroIntro: "A record of your attempts not to become part of the furniture.",
     last30Activities: "activities in the last 30 days", yourMovement: "Your movement", last30Days: "Last 30 days",
@@ -63,6 +67,8 @@ export const activitiesCopy = {
     weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   },
   nl: {
+    strength: "Krachttraining",
+    routineSettings: "Routine en bijzondere periodes",
     activity: "Activiteit", activeRoutine: "Je actieve routine", activeIntro: "Trainingen die iets toevoegen aan de natuurlijke beweging van je dag.",
     zeroTitle: "Kom in beweging. Dan praten we verder.", zeroIntro: "Een overzicht van je pogingen om geen meubelstuk te worden.",
     last30Activities: "activiteiten in de afgelopen 30 dagen", yourMovement: "Je beweging", last30Days: "Afgelopen 30 dagen",
@@ -88,6 +94,8 @@ export const activitiesCopy = {
     bicycle: "Fietsen", other: "Overig", weekdays: ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"],
   },
   fr: {
+    strength: "Musculation",
+    routineSettings: "Routine et périodes particulières",
     activity: "Activité", activeRoutine: "Votre routine active", activeIntro: "Les entraînements qui complètent les mouvements naturels de votre journée.",
     zeroTitle: "Bougez. Ensuite, on en parle.", zeroIntro: "Le journal de vos tentatives pour ne pas devenir un meuble.",
     last30Activities: "activités au cours des 30 derniers jours", yourMovement: "Votre activité", last30Days: "30 derniers jours",

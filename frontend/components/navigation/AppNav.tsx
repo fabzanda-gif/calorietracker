@@ -12,7 +12,7 @@ import styles from "./AppNav.module.css";
 
 const ITEMS = [
   { href: "/", key: "home", icon: "⌂" },
-  { href: "/plan", key: "plan", icon: "▣" },
+  { href: "/activities", key: "activities", icon: "↗" },
   { href: "/ai", key: "ai", icon: "✦" },
   { href: "/food", key: "food", icon: "⌑" },
   {
@@ -28,21 +28,14 @@ const ITEMS = [
 ] as const;
 
 const NAV_LABELS = {
-  it: { home: "Home", plan: "Piano", ai: "AI", food: "Cibo", insights: "Progressi" },
-  en: { home: "Home", plan: "Plan", ai: "AI", food: "Food", insights: "Insights" },
-  nl: { home: "Home", plan: "Plan", ai: "AI", food: "Voeding", insights: "Inzichten" },
-  fr: { home: "Accueil", plan: "Plan", ai: "IA", food: "Alimentation", insights: "Progrès" },
+  it: { home: "Home", activities: "Attività", ai: "AI", food: "Cibo", insights: "Progressi" },
+  en: { home: "Home", activities: "Activity", ai: "AI", food: "Food", insights: "Insights" },
+  nl: { home: "Home", activities: "Activiteiten", ai: "AI", food: "Voeding", insights: "Inzichten" },
+  fr: { home: "Accueil", activities: "Activités", ai: "IA", food: "Alimentation", insights: "Progrès" },
 } as const;
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
-
-  if (
-    href === "/plan" &&
-    pathname.startsWith("/activities")
-  ) {
-    return true;
-  }
 
   if (
     href === "/food" &&
