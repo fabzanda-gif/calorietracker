@@ -168,7 +168,7 @@ function initialDrafts(
 }
 
 
-export function StrengthPlanPanel() {
+export function StrengthPlanPanel({ showCombinedCoach = false, onProgramChanged }: { showCombinedCoach?: boolean; onProgramChanged?: () => void } = {}) {
   const { accessToken } = useAuth();
 
   const [
@@ -225,7 +225,7 @@ export function StrengthPlanPanel() {
   const [
     startDate,
     setStartDate,
-  ] = useState(todayIso());
+  ] = useState("");
 
   const [
     planPreview,
@@ -233,6 +233,9 @@ export function StrengthPlanPanel() {
   ] = useState<
     StrengthPlanPreviewResponse | null
   >(null);
+
+  const [previewDay, setPreviewDay] = useState(0);
+  const previewMatches = planPreview?.plan.start_date === startDate && planPreview.plan.goal === goal && planPreview.plan.experience_level === experience && planPreview.plan.sessions_per_week === sessions && planPreview.plan.total_weeks === weeks;
 
   const [
     previewingPlan,
@@ -436,6 +439,8 @@ export function StrengthPlanPanel() {
       return;
     }
 
+    if (!startDate || startDate < todayIso()) { setError("Scegli il giorno in cui vuoi iniziare, da oggi in poi."); return; }
+    setPlanPreview(null);
     setPreviewingPlan(true);
     setError(null);
     setMessage(null);
@@ -453,6 +458,8 @@ export function StrengthPlanPanel() {
           accessToken,
         );
 
+      if (!response.plan.workouts.length || response.plan.workouts.some((workout) => !workout.exercises?.length)) throw new Error("L’anteprima non contiene le schede degli esercizi. Riprova prima di confermare.");
+      setPreviewDay(0);
       setPlanPreview(response);
     } catch (err) {
       setError(
@@ -472,7 +479,7 @@ export function StrengthPlanPanel() {
   async function confirmPlan() {
     if (
       !accessToken ||
-      !planPreview
+      !planPreview || !previewMatches
     ) {
       return;
     }
@@ -500,6 +507,7 @@ export function StrengthPlanPanel() {
       );
 
       await loadPlan();
+      onProgramChanged?.();
     } catch (err) {
       setError(
         err instanceof Error
@@ -675,6 +683,7 @@ export function StrengthPlanPanel() {
       setMessage(
         "Programma palestra interrotto.",
       );
+      onProgramChanged?.();
     } catch (err) {
       setError(
         err instanceof Error
@@ -1050,9 +1059,11 @@ export function StrengthPlanPanel() {
             </label>
 
             <label>
-              Prima seduta
+              Quando vuoi iniziare?
               <input
                 type="date"
+                min={todayIso()}
+                required
                 value={startDate}
                 onChange={(event) =>
                   setStartDate(
@@ -1073,10 +1084,10 @@ export function StrengthPlanPanel() {
           >
             {previewingPlan
               ? "Genero…"
-              : "Anteprima programma"}
+              : "Mostra l’anteprima del programma"}
           </button>
 
-          {planPreview ? (
+          {planPreview && previewMatches ? (
             <div className={styles.preview}>
               <div>
                 <strong>
@@ -1101,6 +1112,16 @@ export function StrengthPlanPanel() {
                 </span>
               </div>
 
+              <section className={styles.readablePreview} aria-label="Anteprima delle schede">
+                <h3>Il programma che stai per creare</h3>
+                <p>Prima seduta: {formatDate(planPreview.plan.start_date)}. Seleziona un giorno per leggere la scheda prima di confermare.</p>
+                <label>Seduta da consultare<select aria-label="Seduta da consultare" value={previewDay} onChange={(event) => setPreviewDay(Number(event.target.value))}>{planPreview.plan.workouts.map((workout, index) => <option key={index} value={index}>{formatDate(workout.scheduled_date)} · {workoutTitle(workout)}</option>)}</select></label>
+                {planPreview.plan.workouts[previewDay] ? <article>
+                  <h4>{workoutTitle(planPreview.plan.workouts[previewDay])}</h4>
+                  <ol>{planPreview.plan.workouts[previewDay].exercises.map((exercise, index) => <li key={index}><strong>{exercise.exercise_name}</strong><span>{exercise.target_sets} serie × {exercise.target_reps_min}–{exercise.target_reps_max} ripetizioni</span><span>{exercise.prescribed_load_kg == null ? "Peso da impostare con il tuo massimale o la prova guidata" : `${exercise.prescribed_load_kg} kg`}{exercise.rest_seconds ? ` · Recupero ${exercise.rest_seconds} secondi` : ""}</span></li>)}</ol>
+                </article> : null}
+                <p>Il programma verrà salvato solo quando confermi.</p>
+              </section>
               <button
                 type="button"
                 className={
@@ -1195,10 +1216,10 @@ export function StrengthPlanPanel() {
         </>
       )}
 
-      <AdaptiveCoachPanel
+      {showCombinedCoach ? <AdaptiveCoachPanel
         refreshKey={coachRefreshKey}
         onChanged={handleTrainingChanged}
-      />
+      /> : null}
 
       <section className={styles.builder}>
         <h3>{nextWorkout ? "Il prossimo allenamento" : "Allenati quando vuoi"}</h3>

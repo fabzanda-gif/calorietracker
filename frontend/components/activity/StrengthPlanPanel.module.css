@@ -493,3 +493,10 @@
 .section { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .section > *, .heading > *, .planSummary > div { min-width: 0; }
 @media (max-width: 760px) { .section { padding: 14px 10px; } .heading h2 { overflow-wrap: anywhere; } }
+.readablePreview { min-width: 0; padding: 16px; background: white; border-radius: 14px; }
+.readablePreview label { display: grid; gap: 8px; font-weight: 700; }
+.readablePreview select { width: 100%; min-width: 0; padding: 12px 8px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; }
+.readablePreview ol { padding-left: 22px; }
+.readablePreview li { margin: 14px 0; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; }
+.readablePreview li span { display: block; margin-top: 6px; line-height: 1.5; font-size: .9rem; }
+@media (max-width: 720px) { .readablePreview { padding: 12px 8px; } .readablePreview select { font-size: .85rem; } }

@@ -203,6 +203,7 @@ export function RunningPlanBuilder({
   const [longRunWeekday, setLongRunWeekday] =
     useState("6");
 
+  const [planStartDate, setPlanStartDate] = useState("");
   const [targetDate, setTargetDate] =
     useState(() => {
       const target = new Date();
@@ -293,16 +294,15 @@ export function RunningPlanBuilder({
       !targetPaceSeconds ||
       !currentDistanceKm ||
       !targetDistanceKm ||
-      !targetDate
+      !targetDate || !planStartDate || planStartDate < isoDate(new Date())
     ) {
       setMessage(
-        "Controlla distanza, passo e data obiettivo.",
+        "Scegli il giorno di inizio e controlla distanza, passo e data obiettivo.",
       );
       return null;
     }
 
-    const startDate =
-      isoDate(new Date());
+    const startDate = planStartDate;
 
     const start =
       new Date(`${startDate}T00:00:00`);
@@ -319,7 +319,7 @@ export function RunningPlanBuilder({
 
     if (weeks < 8) {
       setMessage(
-        "Servono almeno 8 settimane tra oggi e l’obiettivo.",
+        "Servono almeno 8 settimane tra la data di inizio scelta e l’obiettivo.",
       );
       return null;
     }
@@ -912,6 +912,7 @@ export function RunningPlanBuilder({
         </section>
       ) : null}
 
+      <details open={!activePlan}><summary>{activePlan ? "Modifica o sostituisci il programma" : "Crea il tuo programma corsa"}</summary>
       <div className={styles.columns}>
         <div className={styles.stateCard}>
           <div className={styles.cardTitle}>
@@ -1011,6 +1012,7 @@ export function RunningPlanBuilder({
               </div>
             </label>
 
+            <label>Quando vuoi iniziare?<input type="date" min={isoDate(new Date())} required value={planStartDate} onChange={(event) => { setPlanStartDate(event.target.value); clearPreview(); }} /></label>
             <label>
               Data obiettivo
               <input
@@ -1216,6 +1218,7 @@ export function RunningPlanBuilder({
         </div>
       ) : null}
 
+      </details>
       {message ? (
         <p className={styles.message}>
           {message}

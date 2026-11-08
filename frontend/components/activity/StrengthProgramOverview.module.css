@@ -264,3 +264,6 @@
   .daySheet td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 5px; font-size: .72rem; color: #64748b; }
   .daySheet td button, .startButton { max-width: 100%; white-space: normal; box-sizing: border-box; }
 }
+.loadDialog { width: min(600px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 20px; color: #112a47; background: white; box-sizing: border-box; }
+.loadDialog::backdrop { background: rgba(9,30,51,.65); }
+.closeDialog { display: block; margin-left: auto; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 10px; color: inherit; background: white; font: inherit; cursor: pointer; }

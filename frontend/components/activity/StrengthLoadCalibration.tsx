@@ -5,8 +5,8 @@ import { estimatedMax, roundLoadDown, suggestedReps, weightConvention } from "@/
 import styles from "./StrengthLoadCalibration.module.css";
 
 export type CalibrationResult = { reps: number; loadKg: number; rir: number; feeling: "easy" | "right" };
-export function StrengthLoadCalibration({ exercise, onConfirm, onKnownMax, allowTest = true }: { exercise: StrengthWorkoutExercise; onConfirm?: (result: CalibrationResult) => Promise<boolean>; onKnownMax: (maxKg: number) => Promise<boolean>; allowTest?: boolean }) {
-  const [mode, setMode] = useState<"choose" | "known" | "test">("choose");
+export function StrengthLoadCalibration({ exercise, onConfirm, onKnownMax, allowTest = true, initialMode = "choose" }: { exercise: StrengthWorkoutExercise; onConfirm?: (result: CalibrationResult) => Promise<boolean>; onKnownMax: (maxKg: number) => Promise<boolean>; allowTest?: boolean; initialMode?: "choose" | "known" | "test" }) {
+  const [mode, setMode] = useState<"choose" | "known" | "test">(initialMode);
   const [knownMax, setKnownMax] = useState("");
   const target = Math.min(12, Math.max(6, suggestedReps(exercise)));
   const [load, setLoad] = useState("");
@@ -29,8 +29,8 @@ export function StrengthLoadCalibration({ exercise, onConfirm, onKnownMax, allow
   return <section className={styles.card} aria-label="Troviamo il tuo peso iniziale">
     <span>Il carico per questo esercizio</span><h4>Troviamo il tuo peso iniziale</h4>
     <div className={styles.choices}><button type="button" aria-pressed={mode === "known"} onClick={() => setMode("known")}>Conosco già il mio massimale</button><button type="button" aria-pressed={mode === "test"} onClick={() => setMode("test")}>Non lo conosco: guidami</button></div>
-    {mode === "known" ? <div className={styles.result}><p>Inserisci un massimale recente per questo preciso esercizio e la stessa attrezzatura. È il peso massimo per una ripetizione completa, non il peso da usare oggi.</p><p>{weightConvention(exercise)}</p>
-      <label>Massimale conosciuto (kg)<input type="number" min="0.5" max="2000" step="0.5" value={knownMax} onChange={(event) => setKnownMax(event.target.value)} disabled={saving} /></label>
+    {mode === "known" ? <div className={styles.result}><details><summary>Quale peso devo inserire?</summary><p>Inserisci un massimale recente per questo preciso esercizio e la stessa attrezzatura. È il peso massimo per una ripetizione completa, non il peso da usare oggi.</p><p>{weightConvention(exercise)}</p></details>
+      <label>Massimale conosciuto (kg)<input autoFocus={initialMode === "known"} type="number" min="0.5" max="2000" step="0.5" value={knownMax} onChange={(event) => setKnownMax(event.target.value)} disabled={saving} /></label>
       <p>Calcoleremo un peso di partenza per {suggestedReps(exercise)} ripetizioni con margine, da verificare durante la seduta.</p>
       {Number(knownMax) > 0 && Number(knownMax) <= 2000 ? <p><strong>Peso proposto: {Math.min(1000, roundLoadDown(Number(knownMax) / (1 + (suggestedReps(exercise) + (exercise.target_rir ?? 2)) / 30)))} kg × {suggestedReps(exercise)} ripetizioni</strong></p> : null}
       <button type="button" disabled={saving || !knownMax.trim() || !Number.isFinite(Number(knownMax)) || Number(knownMax) <= 0 || Number(knownMax) > 2000} onClick={() => { setSaving(true); setError(null); void onKnownMax(Number(knownMax)).then((ok) => { if (!ok) setError("Non riesco a salvare il massimale. Riprova."); }).finally(() => setSaving(false)); }}>{saving ? "Salvo…" : "Calcola e salva il peso consigliato"}</button>
