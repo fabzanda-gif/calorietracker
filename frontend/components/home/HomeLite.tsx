@@ -649,7 +649,7 @@ export function HomeLite() {
                 </div>
               </section>
 
-              <HomeAiTile onSaved={refreshAfterAI} />
+              <HomeAiTile onSaved={refreshAfterAI} summary={summary} />
 
               <div className={styles.mainGrid}>
                 <section className={styles.card}>
@@ -795,7 +795,7 @@ export function HomeLite() {
             </>
           )
         ) : null}
-        {((!summary && !loading) || returning) ? <HomeAiTile onSaved={refreshAfterAI} /> : null}
+        {((!summary && !loading) || returning) ? <HomeAiTile onSaved={refreshAfterAI} summary={summary} /> : null}
       </main>
     </>
   );

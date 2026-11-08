@@ -11,6 +11,8 @@ import {
 } from "@/lib/api/conversation";
 import { confirmConversationalMeal } from "@/lib/api/meals";
 import { createWeight } from "@/lib/api/weight";
+import type { HomeSummaryResponse } from "@/lib/api/day";
+import { mealTypeForNow } from "@/lib/mealSlots";
 
 import styles from "./HomeAiTile.module.css";
 
@@ -35,14 +37,16 @@ function metricLabel(action: ConversationalDayPreview["actions"][number]): strin
   })} kg`;
 }
 
-export function HomeAiTile({ onSaved }: { onSaved: () => Promise<void> }) {
+export function HomeAiTile({ onSaved, summary }: {
+  onSaved: () => Promise<void>;
+  summary: HomeSummaryResponse | null;
+}) {
   const tileRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (window.location.hash === "#home-ai") tileRef.current?.scrollIntoView({ block: "start" });
   }, []);
   const { accessToken } = useAuth();
   const [text, setText] = useState("");
-  const [defaultMealType, setDefaultMealType] = useState("Pranzo");
   const [preview, setPreview] = useState<ConversationalDayPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,7 +72,8 @@ export function HomeAiTile({ onSaved }: { onSaved: () => Promise<void> }) {
     try {
       const result = await previewConversationalDay(
         text.trim(),
-        defaultMealType,
+        mealTypeForNow(summary?.date === localIsoDate()
+          ? summary.meals.map((meal) => meal.meal_type) : []),
         localIsoDate(),
         accessToken,
       );
@@ -161,20 +166,6 @@ export function HomeAiTile({ onSaved }: { onSaved: () => Promise<void> }) {
         </section>
 
         <section className={styles.composer}>
-          <label className={styles.mealType}>
-            <span>Pasto predefinito</span>
-            <select
-              disabled={loading || saving}
-              value={defaultMealType}
-              onChange={(event) => { setDefaultMealType(event.target.value); setPreview(null); }}
-            >
-              <option>Colazione</option>
-              <option>Pranzo</option>
-              <option>Snack</option>
-              <option>Cena</option>
-            </select>
-          </label>
-
           <label className={styles.inputLabel} htmlFor="home-ai-message">Pasti, attività o peso</label>
           <textarea
             id="home-ai-message"

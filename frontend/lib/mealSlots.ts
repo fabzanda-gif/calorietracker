@@ -47,3 +47,17 @@ export function nextMealType(
     )?.mealType ?? "Cena"
   );
 }
+
+/** Default only: an explicit meal in the message takes precedence in the interpreter. */
+export function mealTypeForNow(
+  loggedMealTypes: readonly unknown[],
+  now = new Date(),
+): MealType {
+  const logged = new Set(loggedMealTypes.map((value) => normalizeMealType(value).toLocaleLowerCase("it-IT")));
+  const hour = now.getHours();
+  const current: MealType = hour < 5 ? "Snack"
+    : hour < 11 ? "Colazione"
+    : hour < 15 ? "Pranzo"
+    : hour < 18 ? "Snack" : "Cena";
+  return current !== "Snack" && logged.has(current.toLocaleLowerCase("it-IT")) ? "Snack" : current;
+}
