@@ -13,6 +13,7 @@ import {
   type OnboardingStatus,
   type PrimaryGoal,
 } from "@/lib/api/onboarding";
+import { createOnboardingProgram, localIsoDate } from "@/lib/createOnboardingProgram";
 import { updateProfile } from "@/lib/api/profile";
 import { createWeight } from "@/lib/api/weight";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -35,19 +36,6 @@ type WelcomeJourneyProps = {
   testMode?: boolean;
 };
 
-const MUSCLES = [
-  "chest",
-  "back",
-  "shoulders",
-  "biceps",
-  "triceps",
-  "glutes",
-  "quadriceps",
-  "hamstrings",
-  "calves",
-  "core",
-] as const;
-
 const WEEKDAYS = [
   { value: 1, it: "Lun", en: "Mon" },
   { value: 2, it: "Mar", en: "Tue" },
@@ -57,23 +45,6 @@ const WEEKDAYS = [
   { value: 6, it: "Sab", en: "Sat" },
   { value: 7, it: "Dom", en: "Sun" },
 ];
-
-const MUSCLE_LABELS: Record<
-  (typeof MUSCLES)[number],
-  { it: string; en: string }
-> = {
-  chest: { it: "Petto", en: "Chest" },
-  back: { it: "Schiena", en: "Back" },
-  shoulders: { it: "Spalle", en: "Shoulders" },
-  biceps: { it: "Bicipiti", en: "Biceps" },
-  triceps: { it: "Tricipiti", en: "Triceps" },
-  glutes: { it: "Glutei", en: "Glutes" },
-  quadriceps: { it: "Quadricipiti", en: "Quadriceps" },
-  hamstrings: { it: "Femorali", en: "Hamstrings" },
-  calves: { it: "Polpacci", en: "Calves" },
-  core: { it: "Core", en: "Core" },
-};
-
 
 function initialStep(
   status?: OnboardingStatus | null,
@@ -136,9 +107,9 @@ export function WelcomeJourney({
         automaticProtein: "Proteine automatiche",
         macroTracking: "Monitoraggio macro attivo",
         trainingEyebrow: "Setup Training",
-        trainingTitle: "Costruiamo il tuo profilo Training.",
+        trainingTitle: "Creiamo il tuo programma.",
         trainingIntro:
-          "Poche informazioni iniziali; carichi, aderenza e progressione verranno appresi dai tuoi workout.",
+          "Scegli come vuoi allenarti e quando iniziare. Alla conferma troverai il programma già pronto.",
         experience: "Esperienza",
         beginner: "Sto iniziando",
         intermediate: "Mi alleno da un po'",
@@ -285,14 +256,20 @@ export function WelcomeJourney({
     useState<
       "beginner" | "intermediate" | "advanced"
     >("intermediate");
+  const [sport, setSport] = useState<"strength" | "running">("strength");
+  const [startDate, setStartDate] = useState(localIsoDate);
+  const [weeks, setWeeks] = useState(8);
+  const [replaceProgram, setReplaceProgram] = useState(false);
+  const [currentKm, setCurrentKm] = useState(3);
+  const [targetKm, setTargetKm] = useState(5);
+  const [currentPace, setCurrentPace] = useState(6);
+  const [targetPace, setTargetPace] = useState(6);
+  const [longRunDay, setLongRunDay] = useState(6);
+  const [createdProgram, setCreatedProgram] = useState(false);
   const [sessions, setSessions] = useState(3);
-  const [duration, setDuration] = useState(60);
-  const [planningHorizon, setPlanningHorizon] =
-    useState<"weekly" | "monthly">("weekly");
-  const [coachStyle, setCoachStyle] =
-    useState<
-      "conservative" | "balanced" | "ambitious"
-    >("balanced");
+  const duration = 60;
+  const planningHorizon = "monthly" as const;
+  const coachStyle = "balanced" as const;
   const [
     scheduleFlexibility,
     setScheduleFlexibility,
@@ -301,10 +278,7 @@ export function WelcomeJourney({
   );
   const [preferredDays, setPreferredDays] =
     useState<number[]>([1, 3, 5]);
-  const [
-    priorityMuscles,
-    setPriorityMuscles,
-  ] = useState<string[]>([]);
+  const priorityMuscles: string[] = [];
 
   const [saving, setSaving] = useState(false);
   const [error, setError] =
@@ -339,22 +313,6 @@ export function WelcomeJourney({
             (left, right) => left - right,
           ),
     );
-  }
-
-  function togglePriority(key: string) {
-    setPriorityMuscles((current) => {
-      if (current.includes(key)) {
-        return current.filter(
-          (item) => item !== key,
-        );
-      }
-
-      if (current.length >= 3) {
-        return current;
-      }
-
-      return [...current, key];
-    });
   }
 
   async function saveCore() {
@@ -475,18 +433,19 @@ export function WelcomeJourney({
   }
 
   async function saveTraining() {
-    if (
-      scheduleFlexibility === "fixed" &&
-      preferredDays.length === 0
-    ) {
-      setError(copy.required);
-      return;
+    if (!startDate || startDate < localIsoDate() || (sport === "running" && (currentKm <= 0 || targetKm <= 0 || currentPace <= 0 || targetPace <= 0))) {
+      setError(lang === "it" ? "Scegli una data da oggi in poi e completa i dati del programma." : "Choose a start date from today and complete the program details."); return;
     }
-
+    if (sport === "strength" && scheduleFlexibility === "fixed" && (preferredDays.length !== sessions || !preferredDays.includes(new Date(`${startDate}T12:00:00`).getDay() || 7))) {
+      setError(lang === "it" ? `Scegli esattamente ${sessions} giorni, includendo il giorno della prima seduta.` : `Choose exactly ${sessions} days, including your first session day.`); return;
+    }
     setSaving(true);
     setError(null);
 
     try {
+      await createOnboardingProgram({ sport, startDate, weeks, sessions, goal, experience,
+        preferredDays: sport === "strength" && scheduleFlexibility === "fixed" ? preferredDays : [], replace: replaceProgram,
+        currentKm, targetKm, currentPace: Math.round(currentPace * 60), targetPace: Math.round(targetPace * 60), longRunDay }, accessToken);
       await saveTrainingSetup(
         accessToken,
         {
@@ -498,10 +457,9 @@ export function WelcomeJourney({
           environment: "commercial_gym",
           coach_style: coachStyle,
           feedback_mode: "simple",
-          schedule_flexibility:
-            scheduleFlexibility,
+          schedule_flexibility: sport === "strength" ? scheduleFlexibility : "flexible",
           preferred_days:
-            scheduleFlexibility === "fixed"
+            sport === "strength" && scheduleFlexibility === "fixed"
               ? preferredDays
               : [],
           priority_muscles:
@@ -509,6 +467,7 @@ export function WelcomeJourney({
         },
       );
 
+      setCreatedProgram(true);
       setStep("summary");
     } catch (err) {
       setError(
@@ -529,7 +488,8 @@ export function WelcomeJourney({
       );
     }
 
-    window.location.reload();
+    if (trainingEnabled && createdProgram) window.location.assign(`/activities/programs#${sport === "strength" ? "palestra" : "corsa"}`);
+    else window.location.reload();
   }
 
   const goalLabel = {
@@ -980,6 +940,9 @@ export function WelcomeJourney({
             </p>
 
             <div className={styles.grid}>
+              <label><span>{lang === "it" ? "Come vuoi allenarti?" : "How do you want to train?"}</span><select value={sport} onChange={(event) => { setSport(event.target.value as "strength" | "running"); if (sessions > 4) setSessions(3); }}><option value="strength">Palestra</option><option value="running">Corsa</option></select></label>
+              <label><span>{lang === "it" ? "Quando vuoi iniziare?" : "When do you want to start?"}</span><input type="date" min={localIsoDate()} value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+              <label><span>{lang === "it" ? "Durata del programma" : "Program length"}</span><select value={weeks} onChange={(event) => setWeeks(Number(event.target.value))}>{[8, 12, 16].map((value) => <option key={value} value={value}>{value} {lang === "it" ? "settimane" : "weeks"}</option>)}</select></label>
               <label>
                 <span>{copy.experience}</span>
                 <select
@@ -1015,7 +978,7 @@ export function WelcomeJourney({
                     )
                   }
                 >
-                  {[2, 3, 4, 5, 6].map(
+                  {(sport === "strength" ? [2, 3, 4] : [2, 3, 4, 5]).map(
                     (value) => (
                       <option
                         key={value}
@@ -1028,76 +991,7 @@ export function WelcomeJourney({
                 </select>
               </label>
 
-              <label>
-                <span>{copy.duration}</span>
-                <select
-                  value={duration}
-                  onChange={(event) =>
-                    setDuration(
-                      Number(event.target.value),
-                    )
-                  }
-                >
-                  {[30, 45, 60, 75, 90].map(
-                    (value) => (
-                      <option
-                        key={value}
-                        value={value}
-                      >
-                        {value} min
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
-
-              <label>
-                <span>{copy.horizon}</span>
-                <select
-                  value={planningHorizon}
-                  onChange={(event) =>
-                    setPlanningHorizon(
-                      event.target.value as
-                        | "weekly"
-                        | "monthly",
-                    )
-                  }
-                >
-                  <option value="weekly">
-                    {copy.weekly}
-                  </option>
-                  <option value="monthly">
-                    {copy.monthly}
-                  </option>
-                </select>
-              </label>
-
-              <label>
-                <span>{copy.coach}</span>
-                <select
-                  value={coachStyle}
-                  onChange={(event) =>
-                    setCoachStyle(
-                      event.target.value as
-                        | "conservative"
-                        | "balanced"
-                        | "ambitious",
-                    )
-                  }
-                >
-                  <option value="conservative">
-                    {copy.conservative}
-                  </option>
-                  <option value="balanced">
-                    {copy.balanced}
-                  </option>
-                  <option value="ambitious">
-                    {copy.ambitious}
-                  </option>
-                </select>
-              </label>
-
-              <label>
+              {sport === "strength" ? <label>
                 <span>{copy.schedule}</span>
                 <select
                   value={scheduleFlexibility}
@@ -1116,10 +1010,18 @@ export function WelcomeJourney({
                     {copy.fixed}
                   </option>
                 </select>
-              </label>
+              </label> : null}
+              {sport === "running" ? <>
+                <label><span>Quanto corri oggi (km)?</span><input type="number" min="0.5" max="42" step="0.5" value={currentKm} onChange={(event) => setCurrentKm(Number(event.target.value))} /></label>
+                <label><span>Obiettivo distanza (km)</span><input type="number" min="1" max="42.195" step="0.5" value={targetKm} onChange={(event) => setTargetKm(Number(event.target.value))} /></label>
+                <label><span>Passo attuale (min/km)</span><input type="number" min="3" max="12" step="0.1" value={currentPace} onChange={(event) => setCurrentPace(Number(event.target.value))} /></label>
+                <label><span>Passo obiettivo (min/km)</span><input type="number" min="3" max="12" step="0.1" value={targetPace} onChange={(event) => setTargetPace(Number(event.target.value))} /></label>
+                <label><span>Giorno della corsa lunga</span><select value={longRunDay} onChange={(event) => setLongRunDay(Number(event.target.value))}>{WEEKDAYS.map((day) => <option key={day.value} value={day.value - 1}>{day[lang]}</option>)}</select></label>
+                <p className={styles.fullWidth}>Le altre corse saranno distribuite automaticamente nella settimana, a partire dalla data scelta.</p>
+              </> : null}
             </div>
 
-            {scheduleFlexibility ===
+            {sport === "strength" && scheduleFlexibility ===
             "fixed" ? (
               <div className={styles.fieldGroup}>
                 <strong>
@@ -1148,38 +1050,7 @@ export function WelcomeJourney({
               </div>
             ) : null}
 
-            <div className={styles.fieldGroup}>
-              <div>
-                <strong>{copy.priorities}</strong>
-                <span className={styles.help}>
-                  {copy.prioritiesHelp}
-                </span>
-              </div>
-              <div className={styles.chips}>
-                {MUSCLES.map((muscle) => (
-                  <button
-                    key={muscle}
-                    type="button"
-                    className={
-                      priorityMuscles.includes(
-                        muscle,
-                      )
-                        ? styles.chipActive
-                        : styles.chip
-                    }
-                    onClick={() =>
-                      togglePriority(muscle)
-                    }
-                  >
-                    {
-                      MUSCLE_LABELS[muscle][
-                        lang
-                      ]
-                    }
-                  </button>
-                ))}
-              </div>
-            </div>
+            <label className={styles.replaceChoice}><input type="checkbox" checked={replaceProgram} onChange={(event) => setReplaceProgram(event.target.checked)} />{lang === "it" ? "Se ho già un programma di questo sport, sostituiscilo con queste scelte." : "Replace my existing program for this sport with these choices."}</label>
 
             {error ? (
               <p className={styles.error}>
@@ -1210,7 +1081,7 @@ export function WelcomeJourney({
               >
                 {saving
                   ? t("creatingPlan")
-                  : copy.continue}
+                  : (lang === "it" ? "Crea il mio programma" : "Create my program")}
               </button>
             </div>
           </div>
@@ -1225,7 +1096,7 @@ export function WelcomeJourney({
               {copy.summaryTitle}
             </h1>
             <p className={styles.intro}>
-              {copy.summaryIntro}
+              {createdProgram ? (lang === "it" ? "Il tuo programma è stato creato. Puoi già consultare tutte le sedute." : "Your program has been created. You can already view every session.") : copy.summaryIntro}
             </p>
 
             <div className={styles.summary}>
@@ -1242,28 +1113,7 @@ export function WelcomeJourney({
                 <div>
                   <span>{copy.training}</span>
                   <strong>
-                    {sessions}× · {duration} min ·{" "}
-                    {planningHorizon === "weekly"
-                      ? copy.weekly
-                      : copy.monthly}
-                  </strong>
-                </div>
-              ) : null}
-
-              {trainingEnabled ? (
-                <div>
-                  <span>{copy.priorities}</span>
-                  <strong>
-                    {priorityMuscles.length
-                      ? priorityMuscles
-                          .map(
-                            (muscle) =>
-                              MUSCLE_LABELS[
-                                muscle as keyof typeof MUSCLE_LABELS
-                              ][lang],
-                          )
-                          .join(", ")
-                      : copy.noPriority}
+                    {sport === "strength" ? "Palestra" : "Corsa"} · {sessions}× / settimana · {weeks} settimane · dal {new Date(`${startDate}T12:00:00`).toLocaleDateString(lang === "it" ? "it-IT" : "en-GB")}
                   </strong>
                 </div>
               ) : null}
@@ -1301,7 +1151,7 @@ export function WelcomeJourney({
                 type="button"
                 onClick={finish}
               >
-                {copy.startApp}
+                {createdProgram ? (lang === "it" ? "Apri il mio programma" : "Open my program") : copy.startApp}
               </button>
             </div>
 
