@@ -31,7 +31,7 @@ function summary(withMeal: boolean): HomeSummaryResponse {
   };
 }
 
-async function mockServices(page: Page, options: { failActivityOnce?: boolean; previewError?: boolean } = {}) {
+async function mockServices(page: Page, options: { failActivityOnce?: boolean; previewError?: boolean; loggedMealType?: string } = {}) {
   let aiMealLogged = false;
   let failActivity = options.failActivityOnce ?? false;
   const activity = { id: "activity-1", date: new Date().toISOString().slice(0, 10),
@@ -59,6 +59,7 @@ async function mockServices(page: Page, options: { failActivityOnce?: boolean; p
     else if (path === "/onboarding/status") json = { completed: true, preferred_days: [], priority_muscles: [] };
     else if (path.startsWith("/home-summary/")) {
       const home = summary(withMeal);
+      if (options.loggedMealType) home.meals = home.meals.map((meal) => ({ ...meal, meal_type: options.loggedMealType! }));
       if (aiMealLogged) home.meals.push({ id: "ai-meal", meal_type: "Pranzo", name: "Pasta al pomodoro", calories: 500 });
       json = home;
     }
@@ -274,3 +275,27 @@ test("AI errors leave the message editable and old AI links open the home tile",
   await expect(tile.getByLabel("Pasti, attività o peso", { exact: true })).toHaveValue("Messaggio da conservare");
   await expect(tile.getByRole("button", { name: "Analizza con SanoSync AI", exact: true })).toBeEnabled();
 });
+
+
+for (const scenario of [
+  { name: "morning without breakfast", hour: 8, logged: "Pranzo", expected: "Colazione" },
+  { name: "morning after breakfast", hour: 9, logged: "Colazione", expected: "Snack" },
+  { name: "lunchtime", hour: 12, logged: "Colazione", expected: "Pranzo" },
+  { name: "afternoon", hour: 16, logged: "Pranzo", expected: "Snack" },
+  { name: "evening", hour: 20, logged: "Colazione", expected: "Cena" },
+  { name: "after dinner", hour: 21, logged: "Cena", expected: "Snack" },
+]) {
+  test(`AI infers the unspecified meal: ${scenario.name}`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date(2026, 10, 8, scenario.hour));
+    await mockServices(page, { loggedMealType: scenario.logged });
+    await signIn(page);
+    const tile = page.getByRole("region", { name: "SanoSync AI", exact: true });
+    await expect(tile.getByRole("combobox")).toHaveCount(0);
+    await expect(tile.getByText("Pasto predefinito", { exact: true })).toHaveCount(0);
+    await tile.getByLabel("Pasti, attività o peso", { exact: true }).fill("Ho mangiato yogurt e cereali");
+    const request = page.waitForRequest((r) => r.url().endsWith("/meals/conversational/day-preview"));
+    await tile.getByRole("button", { name: "Analizza con SanoSync AI", exact: true }).click();
+    expect((await request).postDataJSON().default_meal_type).toBe(scenario.expected);
+    await expect(tile.getByRole("heading", { name: "Controlla prima di registrare", exact: true })).toBeVisible();
+  });
+}
