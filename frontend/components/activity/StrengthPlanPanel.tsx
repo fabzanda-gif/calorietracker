@@ -11,7 +11,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 
 import { AdaptiveCoachPanel } from "@/components/activity/AdaptiveCoachPanel";
 import { StrengthProgramOverview } from "@/components/activity/StrengthProgramOverview";
-import { StrengthWorkoutLoggerV2 } from "@/components/activity/StrengthWorkoutLoggerV2";
+import Link from "next/link";
+import { workoutTitle } from "@/lib/strengthWorkoutLabels";
 
 import {
   applyStrengthProgression,
@@ -1100,29 +1101,6 @@ export function StrengthPlanPanel() {
                 </span>
               </div>
 
-              <div
-                className={
-                  styles.previewWorkoutList
-                }
-              >
-                {planPreview.plan.workouts
-                  .slice(0, 4)
-                  .map((workout) => (
-                    <span
-                      key={
-                        workout.scheduled_date +
-                        workout.title
-                      }
-                    >
-                      {formatDate(
-                        workout.scheduled_date,
-                      )}
-                      {" · "}
-                      {workout.title}
-                    </span>
-                  ))}
-              </div>
-
               <button
                 type="button"
                 className={
@@ -1222,10 +1200,15 @@ export function StrengthPlanPanel() {
         onChanged={handleTrainingChanged}
       />
 
-      <StrengthWorkoutLoggerV2
-        workout={nextWorkout}
-        onCompleted={handleTrainingChanged}
-      />
+      <section className={styles.builder}>
+        <h3>{nextWorkout ? "Il prossimo allenamento" : "Allenati quando vuoi"}</h3>
+        {nextWorkout ? <>
+          <p>{workoutTitle(nextWorkout)}</p>
+          <p>{nextWorkout.exercises.length} esercizi · {new Date(`${nextWorkout.scheduled_date}T00:00:00`).toLocaleDateString("it-IT", { day: "numeric", month: "long" })}</p>
+          <Link className={styles.primaryButton} href={`/activities/workout/${detail!.plan.id}/${nextWorkout.id}`}>Inizia allenamento</Link>
+        </> : <p>Nessuna seduta in programma.</p>}
+        <p><Link href="/activities/workout/free">Inizia allenamento libero →</Link></p>
+      </section>
 
 
       {loggedWorkout && outcome ? (

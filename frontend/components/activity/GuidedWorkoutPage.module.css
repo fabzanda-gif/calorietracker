@@ -1,0 +1,4 @@
+.main { margin-left: 250px; padding: 44px 32px 100px; max-width: 1200px; }
+.main > h1 { margin-bottom: 8px; }
+.main > p { color: #64748b; }
+@media (max-width: 900px) { .main { margin-left: 0; padding: 24px 16px 100px; } }
