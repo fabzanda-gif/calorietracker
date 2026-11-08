@@ -13,7 +13,6 @@ import styles from "./AppNav.module.css";
 const ITEMS = [
   { href: "/", key: "home", icon: "⌂" },
   { href: "/activities", key: "activities", icon: "↗" },
-  { href: "/ai", key: "ai", icon: "✦" },
   { href: "/food", key: "food", icon: "⌑" },
   {
     href: "/insights",

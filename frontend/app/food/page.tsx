@@ -50,7 +50,7 @@ export default function FoodPage() {
             </p>
           </div>
 
-          <Link href="/ai" className={styles.aiShortcut}>
+          <Link href="/#home-ai" className={styles.aiShortcut}>
             <span aria-hidden="true">✦</span>
             <div>
               <small>SANOSYNC AI</small>
@@ -101,7 +101,7 @@ export default function FoodPage() {
                 <small>Usa ciò che hai oppure cerca un’alternativa.</small>
               </div>
             </Link>
-            <Link href="/ai" className={styles.workflowStep}>
+            <Link href="/#home-ai" className={styles.workflowStep}>
               <span>3</span>
               <div>
                 <strong>Logga in modo naturale</strong>
