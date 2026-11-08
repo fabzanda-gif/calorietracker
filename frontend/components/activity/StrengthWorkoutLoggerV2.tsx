@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -32,6 +33,11 @@ import {
   type ExerciseLibraryItem,
 } from "@/lib/api/exercises";
 
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { exerciseRef, type StrengthLoadProfile } from "@/lib/api/strengthLoads";
+import { effortReserve, estimatedMax, loadAdvice, roundLoadDown, type LoadReference } from "@/lib/strengthRecommendations";
+import { StrengthLoadCalibration, type CalibrationResult } from "./StrengthLoadCalibration";
+import { useStrengthReferences } from "./useStrengthReferences";
 import { workoutTitle } from "@/lib/strengthWorkoutLabels";
 import styles from "./StrengthWorkoutLoggerV2.module.css";
 
@@ -68,15 +74,15 @@ function todayIso(): string {
 
 function emptySets(
   exercise: StrengthWorkoutExercise,
+  references: LoadReference[] = [],
+  profiles: StrengthLoadProfile[] = [],
 ): SetDraft[] {
+  const advice = loadAdvice(exercise, references, profiles);
   return Array.from(
     { length: exercise.target_sets },
     () => ({
-      reps: "",
-      loadKg:
-        exercise.prescribed_load_kg != null
-          ? String(exercise.prescribed_load_kg)
-          : "",
+      reps: String(advice.reps),
+      loadKg: advice.loadKg != null ? String(advice.loadKg) : "",
       feeling: null,
       saved: false,
       saving: false,
@@ -131,9 +137,16 @@ export function StrengthWorkoutLoggerV2({
   onCompleted,
 }: Props) {
   const { accessToken } = useAuth();
+  const { locale } = useI18n();
 
   const [activeWorkout, setActiveWorkout] =
     useState<StrengthWorkout | null>(workout);
+  const loads = useStrengthReferences(accessToken, activeWorkout?.strength_plan_id);
+  const referenceSnapshot = useRef({ references: loads.references, profiles: loads.profiles });
+  referenceSnapshot.current = { references: loads.references, profiles: loads.profiles };
+  const loadsReady = !loads.loading && !loads.error;
+  const activeWorkoutId = activeWorkout?.id;
+  useEffect(() => { setDetails({}); setOpenDemo(null); }, [locale]);
   const [drafts, setDrafts] = useState<
     Record<string, SetDraft[]>
   >({});
@@ -193,11 +206,12 @@ export function StrengthWorkoutLoggerV2({
   }, [workout, activeWorkout?.id, activeWorkout?.workout_kind]);
 
   useEffect(() => {
-    if (!accessToken || !activeWorkout) {
+    if (!accessToken || !activeWorkoutId) {
       setDrafts({});
       return;
     }
 
+    if (!loadsReady) return;
     let active = true;
 
     async function loadSession() {
@@ -206,7 +220,7 @@ export function StrengthWorkoutLoggerV2({
 
       try {
         const response = await startStrengthSession(
-          activeWorkout!.id,
+          activeWorkoutId!,
           performedDate,
           accessToken!,
         );
@@ -222,7 +236,7 @@ export function StrengthWorkoutLoggerV2({
 
         for (const exercise of response.exercises) {
           nextDrafts[exercise.id] =
-            emptySets(exercise);
+            emptySets(exercise, referenceSnapshot.current.references, referenceSnapshot.current.profiles);
         }
 
         for (const saved of response.sets) {
@@ -255,6 +269,11 @@ export function StrengthWorkoutLoggerV2({
           ] = list;
         }
 
+        for (const exercise of response.exercises) {
+          const sets = nextDrafts[exercise.id];
+          const saved = sets.find((set) => set.saved);
+          if (saved) for (const set of sets) if (!set.saved && !set.loadKg) set.loadKg = saved.loadKg;
+        }
         setDrafts(nextDrafts);
         const sorted = [...response.exercises].sort((a, b) => a.position - b.position);
         const unfinished = sorted.findIndex((exercise) => (nextDrafts[exercise.id] ?? []).some((set) => !set.saved));
@@ -289,8 +308,9 @@ export function StrengthWorkoutLoggerV2({
     };
   }, [
     accessToken,
-    activeWorkout?.id,
+    activeWorkoutId,
     performedDate,
+    loadsReady,
   ]);
 
   const hasSavedSet = useMemo(
@@ -377,7 +397,7 @@ export function StrengthWorkoutLoggerV2({
           reps,
           load_kg: loadKg,
           feeling: item.feeling,
-          rir: null,
+          rir: effortReserve(item.feeling),
         },
         accessToken,
       );
@@ -494,7 +514,7 @@ export function StrengthWorkoutLoggerV2({
       const detail = await getExercise(
         accessToken,
         exercise.exercise_id,
-        "it",
+        locale,
       );
 
       setDetails((current) => ({
@@ -574,7 +594,7 @@ export function StrengthWorkoutLoggerV2({
       setDrafts((current) => ({
         ...current,
         [row.id]:
-          emptySets(response.exercise),
+          emptySets(response.exercise, loads.references, loads.profiles),
       }));
 
       setSubstitutions((current) => ({
@@ -662,7 +682,7 @@ export function StrengthWorkoutLoggerV2({
       setDrafts((current) => ({
         ...current,
         [response.exercise.id]:
-          emptySets(response.exercise),
+          emptySets(response.exercise, loads.references, loads.profiles),
       }));
 
       setReviewing(false);
@@ -716,6 +736,21 @@ export function StrengthWorkoutLoggerV2({
           : "Non riesco a creare il workout libero.",
       );
     }
+  }
+
+  async function setStartingLoad(exercise: StrengthWorkoutExercise, maxKg: number | null, result?: CalibrationResult) {
+    const advice = loadAdvice(exercise, []);
+    const calculated = maxKg == null ? result?.loadKg ?? 0 : Math.min(1000, roundLoadDown(maxKg / (1 + (advice.reps + (exercise.target_rir ?? 2)) / 30)));
+    const recommended = result ? Math.min(result.loadKg, calculated) : calculated;
+    try {
+      await loads.save({ exercise_ref: exerciseRef(exercise), exercise_name: exercise.exercise_name,
+        one_rep_max_kg: maxKg, working_load_kg: recommended, reference_reps: result?.reps ?? advice.reps,
+        reserve_reps: result?.rir ?? exercise.target_rir ?? 2, source: result ? "guided_test" : "known_max" });
+      setDrafts((current) => ({ ...current, [exercise.id]: (current[exercise.id] ?? emptySets(exercise)).map((set) => set.saved ? set : { ...set, reps: String(advice.reps), loadKg: String(recommended), feeling: null }) }));
+      setMessage("Peso iniziale salvato. Ora esegui le serie proposte e conferma come sono andate.");
+      setError(null);
+      return true;
+    } catch { setError("Non riesco a salvare il peso iniziale. Riprova."); return false; }
   }
 
   async function nextExercise() {
@@ -926,6 +961,8 @@ export function StrengthWorkoutLoggerV2({
     );
   }
 
+  if (loads.loading || loads.error) return <section className={styles.card}>{loads.loading ? <p>Recupero i tuoi carichi precedenti…</p> : <p role="alert">{loads.error} <button type="button" onClick={loads.retry}>Riprova</button></p>}</section>;
+
   return (
     <section className={styles.card}>
       <header className={styles.header}>
@@ -968,8 +1005,10 @@ export function StrengthWorkoutLoggerV2({
               exercise.exercise_id
                 ? details[exercise.exercise_id]
                 : undefined;
-            const media =
-              mediaFor(libraryDetail);
+            const media = mediaFor(libraryDetail);
+            const advice = loadAdvice(exercise, loads.references, loads.profiles);
+            const savedReference = (drafts[exercise.id] ?? []).find((set) => set.saved);
+            const needsCalibration = advice.loadKg == null && !savedReference;
 
             return (
               <article
@@ -1051,6 +1090,7 @@ export function StrengthWorkoutLoggerV2({
                         {libraryDetail.instructions}
                       </p>
                     ) : null}
+                    {libraryDetail.steps?.length ? <ol>{libraryDetail.steps.map((step, index) => <li key={index}>{step}</li>)}</ol> : null}
                   </div>
                 ) : null}
 
@@ -1083,6 +1123,10 @@ export function StrengthWorkoutLoggerV2({
                   </div>
                 ) : null}
 
+                {needsCalibration ? <StrengthLoadCalibration key={exercise.id} exercise={exercise}
+                  onKnownMax={(max) => setStartingLoad(exercise, max)}
+                  onConfirm={(result) => setStartingLoad(exercise, estimatedMax(result.loadKg, result.reps, result.rir) ?? null, result)} /> : <>
+                <p className={styles.prescription}><strong>Consiglio: {exercise.target_sets} serie × {advice.reps} ripetizioni · {advice.loadKg ?? savedReference?.loadKg} kg</strong><br />I valori sono già compilati. Correggili se hai fatto qualcosa di diverso e indica come è andata ogni serie.</p>
                 <div className={styles.setHeader}>
                   <span>Serie</span>
                   <span>Reps</span>
@@ -1199,6 +1243,7 @@ export function StrengthWorkoutLoggerV2({
                     + Serie
                   </button>
                 </div>
+                </>}
               </article>
             );
           },

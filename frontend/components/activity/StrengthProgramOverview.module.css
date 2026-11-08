@@ -232,3 +232,17 @@
 .workout summary { cursor: pointer; font-weight: 700; }
 .workout li { margin-bottom: 8px; }
 @media (max-width: 720px) { .workout { flex-direction: column; } .workout details { max-width: 100%; } }
+.calendar { display: grid; gap: 12px; margin: 20px 0; }
+.calendarWeek { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 12px; }
+.calendarWeek > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.calendarWeek button { display: grid; gap: 3px; min-width: 130px; min-height: 56px; padding: 9px 12px; text-align: left; border: 1px solid #d4dbe2; border-radius: 12px; color: inherit; background: white; font: inherit; cursor: pointer; }
+.calendarWeek button[aria-pressed="true"] { background: #123651; border-color: #123651; color: white; }
+.calendarWeek small { font-size: .72rem; }
+.daySheet { margin: 24px 0 12px; border-top: 1px solid #d4dbe2; padding-top: 20px; }
+.tableScroll { overflow-x: auto; }
+.daySheet table { border-collapse: collapse; width: 100%; margin: 16px 0; text-align: left; }
+.daySheet th, .daySheet td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+.daySheet td small { display: block; margin-top: 5px; color: #64748b; }
+.daySheet td button { border: 1px solid #cbd5e1; background: white; padding: 9px; border-radius: 9px; font: inherit; color: inherit; cursor: pointer; }
+.startButton { display: inline-block; background: #123651; color: white; padding: 12px 18px; border-radius: 12px; font-weight: 750; text-decoration: none; }
+@media (max-width: 720px) { .calendarWeek { grid-template-columns: 1fr; gap: 7px; } .calendarWeek button { min-width: 0; flex: 1 1 28%; font-size: .8rem; } .daySheet table { min-width: 580px; } }
