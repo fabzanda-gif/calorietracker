@@ -41,6 +41,7 @@ async function mockServices(page: Page, options: { failActivityOnce?: boolean; p
   const routine: Record<string, string> = { monday: "home" };
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/rest/v1/strength_load_profiles**", (route) => route.fulfill({ json: [] }));
   await page.route("**/auth/v1/**", async (route) => {
     if (route.request().url().includes("/logout")) {
       await route.fulfill({ status: 204 });
@@ -300,15 +301,30 @@ for (const scenario of [
   });
 }
 
-async function mockGuidedStrength(page: Page, failSave = false) {
+async function mockGuidedStrength(page: Page, failSave = false, uncalibrated = false) {
   const exercise = (id: string, name: string, position: number, pattern: string) => ({
-    id, exercise_key: id, exercise_name: name, position, movement_pattern: pattern,
+    id, exercise_id: `${id}-library`, exercise_key: id, exercise_name: name, position, movement_pattern: pattern,
     strength_workout_id: "workout-1", target_sets: 1, target_reps_min: 6, target_reps_max: 10,
     target_rir: 2, rest_seconds: 90, prescribed_load_kg: null,
   });
   const exercises = [exercise("bench", "Bench Press", 2, "horizontal_push"), exercise("squat", "Back Squat", 1, "squat")];
   const plan = { id: "plan-1", goal: "hypertrophy", experience_level: "beginner", program_style: "full_body", sessions_per_week: 3, start_date: "2026-11-08", total_weeks: 8, status: "active" };
-  const workouts = Array.from({ length: 24 }, (_, index) => ({ id: `workout-${index + 1}`, strength_plan_id: plan.id, scheduled_date: "2026-11-08", training_week: Math.floor(index / 3) + 1, workout_index: index + 1, title: "Full Body A", focus: "full_body", status: "planned", workout_kind: "planned", estimated_duration_minutes: 45, exercises }));
+  const workouts = Array.from({ length: 24 }, (_, index) => ({ id: `workout-${index + 1}`, strength_plan_id: plan.id, scheduled_date: new Date(Date.UTC(2026, 10, 8 + Math.floor(index / 3) * 7 + index % 3 * 2)).toISOString().slice(0, 10), training_week: Math.floor(index / 3) + 1, workout_index: index + 1, title: "Full Body A", focus: "full_body", status: "planned", workout_kind: "planned", estimated_duration_minutes: 45, exercises }));
+  const profiles: Array<Record<string, unknown>> = uncalibrated ? [] : ["squat", "bench"].map((id) => ({ user_id: user.id, exercise_ref: `library:${id}-library`, exercise_name: id, one_rep_max_kg: null, working_load_kg: id === "squat" ? 30 : 20, reference_reps: 8, reserve_reps: 2, source: "guided_test", updated_at: "2026-11-08T08:00:00Z" }));
+  await page.route("**/rest/v1/strength_load_profiles**", async (route) => {
+    expect(route.request().headers().authorization).toBe(`Bearer ${accessToken}`);
+    if (route.request().method() === "POST") {
+      const profile = route.request().postDataJSON();
+      expect(profile.user_id).toBe(user.id);
+      const index = profiles.findIndex((item) => item.exercise_ref === profile.exercise_ref);
+      if (index >= 0) profiles[index] = profile; else profiles.push(profile);
+      await route.fulfill({ status: 201, json: [] });
+    } else await route.fulfill({ json: profiles });
+  });
+  await page.route("http://localhost:8000/exercises/*", async (route) => {
+    const language = new URL(route.request().url()).searchParams.get("language");
+    await route.fulfill({ json: { id: "squat-library", name: language === "it" ? "Squat con bilanciere" : "Barbell Back Squat", instructions: language === "it" ? "Mantieni il busto stabile e la schiena neutra." : "Keep your torso stable and your back neutral.", steps: language === "it" ? ["Piega anche e ginocchia."] : ["Bend your hips and knees."], media: [] } });
+  });
   let sessionStarts = 0;
   let completions = 0;
   const saved = new Map<string, Record<string, unknown>>();
@@ -333,7 +349,7 @@ async function mockGuidedStrength(page: Page, failSave = false) {
     else throw new Error(`Missing strength fixture: ${path}`);
     await route.fulfill({ json });
   });
-  return { sessionStarts: () => sessionStarts, completions: () => completions, saved };
+  return { sessionStarts: () => sessionStarts, completions: () => completions, saved, profiles };
 }
 
 for (const viewport of [{ name: "desktop", width: 1440, height: 1100 }, { name: "mobile", width: 390, height: 844 }]) {
@@ -345,8 +361,8 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 1100 }, { name: 
     await page.goto("/activities/programs");
     await page.getByRole("tab", { name: "Palestra", exact: true }).click();
     await expect(page.getByText("3 allenamenti a settimana per 8 settimane", { exact: true })).toBeVisible();
-    await expect(page.getByText("Allenamento 1", { exact: true })).toHaveCount(1);
-    await expect(page.getByText("Allenamento 4", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Giorni del programma").getByRole("button")).toHaveCount(24);
+    await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: "1. Back Squat", exact: true })).toBeVisible();
     await expect(page.getByText("Full Body A", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("group", { name: "Come è andata la serie 1?" })).toHaveCount(0);
     expect(strength.sessionStarts()).toBe(0);
@@ -410,4 +426,83 @@ test("workout resumes saved series and history remains a separate read-only page
   await page.getByRole("button", { name: "← Precedente", exact: true }).click();
   await expect(page.getByLabel("Ripetizioni serie 1")).toHaveValue("8");
   await expect(page.getByRole("button", { name: "Giusto", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("every scheduled day opens its sheet without starting a session, and known maximum persists", async ({ page }, testInfo) => {
+  await mockServices(page);
+  const strength = await mockGuidedStrength(page, false, true);
+  await signIn(page);
+  await page.goto("/activities/programs");
+  await page.getByRole("tab", { name: "Palestra", exact: true }).click();
+  const days = page.getByLabel("Giorni del programma").getByRole("button");
+  await expect(days).toHaveCount(24);
+  await days.nth(23).click();
+  await expect(days.nth(23)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: "1. Back Squat", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: "1 × 8 Fascia 6–10", exact: true })).toHaveCount(2);
+  expect(strength.sessionStarts()).toBe(0);
+  await page.getByRole("button", { name: "Imposta massimale · Back Squat", exact: true }).click();
+  await page.getByRole("button", { name: "Conosco già il mio massimale", exact: true }).click();
+  await page.getByLabel("Massimale conosciuto (kg)").fill("100");
+  await page.getByRole("button", { name: "Calcola e salva il peso consigliato", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "75 kg Dal tuo riferimento salvato", exact: true })).toBeVisible();
+  expect(strength.profiles[0].one_rep_max_kg).toBe(100);
+  expect(strength.saved.size).toBe(0);
+  expect(strength.sessionStarts()).toBe(0);
+  await page.screenshot({ path: testInfo.outputPath("all-days-with-loads.png"), fullPage: true });
+  await page.getByRole("link", { name: /Inizia il prossimo allenamento/ }).click();
+  await expect(page).toHaveURL(/\/workout\/plan-1\/workout-1$/);
+  await expect(page.getByLabel("Peso in kg serie 1")).toHaveValue("75");
+  await expect(page.getByLabel("Ripetizioni serie 1")).toHaveValue("8");
+  await page.reload();
+  await expect(page.getByLabel("Peso in kg serie 1")).toHaveValue("75");
+});
+
+test("first exercise guides a submaximal test, saves its reference and pre-fills the prescription", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockServices(page);
+  const strength = await mockGuidedStrength(page, false, true);
+  await signIn(page);
+  await page.goto("/activities/workout/plan-1/workout-1");
+  await expect(page.getByLabel("Troviamo il tuo peso iniziale")).toBeVisible();
+  await expect(page.getByLabel("Peso in kg serie 1")).toHaveCount(0);
+  await page.getByRole("button", { name: "Non lo conosco: guidami", exact: true }).click();
+  await page.getByLabel("Peso provato (kg)").fill("20");
+  await expect(page.getByLabel("Ripetizioni della prova")).toHaveValue("8");
+  await page.getByRole("button", { name: "0–1", exact: true }).click();
+  await expect(page.getByText(/Il carico è troppo impegnativo/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Usa questo peso nella scheda", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Dolore o tecnica instabile", exact: true }).click();
+  await expect(page.getByText(/Interrompi la prova/)).toBeVisible();
+  await page.getByLabel("Ripetizioni della prova").fill("6");
+  await page.getByRole("button", { name: "2–3", exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath("load-calibration-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Usa questo peso nella scheda", exact: true }).click();
+  await expect(page.getByLabel("Ripetizioni serie 1")).toHaveValue("8");
+  await expect(page.getByLabel("Peso in kg serie 1")).toHaveValue("18.5");
+  expect(strength.profiles[0].source).toBe("guided_test");
+  expect(strength.profiles[0].one_rep_max_kg).toBeCloseTo(25.3, 1);
+  expect(strength.saved.size).toBe(0); // Calibration is not falsely recorded as a completed work set.
+  await page.getByRole("button", { name: "Giusto", exact: true }).click();
+  await expect.poll(() => strength.saved.size).toBe(1);
+  expect(strength.saved.get("squat")?.rir).toBe(2);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Bench Press", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "← Precedente", exact: true }).click();
+  await expect(page.getByLabel("Peso in kg serie 1")).toHaveValue("18.5");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("exercise demo uses the selected language and Italian instructions", async ({ page }) => {
+  await mockServices(page);
+  await mockGuidedStrength(page);
+  await signIn(page);
+  await page.goto("/activities/workout/plan-1/workout-1");
+  await page.getByRole("button", { name: "Demo", exact: true }).click();
+  await expect(page.getByText("Mantieni il busto stabile e la schiena neutra.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Piega anche e ginocchia.", { exact: true })).toBeVisible();
+  await page.evaluate(() => localStorage.setItem("sanosync-language", "en"));
+  await page.reload();
+  await page.getByRole("button", { name: "Demo", exact: true }).click();
+  await expect(page.getByText("Keep your torso stable and your back neutral.", { exact: true })).toBeVisible();
 });
