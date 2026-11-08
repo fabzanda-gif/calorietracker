@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { StrengthPlanDetailResponse, StrengthWorkoutExercise } from "@/lib/api/strength";
@@ -19,6 +19,14 @@ export function StrengthProgramOverview({ detail }: { detail: StrengthPlanDetail
   const next = workouts.find((workout) => workout.status === "planned");
   const [selectedId, setSelectedId] = useState(next?.id ?? workouts[0]?.id);
   const [calibrateId, setCalibrateId] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (calibrateId && !dialogRef.current?.open) {
+      dialogRef.current?.showModal();
+      dialogRef.current?.querySelector<HTMLInputElement>('input[type="number"]')?.focus();
+    }
+    else if (!calibrateId && dialogRef.current?.open) dialogRef.current.close();
+  }, [calibrateId]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const selected = workouts.find((item) => item.id === selectedId) ?? next ?? workouts[0];
   const weeks = [...new Set(workouts.map((workout) => workout.training_week))];
@@ -51,7 +59,10 @@ export function StrengthProgramOverview({ detail }: { detail: StrengthPlanDetail
           </tr>; })}
         </tbody></table></div>
         {saveError ? <p role="alert">{saveError}</p> : null}
-        {selected.exercises.filter((exercise) => exercise.id === calibrateId).map((exercise) => <StrengthLoadCalibration key={exercise.id} exercise={exercise} allowTest={false} onKnownMax={(max) => knownMax(exercise, max)} />)}
+        <dialog ref={dialogRef} className={styles.loadDialog} aria-label="Imposta il massimale" onCancel={() => setCalibrateId(null)} onClose={() => setCalibrateId(null)}>
+          <button type="button" className={styles.closeDialog} onClick={() => setCalibrateId(null)}>Chiudi</button>
+          {selected.exercises.filter((exercise) => exercise.id === calibrateId).map((exercise) => <div key={exercise.id}><h3>{exercise.exercise_name}</h3><StrengthLoadCalibration exercise={exercise} allowTest={false} initialMode="known" onKnownMax={(max) => knownMax(exercise, max)} /></div>)}
+        </dialog>
       </>}
       {next ? <p><Link className={styles.startButton} href={`/activities/workout/${detail.plan.id}/${next.id}`}>{selected.id === next.id ? "Inizia questo allenamento" : `Inizia il prossimo allenamento · ${dayLabel(next.scheduled_date)}`}</Link></p> : <p>Hai concluso tutte le sedute del programma.</p>}
     </div> : null}

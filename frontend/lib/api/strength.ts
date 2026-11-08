@@ -96,6 +96,10 @@ export interface StrengthPlanPreviewResponse {
       scheduled_date: string;
       title: string;
       focus: string;
+      training_week: number;
+      workout_index: number;
+      estimated_duration_minutes: number | null;
+      exercises: Array<Omit<StrengthWorkoutExercise, "id" | "strength_workout_id">>;
     }>;
   };
 }

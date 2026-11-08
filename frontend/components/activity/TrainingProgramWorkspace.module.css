@@ -1,0 +1,7 @@
+.tabs { display: flex; gap: 8px; padding: 14px 0; }
+.tabs button, .other button { border: 1px solid #d2dbe4; border-radius: 12px; padding: 12px 16px; font: inherit; color: inherit; background: white; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: #112a47; color: white; border-color: #112a47; }
+.title { font-size: 1rem; margin: 20px 0 0; }
+.other { margin-top: 20px; padding: 16px 0; border-top: 1px solid #e2e8f0; color: #64748b; }
+.other summary { cursor: pointer; font-size: .85rem; }
+.other > div { min-width: 0; }

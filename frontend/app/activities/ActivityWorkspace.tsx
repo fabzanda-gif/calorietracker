@@ -12,8 +12,9 @@ import Link from "next/link";
 
 import { ActivityLogger } from "@/components/activity/ActivityLogger";
 import { ActivityMap } from "@/components/activity/ActivityMap";
-import { RunningPlanBuilder } from "@/components/activity/RunningPlanBuilder";
-import { StrengthPlanPanel } from "@/components/activity/StrengthPlanPanel";
+import { getStrengthPlans } from "@/lib/api/strength";
+import { getTrainingPlans } from "@/lib/api/activities";
+import { TrainingProgramWorkspace } from "@/components/activity/TrainingProgramWorkspace";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   useExperienceMode,
@@ -596,15 +597,24 @@ function MetricChart({
 
 export default function ActivityWorkspace({ view }: { view: "recap" | "programs" }) {
   const programs = view === "programs";
-  const [programKind, setProgramKind] = useState<"running" | "strength">("running");
-  useEffect(() => {
-    if (view === "programs" && window.location.hash === "#palestra") setProgramKind("strength");
-  }, [view]);
+  const [focusedSport, setFocusedSport] = useState<"running" | "strength" | null>(null);
+  const [showRegistry, setShowRegistry] = useState(false);
   const { locale } = useI18n();
   const copy = activitiesCopy[locale];
   const planText = plannerCopy[locale];
   const displayLocale = activityLocale[locale];
   const { accessToken } = useAuth();
+  useEffect(() => {
+    if (programs || !accessToken) return;
+    let active = true;
+    void Promise.all([getTrainingPlans(accessToken), getStrengthPlans(accessToken)]).then(([running, strength]) => {
+      if (!active) return;
+      const run = running.items.some((plan) => plan.status === "active");
+      const gym = strength.items.some((plan) => plan.status === "active");
+      setFocusedSport(run !== gym ? (gym ? "strength" : "running") : null);
+    }).catch(() => { if (active) setFocusedSport(null); });
+    return () => { active = false; };
+  }, [programs, accessToken]);
   const {
     experienceMode,
   } = useExperienceMode();
@@ -2005,24 +2015,28 @@ export default function ActivityWorkspace({ view }: { view: "recap" | "programs"
             <p className={styles.eyebrow}>
               {copy.activity}
             </p>
-            <h1>{programs ? copy.programs : copy.activity}</h1>
-            <p>{programs ? copy.programsIntro : copy.activeIntro}</p>
+            <h1>{focusedSport ? (focusedSport === "strength" ? copy.strength : copy.run) : programs ? copy.programs : copy.activity}</h1>
+            <p>{focusedSport ? "Il tuo programma, le schede e i prossimi allenamenti." : programs ? copy.programsIntro : copy.activeIntro}</p>
           </div>
           <div className={styles.workspaceActions}>
-            <Link className={styles.workspacePrimary} href={programs ? "/activities" : "/activities/programs"}>
+            {(!focusedSport || programs) ? <Link className={styles.workspacePrimary} href={programs ? "/activities" : "/activities/programs"}>
               {programs ? `← ${copy.activity}` : `${copy.trainingPrograms} →`}
-            </Link>
+            </Link> : null}
             {programs ? (
               <Link className={styles.workspaceSecondary} href="/profile#planning-settings">
                 {copy.routineSettings}
               </Link>
-            ) : (
+            ) : focusedSport ? <button type="button" className={styles.workspaceSecondary} onClick={() => setShowRegistry((value) => !value)}>Registro attività</button> : (
               <a className={styles.workspaceSecondary} href="#registra-attivita">{copy.newActivityOrSteps}</a>
             )}
           </div>
         </header>
 
-        {!programs ? <>
+        {!programs && focusedSport ? <>
+          <section className={styles.trainingPrograms}><div className={styles.trainingProgramsBody}><TrainingProgramWorkspace onSportFocus={setFocusedSport} /></div></section>
+          <details open={showRegistry} onToggle={(event) => setShowRegistry(event.currentTarget.open)}><summary>Registro attività</summary></details>
+        </> : null}
+        {!programs && (!focusedSport || showRegistry) ? <>
 
         <section className={styles.summarySection}>
           <div className={styles.summaryHeading}>
@@ -2375,23 +2389,7 @@ export default function ActivityWorkspace({ view }: { view: "recap" | "programs"
           className={styles.trainingPrograms}
           aria-label={copy.trainingPrograms}
         >
-          <div className={styles.programTabs} role="tablist" aria-label={copy.programs} onKeyDown={(event) => {
-            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-            event.preventDefault();
-            const next = event.key === "Home" ? "running" : event.key === "End" ? "strength" : programKind === "running" ? "strength" : "running";
-            setProgramKind(next);
-            document.getElementById(`${next}-tab`)?.focus();
-          }}>
-            <button id="running-tab" role="tab" aria-selected={programKind === "running"} tabIndex={programKind === "running" ? 0 : -1} aria-controls="program-panel" type="button" onClick={() => setProgramKind("running")}>{copy.run}</button>
-            <button id="strength-tab" role="tab" aria-selected={programKind === "strength"} tabIndex={programKind === "strength" ? 0 : -1} aria-controls="program-panel" type="button" onClick={() => setProgramKind("strength")}>{copy.strength}</button>
-          </div>
-          <div className={styles.trainingProgramsBody} id="program-panel" role="tabpanel" aria-labelledby={`${programKind}-tab`}>
-            {programKind === "running" ? <RunningPlanBuilder
-              onCreated={() => {
-                void loadMonth();
-              }}
-            /> : <StrengthPlanPanel />}
-          </div>
+          <div className={styles.trainingProgramsBody}><TrainingProgramWorkspace onSportFocus={setFocusedSport} onChanged={() => { void loadMonth(); }} /></div>
         </section>
 
         <details
@@ -3604,7 +3602,7 @@ export default function ActivityWorkspace({ view }: { view: "recap" | "programs"
           </div>
         ) : null}
 
-        {!programs ? <details id="registra-attivita" className={styles.loggerCard}>
+        {!programs && (!focusedSport || showRegistry) ? <details id="registra-attivita" className={styles.loggerCard}>
           <summary className={styles.loggerHeading}>
             <span>
               <span className={styles.eyebrow}>{copy.register}</span>
@@ -3779,7 +3777,7 @@ export default function ActivityWorkspace({ view }: { view: "recap" | "programs"
           </section>
         ) : null}
 
-        {!programs ? <div className={styles.contentGrid}>
+        {!programs && (!focusedSport || showRegistry) ? <div className={styles.contentGrid}>
           <section className={styles.card}>
             <div className={styles.cardHeading}>
               <div>

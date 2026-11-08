@@ -358,8 +358,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 1100 }, { name: 
     const errors = await mockServices(page);
     const strength = await mockGuidedStrength(page);
     await signIn(page);
-    await page.goto("/activities/programs");
-    await page.getByRole("tab", { name: "Palestra", exact: true }).click();
+    await page.goto("/activities/programs#palestra");
     await expect(page.getByText("3 allenamenti a settimana per 8 settimane", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Giorni del programma").getByRole("button")).toHaveCount(24);
     await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: /1\. Back Squat/ })).toBeVisible();
@@ -432,8 +431,7 @@ test("every scheduled day opens its sheet without starting a session, and known 
   await mockServices(page);
   const strength = await mockGuidedStrength(page, false, true);
   await signIn(page);
-  await page.goto("/activities/programs");
-  await page.getByRole("tab", { name: "Palestra", exact: true }).click();
+  await page.goto("/activities/programs#palestra");
   const days = page.getByLabel("Giorni del programma").getByRole("button");
   await expect(days).toHaveCount(24);
   await days.nth(23).click();
@@ -582,7 +580,7 @@ test("gym onboarding creates the dated fixed-day program and retry does not dupl
   expect(result.workouts[2].scheduled_date).toBe("2026-11-23");
   await page.getByRole("button", { name: "Apri il mio programma", exact: true }).click();
   await expect(page).toHaveURL(/\/activities\/programs#palestra$/);
-  await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Il tuo programma palestra", exact: true })).toBeVisible();
   await expect(page.getByLabel("Giorni del programma").getByRole("button")).toHaveCount(16);
 });
 
@@ -615,4 +613,145 @@ for (const width of [360, 390, 430]) test(`program calendar and exercise sheet f
   await expect(page.getByLabel("Scheda del giorno").getByRole("cell", { name: /1\. Back Squat/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath(`program-mobile-${width}.png`), fullPage: true });
+});
+
+for (const width of [390, 1440]) test(`gym preview requires a chosen start and shows each exercise before confirmation at ${width}px`, async ({ page }, testInfo) => {
+  await page.clock.install({ time: new Date("2026-11-08T10:00:00Z") });
+  await page.setViewportSize({ width, height: 900 });
+  await mockServices(page);
+  const previews: Array<Record<string, unknown>> = [];
+  const creates: Array<Record<string, unknown>> = [];
+  await page.route("http://localhost:8000/strength/plans/preview", async (route) => {
+    const input = route.request().postDataJSON(); previews.push(input);
+    const workouts = Array.from({ length: input.total_weeks * input.sessions_per_week }, (_, index) => ({
+      scheduled_date: new Date(Date.UTC(2026, 10, 16 + index * 2)).toISOString().slice(0, 10), title: "Full Body A", focus: "full_body", training_week: Math.floor(index / input.sessions_per_week) + 1, workout_index: index % input.sessions_per_week + 1, estimated_duration_minutes: 45,
+      exercises: [{ position: 1, exercise_key: index === 0 ? "back_squat" : "lat_pulldown", exercise_name: index === 0 ? "Back Squat" : "Lat Pulldown", movement_pattern: index === 0 ? "squat" : "vertical_pull", target_sets: 3, target_reps_min: 6, target_reps_max: 10, rest_seconds: 120, prescribed_load_kg: null, target_rir: 2 }],
+    }));
+    await route.fulfill({ json: { preview: true, plan: { ...input, workout_count: workouts.length, workouts } } });
+  });
+  await page.route("http://localhost:8000/strength/plans", async (route) => {
+    if (route.request().method() === "POST") { creates.push(route.request().postDataJSON()); await route.fulfill({ status: 201, json: { plan: { id: "preview-plan" } } }); }
+    else await route.fulfill({ json: { items: [], count: 0 } });
+  });
+  await signIn(page);
+  await page.goto("/activities/programs#palestra");
+  await expect(page.getByLabel("Quando vuoi iniziare?", { exact: true })).toHaveValue("");
+  await page.getByRole("button", { name: "Mostra l’anteprima del programma", exact: true }).click();
+  await expect(page.getByText("Scegli il giorno in cui vuoi iniziare, da oggi in poi.", { exact: true })).toBeVisible();
+  expect(previews).toHaveLength(0);
+  await page.getByLabel("Quando vuoi iniziare?", { exact: true }).fill("2026-11-16");
+  await page.getByRole("button", { name: "Mostra l’anteprima del programma", exact: true }).click();
+  const preview = page.getByLabel("Anteprima delle schede");
+  await expect(preview.getByRole("heading", { name: "Il programma che stai per creare", exact: true })).toBeVisible();
+  await expect(preview.getByText("Back Squat", { exact: true })).toBeVisible();
+  await expect(preview.getByText("3 serie × 6–10 ripetizioni", { exact: true })).toBeVisible();
+  await expect(preview.getByText(/Recupero 120 secondi/)).toBeVisible();
+  expect(creates).toHaveLength(0);
+  await page.getByLabel("Seduta da consultare", { exact: true }).selectOption("1");
+  await expect(preview.getByText("Lat Pulldown", { exact: true })).toBeVisible();
+  await expect(preview.getByText("Back Squat", { exact: true })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Sedute / settimana", exact: true }).selectOption("2");
+  await expect(page.getByRole("button", { name: "Conferma programma", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Mostra l’anteprima del programma", exact: true }).click();
+  await expect(preview.getByText("Back Squat", { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath(`readable-preview-${width}.png`), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole("button", { name: "Conferma programma", exact: true }).click();
+  await expect.poll(() => creates.length).toBe(1);
+  expect(creates[0]).toMatchObject({ start_date: "2026-11-16", sessions_per_week: 2 });
+});
+
+test("running builder uses the selected start date rather than today", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-08T10:00:00Z") });
+  await mockServices(page);
+  let input: Record<string, unknown> | null = null;
+  await page.route("http://localhost:8000/activities/training-plans/running/preview", async (route) => {
+    input = route.request().postDataJSON();
+    await route.fulfill({ json: { preview: true, total_weeks: 8, session_count: 1, sessions: [{ id: "run-preview", scheduled_date: input!.start_date, title: "Corsa facile", activity_type: "Corsa", status: "planned", intensity: "easy" }] } });
+  });
+  await signIn(page);
+  await page.goto("/activities/programs");
+  await page.getByRole("button", { name: "Genera anteprima", exact: true }).click();
+  await expect(page.getByText(/Scegli il giorno di inizio/)).toBeVisible();
+  expect(input).toBeNull();
+  await page.getByLabel("Quando vuoi iniziare?", { exact: true }).fill("2026-11-16");
+  await page.getByLabel("Data obiettivo", { exact: true }).fill("2027-01-11");
+  await page.getByRole("button", { name: "Genera anteprima", exact: true }).click();
+  await expect.poll(() => input).not.toBeNull();
+  expect(input).toMatchObject({ start_date: "2026-11-16", target_date: "2027-01-11" });
+});
+
+test("an incomplete gym preview cannot be confirmed blindly", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-08T10:00:00Z") });
+  await mockServices(page);
+  await page.route("http://localhost:8000/strength/plans/preview", async (route) => {
+    await route.fulfill({ json: { preview: true, plan: { ...route.request().postDataJSON(), workouts: [{ scheduled_date: "2026-11-16", title: "Full Body A" }], workout_count: 1 } } });
+  });
+  await signIn(page);
+  await page.goto("/activities/programs#palestra");
+  await page.getByLabel("Quando vuoi iniziare?", { exact: true }).fill("2026-11-16");
+  await page.getByRole("button", { name: "Mostra l’anteprima del programma", exact: true }).click();
+  await expect(page.getByText("L’anteprima non contiene le schede degli esercizi. Riprova prima di confermare.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Conferma programma", exact: true })).toHaveCount(0);
+});
+
+test("one gym program focuses Activities and hides other-sport creation and the combined coach", async ({ page }) => {
+  await mockServices(page); await mockGuidedStrength(page); await signIn(page);
+  await page.goto("/activities");
+  await expect(page.getByRole("heading", { level: 1, name: "Palestra", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Giorni del programma")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Corsa", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Bilanciato", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Attività registrate", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Crea un programma corsa", exact: true })).not.toBeVisible();
+  await page.getByText("Altri programmi", { exact: true }).click();
+  await page.getByRole("button", { name: "Crea un programma corsa", exact: true }).click();
+  await expect(page.getByLabel("Distanza attuale")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Palestra", exact: true })).toBeVisible();
+});
+
+test("set maximum opens a focused dialog immediately, closes with Escape, and saves without logging a set", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockServices(page); const strength = await mockGuidedStrength(page); await signIn(page);
+  await page.goto("/activities/programs");
+  const trigger = page.getByRole("button", { name: "Imposta massimale · Back Squat", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Imposta il massimale", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Massimale conosciuto (kg)")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await trigger.click();
+  await dialog.getByLabel("Massimale conosciuto (kg)").fill("100");
+  await expect(dialog.getByRole("button", { name: "Calcola e salva il peso consigliato", exact: true })).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: testInfo.outputPath("maximum-dialog-mobile.png"), fullPage: false });
+  await dialog.getByRole("button", { name: "Calcola e salva il peso consigliato", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(strength.profiles.find((profile) => profile.exercise_ref === "library:squat-library")?.one_rep_max_kg).toBe(100);
+  expect(strength.saved.size).toBe(0);
+});
+
+async function mockRunningActive(page: Page) {
+  await page.route("http://localhost:8000/activities/training-plans", (route) => route.fulfill({ json: { items: [{ id: "active-run", sport: "running", status: "active", start_date: "2026-11-08", target_date: "2027-01-03", current_distance_meters: 5000, target_distance_meters: 10000, current_pace_seconds_per_km: 360, target_pace_seconds_per_km: 360, sessions_per_week: 3, total_weeks: 8, long_run_weekday: 6 }], count: 1 } }));
+  await page.route("http://localhost:8000/activities/training-plans/active-run/sessions", (route) => route.fulfill({ json: { items: [], count: 0 } }));
+}
+
+test("running-only workspace hides gym and folds the new-plan form", async ({ page }) => {
+  await mockServices(page); await mockRunningActive(page); await signIn(page);
+  await page.goto("/activities/programs#palestra");
+  await expect(page.getByRole("heading", { level: 1, name: "Corsa", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Distanza attuale")).not.toBeVisible();
+  await expect(page.getByText("Modifica o sostituisci il programma", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bilanciato", exact: true })).toHaveCount(0);
+});
+
+test("sport tabs and combined priorities appear only with both active programs", async ({ page }) => {
+  await mockServices(page); await mockGuidedStrength(page); await mockRunningActive(page); await signIn(page);
+  await page.goto("/activities/programs#palestra");
+  await expect(page.getByRole("tab", { name: "Corsa", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bilanciato", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Corsa", exact: true }).click();
+  await expect(page.getByLabel("Distanza attuale")).not.toBeVisible();
 });

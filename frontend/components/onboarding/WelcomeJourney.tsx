@@ -257,7 +257,7 @@ export function WelcomeJourney({
       "beginner" | "intermediate" | "advanced"
     >("intermediate");
   const [sport, setSport] = useState<"strength" | "running">("strength");
-  const [startDate, setStartDate] = useState(localIsoDate);
+  const [startDate, setStartDate] = useState("");
   const [weeks, setWeeks] = useState(8);
   const [replaceProgram, setReplaceProgram] = useState(false);
   const [currentKm, setCurrentKm] = useState(3);
