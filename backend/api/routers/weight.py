@@ -126,6 +126,11 @@ def update_weight(
                 weight=payload.weight,
             )
 
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Weight measurement not found",
+            )
         return {"updated": True, "item": item}
 
     except HTTPException:

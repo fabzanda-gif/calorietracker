@@ -1,5 +1,20 @@
 "use client";
 
+type BrowserSpeechEvent = {
+  results?: ArrayLike<ArrayLike<{ transcript?: string }>>;
+};
+type BrowserSpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: BrowserSpeechEvent) => void) | null;
+  start: () => void;
+};
+
+
 import { type FormEvent, useEffect, useState } from "react";
 
 import { AppNav } from "@/components/navigation/AppNav";
@@ -426,8 +441,8 @@ export default function InventoryPage() {
   function startFoodAIVoice() {
     const speechWindow =
       window as typeof window & {
-        SpeechRecognition?: new () => any;
-        webkitSpeechRecognition?: new () => any;
+        SpeechRecognition?: new () => BrowserSpeechRecognition;
+        webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
       };
 
     const Recognition =
@@ -467,7 +482,7 @@ export default function InventoryPage() {
     };
 
     recognition.onresult = (
-      event: any,
+      event: BrowserSpeechEvent,
     ) => {
       const transcript =
         String(
@@ -875,7 +890,7 @@ export default function InventoryPage() {
         <main className={styles.page}>
           <section className={styles.card}>
             <h1>Dispensa</h1>
-            <p>Effettua l'accesso per vedere la dispensa.</p>
+            <p>Effettua l&apos;accesso per vedere la dispensa.</p>
           </section>
         </main>
       </>
@@ -1117,7 +1132,7 @@ export default function InventoryPage() {
                 <div>
                   <strong>✦ Compila con SanoSync AI</strong>
                   <span>
-                    Descrivi il prodotto, fotografa l'etichetta o dettalo.
+                    Descrivi il prodotto, fotografa l&apos;etichetta o dettalo.
                     Controllerai sempre i valori prima di salvarli.
                   </span>
                 </div>

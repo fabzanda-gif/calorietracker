@@ -1781,16 +1781,17 @@ def get_day_briefing(
     }
 
     try:
-        briefing_repo.save({
-            "user_id": current_user.id,
-            "date": str(day_date),
-            "moment": moment,
-            "mode": mode,
-            "input_signature": input_signature,
-            "message": message,
-            "source": source,
-            "updated_at": datetime.utcnow().isoformat(),
-        })
+        if not current_user.read_only:
+            briefing_repo.save({
+                "user_id": current_user.id,
+                "date": str(day_date),
+                "moment": moment,
+                "mode": mode,
+                "input_signature": input_signature,
+                "message": message,
+                "source": source,
+                "updated_at": datetime.utcnow().isoformat(),
+            })
     except RepositoryError:
         # Briefings remain available even before/while the cache migration is
         # deployed; the in-process cache below is the graceful fallback.

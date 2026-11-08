@@ -1,37 +1,22 @@
 # SanoSync Web
 
-Nuovo frontend mobile-first di SanoSync.
+The current Next.js/React/TypeScript frontend includes authentication, onboarding,
+Home (`HomeLite`), planning, AI logging, food management and progress views.
 
-## Stack
-
-- Next.js
-- React
-- TypeScript
-- FastAPI backend esistente
-
-## Avvio locale
+See the [project README](../README.md) for complete backend setup, migrations,
+deployment order and security-related configuration.
 
 ```bash
 cp .env.example .env.local
-npm install
+# Fill in the public Supabase URL and publishable key.
+npm ci
 npm run dev
 ```
 
-Frontend:
-`http://localhost:3000`
+Development: http://localhost:3000. The complete API defaults to
+http://localhost:8000. `NEXT_PUBLIC_CORE_API_BASE_URL` optionally routes core reads
+to a separate service, with fallback to the complete API.
 
-Backend FastAPI predefinito:
-`http://localhost:8000`
-
-## Step 5D.1
-
-Questo primo step definisce:
-
-- skeleton Next.js;
-- layout mobile-first;
-- client API tipizzato;
-- tipi base per Day e Decision Engine;
-- configurazione della base URL;
-- Home placeholder.
-
-Non implementa ancora autenticazione né il design definitivo della Home.
+Checks: `npm run lint`, `npm run typecheck`, `npm run build` and
+`npm run test:e2e` (after `npx playwright install chromium`). Browser checks use
+mocked network boundaries and always exercise authenticated UI flows in CI.

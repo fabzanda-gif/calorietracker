@@ -99,6 +99,14 @@ def test_move_weight_requires_weight():
     assert r.status_code == 400
 
 
+def test_move_missing_or_foreign_weight_returns_not_found(monkeypatch):
+    monkeypatch.setattr(fake_repo, "move_weight", lambda **kwargs: None)
+    response = client.patch(
+        "/weight/missing", json={"date": "2026-08-21", "weight": 79.3},
+    )
+    assert response.status_code == 404
+
+
 def test_empty_update_rejected():
     r = client.patch("/weight/row-2", json={})
     assert r.status_code == 400

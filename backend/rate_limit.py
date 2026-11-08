@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import os
 import threading
 import time
@@ -8,6 +7,11 @@ from collections import defaultdict, deque
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
+
+from backend.api.dependencies import get_current_user, get_admin_supabase_client
 
 
 _DEFAULT_AI_PATHS = {
@@ -24,11 +28,10 @@ _DEFAULT_AI_PATHS = {
 
 class AIRateLimitMiddleware(BaseHTTPMiddleware):
     """
-    Per-token/IP rate limiting for endpoints that call an LLM.
+    Per-authenticated-user rolling limits for endpoints that call an LLM.
 
-    The current Render service runs a single instance, so a process-local
-    limiter is sufficient today. If the API scales horizontally, move the
-    counters to a shared store such as Redis/Key Value.
+    Production counters live in Supabase across workers and restarts.
+    The explicitly selected memory backend is for local development/tests.
     """
 
     def __init__(self, app):
@@ -53,24 +56,9 @@ class AIRateLimitMiddleware(BaseHTTPMiddleware):
         self._paths = _DEFAULT_AI_PATHS | configured_paths
         self._events: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
-
-    @staticmethod
-    def _request_key(request) -> str:
-        authorization = request.headers.get("authorization", "")
-        if authorization.lower().startswith("bearer "):
-            token = authorization.split(" ", 1)[1].strip()
-            if token:
-                digest = hashlib.sha256(
-                    token.encode("utf-8")
-                ).hexdigest()
-                return f"token:{digest}"
-
-        client_host = (
-            request.client.host
-            if request.client is not None
-            else "unknown"
-        )
-        return f"ip:{client_host}"
+        self._backend = os.getenv("AI_RATE_LIMIT_BACKEND", "supabase").strip()
+        if self._backend not in {"memory", "supabase"}:
+            raise ValueError("AI_RATE_LIMIT_BACKEND must be memory or supabase")
 
     def _is_protected(self, request) -> bool:
         path = request.url.path
@@ -89,6 +77,19 @@ class AIRateLimitMiddleware(BaseHTTPMiddleware):
         return False
 
     def _check_limit(self, key: str) -> tuple[bool, int]:
+        if self._backend == "supabase":
+            response = get_admin_supabase_client().rpc("consume_ai_rate_limit", {
+                "p_user_id": key,
+                "p_minute_limit": self._minute_limit,
+                "p_day_limit": self._day_limit,
+            }).execute()
+            result = response.data
+            if not isinstance(result, dict) or not isinstance(result.get("allowed"), bool):
+                raise RuntimeError("Invalid rate limiter response")
+            return result["allowed"], max(0, int(result["retry_after"]))
+        return self._check_memory_limit(key)
+
+    def _check_memory_limit(self, key: str) -> tuple[bool, int]:
         now = time.time()
         minute_cutoff = now - 60
         day_cutoff = now - 86_400
@@ -142,9 +143,33 @@ class AIRateLimitMiddleware(BaseHTTPMiddleware):
         if not self._is_protected(request):
             return await call_next(request)
 
-        allowed, retry_after = self._check_limit(
-            self._request_key(request)
-        )
+        try:
+            # Honor the same overrides as FastAPI routes in isolated tests.
+            override = request.app.dependency_overrides.get(get_current_user)
+            if override is not None:
+                user = await run_in_threadpool(override)
+            else:
+                authorization = request.headers.get("authorization", "")
+                scheme, _, token = authorization.partition(" ")
+                credentials = (
+                    HTTPAuthorizationCredentials(scheme="Bearer", credentials=token.strip())
+                    if scheme.lower() == "bearer" and token.strip() else None
+                )
+                user = await run_in_threadpool(get_current_user, credentials)
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code,
+                                content={"detail": exc.detail}, headers=exc.headers)
+
+        try:
+            # Use the authenticated identity, not the demo's effective source ID.
+            allowed, retry_after = await run_in_threadpool(
+                self._check_limit, getattr(user, "authenticated_id", None) or user.id,
+            )
+        except Exception:
+            # Never bypass spending limits if shared storage is unavailable.
+            return JSONResponse(status_code=503, content={
+                "detail": "Limite AI temporaneamente non disponibile. Riprova tra poco.",
+            }, headers={"Retry-After": "30"})
 
         if not allowed:
             return JSONResponse(

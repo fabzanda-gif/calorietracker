@@ -7,6 +7,7 @@ import time
 
 import requests
 import httpx
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
@@ -89,6 +90,28 @@ _AUTH_CACHE: dict[
 ] = {}
 _AUTH_CACHE_LOCK = threading.Lock()
 _AUTH_CACHE_TTL_SECONDS = 60.0
+
+
+_AUTH_TOKEN_LOCKS: dict[str, tuple[threading.Lock, int]] = {}
+
+
+@contextmanager
+def _auth_token_lock(token_key: str):
+    # The registry lock never spans network I/O. Only requests for the same
+    # token wait for each other; reference counts keep the registry bounded.
+    with _AUTH_CACHE_LOCK:
+        lock, users = _AUTH_TOKEN_LOCKS.get(token_key, (threading.Lock(), 0))
+        _AUTH_TOKEN_LOCKS[token_key] = (lock, users + 1)
+    try:
+        with lock:
+            yield
+    finally:
+        with _AUTH_CACHE_LOCK:
+            lock, users = _AUTH_TOKEN_LOCKS[token_key]
+            if users == 1:
+                del _AUTH_TOKEN_LOCKS[token_key]
+            else:
+                _AUTH_TOKEN_LOCKS[token_key] = (lock, users - 1)
 
 
 def _demo_user_ids() -> tuple[str, str] | None:
@@ -219,7 +242,8 @@ def get_current_user(
     token_key = hashlib.sha256(token.encode("utf-8")).hexdigest()
     now = time.monotonic()
 
-    cached = _AUTH_CACHE.get(token_key)
+    with _AUTH_CACHE_LOCK:
+        cached = _AUTH_CACHE.get(token_key)
     if cached and cached[0] > now:
         print(
             "[SUPA perf] auth cache hit",
@@ -227,12 +251,11 @@ def get_current_user(
         )
         return _cached_current_user(cached, token)
 
-    # Una sola richiesta remota alla volta:
-    # le chiamate parallele della Home aspettano la prima validazione.
-    with _AUTH_CACHE_LOCK:
+    with _auth_token_lock(token_key):
         now = time.monotonic()
 
-        cached = _AUTH_CACHE.get(token_key)
+        with _AUTH_CACHE_LOCK:
+            cached = _AUTH_CACHE.get(token_key)
         if cached and cached[0] > now:
             return _cached_current_user(cached, token)
 
@@ -251,7 +274,8 @@ def get_current_user(
                 flush=True,
             )
         except Exception as exc:
-            _AUTH_CACHE.pop(token_key, None)
+            with _AUTH_CACHE_LOCK:
+                _AUTH_CACHE.pop(token_key, None)
 
             print(
                 "AUTH DEBUG:",
@@ -304,22 +328,23 @@ def get_current_user(
             )
         )
 
-        _AUTH_CACHE[token_key] = (
-            time.monotonic() + _AUTH_CACHE_TTL_SECONDS,
-            effective_id,
-            dict(metadata),
-            authenticated_id,
-            read_only,
-        )
+        with _AUTH_CACHE_LOCK:
+            _AUTH_CACHE[token_key] = (
+                time.monotonic() + _AUTH_CACHE_TTL_SECONDS,
+                effective_id,
+                dict(metadata),
+                authenticated_id,
+                read_only,
+            )
 
-        # Pulizia minima delle entry scadute
-        expired = [
-            key_
-            for key_, value in _AUTH_CACHE.items()
-            if value[0] <= time.monotonic()
-        ]
-        for key_ in expired:
-            _AUTH_CACHE.pop(key_, None)
+            # Pulizia minima delle entry scadute
+            expired = [
+                key_
+                for key_, value in _AUTH_CACHE.items()
+                if value[0] <= time.monotonic()
+            ]
+            for key_ in expired:
+                _AUTH_CACHE.pop(key_, None)
 
         return CurrentUser(
             id=effective_id,

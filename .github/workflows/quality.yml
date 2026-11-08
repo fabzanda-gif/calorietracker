@@ -62,14 +62,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright package
-        run: npm install --no-save --package-lock=false @playwright/test@1.55.1
-
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Check Home meal actions
-        run: npm run check:home-actions
+      - name: Lint
+        run: npm run lint
 
       - name: Build
         env:
@@ -88,7 +85,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-        run: npx playwright test
+        run: npm run test:e2e
 
       - name: Upload browser failure artifacts
         if: failure()
