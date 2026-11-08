@@ -1,0 +1,9 @@
+.card { margin: 24px 0; padding: 24px; border: 1px solid #e0e5e9; border-radius: 20px; background: #fff; color: #102744; scroll-margin-top: 80px; }
+.card summary { cursor: pointer; }
+.card summary strong { font-size: 1.1rem; }
+.card summary span { display: block; margin-top: 8px; color: #64748b; line-height: 1.5; }
+.days { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 20px 0; }
+.days label { display: grid; gap: 8px; }
+.days select { padding: 10px; border: 1px solid #ccd5df; border-radius: 10px; background: #fff; color: inherit; }
+.card button { padding: 12px 18px; border: 0; border-radius: 12px; background: #102744; color: #fff; cursor: pointer; }
+.card button:disabled { opacity: .5; cursor: default; }

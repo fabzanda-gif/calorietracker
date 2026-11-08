@@ -3185,3 +3185,20 @@ label.completePlanButton {
       0 8px 18px rgba(0, 0, 0, 0.16);
   }
 }
+
+/* Recap and program routes share activity details but have distinct navigation. */
+.workspaceActions { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex-shrink: 0; }
+.workspacePrimary { display: inline-flex; align-items: center; min-height: 44px; padding: 12px 18px; border-radius: 14px; background: #102744; color: #fff; text-decoration: none; font-weight: 750; }
+.workspaceSecondary { color: #51657c; text-decoration: underline; text-underline-offset: 3px; font-size: .86rem; padding: 5px 0; }
+.pageZero .workspacePrimary { background: #f43d3d; }
+.pageZero .workspaceSecondary { color: #c6ced8; }
+@media (max-width: 759px) {
+  .workspaceActions { align-items: stretch; width: 100%; }
+  .workspacePrimary { justify-content: center; }
+  .header { flex-wrap: wrap; }
+}
+
+.programTabs { display: flex; gap: 8px; padding: 20px 20px 16px; }
+.programTabs button { min-height: 44px; padding: 10px 24px; border: 1px solid #d5dce4; border-radius: 12px; background: transparent; color: inherit; cursor: pointer; font-weight: 750; }
+.programTabs button[aria-selected="true"] { background: #102744; border-color: #102744; color: white; }
+.pageZero .programTabs button[aria-selected="true"] { background: #f43d3d; border-color: #f43d3d; }

@@ -6,6 +6,9 @@ activity and weight history, training plans, and AI-assisted logging.
 ## Architecture
 
 - `frontend/`: Next.js 15, React 19 and TypeScript. The current home is `HomeLite`.
+- `/activities`: activity recap, calendar and logging; `/activities/programs`:
+  running/strength programs and upcoming workouts. Weekly routine and special
+  periods are managed from Profile. Legacy `/plan` links redirect to Activities.
 - `backend/api/main.py`: complete FastAPI service, including AI and integrations.
 - `backend/api/core_main.py`: optional smaller API for profile, onboarding, weight,
   progress and other frequently used endpoints. The frontend can fall back to the

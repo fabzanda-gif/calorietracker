@@ -32,7 +32,11 @@ function summary(withMeal: boolean): HomeSummaryResponse {
 }
 
 async function mockServices(page: Page) {
+  const activity = { id: "activity-1", date: new Date().toISOString().slice(0, 10),
+    activity_name: "Corsa del parco", activity_type: "Corsa", burned_calories: 300,
+    duration_seconds: 1800, distance_meters: 5000, route_points: [], series_points: [] };
   let withMeal = true;
+  const routine: Record<string, string> = { monday: "home" };
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/auth/v1/**", async (route) => {
@@ -55,10 +59,25 @@ async function mockServices(page: Page) {
     else if (path === "/meals/meal-1" && route.request().method() === "DELETE") {
       withMeal = false;
       json = { deleted: true };
-    } else if (path === "/weekly-schedule") json = { days: {}, items: [], week_start: "2026-11-02" };
+    } else if (path === "/weekly-schedule") {
+      if (route.request().method() === "PUT") {
+        const labels = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+        for (const day of route.request().postDataJSON().days) routine[labels[day.day_of_week - 1]] = day.context;
+      }
+      json = { days: routine, items: [], week_start: "2026-11-02" };
+    }
     else if (path === "/progress/nutrition") json = { items: [], summary: {
       logged_days: 0, average_consumed_kcal: 0, days_within_budget: 0, days_with_budget: 0,
     } };
+    else if (path === "/activities/overview") json = { items: [activity], energy_days: [], summary: {} };
+    else if (path === "/activities/range") json = { items: [activity], count: 1 };
+    else if (path === "/activities/comment") json = { comment: "Attività registrata.", source: "fallback" };
+    else if (path === "/activities/training-plans" || path === "/strength/plans") json = { items: [], count: 0 };
+    else if (path.startsWith("/activities/movement/")) json = { total_steps: 0, net_daily_steps: 0, estimated_training_steps: 0, applied_step_offset: 0, step_calories: 0 };
+    else if (path === "/coach/reconcile") json = { policy: "balanced", load_events: [], adjustments: [], history: [], summary: { events: 0, proposed: 0, auto_applied: 0 } };
+    else if (path === "/coach/preferences") json = { priority: "balanced" };
+    else if (path === "/weight/latest") json = { item: null };
+    else if (path.endsWith("/status") && path.startsWith("/integrations/")) json = { connected: false, configured: false };
     else if (path === "/auth-events/login") json = { notified: true };
     else if (path === "/notifications/vapid-public-key") json = { public_key: "test" };
     else if (["/activities/planned", "/special-periods", "/weight"].includes(path)) json = { items: [], count: 0 };
@@ -92,7 +111,7 @@ test("login and public legal pages remain accessible", async ({ page }) => {
 test("signed-in users can navigate the current primary areas", async ({ page }) => {
   const errors = await mockServices(page);
   await signIn(page);
-  for (const path of ["/plan", "/food", "/insights", "/"]) {
+  for (const path of ["/activities", "/food", "/insights", "/"]) {
     await page.locator(`a[href="${path}"]`).first().click();
     await expect(page).toHaveURL(new RegExp(path === "/" ? "/$" : `${path}$`));
     await expect(page.locator("main h1")).toBeVisible();
@@ -120,4 +139,67 @@ test("logout removes access to authenticated pages", async ({ page }) => {
   await expect(page.getByLabel("Password")).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Password")).toBeVisible();
+});
+
+
+for (const viewport of [{ name: "desktop", width: 1280, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
+  test(`activity recap and nested programs on ${viewport.name}`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    const errors = await mockServices(page);
+    const futureCalls: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/activities/planned")) futureCalls.push(request.url());
+    });
+    await signIn(page);
+    await page.locator('a[href="/activities"]:visible').first().click();
+    await expect(page.getByRole("heading", { name: "Attività", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ultimi 30 giorni", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Attività registrate", exact: true })).toBeVisible();
+    await expect(page.getByText("Corsa del parco", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toHaveCount(0);
+    await expect(page.locator('a[href="/plan"]')).toHaveCount(0);
+    expect(futureCalls).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath(`activity-recap-${viewport.name}.png`), fullPage: false });
+    await page.getByRole("link", { name: "Programmi di allenamento →", exact: true }).click();
+    await expect(page).toHaveURL(/\/activities\/programs$/);
+    await expect(page.getByRole("heading", { name: "Programmi", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Corsa", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("heading", { name: "Attività registrate", exact: true })).toHaveCount(0);
+    await page.getByRole("tab", { name: "Palestra", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Programma forza", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "Palestra", exact: true }).press("ArrowLeft");
+    await expect(page.getByRole("tab", { name: "Corsa", exact: true })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "Corsa", exact: true }).press("ArrowRight");
+    await expect(page.getByRole("tab", { name: "Palestra", exact: true })).toHaveAttribute("aria-selected", "true");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath(`activity-programs-${viewport.name}.png`), fullPage: false });
+    await page.getByRole("link", { name: "← Attività", exact: true }).click();
+    await expect(page).toHaveURL(/\/activities$/);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("old Plan links redirect to Activities", async ({ page }) => {
+  await mockServices(page);
+  await signIn(page);
+  await page.goto("/plan");
+  await expect(page).toHaveURL(/\/activities$/);
+  await expect(page.getByRole("heading", { name: "Attività", exact: true })).toBeVisible();
+});
+
+test("weekly exceptions and special periods stay in the profile", async ({ page }) => {
+  const errors = await mockServices(page);
+  await signIn(page);
+  await page.goto("/profile#planning-settings");
+  const weekly = page.locator("#planning-settings");
+  await weekly.locator("summary").click();
+  await weekly.getByLabel("Lunedì", { exact: true }).selectOption("office");
+  await weekly.getByRole("button", { name: "Salva questa settimana", exact: true }).click();
+  await expect(weekly.getByRole("status")).toContainText("Routine della settimana aggiornata");
+  await expect(page.locator("#periodi-speciali")).toBeVisible();
+  await page.reload();
+  await weekly.locator("summary").click();
+  await expect(weekly.getByLabel("Lunedì", { exact: true })).toHaveValue("office");
+  expect(errors).toEqual([]);
 });

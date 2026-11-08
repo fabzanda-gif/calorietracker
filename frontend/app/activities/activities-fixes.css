@@ -257,3 +257,43 @@ main[class*="ActivitiesPage_page"] [class*="ActivitiesPage_detailCard"] h2 {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Give recap and programs their own layout; absent sections reserve no space. */
+main[data-activity-view="recap"] {
+  grid-template-areas:
+    "header header"
+    "summary summary"
+    "calendar calendar"
+    "logger upload"
+    "activities detail"
+    "preview preview" !important;
+}
+main[data-activity-view="programs"] {
+  display: flex !important;
+  flex-direction: column;
+  gap: 24px !important;
+}
+main[data-activity-view="programs"] > * {
+  width: 100%;
+  box-sizing: border-box;
+  align-self: stretch;
+}
+@media (min-width: 760px) {
+  main[data-activity-view] { padding-top: 82px !important; }
+}
+@media (max-width: 759px) {
+  main[data-activity-view] { padding-top: 68px !important; }
+}
+@media (max-width: 1240px) {
+  main[data-activity-view="recap"] {
+    grid-template-areas:
+      "header"
+      "summary"
+      "calendar"
+      "logger"
+      "upload"
+      "activities"
+      "detail"
+      "preview" !important;
+  }
+}

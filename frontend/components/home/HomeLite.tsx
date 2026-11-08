@@ -97,10 +97,10 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     deleting: "Elimino…",
     movement: "MOVIMENTO",
     trainingActivity: "Allenamento e attività",
-    plan: "Plan →",
+    plan: "Programmi →",
     nextTraining: "PROSSIMO ALLENAMENTO",
     noTraining: "Nessun allenamento pianificato oggi",
-    planHint: "Puoi pianificarlo dalla sezione Plan.",
+    planHint: "Gestisci gli allenamenti in Attività → Programmi.",
     aiTitle: "Logga tutto in una frase",
     aiBody: "“Ho mangiato una piadina, corso 7 km e stamattina pesavo 81,2 kg.”",
     aiAction: "Scrivi a SanoSync →",
@@ -145,10 +145,10 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     deleting: "Deleting…",
     movement: "MOVEMENT",
     trainingActivity: "Training and activity",
-    plan: "Plan →",
+    plan: "Programs →",
     nextTraining: "NEXT WORKOUT",
     noTraining: "No workout planned for today",
-    planHint: "You can plan one from Plan.",
+    planHint: "Manage workouts in Activity → Programs.",
     aiTitle: "Log everything in one sentence",
     aiBody: "“I had a wrap, ran 7 km and weighed 81.2 kg this morning.”",
     aiAction: "Write to SanoSync →",
@@ -193,10 +193,10 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     deleting: "Verwijderen…",
     movement: "BEWEGING",
     trainingActivity: "Training en activiteit",
-    plan: "Plan →",
+    plan: "Programma’s →",
     nextTraining: "VOLGENDE TRAINING",
     noTraining: "Geen training gepland vandaag",
-    planHint: "Je kunt er een plannen via Plan.",
+    planHint: "Beheer trainingen via Activiteiten → Programma’s.",
     aiTitle: "Registreer alles in één zin",
     aiBody: "“Ik at een wrap, liep 7 km en woog vanochtend 81,2 kg.”",
     aiAction: "Schrijf naar SanoSync →",
@@ -241,10 +241,10 @@ const HOME_COPY: Record<AppLocale, HomeCopy> = {
     deleting: "Suppression…",
     movement: "MOUVEMENT",
     trainingActivity: "Entraînement et activité",
-    plan: "Plan →",
+    plan: "Programmes →",
     nextTraining: "PROCHAIN ENTRAÎNEMENT",
     noTraining: "Aucun entraînement prévu aujourd’hui",
-    planHint: "Vous pouvez en planifier un depuis Plan.",
+    planHint: "Gérez les séances dans Activités → Programmes.",
     aiTitle: "Tout enregistrer en une phrase",
     aiBody: "« J’ai mangé un wrap, couru 7 km et je pesais 81,2 kg ce matin. »",
     aiAction: "Écrire à SanoSync →",
@@ -576,7 +576,7 @@ export function HomeLite() {
                   <p>{heroCopy?.message ?? summary.hero.message}</p>
                 </div>
                 {summary.special_period ? (
-                  <Link href="/activities" className={styles.heroLink}>
+                  <Link href="/profile#periodi-speciali" className={styles.heroLink}>
                     {summary.special_period.period_type === "vacation"
                       ? copy.vacation
                       : copy.illness}{" "}
@@ -731,7 +731,7 @@ export function HomeLite() {
                       <span className={styles.sectionKicker}>{copy.movement}</span>
                       <h2>{copy.trainingActivity}</h2>
                     </div>
-                    <Link href="/activities" className={styles.smallAction}>
+                    <Link href="/activities/programs" className={styles.smallAction}>
                       {copy.plan}
                     </Link>
                   </div>
